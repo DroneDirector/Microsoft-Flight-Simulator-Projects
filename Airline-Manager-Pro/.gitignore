@@ -5,6 +5,6 @@ www/app.js
 www/index.html
 src/generated/
 capacitor.config.json
-android/
+/android/
 src/**/*.js
 www/vendor/
