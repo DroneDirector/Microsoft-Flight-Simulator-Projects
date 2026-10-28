@@ -2,11 +2,15 @@
 # Prepares the Android project from app.config.json: landscape only, name, id and version.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+LOG=$(mktemp)
+# Report the failing command as a build annotation so it shows on the run summary.
+trap 'echo "::error title=Android setup failed::line $LINENO: $BASH_COMMAND"; tail -n 15 "$LOG" | while IFS= read -r l; do echo "::error::$l"; done' ERR
+run() { "$@" >>"$LOG" 2>&1; }
 NAME=$(node -p "require('./app.config.json').appName")
 VERSION=$(node -p "require('./app.config.json').version")
 CODE=$(node -p "require('./app.config.json').versionCode")
-[ -d android ] || npx cap add android
-npx cap sync android
+[ -d android ] || run npx cap add android
+run npx cap sync android
 MAN=android/app/src/main/AndroidManifest.xml
 # landscape only (both directions), keep the app full screen while flying
 grep -q 'screenOrientation' "$MAN" || sed -i 's/<activity/<activity android:screenOrientation="sensorLandscape"/' "$MAN"
