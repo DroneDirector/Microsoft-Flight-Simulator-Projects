@@ -55,6 +55,12 @@ const MY_MAX = millerY(MAP_LAT_MAX), MY_MIN = millerY(MAP_LAT_MIN);
 
 interface MapOpts { interactive?: boolean; labels?: boolean; onSelect?: (id: string) => void; compact?: boolean; insetRight?: number }
 
+/** Where a flight is now: its real position when it comes from the simulator, otherwise along its route. */
+function flightPos(f: LiveFlight): number[] {
+  if (f.pos) return f.pos;
+  return gcInterpolate(apt(f.from).pos, apt(f.to).pos, f.t);
+}
+
 class WorldMap {
   el: HTMLElement; cv: HTMLCanvasElement; ctx: CanvasRenderingContext2D;
   base: HTMLCanvasElement; baseDirty = true;
@@ -172,7 +178,7 @@ class WorldMap {
   follow(id: string) {
     const f = State.live.filter(x => x.id === id)[0]; if (!f) return;
     this.following = id; this.selected = id;
-    const p = gcInterpolate(apt(f.from).pos, apt(f.to).pos, f.t);
+    const p = flightPos(f);
     const span = 3.2;
     this.fit([[p[0] - span * 1.6, p[1] - span], [p[0] + span * 1.6, p[1] + span]], 40, true);
     this.userMoved = false;
@@ -225,7 +231,7 @@ class WorldMap {
   tapAt(x: number, y: number) {
     let best: string = null, bd = 28;
     for (const f of liveOf()) {
-      const p = this.px.apply(this, gcInterpolate(apt(f.from).pos, apt(f.to).pos, f.t));
+      const p = this.px.apply(this, flightPos(f));
       const d = Math.hypot(p[0] - x, p[1] - y);
       if (d < bd) { bd = d; best = f.id; }
     }
@@ -299,7 +305,7 @@ class WorldMap {
       this.followT = now;
       const ff = State.live.filter(x => x.id === this.following)[0];
       if (ff) {
-        const p = gcInterpolate(apt(ff.from).pos, apt(ff.to).pos, ff.t);
+        const p = flightPos(ff);
         const ins = this.w > 600 ? (this.opts.insetRight || 0) : 0;
         if (this.ml) { if (!this.ml.isMoving()) this.ml.easeTo({ center: p, offset: [-ins / 2, 0], duration: 240, easing: (x: number) => x }); }
         else { this.cx = p[0] * D2R + ins / 2 / this.R; this.cy = millerY(p[1]); this.clampView(); this.baseDirty = true; }
@@ -313,25 +319,28 @@ class WorldMap {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const degPx = this.degPx();
     for (const f of liveOf()) {
-      f.t = f.t + f.rate * dt * (State.settings.reduceMotion ? 0 : 1);
-      if (f.t > 1) f.t = 0.02;
+      if (!f.real) { f.t = f.t + f.rate * dt * (State.settings.reduceMotion ? 0 : 1); if (f.t > 1) f.t = 0.02; }
       const a = apt(f.from).pos, b = apt(f.to).pos;
       const N = 48;
       const pts: number[][] = [];
-      for (let i = 0; i <= N; i++) pts.push(this.px.apply(this, gcInterpolate(a, b, i / N)));
+      if (!f.noDest) for (let i = 0; i <= N; i++) pts.push(this.px.apply(this, gcInterpolate(a, b, i / N)));
       const sel = this.selected === f.id, mine = !!f.you;
-      // remaining route: dashed
-      c.setLineDash([4, 5]); c.lineWidth = 1.2; c.strokeStyle = mine ? col.cyan : col.mag; c.globalAlpha = 0.45;
-      c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
-      // flown part: solid
-      c.setLineDash([]); c.globalAlpha = 1; c.lineWidth = sel || mine ? 2.4 : 1.8;
-      const cut = Math.max(1, Math.floor(f.t * N));
-      c.beginPath(); for (let i = 0; i <= cut; i++) i ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]);
-      const here = this.px.apply(this, gcInterpolate(a, b, f.t));
-      c.lineTo(here[0], here[1]); c.stroke();
-      // heading from a point just ahead
-      const ah = this.px.apply(this, gcInterpolate(a, b, Math.min(f.t + 0.01, 1)));
-      const hdg = Math.atan2(ah[0] - here[0], -(ah[1] - here[1])) / D2R;
+      const here = this.px.apply(this, flightPos(f));
+      if (pts.length) {
+        // remaining route: dashed
+        c.setLineDash([4, 5]); c.lineWidth = 1.2; c.strokeStyle = mine ? col.cyan : col.mag; c.globalAlpha = 0.45;
+        c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+        // flown part: solid
+        c.setLineDash([]); c.globalAlpha = 1; c.lineWidth = sel || mine ? 2.4 : 1.8;
+        const cut = Math.max(1, Math.floor(f.t * N));
+        c.beginPath(); for (let i = 0; i <= cut; i++) i ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]);
+        c.lineTo(here[0], here[1]); c.stroke();
+      }
+      c.setLineDash([]); c.globalAlpha = 1;
+      // heading: the real one for your flight, otherwise from a point just ahead on the route
+      let hdg: number;
+      if (f.real && f.hdg != null) hdg = f.hdg;
+      else { const ah = this.px.apply(this, gcInterpolate(a, b, Math.min(f.t + 0.01, 1))); hdg = Math.atan2(ah[0] - here[0], -(ah[1] - here[1])) / D2R; }
       const t = acType(plane(f.reg).typeId);
       const prop = t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga';
       if (sel || mine) {

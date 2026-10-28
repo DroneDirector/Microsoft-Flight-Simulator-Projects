@@ -2,6 +2,7 @@
 (function boot() {
   document.title = APP.name;
   Store.load();
+  loadKnownAirports();
   ensurePeople();
   ensurePayroll();
   Store.bind();
@@ -18,6 +19,8 @@
   checkBirthday();
   scheduleBirthdayNotification();
   startConductClock();
+  Link.init();
+  if ((State as any).linkedOnce) State.live = State.live.filter(f => !(f.you && !f.real));
   // Splash fades out once the first screen is painted
   const sp = document.createElement('div');
   sp.className = 'splash';
@@ -26,7 +29,7 @@
   setTimeout(() => sp.classList.add('out'), reducedMotion() ? 50 : 900);
   setTimeout(() => sp.remove(), 1600);
   // a new message lands a little after start, to show the live inbox
-  setTimeout(() => {
+  if (!(State as any).linkedOnce) setTimeout(() => {
     State.notices.unshift({ id: uid(), kind: 'pilot', title: 'Sigrid Berg is on final at EKVG', body: 'ATN612 from Bergen, landing in about 4 minutes.', time: 'Now', read: false, ref: 'f5' });
     renderTopbar(); Sound.chime();
     toast('Sigrid Berg is on final at EKVG', 'info', { label: 'Show', act: 'show-flight', data: 'f5' });

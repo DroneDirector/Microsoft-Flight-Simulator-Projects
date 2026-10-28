@@ -18,7 +18,13 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'simRate', label: 'Simulation speed', hint: 'How much company time passes for each real day.', options: [['week', '1 day = 1 week'], ['month', '1 day = 1 month'], ['quarter', '1 day = 3 months']], when: () => State.settings.timeMode === 'sim' },
   ] },
   { id: 'sync', title: 'Simulator link', icon: 'sync', items: [
-    { type: 'html', html: () => `<div class="set-card link ${State.bridge.pc === 'connected' ? 'ok' : ''}"><span class="pc-ic">${icon('pc')}</span><span><b>${State.bridge.pc === 'connected' ? 'Connected to your PC' : 'Not connected'}</b><small>${esc(State.bridge.sim)} on ${esc(State.bridge.pcName)}, Wi-Fi, ${State.bridge.latencyMs} ms</small></span><button class="btn ghost sm" data-act="link-panel">Details</button></div>` },
+    { type: 'html', html: () => {
+      const on = Link.status === 'connected', pc = Link.pc;
+      const sub = on ? `${Link.sim && Link.sim.connected ? esc(Link.sim.sim) : 'Flight Simulator not running'} on ${esc(pc.name)}, ${esc(pc.ip)}${Link.latency ? ', ' + Link.latency + ' ms' : ''}`
+        : pc ? `Paired with ${esc(pc.name)}. Looking for it on this Wi-Fi…` : 'Not paired yet. The screens show demo data until you link your PC.';
+      return `<div class="set-card link ${on ? 'ok' : ''}"><span class="pc-ic">${icon('pc')}</span><span><b>${on ? 'Connected to your PC' : pc ? 'Not connected' : 'No PC linked'}</b><small>${sub}</small></span><button class="btn ${pc ? 'ghost' : 'primary'} sm" data-act="link-panel">${pc ? 'Details' : 'Link a PC'}</button></div>`
+        + (pc ? `<div class="btn-row"><button class="btn ghost sm" data-act="link-forget">${icon('close')}Unpair ${esc(pc.name)}</button></div>` : '');
+    } },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}The app links to the ${esc(APP.shortName)} PC app over Wi-Fi. Your phone and the PC with Flight Simulator must be on the same Wi-Fi network.</p>` },
     { type: 'toggle', key: 'gsx', label: 'Passenger numbers from GSX', hint: 'Reads boarded passengers from GSX Pro. Falls back to the app’s own numbers.' },
   ] },
@@ -136,12 +142,7 @@ ACTIONS['sound-test'] = () => { const was = State.settings.purchaseSound; State.
 ACTIONS['pay-test'] = () => { const was = State.settings.paySound; State.settings.paySound = true; Sound.payOut(); Haptics.pulse(30); State.settings.paySound = was; };
 ACTIONS['voice-test'] = () => { Voice.speak('Morning, captain. I had a look at your aircraft after that last flight. Everything is in good shape.'); };
 ACTIONS.voicepack = () => { State.settings.voicePack = !State.settings.voicePack; rerenderSettingsBody(); toast(State.settings.voicePack ? 'Voice pack installed' : 'Voice pack removed', 'ok'); };
-ACTIONS.pair = () => {
-  openLayer('modal', `<div class="modal-head"><h2>Pair with your PC</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-    <div class="modal-body pair"><p class="lede">Open the ${esc(APP.shortName)} bridge on the PC that runs the simulator and enter this code.</p>
-    <div class="pair-code">${'482 913'.split('').map(ch => ch === ' ' ? '<i></i>' : `<b>${ch}</b>`).join('')}</div>
-    <p class="muted">Your phone and the PC must be on the same Wi-Fi network.</p></div>`, { cls: 'narrow' });
-};
+ACTIONS['link-forget'] = () => { Link.forget(); rerenderSettingsBody(); toast('PC unpaired', 'info'); };
 ACTIONS['new-division'] = () => {
   const c = company();
   c.divisions.push({ id: uid(), name: 'Division ' + (c.divisions.length + 1), color: '#5FD4A0' });

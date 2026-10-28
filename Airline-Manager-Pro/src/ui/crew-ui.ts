@@ -256,23 +256,103 @@ function scheduleBirthdayNotification() {
 }
 
 /* ---------- Connection panel (Wi-Fi only) ---------- */
-ACTIONS['link-panel'] = () => {
-  const b: any = State.bridge;
+ACTIONS['link-panel'] = async () => {
   Sound.tick(); closeAll();
+  const wi = await Link.wifiInfo(true);
+  const bars = Math.max(0, Math.min(4, wi.level || 0));
   const wrap = openLayer('modal', `
     <div class="modal-head"><div><h2>Connection</h2><small>The app links to the PC that runs Flight Simulator over your Wi-Fi.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body link">
-      <div class="ln-card ok"><span class="ln-ic">${icon('wifi')}</span><span><b>${esc(b.wifi)}</b><small>Wi-Fi, this phone ${esc(b.phoneIp)}</small></span><span class="bars">${[1, 2, 3, 4].map(i => `<i class="${i <= b.signal ? 'on' : ''}" style="height:${i * 4 + 2}px"></i>`).join('')}</span></div>
+      <div class="ln-card ${wi.wifi ? 'ok' : ''}"><span class="ln-ic">${icon('wifi')}</span><span><b>${wi.wifi ? esc(wi.ssid || 'Wi-Fi') : 'Not on Wi-Fi'}</b><small>${wi.wifi ? `Wi-Fi${wi.ip ? ', this phone ' + esc(wi.ip) : ''}${wi.ssid ? '' : (lanPlugin() ? '. Allow location access to show the network name' : '')}` : 'Connect this phone to the same Wi-Fi as your PC'}</small></span>
+        <span class="bars">${[1, 2, 3, 4].map(i => `<i class="${i <= bars ? 'on' : ''}" style="height:${i * 4 + 2}px"></i>`).join('')}</span></div>
       <div class="ln-radar"><div class="rd"><i></i><i></i><i></i><span class="sweep"></span><b class="pc-dot"></b></div>
-        <div class="ln-scan" data-scan><b>Scanning ${esc(b.wifi)} for the PC app…</b><small>Make sure the ${esc(APP.shortName)} PC app is running next to Flight Simulator.</small></div></div>
-      <div class="ln-card"><span class="ln-ic">${icon('cell')}</span><span><b>Mobile data</b><small>On, not used for linking</small></span></div>
+        <div class="ln-scan" data-scan><b>Scanning ${esc(wi.ssid || 'your Wi-Fi')} for the PC app…</b><small>Make sure the ${esc(APP.shortName)} PC app is running next to Flight Simulator.</small></div></div>
+      <div data-pcs></div>
+      <div class="ln-card"><span class="ln-ic">${icon('cell')}</span><span><b>Mobile data</b><small>${wi.cellular ? 'On, ' : ''}not used for linking</small></span></div>
       <p class="fine-print">${icon('info')}Your phone and the PC must be on the same Wi-Fi network.</p>
     </div>`, { cls: 'narrow link-pop' });
-  setTimeout(() => {
-    const sc = $('[data-scan]', wrap); if (!sc) return;
-    wrap.querySelector('.ln-radar').classList.add('found');
-    sc.innerHTML = `<b>${icon('check')}Found ${esc(b.pcName)} (${esc(b.pcIp)})</b><small>${esc(b.sim)} running, ${b.latencyMs} ms${b.gsx ? ', GSX Pro detected' : ', GSX not running'}</small>`;
-  }, 1700);
+  linkScan(wrap);
+};
+
+async function linkScan(wrap: HTMLElement) {
+  const sc = $('[data-scan]', wrap), list = $('[data-pcs]', wrap);
+  const pcs = await Link.discover();
+  if (!wrap.isConnected) return;
+  const cur = Link.pc;
+  if (pcs.length) wrap.querySelector('.ln-radar').classList.add('found');
+  sc.innerHTML = pcs.length ? `<b>${icon('check')}Found ${pcs.length === 1 ? esc(pcs[0].pcName) : pcs.length + ' PCs'}</b><small>Tap your PC to link it.</small>`
+    : `<b>No PC app found yet</b><small>Start the ${esc(APP.shortName)} PC app on the PC with Flight Simulator, then <button class="text-btn" data-act="link-rescan">scan again</button>.</small>`;
+  list.innerHTML = pcs.map(p => {
+    const isCur = cur && cur.name === p.pcName, on = isCur && Link.status === 'connected';
+    const simTxt = on && Link.sim ? (Link.sim.connected ? `${esc(Link.sim.sim)} running${Link.sim.gsx.running ? ', GSX Pro detected' : ''}` : 'Flight Simulator not running') : `PC app ${esc(p.version)}`;
+    return `<button class="ln-card ln-pc ${on ? 'ok' : ''}" data-act="link-pick" data-ip="${esc(p.ip)}" data-name="${esc(p.pcName)}">
+      <span class="ln-ic">${icon('pc')}</span><span><b>${esc(p.pcName)}</b><small>${esc(p.ip)}, ${simTxt}</small></span>
+      <span class="ln-go">${on ? `${icon('check')}Linked` : isCur ? 'Reconnect' : 'Link'}</span></button>`;
+  }).join('') + `<button class="text-btn ln-manual" data-act="link-manual">Enter the PC's address instead</button>`;
+}
+ACTIONS['link-rescan'] = el => { const w = el.closest('.layer') as HTMLElement; const sc = $('[data-scan]', w); sc.innerHTML = '<b>Scanning…</b>'; linkScan(w); };
+
+ACTIONS['link-pick'] = el => {
+  const ip = el.getAttribute('data-ip'), name = el.getAttribute('data-name');
+  if (Link.pc && Link.pc.name === name) {
+    if (Link.status === 'connected') return;
+    (State as any).linkPc.ip = ip;
+    el.querySelector('.ln-go').textContent = 'Connecting…';
+    Link.connect(ip).then(r => { if (r.ok) closeAll(); else el.querySelector('.ln-go').textContent = 'Try again'; });
+    return;
+  }
+  pairPopup(ip, name);
+};
+
+ACTIONS['link-manual'] = () => {
+  closeAll();
+  openLayer('modal', `<div class="modal-head"><div><h2>PC address</h2><small>Shown in the PC app's window, for example 192.168.1.24</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body"><input class="le-in" data-ip-in inputmode="decimal" placeholder="192.168.1.24" autocomplete="off">
+    <p class="fine-print" data-ip-err></p>
+    <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="link-manual-go">Continue</button></div></div>`, { cls: 'narrow' });
+  setTimeout(() => { const i = $('[data-ip-in]') as HTMLInputElement; if (i) i.focus(); }, 300);
+};
+ACTIONS['link-manual-go'] = async () => {
+  const ip = (($('[data-ip-in]') as HTMLInputElement).value || '').trim();
+  const err = $('[data-ip-err]');
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { err.innerHTML = `${icon('alert')}That doesn't look like an address. Use four numbers with dots.`; return; }
+  err.innerHTML = 'Checking…';
+  try {
+    const ctl = new AbortController(); setTimeout(() => ctl.abort(), 2500);
+    const j = await (await fetch(`http://${ip}:${LINK_PORT}/info`, { signal: ctl.signal })).json();
+    closeAll(); pairPopup(ip, j.pcName || ip);
+  } catch (e) { err.innerHTML = `${icon('alert')}No PC app answered at ${esc(ip)}. Check that it's running and on the same Wi-Fi.`; }
+};
+
+function pairPopup(ip: string, name: string) {
+  closeAll();
+  openLayer('modal', `<div class="modal-head"><div><h2>Link ${esc(name)}</h2><small>Enter the 6-digit code shown in the PC app's window.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body pair">
+      <div class="pair-code entry">${[0, 1, 2, 3, 4, 5].map(i => `${i === 3 ? '<i></i>' : ''}<input class="pc-digit" data-d="${i}" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="Digit ${i + 1}">`).join('')}</div>
+      <p class="fine-print" data-pair-err></p>
+      <div class="modal-actions center"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="pair-go" data-ip="${esc(ip)}">${icon('check')}Link</button></div>
+    </div>`, { cls: 'narrow pair-pop' });
+  const digits = $all('.pc-digit');
+  digits.forEach((d, i) => {
+    d.addEventListener('input', () => {
+      const v = (d as HTMLInputElement).value.replace(/\D/g, '');
+      if (v.length > 1) { v.split('').slice(0, 6 - i).forEach((ch, k) => (digits[i + k] as HTMLInputElement).value = ch); }
+      else (d as HTMLInputElement).value = v;
+      const next = digits[Math.min(5, i + Math.max(1, v.length))]; if (v && next) next.focus();
+      if (digits.every(x => (x as HTMLInputElement).value)) ACTIONS['pair-go']($('[data-act=pair-go]'), null);
+    });
+    d.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Backspace' && !(d as HTMLInputElement).value && i > 0) digits[i - 1].focus(); });
+  });
+  setTimeout(() => digits[0] && digits[0].focus(), 350);
+}
+ACTIONS['pair-go'] = async el => {
+  const code = $all('.pc-digit').map(x => (x as HTMLInputElement).value).join('');
+  const err = $('[data-pair-err]');
+  if (code.length < 6) { err.innerHTML = `${icon('info')}Enter all 6 digits.`; return; }
+  err.innerHTML = 'Linking…';
+  const r = await Link.connect(el.getAttribute('data-ip'), code);
+  if (r.ok) { closeAll(); Haptics.success(); }
+  else { err.innerHTML = `${icon('alert')}${esc(r.reason || 'Linking failed.')}`; $all('.pc-digit').forEach(x => (x as HTMLInputElement).value = ''); const f = $('.pc-digit'); if (f) f.focus(); }
 };
 
 /* ---------- Weights ---------- */

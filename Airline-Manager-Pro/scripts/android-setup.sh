@@ -19,6 +19,11 @@ APPID=$(node -p "require('./app.config.json').appId")
 JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
 mkdir -p "$JDIR"
 sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
+sed "s/__PACKAGE__/${APPID}/" scripts/android/LanLinkPlugin.java > "$JDIR/LanLinkPlugin.java"
+# permissions for the Wi-Fi link (network name needs location) and notifications
+for P in ACCESS_WIFI_STATE ACCESS_NETWORK_STATE CHANGE_WIFI_MULTICAST_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS; do
+  grep -q "android.permission.$P\"" "$MAN" || sed -i "s|</manifest>|    <uses-permission android:name=\"android.permission.$P\" />\n</manifest>|" "$MAN"
+done
 GR=android/app/build.gradle
 # sign every build with the fixed test key (signing/), so new APKs install over the old one
 if ! grep -q 'airlinemanagerpro-test' "$GR"; then

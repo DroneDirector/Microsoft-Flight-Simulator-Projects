@@ -16,12 +16,12 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 
 | Feature | Status |
 |---|---|
-| PC bridge app that reads the simulator through SimConnect | Planned (next stage) |
-| Link over Wi-Fi only (phone and PC on the same network) | Planned, connection panel in place |
-| Pairing a PC with a code | Mock-up |
-| Detect which aircraft is loaded in the sim and match it to the aircraft you're flying | Mock-up |
+| PC app (Windows) that reads the simulator through SimConnect, no SDK needed | Built |
+| Link over Wi-Fi only (phone and PC on the same network), discovery, 6-digit pairing, auto-reconnect | Built |
+| Pairing a PC with a code | Built |
+| Detect which aircraft is loaded in the sim and match it to the aircraft you're flying | Built |
 | Detect installed aircraft (default and add-ons such as PMDG, Fenix, iniBuilds, Aerosoft) | Planned; market shows demo list |
-| Passenger numbers from GSX Pro | Planned; shown in your flight card |
+| Passenger numbers from GSX Pro (and the sim's payload stations without GSX) | Built |
 
 ## Companies and pilots
 
@@ -80,8 +80,8 @@ Only damage the simulator can actually detect.
 
 | Feature | Status |
 |---|---|
-| Tail strike, hard landing, flap/gear overspeed, engine failures, overstress | Planned detection; reports built |
-| Severe turbulence damage (extreme only, realistic results: inspection, overstress, cabin damage) | Planned detection; reports built |
+| Tail strike, hard landing, flap/gear overspeed, engine failures, overstress | Built |
+| Severe turbulence damage (extreme only, realistic results: inspection, overstress, cabin damage) | Built |
 | Mechanic reports in the inbox and an animated mechanic pop-up | Built |
 | Fix now or fix later; serious damage grounds the aircraft | Built |
 | Mechanic voice, fully offline: recorded lines plus an optional neural voice pack | Planned; device voice used as stand-in |
@@ -142,8 +142,19 @@ Only damage the simulator can actually detect.
 | Feature | Status |
 |---|---|
 | Route legs limited by the aircraft's published range with fuel reserves | Built |
-| Fuel on board and weights (empty, passengers, bags, cargo, mail, fuel, total vs. MTOW) from Flight Simulator | Mock-up, PC app next |
-| GSX detection; fallback to the sim's own payload data | Mock-up, PC app next |
+| Fuel on board and weights (empty, passengers, bags, cargo, mail, fuel, total vs. MTOW) from Flight Simulator | Built |
+| GSX detection; fallback to the sim's own payload data | Built |
 | Load data from PMDG / Fenix / iniBuilds own interfaces where needed | Planned |
-| Connection panel: Wi-Fi network, PC app scan; Wi-Fi only, same network | Built (demo scan) |
+| Connection panel: Wi-Fi network, PC app scan, manual address; Wi-Fi only, same network | Built |
 | Finance transaction details and salary list | Built |
+
+## Your flights from the simulator
+
+| Feature | Status |
+|---|---|
+| Live position, heading, phase, altitude, remaining distance and arrival time on the map and flight card | Built |
+| Leg logged at blocks on: landing rate, G, block time, passengers, hours, landings, aircraft hours and cycles | Built |
+| Ticket revenue, fuel and fees booked per leg | Built |
+| Mechanic reports damage found on the leg after landing | Built |
+| Installed aircraft list from the sim (MSFS 2024 aircraft and livery list) | Planned |
+| Built-in ATC clearance tracking | Planned (the sim doesn't expose clearances directly) |

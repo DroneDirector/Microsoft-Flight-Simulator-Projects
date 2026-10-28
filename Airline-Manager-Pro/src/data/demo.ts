@@ -15,6 +15,7 @@ interface Aircraft {
 interface LiveFlight {
   id: string; reg: string; pilotId: string; from: string; to: string; t: number; rate: number;
   callsign: string; pax: number; paxMax: number; alt: number; phase: string; you?: boolean;
+  real?: boolean; pos?: number[]; hdg?: number; noDest?: boolean; gs?: number;
 }
 interface Leg { from: string; to: string; dep: string; reg: string; status: 'done' | 'active' | 'next' | 'planned' }
 interface RouteDef { id: string; companyId: string; code: string; legs: string[]; days: string; typeId: string; pilotId?: string; demand: number; yieldPerPax: number }

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "/opt/npm-tools/node_modules/@types"]
+  },
+  "include": ["src/**/*.ts"]
+}

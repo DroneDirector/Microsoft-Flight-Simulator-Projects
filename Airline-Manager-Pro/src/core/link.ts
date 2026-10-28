@@ -1,0 +1,145 @@
+// Link to the Airline Manager Pro PC app over the local Wi-Fi network.
+// Finds the PC (UDP discovery through the native LanLink plugin), pairs with the 6-digit code
+// shown on the PC, remembers it, and reconnects automatically.
+
+const LINK_PORT = 47610;
+
+interface SimSnapshot {
+  t: number; connected: boolean; sim: string; inFlight: boolean; paused: boolean; title: string; atcId: string; atcModel: string; atcType: string;
+  lat: number; lon: number; altFt: number; aglFt: number; hdg: number; ias: number; gs: number; vsFpm: number; g: number; pitch: number;
+  onGround: boolean; parkingBrake: boolean; enginesRunning: number; engines: number; flapsIndex: number; gearDown: boolean;
+  fuelKg: number; emptyKg: number; totalKg: number; mtowKg: number; stations: { name: string; kg: number }[];
+  gsx: { running: boolean; boardingState: number; paxBoarded: number; paxTotal: number; cargoPct: number };
+  approachAirport: string; phase: string; from: string;
+}
+interface FlightEvent {
+  type: string; t: number; lat: number; lon: number; airport?: string; fpm?: number; g?: number; pitch?: number; bounces?: number;
+  code?: string; severity?: 'minor' | 'major' | 'grounding'; detail?: string;
+  summary?: { from: string; to: string; blockMin: number; airMin: number; distanceNm: number; fuelUsedKg: number; landingFpm: number; landingG: number; pax: number; cargoKg: number; aircraftTitle: string; atcId: string };
+}
+interface FoundPc { pcName: string; ip: string; version: string; port: number; addresses?: string[] }
+
+function lanPlugin(): any { const c = (window as any).Capacitor; return c && c.Plugins && c.Plugins.LanLink; }
+
+const Link = {
+  ws: null as WebSocket,
+  status: 'unpaired' as 'unpaired' | 'connecting' | 'pairing' | 'connected' | 'offline',
+  sim: null as SimSnapshot,
+  retry: 0 as any,
+  pending: null as { resolve: (r: any) => void } ,
+  lastMsg: 0,
+  latency: 0,
+
+  get pc(): { ip: string; name: string; token: string } { return (State as any).linkPc || null; },
+
+  init() {
+    if (this.pc) this.connect(this.pc.ip);
+    setInterval(() => this.heartbeat(), 5000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && this.pc && this.status !== 'connected') this.connect(this.pc.ip); });
+  },
+
+  /** Wi-Fi details from the phone (name needs the location permission on Android). */
+  async wifiInfo(ask?: boolean): Promise<{ ssid: string; ip: string; level: number; wifi: boolean; cellular: boolean }> {
+    const p = lanPlugin();
+    if (p) { try { return await p.wifiInfo({ askLocation: !!ask }); } catch (e) { /* fall through */ } }
+    return { ssid: '', ip: '', level: 0, wifi: navigator.onLine, cellular: false };
+  },
+
+  /** Look for PC apps on the local network. */
+  async discover(): Promise<FoundPc[]> {
+    const p = lanPlugin();
+    const out: FoundPc[] = [];
+    if (p) { try { const r = await p.discover({ timeout: 1800 }); (r.pcs || []).forEach((x: any) => out.push(x)); } catch (e) { /* no Wi-Fi */ } }
+    // browser preview or no reply: try this computer and the last known PC directly
+    const tryHosts = ['127.0.0.1'].concat(this.pc ? [this.pc.ip] : []);
+    for (const h of tryHosts) {
+      if (out.some(x => x.ip === h)) continue;
+      try {
+        const ctl = new AbortController(); setTimeout(() => ctl.abort(), 900);
+        const r = await fetch(`http://${h}:${LINK_PORT}/info`, { signal: ctl.signal });
+        const j = await r.json(); out.push(Object.assign(j, { ip: h }));
+      } catch (e) { /* not there */ }
+    }
+    return out;
+  },
+
+  connect(ip: string, code?: string): Promise<{ ok: boolean; reason?: string }> {
+    clearTimeout(this.retry);
+    if (this.ws) { try { this.ws.onclose = null; this.ws.close(); } catch (e) { /* closed */ } }
+    this.status = code ? 'pairing' : 'connecting';
+    linkChanged();
+    return new Promise(resolve => {
+      let done = false;
+      const finish = (r: { ok: boolean; reason?: string }) => { if (!done) { done = true; resolve(r); } };
+      let ws: WebSocket;
+      try { ws = new WebSocket(`ws://${ip}:${LINK_PORT}`); } catch (e) { this.status = 'offline'; linkChanged(); finish({ ok: false, reason: 'Can\'t reach that address.' }); return; }
+      this.ws = ws;
+      const timer = setTimeout(() => { if (ws.readyState !== 1) { try { ws.close(); } catch (e) { /* closed */ } finish({ ok: false, reason: 'The PC didn\'t answer. Check that the PC app is running and both are on the same Wi-Fi.' }); } }, 5000);
+      ws.onopen = () => {
+        clearTimeout(timer);
+        const device = 'Android phone';
+        if (code) ws.send(JSON.stringify({ type: 'pair', code, device }));
+        else ws.send(JSON.stringify({ type: 'hello', device, token: this.pc ? this.pc.token : undefined }));
+      };
+      ws.onmessage = ev => {
+        let m: any; try { m = JSON.parse(ev.data); } catch (e) { return; }
+        this.lastMsg = Date.now();
+        if (m.type === 'welcome') { (ws as any)._pcName = m.pcName; (ws as any)._version = m.version; }
+        else if (m.type === 'pair-result') {
+          if (m.ok) {
+            (State as any).linkPc = { ip, name: (ws as any)._pcName || ip, token: m.token };
+            (State as any).linkedOnce = true;
+            this.status = 'connected'; Store.save(); linkChanged();
+            onLinked();
+            finish({ ok: true });
+          } else { this.status = this.pc ? 'offline' : 'unpaired'; linkChanged(); finish({ ok: false, reason: m.reason || 'Pairing failed.' }); }
+        }
+        else if (m.type === 'state') onSimState(m.s);
+        else if (m.type === 'event') onSimEvent(m.e);
+        else if (m.type === 'airports') onAirports(m.list);
+        else if (m.type === 'pong') this.latency = Date.now() - m.t;
+      };
+      ws.onclose = () => {
+        clearTimeout(timer);
+        if (this.ws !== ws) return;
+        const was = this.status;
+        this.status = this.pc ? 'offline' : 'unpaired';
+        this.sim = null; onSimState(null);
+        linkChanged();
+        finish({ ok: false, reason: 'The PC didn\'t answer. Check that the PC app is running and both are on the same Wi-Fi.' });
+        if (this.pc) this.retry = setTimeout(() => this.reconnect(), was === 'connected' ? 2000 : 6000);
+      };
+      ws.onerror = () => { /* onclose follows */ };
+    });
+  },
+
+  /** Reconnect to the paired PC, finding it again if its address changed. */
+  async reconnect() {
+    if (!this.pc || this.status === 'connected' || document.hidden) { if (this.pc && this.status !== 'connected') this.retry = setTimeout(() => this.reconnect(), 8000); return; }
+    const found = await this.discover();
+    const same = found.filter(x => x.pcName === this.pc.name)[0];
+    if (same && same.ip !== this.pc.ip) { (State as any).linkPc.ip = same.ip; Store.save(); }
+    this.connect(this.pc.ip);
+  },
+
+  heartbeat() {
+    if (this.ws && this.status === 'connected' && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type: 'ping', t: Date.now() }));
+  },
+
+  forget() {
+    (State as any).linkPc = null; Store.save();
+    if (this.ws) { try { this.ws.onclose = null; this.ws.close(); } catch (e) { /* closed */ } }
+    this.status = 'unpaired'; this.sim = null; onSimState(null); linkChanged();
+  },
+};
+
+/** Refresh everything that shows the link status. */
+function linkChanged() {
+  const b: any = State.bridge;
+  b.pc = Link.status === 'connected' ? 'connected' : Link.status === 'unpaired' ? 'offline' : 'searching';
+  b.link = Link.status === 'connected' ? 'wifi' : 'none';
+  if (Link.pc) { b.pcName = Link.pc.name; b.pcIp = Link.pc.ip; }
+  b.latencyMs = Link.latency || b.latencyMs;
+  renderTopbar();
+  const set = $('#set-body'); if (set && _setSection === 'sync') rerenderSettingsBody();
+}

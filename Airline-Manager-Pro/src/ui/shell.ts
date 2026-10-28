@@ -36,7 +36,9 @@ function renderTopbar() {
   const c = company();
   const div = c.divisions.filter(d => d.id === State.divisionId)[0];
   const b = State.bridge;
-  const linkTxt = b.pc !== 'connected' ? 'Looking for your PC' : 'Linked over Wi-Fi';
+  const st = Link.status;
+  const linkTxt = st === 'connected' ? (Link.sim && !Link.sim.connected ? 'Linked, sim not running' : 'Linked over Wi-Fi')
+    : st === 'unpaired' ? ((State as any).linkedOnce ? 'Link your PC' : 'Demo, link your PC') : 'Looking for your PC';
   const n = unreadCount();
   $('.topbar').innerHTML = `
     <button class="co-switch" data-act="switcher" aria-label="Switch company">
@@ -45,7 +47,7 @@ function renderTopbar() {
       ${icon('down', 'co-chev')}
     </button>
     <button class="link-pill ${b.pc === 'connected' ? 'ok' : 'warn'}" data-act="link-panel" aria-label="${linkTxt}. Open connection details">
-      <i class="link-led"></i>${icon('wifi')}<span>${linkTxt}</span><em>${b.pc === 'connected' ? b.latencyMs + ' ms' : ''}</em>
+      <i class="link-led"></i>${icon('wifi')}<span>${linkTxt}</span><em>${b.pc === 'connected' && Link.latency ? Link.latency + ' ms' : ''}</em>
     </button>
     <div class="top-spacer"></div>
     <div class="balance" data-balance><small>Balance</small><b data-balance-val>${money(c.balance, { compact: true })}</b></div>

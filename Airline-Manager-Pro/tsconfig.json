@@ -22,6 +22,8 @@
     "src/graphics/aircraft-art.ts",
     "src/graphics/avatar.ts",
     "src/data/people.ts",
+    "src/core/link.ts",
+    "src/core/feed.ts",
     "src/graphics/land.ts",
     "src/graphics/worldmap.ts",
     "src/ui/shell.ts",

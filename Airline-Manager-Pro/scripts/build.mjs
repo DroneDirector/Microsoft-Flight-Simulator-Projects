@@ -22,7 +22,10 @@ writeFileSync(
 // Capacitor (Android wrapper) settings come from the same config
 writeFileSync(join(root, 'capacitor.config.json'), JSON.stringify({
   appId: cfg.appId, appName: cfg.appName, webDir: 'www',
-  android: { backgroundColor: '#06111F' },
+  // allowMixedContent lets the app open ws:// links to the PC on the local network without
+  // changing the app's https://localhost origin, so saved airlines are kept.
+  android: { backgroundColor: '#06111F', allowMixedContent: true },
+  server: { cleartext: true },
   plugins: { SplashScreen: { launchShowDuration: 0 } },
 }, null, 2) + '\n');
 

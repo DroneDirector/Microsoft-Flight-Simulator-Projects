@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 (2026-10-28)
+
+First version that works with Microsoft Flight Simulator.
+
+- New **PC app** for Windows (`AirlineManagerPro-PC-0.3.0.zip`): reads your aircraft from Flight Simulator 2024 or 2020 through SimConnect, no SDK needed
+- Wi-Fi link: the phone finds the PC on the same network, you pair once with a 6-digit code, and it reconnects automatically
+- Connection panel shows your real Wi-Fi network, signal and phone address, scans for the PC app, and lets you enter its address by hand
+- Your flight comes from the sim: real position and heading on the map, phase, altitude, remaining distance and arrival time
+- Fuel on board and weights from the sim; passengers from GSX Pro when it's running, otherwise from the aircraft's payload stations
+- "Your aircraft" checks the aircraft loaded in the sim against the one you're flying
+- At the end of each leg: flight log entry with landing rate and G, your hours and landings, aircraft hours and cycles, ticket revenue, fuel and fees
+- Damage detected by the sim (tail strike, hard landing, flap and gear overspeed, engine failure, overstress, severe turbulence) goes to the mechanic, who reports after landing
+- Crashes open the register or disregard prompt
+- Demo data stays until you link your PC for the first time
+
 ## 0.2.0 (2026-10-28)
 
 - Animated full-body avatars for everyone: your captain, co-pilots, hired pilots, flight attendants and mechanics, male and female, gently swaying and blinking

@@ -301,7 +301,7 @@ ACTIONS['crash-decide'] = el => {
   const a = plane(l.reg);
   if (l.decision === 'registered') {
     a.status = 'grounded'; a.condition = 12;
-    State.issues.unshift({ id: uid(), reg: a.reg, title: 'Crash damage', detail: 'Float and wing structure damaged on water impact. Major repair needed.', source: 'Crash registered by you', severity: 'grounding', cost: 410000, days: 9, status: 'open', date: '2026-10-28' });
+    State.issues.unshift({ id: uid(), reg: a.reg, title: 'Crash damage', detail: 'Airframe damaged in the crash. Major structural repair needed before the next flight.', source: 'Crash registered by you', severity: 'grounding', cost: 410000, days: 9, status: 'open', date: '2026-10-28' });
     company(a.companyId).reputation -= 6;
   }
   State.notices = State.notices.filter(n => n.ref !== l.id);

@@ -1258,6 +1258,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 button.sync-item { text-align: left; }
 .si-ok { margin-left: auto; color: var(--green); font-style: normal; }
 .si-ok .ic { width: 15px; height: 15px; color: var(--green); }
+.si-ok.bad .ic { color: var(--amber); }
 .sync-item.cp { grid-column: 1 / -1; padding-top: 4px; padding-bottom: 4px; }
 .cp-av { width: 36px; height: 42px; flex: none; border-radius: 9px; overflow: hidden; background: linear-gradient(180deg, #16304F, #0E2034); }
 .cp-av .av { width: 100%; height: 100%; }
@@ -1357,3 +1358,15 @@ button.link-pill:hover { border-color: var(--line-2); background: var(--panel-2)
 @media (max-width: 860px) {
   .le-row2 { grid-template-columns: 1fr; }
 }
+
+/* ---------- Link: PCs found, pairing code entry ---------- */
+.ln-pc { width: 100%; text-align: left; transition: border-color .2s, background .2s; }
+.ln-pc:hover { border-color: var(--line-2); }
+.ln-go { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--cyan); white-space: nowrap; }
+.ln-pc.ok .ln-go { color: var(--green); }
+.ln-go .ic { width: 15px; height: 15px; }
+.ln-manual { display: block; margin: 2px 0 10px; }
+.pair-code.entry { gap: 6px; }
+.pc-digit { width: 42px; height: 52px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line-2); color: var(--ink); text-align: center; font: 700 24px var(--display); caret-color: var(--cyan); user-select: text; -webkit-user-select: text; animation: pop .4s var(--spring) both; }
+.pc-digit:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(63, 208, 232, .2); }
+[data-pair-err], [data-ip-err] { min-height: 18px; }

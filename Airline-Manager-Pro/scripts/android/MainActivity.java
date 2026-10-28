@@ -26,6 +26,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(LanLinkPlugin.class);
         super.onCreate(savedInstanceState);
         enterImmersive();
         protectEdges();

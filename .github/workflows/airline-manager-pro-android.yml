@@ -1,4 +1,4 @@
-name: Airline Manager Pro – Android build
+name: Airline Manager Pro – build
 
 on:
   push:
@@ -12,11 +12,65 @@ permissions:
   contents: write
 
 concurrency:
-  group: airline-manager-pro-android
+  group: airline-manager-pro-build
   cancel-in-progress: true
 
 jobs:
+  pc:
+    name: PC app (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Airline-Manager-Pro/pc-bridge
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Check the SimConnect library API
+        run: npx tsc -p ci/tsconfig.json
+
+      - name: Build
+        run: npx tsc -p tsconfig.json
+
+      - name: Test flight tracking and the Wi-Fi link
+        run: npm test
+
+      - name: Package
+        run: node ci/package-pc.mjs
+
+      - name: Smoke test the packaged app
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "build/Airline Manager Pro PC/AirlineManagerPro-PC.exe" -ArgumentList "--demo","50" -PassThru -NoNewWindow
+          Start-Sleep -Seconds 6
+          $r = Invoke-RestMethod -Uri "http://127.0.0.1:47610/info"
+          Write-Output ("PC app answered: " + $r.app + " " + $r.version)
+          Stop-Process -Id $p.Id -Force
+          if ($r.app -ne "Airline Manager Pro") { exit 1 }
+
+      - name: Zip
+        id: zip
+        shell: pwsh
+        run: |
+          $v = (Get-Content ../app.config.json | ConvertFrom-Json).version
+          $f = "AirlineManagerPro-PC-$v.zip"
+          Compress-Archive -Path "build/Airline Manager Pro PC" -DestinationPath $f
+          "file=$f" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: airline-manager-pro-pc
+          path: Airline-Manager-Pro/pc-bridge/${{ steps.zip.outputs.file }}
+
   apk:
+    name: Android app
+    needs: pc
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -57,6 +111,11 @@ jobs:
           echo "file=Airline-Manager-Pro/$F" >> "$GITHUB_OUTPUT"
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: airline-manager-pro-pc
+          path: pc
+
       - uses: actions/upload-artifact@v4
         with:
           name: airline-manager-pro-apk
@@ -69,4 +128,6 @@ jobs:
           name: Airline Manager Pro ${{ steps.apk.outputs.version }}
           prerelease: true
           body_path: Airline-Manager-Pro/release-notes/${{ steps.apk.outputs.version }}.md
-          files: ${{ steps.apk.outputs.file }}
+          files: |
+            ${{ steps.apk.outputs.file }}
+            pc/*.zip

@@ -11,27 +11,31 @@ function coPilotChip(): string {
 
 function flightCard(f: LiveFlight): string {
   const a = plane(f.reg), t = acType(a.typeId), A = apt(f.from), B = apt(f.to);
-  const dist = gcDistanceNm(A.pos, B.pos), left = dist * (1 - f.t);
-  const eta = Math.round(left / t.cruiseKt * 60);
+  const dist = gcDistanceNm(A.pos, B.pos);
+  const left = f.real ? (f.noDest ? 0 : gcDistanceNm(f.pos, B.pos)) : dist * (1 - f.t);
+  const spd = f.real && f.gs > 60 ? f.gs : t.cruiseKt;
+  const eta = Math.round(left / spd * 60);
+  const altTxt = f.alt < 18000 ? num(Math.round(f.alt / 100) * 100) + ' ft' : 'FL' + Math.round(f.alt / 100);
+  const fuelOk = (State as any).myLoad.fuelKg >= (State as any).myLoad.tripFuelKg + (State as any).myLoad.reserveKg;
   return `
   <div class="card flight-card">
     <div class="fc-top"><span class="fc-cs">${esc(f.callsign)}</span>${statusChip('flying')}<span class="fc-ac">${esc(f.reg)}, ${esc(t.model)}</span></div>
     <div class="fc-route">
       <div><b>${esc(f.from)}</b><small>${esc(A.city)}</small></div>
       <div class="fc-track"><i class="fc-fill" style="width:${(f.t * 100).toFixed(1)}%"></i><i class="fc-plane" style="left:${(f.t * 100).toFixed(1)}%">${icon('fleet')}</i></div>
-      <div class="r"><b>${esc(f.to)}</b><small>${esc(B.city)}</small></div>
+      <div class="r"><b>${f.noDest ? '—' : esc(f.to)}</b><small>${f.noDest ? 'No destination yet' : esc(B.city)}</small></div>
     </div>
     <div class="fc-grid">
       <div><small>Phase</small><b>${esc(f.phase)}</b></div>
-      <div><small>Altitude</small><b>FL${Math.round(f.alt / 100)}</b></div>
-      <div><small>Remaining</small><b>${num(left)} nm</b></div>
-      <div><small>Arrives in</small><b>${hours(eta)}</b></div>
+      <div><small>Altitude</small><b>${altTxt}</b></div>
+      <div><small>Remaining</small><b>${f.noDest ? '—' : num(left) + ' nm'}</b></div>
+      <div><small>Arrives in</small><b>${f.noDest ? '—' : hours(eta)}</b></div>
     </div>
     ${f.you ? `<div class="fc-sync">
       <div class="sync-item">${icon('pax')}<span><small>Passengers from ${(State as any).myLoad.source === 'gsx' ? 'GSX' : 'the sim'}</small><b>${f.pax} / ${f.paxMax}</b></span></div>
-      <button class="sync-item" data-act="weights">${icon('fuel')}<span><small>Fuel on board</small><b>${num((State as any).myLoad.fuelKg)} kg</b></span><i class="si-ok">${icon('check')}</i></button>
+      <button class="sync-item" data-act="weights">${icon('fuel')}<span><small>Fuel on board</small><b>${num((State as any).myLoad.fuelKg)} kg</b></span><i class="si-ok ${fuelOk ? '' : 'bad'}">${icon(fuelOk ? 'check' : 'alert')}</i></button>
       <div class="sync-item">${icon('radio')}<span><small>ATC, ${State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'built-in'}</small>
-        <span class="clr"><i class="ok">Taxi</i><i class="ok">Takeoff</i><i>Landing</i></span></span></div>
+        <span class="clr">${f.real ? '<i>Taxi</i><i>Takeoff</i><i>Landing</i>' : '<i class="ok">Taxi</i><i class="ok">Takeoff</i><i>Landing</i>'}</span></span></div>
       ${coPilotChip()}
     </div>` : `<div class="fc-sync"><div class="sync-item">${icon('user')}<span><small>Flown by</small><b>${esc(pilot(f.pilotId).name)}</b></span></div>
       <div class="sync-item">${icon('pax')}<span><small>On board</small><b>${f.pax} passengers</b></span></div></div>`}
@@ -110,12 +114,7 @@ SCREENS.ops = {
           <button class="map-expand" data-act="go" data-screen="map" aria-label="Open the full map">${icon('map')}Full map</button>
         </div>
         <aside class="ops-side">
-          ${myA ? `<div class="card my-ac ${match ? 'ok' : 'warn'}">
-            <div class="card-h"><b>Your aircraft</b><button class="text-btn" data-act="pick-my-ac">Change</button></div>
-            <div class="my-ac-row"><span class="my-art">${aircraftArt(myA.typeId, { color: c.color, color2: c.color2, ground: false })}</span>
-              <span><b>${esc(myA.reg)}</b><small>${esc(acType(myA.typeId).maker)} ${esc(acType(myA.typeId).model)}</small></span></div>
-            <div class="sim-match">${icon(match ? 'check' : 'alert')}<span>${match ? `Matches the aircraft loaded in the sim (${esc(sim.title)})` : `The sim has a ${esc(sim.title)} loaded. Load the ${esc(acType(myA.typeId).model)} to fly ${esc(myA.reg)}.`}</span></div>
-          </div>` : ''}
+          ${myAircraftCard()}
           ${mine ? flightCard(mine) : ''}
           <div class="card attn-card">
             <div class="card-h"><b>Needs you</b></div>
@@ -138,7 +137,7 @@ SCREENS.ops = {
     const host = $('#ops-map', root);
     _opsMap = new WorldMap(host, { interactive: true, onSelect: id => showSel(id) });
     const pts: number[][] = [];
-    liveOf().forEach(f => { pts.push(apt(f.from).pos, apt(f.to).pos); });
+    liveOf().forEach(f => { pts.push(apt(f.from).pos); if (!f.noDest) pts.push(apt(f.to).pos); if (f.pos) pts.push(f.pos); });
     if (!pts.length) pts.push(apt(company().hub).pos, [apt(company().hub).pos[0] + 8, apt(company().hub).pos[1] + 4]);
     _opsMap.fit(pts, 40);
     const mine = yourFlight(); if (mine) _opsMap.selected = mine.id;
@@ -149,6 +148,30 @@ SCREENS.ops = {
     }
   },
 };
+
+/** "Your aircraft" card: the aircraft you fly, and whether the sim has the same type loaded. */
+function myAircraftCard(): string {
+  const c = company();
+  const myA = plane(State.myReg[c.id]);
+  if (!myA) return '';
+  const sim: any = State.simAircraft;
+  const linked = Link.status === 'connected';
+  const loaded = !linked || (Link.sim && Link.sim.connected && sim.title);
+  const match = loaded && sim.typeId === myA.typeId;
+  const t = acType(myA.typeId);
+  const msg = !linked && (State as any).linkedOnce ? `Not linked to your PC right now`
+    : linked && !(Link.sim && Link.sim.connected) ? `Waiting for Flight Simulator on ${esc(Link.pc.name)}`
+      : !loaded ? 'No aircraft loaded in the sim yet'
+        : match ? `Matches the aircraft loaded in the sim (${esc(sim.title)})`
+          : `The sim has a ${esc(sim.title)} loaded. Load the ${esc(t.model)} to fly ${esc(myA.reg)}.`;
+  const ok = match && (linked || !(State as any).linkedOnce);
+  return `<div class="card my-ac ${ok ? 'ok' : 'warn'}">
+            <div class="card-h"><b>Your aircraft</b><button class="text-btn" data-act="pick-my-ac">Change</button></div>
+            <div class="my-ac-row"><span class="my-art">${aircraftArt(myA.typeId, { color: c.color, color2: c.color2, ground: false })}</span>
+              <span><b>${esc(myA.reg)}</b><small>${esc(t.maker)} ${esc(t.model)}</small></span></div>
+            <div class="sim-match">${icon(ok ? 'check' : 'alert')}<span>${msg}</span></div>
+          </div>`;
+}
 
 ACTIONS['ov-period'] = (el, ev) => {
   ev.stopPropagation();

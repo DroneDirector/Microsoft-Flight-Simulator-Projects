@@ -4,7 +4,7 @@ A virtual airline manager for **Microsoft Flight Simulator 2024**, built for And
 
 Start your own airline or bush outfit, buy the aircraft you actually have installed in the simulator (default aircraft and add-ons), hire pilots who fly your routes on a live world map, and fly your own trips with a pilot profile that syncs with your simulator flights.
 
-> **Status: 0.2.0, early preview.** Every screen, graphic and animation is in place and runs on demo data. The simulator link (PC bridge) is the next build stage.
+> **Status: 0.3.0.** Works with Microsoft Flight Simulator through the PC app in `pc-bridge/`. Until you link a PC, the screens show demo data.
 
 ## Get the app
 
@@ -16,6 +16,7 @@ Each push to `main` builds an APK in the cloud, signed with the same test key ev
 |---|---|
 | `app.config.json` | App name, app ID and version. Change the name here, nowhere else. |
 | `src/` | TypeScript source: screens, map, aircraft illustrations, sounds |
+| `pc-bridge/` | Windows PC app that reads Flight Simulator and links it to the phone |
 | `www/` | Page template, styles and bundled fonts |
 | `scripts/build.mjs` | Builds the app into `www/` (add `--preview` for a single-file preview in `dist/`) |
 | `scripts/android-setup.sh` | Creates and configures the Android project (landscape, name, version) |
@@ -38,6 +39,7 @@ The whole interface is plain HTML, CSS and TypeScript compiled to one classic sc
 ## Credits
 
 - Inter typeface by The Inter Project Authors, SIL Open Font License 1.1
+- node-simconnect, GNU LGPL v3, used unmodified in the PC app
 - MapLibre GL JS, BSD 3-Clause License (optional street and satellite maps)
 - Street map © OpenStreetMap contributors, OpenMapTiles, served by OpenFreeMap
 - Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0
