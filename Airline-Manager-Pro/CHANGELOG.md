@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 (2026-10-28)
+
+- Crew avatars are now 3D figures: captains, co-pilots, hired pilots, flight attendants and mechanics, lit and shaded, with every look option (face, eyes, nose, lips, skin tone, hairstyle, facial hair, glasses, garments, shoes, hats, uniform colour)
+- Large figures breathe, sway, blink and look around, and can be turned with a finger; small ones are drawn once and kept
+- Pilot's cap for captains (gold braid on the visor) and co-pilots; the co-pilot's male/female screen has a cap choice, and its look is kept exactly as shown
+- Phones without 3D support keep the drawn avatars
+
 ## 0.3.1 (2026-10-28)
 
 - Error log: errors pop up with the details and Copy and Share buttons, and are saved in Settings → Updates and errors

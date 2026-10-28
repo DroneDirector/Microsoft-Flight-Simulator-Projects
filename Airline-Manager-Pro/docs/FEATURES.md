@@ -130,7 +130,8 @@ Only damage the simulator can actually detect.
 
 | Feature | Status |
 |---|---|
-| Animated full-body avatars (idle sway, blinking) for all pilots, co-pilots, flight attendants and mechanics, male and female | Built |
+| 3D full-body avatars (breathing, sway, blinking, look-around, turn with a finger) for all pilots, co-pilots, flight attendants and mechanics, male and female; drawn avatars where 3D isn't available | Built |
+| Pilot's cap for captain (gold braid) and co-pilot | Built |
 | Create your pilot: name, date of birth, nationality with flag, skin tone, face, eyes, nose, lips, facial hair, glasses, hair, uniform | Built |
 | Avatars always fully dressed; clothing only swaps complete garments | Built |
 | Hire flight attendants and mechanics, change flight attendants' looks | Built |

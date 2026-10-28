@@ -36,6 +36,13 @@ if (existsSync(ml)) {
   for (const f of ['maplibre-gl.js', 'maplibre-gl.css']) copyFileSync(join(ml, f), join(root, 'www/vendor', f));
 }
 
+// 3D library for the crew figures (MIT)
+const three = join(root, 'node_modules/three/build/three.min.js');
+if (existsSync(three)) {
+  mkdirSync(join(root, 'www/vendor'), { recursive: true });
+  copyFileSync(three, join(root, 'www/vendor/three.min.js'));
+}
+
 const tpl = readFileSync(join(root, 'www/index.template.html'), 'utf8');
 writeFileSync(join(root, 'www/index.html'), tpl.replace(/%APP_NAME%/g, cfg.appName).replace(/%APP_VERSION%/g, cfg.version));
 
@@ -55,7 +62,8 @@ if (process.argv.includes('--preview')) {
   const js = readFileSync(join(root, 'www/app.js'), 'utf8');
   html = html
     .replace(/\s*<link rel="stylesheet" href="vendor\/[^"]+">/g, '')
-    .replace(/\s*<script src="vendor\/[^"]+"><\/script>/g, '')
+    .replace(/<script src="vendor\/three.min.js"><\/script>/, () => existsSync(three) ? `<script>${readFileSync(three, 'utf8').replace(/<\/script/g, '<\\/script')}</script>` : '')
+    .replace(/\s*<script src="vendor\/maplibre[^"]+"><\/script>/g, '')
     .replace(/<link rel="stylesheet" href="styles.css">/, () => `<style>${css}</style>`)
     .replace(/<script src="app.js"><\/script>/, () => `<script>${js.replace(/<\/script/g, '<\\/script')}</script>`);
   mkdirSync(join(root, 'dist'), { recursive: true });

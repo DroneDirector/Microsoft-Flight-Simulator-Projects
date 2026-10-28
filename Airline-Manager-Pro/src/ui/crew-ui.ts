@@ -159,7 +159,12 @@ ACTIONS['copilot-sex'] = () => {
   const cur = State.pilots.filter((p: any) => p.coPilotFor === cid)[0];
   closeAll();
   openLookEditor({ title: 'Your co-pilot', role: 'fo', look: cur ? cur.look : defaultLook(cp.sex, 'fo'), sexOnly: true,
-    onAccept: look => { cp.sex = look.sex; cp.gen = (cp.gen || 0) + 1; ensureCoPilot(cid); Store.save(); refresh(); toast('Co-pilot updated', 'ok'); } });
+    onAccept: look => {
+      cp.sex = look.sex; cp.gen = (cp.gen || 0) + 1;
+      const p: any = ensureCoPilot(cid);
+      if (p) p.look = Object.assign({}, look); // keep exactly the look shown, cap included
+      Store.save(); refresh(); toast('Co-pilot updated', 'ok');
+    } });
 };
 
 /* ---------- Hire ---------- */

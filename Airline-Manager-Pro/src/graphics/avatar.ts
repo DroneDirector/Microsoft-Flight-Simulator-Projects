@@ -1,4 +1,4 @@
-// Full-body crew avatars, drawn in code (front view, airline-poster style).
+// Full-body crew avatars: look options, and the drawn front view used where 3D isn't available.
 // Every avatar is always fully dressed: each clothing slot always holds a garment,
 // and options only swap one complete garment for another.
 
@@ -44,6 +44,7 @@ function shade(hex: string, f: number): string {
 function dressed(l: Look, role: CrewRole): Look {
   const d: Look = Object.assign(defaultLook(l && l.sex || 'm', role), l || {});
   if (role === 'mech') { d.top = 'overalls'; d.bottom = 'trousers'; if (d.hat === 'pillbox') d.hat = 'none'; }
+  if ((role === 'captain' || role === 'fo') && d.hat === 'pillbox') d.hat = 'cap';
   if (d.top === 'overalls') d.bottom = 'trousers';
   if (!d.top) d.top = 'jacket';
   if (!d.bottom) d.bottom = 'trousers';
@@ -87,8 +88,16 @@ let _avSeq = 0;
 /**
  * Render an avatar. view 'full' = head to toe, 'bust' = head and shoulders.
  * company colour is used for the hat badge and scarf/tie accents.
+ * Uses the 3D figures where the device can show them (see avatar3d-view.ts), the drawing otherwise.
  */
 function avatarSvg(look: Look, role: CrewRole, o?: { view?: 'full' | 'bust'; accent?: string; still?: boolean; cls?: string }): string {
+  o = o || {};
+  if (av3Supported()) { av3Init(); return avatar3dHtml(look, role, o); }
+  return avatarSvg2d(look, role, o);
+}
+
+/** The drawn (2D) avatar, used where 3D isn't available. */
+function avatarSvg2d(look: Look, role: CrewRole, o?: { view?: 'full' | 'bust'; accent?: string; still?: boolean; cls?: string }): string {
   o = o || {};
   const L = dressed(look, role);
   const id = 'av' + (++_avSeq);

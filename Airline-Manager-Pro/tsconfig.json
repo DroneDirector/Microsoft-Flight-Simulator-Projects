@@ -21,6 +21,8 @@
     "src/core/store.ts",
     "src/graphics/aircraft-art.ts",
     "src/graphics/avatar.ts",
+    "src/graphics/avatar3d.ts",
+    "src/graphics/avatar3d-view.ts",
     "src/data/people.ts",
     "src/core/link.ts",
     "src/core/feed.ts",

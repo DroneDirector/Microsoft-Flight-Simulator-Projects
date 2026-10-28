@@ -27,6 +27,7 @@ function lookEditorBody(): string {
   const L = _le.look, role = _le.o.role, id = _le.id, t = _le.tab;
   if (_le.o.sexOnly) {
     return `<div class="le-group"><b>Male or female</b><p class="muted">The rest of the look and the uniform are chosen automatically.</p>${leChoice('sex', [['m', 'Male'], ['f', 'Female']], L.sex)}</div>
+      ${role === 'captain' || role === 'fo' ? `<div class="le-group"><b>Pilot's cap</b>${leChoice('hat', [['none', 'No cap'], ['cap', 'Wear the cap']], L.hat)}</div>` : ''}
       <div class="le-group"><button class="btn ghost" data-act="le-shuffle">${icon('sync')}Another person</button></div>`;
   }
   if (t === 'person') return `
@@ -54,7 +55,7 @@ function lookEditorBody(): string {
     <div class="le-group"><b>Bottom</b>${leChoice('bottom', [['trousers', 'Trousers'], ['skirt', 'Skirt'], ['shorts', 'Shorts']], L.bottom)}</div>
     <div class="le-group"><b>Neckwear</b>${leChoice('neck', [['tie', 'Tie'], ['scarf', 'Scarf'], ['open', 'Open collar']], L.neck)}</div>`}
     <div class="le-group"><b>Shoes</b>${leChoice('shoes', [['oxford', 'Oxfords'], ['pumps', 'Low heels'], ['boots', 'Boots'], ['sneakers', 'Sneakers']], L.shoes)}</div>
-    <div class="le-group"><b>Hat</b>${leChoice('hat', mech ? [['none', 'No hat'], ['cap', 'Cap']] : [['none', 'No hat'], ['cap', 'Uniform cap'], ['pillbox', 'Pillbox hat']], L.hat)}</div>
+    <div class="le-group"><b>Hat</b>${leChoice('hat', mech ? [['none', 'No hat'], ['cap', 'Cap']] : role === 'fa' ? [['none', 'No hat'], ['cap', 'Uniform cap'], ['pillbox', 'Pillbox hat']] : [['none', 'No hat'], ['cap', 'Pilot\'s cap']], L.hat)}</div>
     <div class="le-group"><b>Uniform colour</b>${leSwatches('uniform', UNIFORM_COLORS, L.uniform)}</div>`;
 }
 
@@ -98,15 +99,16 @@ ACTIONS['le-set'] = el => {
   leReadIdentity();
   const k = el.getAttribute('data-k'), v = el.getAttribute('data-v');
   (_le.look as any)[k] = /^(skin|hairColor|uniform)$/.test(k) ? +v : v;
-  if (k === 'sex' && _le.o.sexOnly) _le.look = randomLook('cp' + Math.random(), v as any, _le.o.role);
+  if (k === 'sex' && _le.o.sexOnly) { const hat = _le.look.hat; _le.look = randomLook('cp' + Math.random(), v as any, _le.o.role); _le.look.hat = hat; }
   if (k === 'top' && v === 'overalls') _le.look.bottom = 'trousers';
   _le.look = dressed(_le.look, _le.o.role);
   Sound.tick(); leRefresh(true);
 };
 ACTIONS['le-shuffle'] = () => {
   leReadIdentity();
-  const keep = _le.look.sex;
+  const keep = _le.look.sex, hat = _le.look.hat;
   _le.look = randomLook('shuffle' + Math.random(), keep, _le.o.role);
+  if (_le.o.sexOnly) _le.look.hat = hat;
   if (!_le.o.sexOnly) _le.look.top = dressed(_le.look, _le.o.role).top;
   Sound.tick(); leRefresh(true);
 };
