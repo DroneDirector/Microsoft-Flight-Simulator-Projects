@@ -20,6 +20,11 @@ JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
 mkdir -p "$JDIR"
 sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
 GR=android/app/build.gradle
+# sign every build with the fixed test key (signing/), so new APKs install over the old one
+if ! grep -q 'airlinemanagerpro-test' "$GR"; then
+  PW=$(cat signing/test-signing.password)
+  sed -i "0,/^android {/s||android {\n    signingConfigs {\n        debug {\n            storeFile file('../../signing/test-signing.jks')\n            storePassword '${PW}'\n            keyAlias 'airlinemanagerpro-test'\n            keyPassword '${PW}'\n        }\n    }|" "$GR"
+fi
 sed -i "s/versionCode [0-9]*/versionCode ${CODE}/; s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/" "$GR"
 sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">${NAME}</string>|; s|<string name=\"title_activity_main\">.*</string>|<string name=\"title_activity_main\">${NAME}</string>|" android/app/src/main/res/values/strings.xml
 echo "Android project ready: ${NAME} ${VERSION} (${CODE})"
