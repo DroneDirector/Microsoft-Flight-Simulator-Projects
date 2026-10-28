@@ -12,6 +12,7 @@
     "@capacitor/app": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@capacitor/haptics": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0",
     "@capacitor/screen-orientation": "^7.0.0",
     "maplibre-gl": "^5.0.0"
   },

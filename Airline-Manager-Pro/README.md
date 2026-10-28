@@ -4,7 +4,7 @@ A virtual airline manager for **Microsoft Flight Simulator 2024**, built for And
 
 Start your own airline or bush outfit, buy the aircraft you actually have installed in the simulator (default aircraft and add-ons), hire pilots who fly your routes on a live world map, and fly your own trips with a pilot profile that syncs with your simulator flights.
 
-> **Status: 0.1.5, early preview.** Every screen, graphic and animation is in place and runs on demo data. The simulator link (PC bridge) is the next build stage.
+> **Status: 0.2.0, early preview.** Every screen, graphic and animation is in place and runs on demo data. The simulator link (PC bridge) is the next build stage.
 
 ## Get the app
 

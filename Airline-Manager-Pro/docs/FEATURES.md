@@ -17,8 +17,7 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | Feature | Status |
 |---|---|
 | PC bridge app that reads the simulator through SimConnect | Planned (next stage) |
-| Link over Wi-Fi (direct, same network) | Planned, settings in place |
-| Link over mobile data (through an online relay) | Planned, settings in place |
+| Link over Wi-Fi only (phone and PC on the same network) | Planned, connection panel in place |
 | Pairing a PC with a code | Mock-up |
 | Detect which aircraft is loaded in the sim and match it to the aircraft you're flying | Mock-up |
 | Detect installed aircraft (default and add-ons such as PMDG, Fenix, iniBuilds, Aerosoft) | Planned; market shows demo list |
@@ -123,3 +122,28 @@ Only damage the simulator can actually detect.
 | Pilot messages open the map on that aircraft and follow it | Built |
 | Google Maps style (needs your own Google Cloud billing account and API key) | Possible, not planned |
 | Bing Maps | Not possible: free Bing Maps accounts were shut down in June 2025 |
+
+## Crew
+
+| Feature | Status |
+|---|---|
+| Animated full-body avatars (idle sway, blinking) for all pilots, co-pilots, flight attendants and mechanics, male and female | Built |
+| Create your pilot: name, date of birth, nationality with flag, skin tone, face, eyes, nose, lips, facial hair, glasses, hair, uniform | Built |
+| Avatars always fully dressed; clothing only swaps complete garments | Built |
+| Hire flight attendants and mechanics, change flight attendants' looks | Built |
+| Co-pilot on two-pilot aircraft: choose male or female, look generated | Built |
+| Weekly salaries for all staff, paid from the company balance, shown in Finance | Built (demo payroll) |
+| Conduct reports: discipline or dismiss; adjustable frequency | Built |
+| Real-world crew rules (attendants per seats, co-pilot, mechanics per base and fleet) block flights | Built |
+| Birthday greeting in the app and as a phone notification | Built |
+
+## Flight data
+
+| Feature | Status |
+|---|---|
+| Route legs limited by the aircraft's published range with fuel reserves | Built |
+| Fuel on board and weights (empty, passengers, bags, cargo, mail, fuel, total vs. MTOW) from Flight Simulator | Mock-up, PC app next |
+| GSX detection; fallback to the sim's own payload data | Mock-up, PC app next |
+| Load data from PMDG / Fenix / iniBuilds own interfaces where needed | Planned |
+| Connection panel: Wi-Fi network, PC app scan; Wi-Fi only, same network | Built (demo scan) |
+| Finance transaction details and salary list | Built |

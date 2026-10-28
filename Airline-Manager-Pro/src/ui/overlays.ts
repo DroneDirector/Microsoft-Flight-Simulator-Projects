@@ -94,7 +94,7 @@ ACTIONS['new-company'] = () => {
         ${[['major', 'Airline', 'Jets and turboprops on scheduled routes, IFR.', 'a320neo'],
            ['regional', 'Regional and cargo', 'Smaller jets and turboprops, short hops.', 'crj7-aero'],
            ['bush', 'Bush outfit', 'Floatplanes and STOL aircraft, VFR and IFR.', 'dhc2']].map(k => `
-          <button class="choice" data-act="close-layer">
+          <button class="choice" data-act="create-company" data-kind="${k[0]}">
             <div class="choice-art">${aircraftArt(k[3], { color: '#3FD0E8', color2: '#0D3A4A', ground: false })}</div>
             <b>${k[1]}</b><small>${k[2]}</small></button>`).join('')}
       </div>
@@ -118,11 +118,12 @@ const NOTICE_META: { [k: string]: { label: string; icon: string } } = {
   mechanic: { label: 'Mechanic', icon: 'wrench' }, authority: { label: 'Aviation authority', icon: 'shield' },
   flight: { label: 'Flights', icon: 'land' }, finance: { label: 'Finance', icon: 'finance' },
   pilot: { label: 'Pilots', icon: 'pilots' }, company: { label: 'Company', icon: 'info' },
+  staff: { label: 'Staff', icon: 'user' }, birthday: { label: 'Birthday', icon: 'info' },
 };
 let _inboxTab = 'all';
 
 function inboxHtml(): string {
-  const tabs = ['all', 'mechanic', 'authority', 'flight', 'pilot', 'finance'];
+  const tabs = ['all', 'mechanic', 'staff', 'authority', 'flight', 'pilot', 'finance'];
   const list = State.notices.filter(n => _inboxTab === 'all' || n.kind === _inboxTab);
   return `
     <div class="drawer-head"><h2>Notifications</h2>
@@ -152,6 +153,8 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref) crashPopup(n.ref);
   else if (n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref)) showFlightOnMap(n.ref);
+  else if (n.kind === 'staff' && n.ref) incidentPopup(n.ref);
+  else if (n.kind === 'birthday') ACTIONS['bday-preview'](null, null);
   else openLayer('modal', `<div class="modal-head"><h2>${esc(n.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div><div class="modal-body"><p class="lede">${esc(n.body)}</p></div>`, { cls: 'narrow' });
 };
 
@@ -221,7 +224,8 @@ ACTIONS['fix-now'] = el => {
   i.status = i.days ? 'scheduled' : 'fixed';
   if (i.severity === 'grounding' || i.days) a.status = 'maintenance';
   if (!State.issues.some(x => x.reg === i.reg && x.status === 'open' && x.severity === 'grounding') && a.status === 'grounded') a.status = 'maintenance';
-  State.txns.unshift({ id: uid(), date: '2026-10-28', label: `Repair: ${i.title} (${i.reg})`, amount: -i.cost, kind: 'maint' });
+  State.txns.unshift({ id: uid(), companyId: a.companyId, date: '2026-10-28', time: new Date().toTimeString().slice(0, 5), label: `Repair: ${i.title} (${i.reg})`, amount: -i.cost, kind: 'maint', reg: i.reg,
+    lines: [['Labour', -Math.round(i.cost * 0.45)], ['Parts', -Math.round(i.cost * 0.55)]], note: i.detail, link: { kind: 'aircraft', id: i.reg } });
   Voice.stop(); closeAll(); Sound.payOut(); Haptics.pulse(30); refresh(); animateBalance(from, c.balance);
   toast(i.days ? `${i.reg} is in the hangar, back in ${i.days} d` : `${i.title} fixed on ${i.reg}`, 'ok');
 };
@@ -253,7 +257,8 @@ ACTIONS['fine-pay'] = el => {
   const ref = el.getAttribute('data-ref'); const f = State.fines[ref]; if (!f) return;
   const c = company(), from = c.balance;
   c.balance -= f.amount;
-  State.txns.unshift({ id: uid(), date: '2026-10-28', label: `Fine: ${f.title.toLowerCase()} (${f.flight})`, amount: -f.amount, kind: 'fine' });
+  State.txns.unshift({ id: uid(), companyId: c.id, date: '2026-10-28', time: new Date().toTimeString().slice(0, 5), label: `Fine: ${f.title.toLowerCase()} (${f.flight})`, amount: -f.amount, kind: 'fine', reg: f.reg, flight: f.flight,
+    route: f.airport + ' runway ' + f.runway, lines: [[f.authority, -f.amount]] });
   delete State.fines[ref];
   State.notices = State.notices.filter(n => n.ref !== ref);
   closeAll(); Sound.payOut(); Haptics.pulse(40); refresh(); animateBalance(from, c.balance);
@@ -308,3 +313,37 @@ ACTIONS['crash-decide'] = el => {
 function toggle(key: string, on: boolean): string {
   return `<button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="toggle" data-key="${key}"><i></i></button>`;
 }
+
+ACTIONS['create-company'] = el => {
+  const kind = el.getAttribute('data-kind') as any;
+  const ownPilot = !($('.tg[data-key=nc-pilot]') && !$('.tg[data-key=nc-pilot]').classList.contains('on'));
+  const asDivision = !!($('.tg[data-key=nc-div]') && $('.tg[data-key=nc-div]').classList.contains('on'));
+  const cur = company();
+  closeAll();
+  if (asDivision) {
+    cur.divisions.push({ id: uid(), name: kind === 'bush' ? 'Bush' : kind === 'regional' ? 'Regional' : 'Division ' + (cur.divisions.length + 1), color: '#5FD4A0' });
+    Store.save(); renderTopbar(); toast(`New division added to ${cur.name}`, 'ok'); return;
+  }
+  const make = (profileId: string) => {
+    const names: any = { major: ['Northern Lights Air', 'NLA', '#3FB6A8'], regional: ['Fjord Regional', 'FJR', '#E2A23B'], bush: ['Tundra Wings', 'TWG', '#D2553A'] };
+    const n = names[kind] || names.major;
+    const id = uid();
+    State.companies.push({ id, profileId, name: n[0], icao: n[1], callsign: n[0].split(' ')[0].toUpperCase(), hub: kind === 'bush' ? 'PALH' : 'EKVG', color: n[2], color2: '#1A2433',
+      balance: kind === 'bush' ? 1500000 : 25000000, reputation: 50, founded: '2026-10-28', kind, divisions: [] } as any);
+    (State as any).coPilot[id] = { sex: 'f', id: '' };
+    State.companyId = id; State.divisionId = 'all';
+    applyCompanyTheme(true); Store.save(); go('ops'); renderTopbar();
+    toast(`${n[0]} founded. Buy your first aircraft and hire a mechanic to start flying.`, 'ok');
+  };
+  if (ownPilot) { make(profileOfCompany(cur.id).id); return; }
+  // a separate pilot profile: create the pilot first
+  const look = defaultLook('m', 'captain');
+  openLookEditor({ title: 'Create your pilot', role: 'captain', look, identity: { name: 'Capt. New Pilot', dob: '1990-06-15', nat: 'FO' },
+    onAccept: (lk, idt) => {
+      const pid = 'you-' + uid(), prid = 'p-' + uid();
+      State.pilots.push({ id: pid, name: idt.name, rank: 'Captain', hoursMin: 0, landings: 0, base: kind === 'bush' ? 'PALH' : 'EKVG', you: true, profileId: prid, status: 'standby', types: [], rating: 4,
+        sex: lk.sex, look: lk, dob: idt.dob, nat: idt.nat, lookAccepted: true } as any);
+      State.profiles.push({ id: prid, pilotId: pid, label: 'Profile ' + (State.profiles.length + 1) });
+      make(prid);
+    } });
+};

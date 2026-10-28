@@ -9,6 +9,7 @@ function fleetCard(a: Aircraft, i: number): string {
   return `<button class="ac-card st-${fleetState(a)}" data-act="ac-detail" data-reg="${a.reg}" style="--i:${i}">
     <div class="ac-stage">${aircraftArt(a.typeId, { color: div ? div.color : c.color, color2: c.color2, reg: a.reg })}</div>
     <div class="ac-info">
+      ${_blocked[a.reg] ? `<span class="crew-short">${icon('pilots')}${esc(_blocked[a.reg].join(', '))}</span>` : ''}
       <div class="ac-row1"><b class="ac-reg">${esc(a.reg)}</b>${State.myReg[a.companyId] === a.reg ? '<span class="you-tag">You fly this</span>' : ''}${statusChip(a.status)}</div>
       <div class="ac-type">${esc(t.maker)} ${esc(t.model)}</div>
       <div class="ac-dev"><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span>${div ? `<span class="div-tag" style="--dc:${div.color}">${esc(div.name)}</span>` : ''}</div>
@@ -21,9 +22,11 @@ function fleetCard(a: Aircraft, i: number): string {
   </button>`;
 }
 
+let _blocked: { [reg: string]: string[] } = {};
 SCREENS.fleet = {
   title: 'Fleet', icon: 'fleet',
   render() {
+    _blocked = crewCheck().blocked;
     const all = fleetOf();
     const classes = [['all', 'All'], ['airliner', 'Narrowbody'], ['widebody', 'Widebody'], ['regional', 'Regional jets'], ['turboprop', 'Turboprops'], ['bush', 'Bush'], ['ga', 'Light aircraft']]
       .filter(c => c[0] === 'all' || all.some(a => acType(a.typeId).cls === c[0]));

@@ -5,6 +5,7 @@ interface Pilot {
   you?: boolean; profileId?: string; salary?: number; rating?: number; status: 'flying' | 'resting' | 'standby' | 'off';
   rules?: { maxDutyHrs: number; maxLandingFpm: number; ifrOnly: boolean; homeBaseReturn: boolean };
   types: string[];
+  sex?: 'm' | 'f'; nat?: string; dob?: string; look?: any; lookAccepted?: boolean; coPilotFor?: string; warnings?: number; companyId?: string;
 }
 interface Aircraft {
   reg: string; typeId: string; companyId: string; divisionId?: string; base: string; location: string;
@@ -26,10 +27,14 @@ interface Issue {
   cost: number; days: number; status: 'open' | 'scheduled' | 'fixed'; date: string;
 }
 interface Notice {
-  id: string; kind: 'mechanic' | 'authority' | 'finance' | 'pilot' | 'company' | 'flight';
+  id: string; kind: 'mechanic' | 'authority' | 'finance' | 'pilot' | 'company' | 'flight' | 'staff' | 'birthday';
   title: string; body: string; time: string; read: boolean; ref?: string;
 }
-interface Txn { id: string; date: string; label: string; amount: number; kind: 'revenue' | 'fuel' | 'crew' | 'maint' | 'fine' | 'purchase' | 'fees' }
+interface Txn {
+  id: string; date: string; label: string; amount: number; kind: 'revenue' | 'fuel' | 'crew' | 'maint' | 'fine' | 'purchase' | 'fees' | 'salary';
+  companyId?: string; time?: string; reg?: string; flight?: string; route?: string; personId?: string;
+  lines?: [string, number][]; note?: string; link?: { kind: 'log' | 'issue' | 'staff' | 'aircraft'; id: string };
+}
 interface Division { id: string; name: string; color: string }
 interface Company {
   id: string; profileId: string; name: string; icao: string; callsign: string; hub: string; color: string; color2: string;
@@ -42,12 +47,14 @@ const State = {
   companyId: 'atn',
   // The one aircraft you fly yourself (per company). The PC bridge checks the aircraft loaded in the sim against it.
   myReg: { atn: 'OY-ANA', ndc: 'OY-NCA', rba: 'N100RB' } as { [co: string]: string },
+  // Weights for your current flight, as read from the simulator (GSX or the sim's own payload data)
+  myLoad: { source: 'gsx' as 'gsx' | 'sim', emptyKg: 42600, pax: 168, paxKg: 84, bagsKg: 2520, cargoKg: 1150, mailKg: 180, fuelKg: 6840, tripFuelKg: 4920, reserveKg: 1350, mtowKg: 78000 },
   simAircraft: { title: 'Fenix A320 CFM', typeId: 'a320-fenix', reg: 'OY-ANA' },
   divisionId: 'all',
-  bridge: { pc: 'connected' as 'connected' | 'searching' | 'offline', link: 'wifi' as 'wifi' | 'mobile' | 'none', sim: 'MSFS 2024', latencyMs: 38 },
+  bridge: { pc: 'connected' as 'connected' | 'searching' | 'offline', link: 'wifi' as 'wifi' | 'none', sim: 'MSFS 2024', latencyMs: 38,
+    wifi: 'Heima-5G', signal: 4, phoneIp: '192.168.1.37', pcName: 'SIM-PC', pcIp: '192.168.1.24', gsx: true },
   settings: {
     appMode: 'shared' as 'shared' | 'separate',
-    useWifi: true, useMobile: true,
     atcSource: 'builtin' as 'builtin' | 'beyondatc',
     atcListen: true, atcFines: true, atcTranscripts: true, sttQuality: 'balanced' as 'light' | 'balanced' | 'accurate',
     damage: true, turbulence: true, crashPrompt: true, gsx: true,
@@ -158,13 +165,18 @@ const State = {
     { id: 'n7', kind: 'company', title: 'Reputation up to 78', body: 'On-time departures and smooth landings this week.', time: 'Mon', read: true },
   ] as Notice[],
   txns: [
-    { id: 't1', date: '2026-10-28', label: 'ATN201 ticket revenue', amount: 35280, kind: 'revenue' },
-    { id: 't2', date: '2026-10-28', label: 'Fuel uplift EKVG', amount: -18420, kind: 'fuel' },
-    { id: 't4', date: '2026-10-27', label: 'ATN11 ticket revenue', amount: 231680, kind: 'revenue' },
-    { id: 't5', date: '2026-10-27', label: 'Crew salaries (weekly)', amount: -71200, kind: 'crew' },
-    { id: 't6', date: '2026-10-27', label: 'Landing & handling fees', amount: -22900, kind: 'fees' },
-    { id: 't7', date: '2026-10-26', label: 'Flap inspection OY-ANB', amount: -6400, kind: 'maint' },
-    { id: 't8', date: '2026-10-19', label: 'Purchase: Airbus A350-900 (OY-ANF)', amount: -317400000, kind: 'purchase' },
+    { id: 't1', companyId: 'atn', date: '2026-10-28', time: '11:58', label: 'Ticket revenue BIKF to EKVG', amount: 35280, kind: 'revenue', reg: 'OY-ANA', flight: 'ATN201', route: 'BIKF → EKVG',
+      lines: [['172 economy seats', 30960], ['Baggage fees', 2580], ['Onboard sales', 1740]], link: { kind: 'log', id: 'l0' } },
+    { id: 't2', companyId: 'atn', date: '2026-10-28', time: '12:40', label: 'Fuel uplift at EKVG', amount: -18420, kind: 'fuel', reg: 'OY-ANA', flight: 'ATN201', route: 'EKVG → EKCH',
+      lines: [['Jet A-1, 6,840 kg', -17330], ['Into-plane service', -1090]] },
+    { id: 't4', companyId: 'atn', date: '2026-10-27', time: '19:20', label: 'Ticket revenue EKCH to KJFK', amount: 231680, kind: 'revenue', reg: 'OY-ANE', flight: 'ATN11', route: 'EKCH → KJFK',
+      lines: [['42 business seats', 105000], ['320 economy seats', 118400], ['Cargo 6.2 t', 8280]] },
+    { id: 't6', companyId: 'atn', date: '2026-10-27', time: '23:59', label: 'Landing and handling fees', amount: -22900, kind: 'fees',
+      lines: [['Landing fees, 9 movements', -11800], ['Ground handling', -7600], ['Navigation charges', -3500]] },
+    { id: 't7', companyId: 'atn', date: '2026-10-26', time: '07:10', label: 'Flap inspection OY-ANB', amount: -6400, kind: 'maint', reg: 'OY-ANB',
+      lines: [['Labour, 6 h', -3600], ['Parts', -2800]], link: { kind: 'aircraft', id: 'OY-ANB' } },
+    { id: 't8', companyId: 'atn', date: '2026-10-19', time: '10:00', label: 'Purchase: Airbus A350-900 (OY-ANF)', amount: -317400000, kind: 'purchase', reg: 'OY-ANF',
+      lines: [['Aircraft, iniBuilds A350-900', -317400000]], link: { kind: 'aircraft', id: 'OY-ANF' } },
   ] as Txn[],
   // Last 7 days, thousands of dollars
   week: { days: ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'], rev: [412, 388, 455, 501, 437, 468, 396], cost: [301, 322, 340, 361, 318, 344, 351] },

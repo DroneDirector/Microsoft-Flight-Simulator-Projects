@@ -18,9 +18,8 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'simRate', label: 'Simulation speed', hint: 'How much company time passes for each real day.', options: [['week', '1 day = 1 week'], ['month', '1 day = 1 month'], ['quarter', '1 day = 3 months']], when: () => State.settings.timeMode === 'sim' },
   ] },
   { id: 'sync', title: 'Simulator link', icon: 'sync', items: [
-    { type: 'html', html: () => `<div class="set-card link ${State.bridge.pc === 'connected' ? 'ok' : ''}"><span class="pc-ic">${icon('pc')}</span><span><b>${State.bridge.pc === 'connected' ? 'Connected to your PC' : 'Not connected'}</b><small>${esc(State.bridge.sim)}, ${State.bridge.link === 'wifi' ? 'Wi-Fi' : 'mobile data'}, ${State.bridge.latencyMs} ms</small></span><button class="btn ghost sm" data-act="pair">Pair a PC</button></div>` },
-    { type: 'toggle', key: 'useWifi', label: 'Connect over Wi-Fi', hint: 'Direct link to the PC bridge on the same network. Fastest.' },
-    { type: 'toggle', key: 'useMobile', label: 'Connect over mobile data', hint: 'Goes through the online relay when you are away from home.' },
+    { type: 'html', html: () => `<div class="set-card link ${State.bridge.pc === 'connected' ? 'ok' : ''}"><span class="pc-ic">${icon('pc')}</span><span><b>${State.bridge.pc === 'connected' ? 'Connected to your PC' : 'Not connected'}</b><small>${esc(State.bridge.sim)} on ${esc(State.bridge.pcName)}, Wi-Fi, ${State.bridge.latencyMs} ms</small></span><button class="btn ghost sm" data-act="link-panel">Details</button></div>` },
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}The app links to the ${esc(APP.shortName)} PC app over Wi-Fi. Your phone and the PC with Flight Simulator must be on the same Wi-Fi network.</p>` },
     { type: 'toggle', key: 'gsx', label: 'Passenger numbers from GSX', hint: 'Reads boarded passengers from GSX Pro. Falls back to the app’s own numbers.' },
   ] },
   { id: 'atc', title: 'ATC', icon: 'radio', items: [
@@ -29,6 +28,11 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'atcFines', label: 'Clearance violations and fines', hint: 'Taking off, landing or taxiing without clearance earns a fine you can contest.' },
     { type: 'toggle', key: 'atcTranscripts', label: 'Save ATC transcripts to the logbook' },
     { type: 'choice', key: 'sttQuality', label: 'Speech recognition quality', hint: 'Higher quality uses more of your PC while you fly.', options: [['light', 'Light'], ['balanced', 'Balanced'], ['accurate', 'Accurate']], when: () => State.settings.atcSource === 'beyondatc' && State.settings.atcListen },
+  ] },
+  { id: 'staff', title: 'Staff', icon: 'pilots', items: [
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}Most of the time your staff behave well. Choose how often someone steps out of line. You'll be asked to discipline or dismiss them when it happens.</p>` },
+    { type: 'html', html: () => [['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['fo', 'Co-pilots']].map(r => `<div class="ch-row"><span><b>${r[1]}</b><small>How often they misbehave</small></span><div class="seg">${[['never', 'Never'], ['rare', 'Rarely'], ['normal', 'Sometimes'], ['often', 'Often']].map(o => `<button class="${(State.settings as any).misconduct[r[0]] === o[0] ? 'on' : ''}" data-act="set-misconduct" data-r="${r[0]}" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>`).join('') },
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}Rarely is about 2% of the time, sometimes about 5–10%, often about 20%.</p>` },
   ] },
   { id: 'realism', title: 'Damage and realism', icon: 'shield', items: [
     { type: 'toggle', key: 'damage', label: 'Damage detection', hint: 'Tail strikes, hard landings, overspeed, engine failures and overstress the simulator can detect.' },
@@ -136,7 +140,7 @@ ACTIONS.pair = () => {
   openLayer('modal', `<div class="modal-head"><h2>Pair with your PC</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body pair"><p class="lede">Open the ${esc(APP.shortName)} bridge on the PC that runs the simulator and enter this code.</p>
     <div class="pair-code">${'482 913'.split('').map(ch => ch === ' ' ? '<i></i>' : `<b>${ch}</b>`).join('')}</div>
-    <p class="muted">Works over Wi-Fi at home, and over mobile data through the relay when you're away.</p></div>`, { cls: 'narrow' });
+    <p class="muted">Your phone and the PC must be on the same Wi-Fi network.</p></div>`, { cls: 'narrow' });
 };
 ACTIONS['new-division'] = () => {
   const c = company();
@@ -192,3 +196,5 @@ ACTIONS['delete-company-do'] = el => {
   toast(`${c.name} deleted`, 'warn');
 };
 ACTIONS['reset-do'] = () => Store.reset();
+
+ACTIONS['set-misconduct'] = el => { (State.settings as any).misconduct[el.getAttribute('data-r')] = el.getAttribute('data-v'); Sound.tick(); rerenderSettingsBody(); };

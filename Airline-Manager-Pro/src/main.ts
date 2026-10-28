@@ -2,6 +2,8 @@
 (function boot() {
   document.title = APP.name;
   Store.load();
+  ensurePeople();
+  ensurePayroll();
   Store.bind();
   if (reducedMotion()) State.settings.reduceMotion = true;
   document.documentElement.classList.toggle('calm', State.settings.reduceMotion);
@@ -13,6 +15,9 @@
   bindActions();
   bindBack();
   renderShell();
+  checkBirthday();
+  scheduleBirthdayNotification();
+  startConductClock();
   // Splash fades out once the first screen is painted
   const sp = document.createElement('div');
   sp.className = 'splash';

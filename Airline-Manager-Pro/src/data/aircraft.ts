@@ -1,4 +1,4 @@
-// Aircraft types the airline can buy. In the finished app this list is filtered to what the
+// Aircraft types the airline can buy. rangeNm is the manufacturer's published range (nautical miles). In the finished app this list is filtered to what the
 // simulator reports as installed (default aircraft plus add-ons in the Community folder).
 // Manufacturer and developer names are used only to identify products; no logos or product art are used.
 
@@ -36,7 +36,7 @@ const AIRCRAFT: AircraftType[] = [
     art: { len: 0.78, h: 28, nose: 'airbus', eng: 'wing2', wing: 'low', tail: 'conv', win: 32 } },
   { id: 'b738-pmdg', maker: 'Boeing', model: '737-800', variant: '737-8AS', dev: 'PMDG', devKind: 'add-on', seats: 189, rangeNm: 2935, cruiseKt: 453, price: 48000000, costPerHr: 6300, cls: 'airliner', installed: true,
     art: { len: 0.75, h: 21, nose: 'boeing', eng: 'wing2', wing: 'low', tail: 'conv', win: 27 } },
-  { id: 'b736-pmdg', maker: 'Boeing', model: '737-600', variant: '737-683', dev: 'PMDG', devKind: 'add-on', seats: 123, rangeNm: 3050, cruiseKt: 450, price: 24000000, costPerHr: 5600, cls: 'airliner', installed: true,
+  { id: 'b736-pmdg', maker: 'Boeing', model: '737-600', variant: '737-683', dev: 'PMDG', devKind: 'add-on', seats: 123, rangeNm: 3235, cruiseKt: 450, price: 24000000, costPerHr: 5600, cls: 'airliner', installed: true,
     art: { len: 0.6, h: 21, nose: 'boeing', eng: 'wing2', wing: 'low', tail: 'conv', win: 20 } },
   { id: 'b77w-pmdg', maker: 'Boeing', model: '777-300ER', variant: '777-36N(ER)', dev: 'PMDG', devKind: 'add-on', seats: 396, rangeNm: 7370, cruiseKt: 490, price: 375500000, costPerHr: 14900, cls: 'widebody', installed: true,
     art: { len: 1, h: 31, nose: 'boeing', eng: 'wing2', wing: 'low', tail: 'conv', win: 48 } },
@@ -52,7 +52,7 @@ const AIRCRAFT: AircraftType[] = [
     art: { len: 0.58, h: 19, nose: 'turboprop', eng: 'prop2', wing: 'high', tail: 'T', win: 19 } },
   { id: 'dhc6-aero', maker: 'de Havilland Canada', model: 'DHC-6 Twin Otter', variant: 'DHC-6-300', dev: 'Aerosoft', devKind: 'add-on', seats: 19, rangeNm: 770, cruiseKt: 150, price: 7200000, costPerHr: 1100, cls: 'bush', installed: true,
     art: { len: 0.48, h: 16, nose: 'turboprop', eng: 'prop2', wing: 'high', tail: 'conv', win: 8, fixedGear: true, strut: true } },
-  { id: 'dhc2', maker: 'de Havilland Canada', model: 'DHC-2 Beaver', variant: 'DHC-2 on floats', dev: 'Microsoft / Asobo', devKind: 'default', seats: 6, rangeNm: 455, cruiseKt: 125, price: 750000, costPerHr: 420, cls: 'bush', installed: true,
+  { id: 'dhc2', maker: 'de Havilland Canada', model: 'DHC-2 Beaver', variant: 'DHC-2 on floats', dev: 'Microsoft / Asobo', devKind: 'default', seats: 6, rangeNm: 395, cruiseKt: 125, price: 750000, costPerHr: 420, cls: 'bush', installed: true,
     art: { len: 0.42, h: 15, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 3, floats: true, strut: true } },
   { id: 'c208', maker: 'Cessna', model: '208B Grand Caravan', variant: '208B Grand Caravan EX', dev: 'Microsoft / Asobo', devKind: 'default', seats: 12, rangeNm: 960, cruiseKt: 185, price: 2600000, costPerHr: 640, cls: 'bush', installed: true,
     art: { len: 0.46, h: 15, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 6, fixedGear: true, strut: true } },

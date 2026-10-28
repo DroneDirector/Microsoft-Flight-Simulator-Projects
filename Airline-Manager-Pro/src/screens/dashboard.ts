@@ -3,6 +3,12 @@ let _opsMap: WorldMap = null;
 
 function yourFlight(): LiveFlight { return liveOf().filter(f => f.you)[0]; }
 
+function coPilotChip(): string {
+  const co: any = State.pilots.filter((p: any) => p.coPilotFor === State.companyId)[0];
+  if (!co) return '';
+  return `<button class="sync-item cp" data-act="staff-detail" data-id="${co.id}"><span class="cp-av">${avatarSvg(co.look, 'fo', { view: 'bust', accent: company().color })}</span><span><small>Co-pilot</small><b>${esc(co.name)}</b></span></button>`;
+}
+
 function flightCard(f: LiveFlight): string {
   const a = plane(f.reg), t = acType(a.typeId), A = apt(f.from), B = apt(f.to);
   const dist = gcDistanceNm(A.pos, B.pos), left = dist * (1 - f.t);
@@ -22,9 +28,11 @@ function flightCard(f: LiveFlight): string {
       <div><small>Arrives in</small><b>${hours(eta)}</b></div>
     </div>
     ${f.you ? `<div class="fc-sync">
-      <div class="sync-item">${icon('pax')}<span><small>Passengers from GSX</small><b>${f.pax} / ${f.paxMax}</b></span></div>
+      <div class="sync-item">${icon('pax')}<span><small>Passengers from ${(State as any).myLoad.source === 'gsx' ? 'GSX' : 'the sim'}</small><b>${f.pax} / ${f.paxMax}</b></span></div>
+      <button class="sync-item" data-act="weights">${icon('fuel')}<span><small>Fuel on board</small><b>${num((State as any).myLoad.fuelKg)} kg</b></span><i class="si-ok">${icon('check')}</i></button>
       <div class="sync-item">${icon('radio')}<span><small>ATC, ${State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'built-in'}</small>
         <span class="clr"><i class="ok">Taxi</i><i class="ok">Takeoff</i><i>Landing</i></span></span></div>
+      ${coPilotChip()}
     </div>` : `<div class="fc-sync"><div class="sync-item">${icon('user')}<span><small>Flown by</small><b>${esc(pilot(f.pilotId).name)}</b></span></div>
       <div class="sync-item">${icon('pax')}<span><small>On board</small><b>${f.pax} passengers</b></span></div></div>`}
   </div>`;
@@ -74,6 +82,7 @@ SCREENS.ops = {
     const pendingCrash = State.logbook.filter(l => l.result === 'crash' && l.decision === 'pending' && plane(l.reg).companyId === c.id);
     const fines = State.notices.filter(n => n.kind === 'authority' && n.ref && State.fines[n.ref]);
     const myA = plane(State.myReg[c.id]);
+    const cc = crewCheck(c.id);
     const sim = State.simAircraft;
     const match = myA && sim.typeId === myA.typeId;
     const pct = (n: number) => fl.length ? (n / fl.length * 100).toFixed(1) : '0';
@@ -112,8 +121,10 @@ SCREENS.ops = {
             <div class="card-h"><b>Needs you</b></div>
             ${pendingCrash.map(l => `<button class="attn red" data-act="open-crash" data-id="${l.id}">${icon('alert')}<span><b>Crash on ${esc(l.from)} to ${esc(l.to)}</b><small>Register or disregard</small></span>${icon('chevron')}</button>`).join('')}
             ${fines.map(n => `<button class="attn amber" data-act="open-fine" data-ref="${n.ref}">${icon('shield')}<span><b>${esc(n.title)}</b><small>${esc(n.body)}</small></span>${icon('chevron')}</button>`).join('')}
-            ${openIssues.slice(0, 3).map(i => `<button class="attn ${i.severity === 'grounding' ? 'red' : 'amber'}" data-act="open-issue" data-id="${i.id}">${icon('wrench')}<span><b>${esc(i.reg)}: ${esc(i.title)}</b><small>${i.severity === 'grounding' ? 'Grounded' : 'Mechanic report'}</small></span>${icon('chevron')}</button>`).join('')}
-            ${!pendingCrash.length && !fines.length && !openIssues.length ? `<p class="muted pad">All clear. Nothing needs your attention.</p>` : ''}
+            ${(State as any).incidents.filter((x: Incident) => x.status === 'open' && staffById(x.staffId) && (staffById(x.staffId).companyId === c.id || staffById(x.staffId).coPilotFor === c.id)).map((x: Incident) => `<button class="attn amber" data-act="open-incident" data-id="${x.id}">${icon('user')}<span><b>Conduct: ${esc(staffById(x.staffId).name)}</b><small>${esc(x.title)}. Discipline or dismiss</small></span>${icon('chevron')}</button>`).join('')}
+          ${Object.keys(cc.blocked).map(reg => `<button class="attn red" data-act="go-hire" data-id="${/attendant/.test(cc.blocked[reg].join()) ? 'fa' : /mechanic/.test(cc.blocked[reg].join()) ? 'mech' : 'fo'}">${icon('pilots')}<span><b>${esc(reg)} can't fly</b><small>${esc(cc.blocked[reg].join(', '))}</small></span>${icon('chevron')}</button>`).join('')}
+          ${openIssues.slice(0, 3).map(i => `<button class="attn ${i.severity === 'grounding' ? 'red' : 'amber'}" data-act="open-issue" data-id="${i.id}">${icon('wrench')}<span><b>${esc(i.reg)}: ${esc(i.title)}</b><small>${i.severity === 'grounding' ? 'Grounded' : 'Mechanic report'}</small></span>${icon('chevron')}</button>`).join('')}
+            ${!pendingCrash.length && !fines.length && !openIssues.length && !Object.keys(cc.blocked).length && !(State as any).incidents.some((x: Incident) => x.status === 'open') ? `<p class="muted pad">All clear. Nothing needs your attention.</p>` : ''}
           </div>
         </aside>
       </div>

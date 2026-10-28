@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0 (2026-10-28)
+
+- Animated full-body avatars for everyone: your captain, co-pilots, hired pilots, flight attendants and mechanics, male and female, gently swaying and blinking
+- Look editor for your own pilot: name, date of birth, nationality (all countries, with flags), skin tone, face shape, eyes, nose, lips, facial hair, glasses, hairstyle and colour, uniform, shoes, neckwear and hat; avatars are always fully dressed
+- Cabin crew and mechanics: hire them, change flight attendants' looks, weekly salaries paid from the company balance
+- Co-pilot assigned automatically on two-pilot aircraft; you choose male or female, the look is generated
+- Conduct reports: now and then staff misbehave; discipline or dismiss, with a setting for how often it happens (Settings → Staff)
+- Real-world crew rules: 1 flight attendant per 50 seats on aircraft with 20+ seats, co-pilot on two-pilot aircraft, mechanics per base and fleet size; aircraft without the crew they need can't fly
+- Route builder checks every leg against the aircraft's published range with fuel reserves; too-long legs can't be added
+- Fuel and weights of your flight, read from Flight Simulator, with or without GSX
+- Finance: tap any transaction for details, salaries for every person, payroll summary and filters
+- Happy birthday greeting on your pilot's birthday, in the app and as a phone notification
+- Connection panel: tap "Linked over Wi-Fi" to see your network and the PC app scan; Wi-Fi only
+- Aircraft under maintenance keep the normal blue background
+
 ## 0.1.5 (2026-10-28)
 
 - Delete a company from Settings → Profiles and companies, with a prompt that shows what will be deleted and asks you to confirm

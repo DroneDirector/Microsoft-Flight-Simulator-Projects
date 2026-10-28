@@ -6,7 +6,8 @@ const STORE_KEY = 'airline-manager-pro.save';
 const SAVE_VERSION = 1;
 // Parts of State that are saved. Screen position and the like start fresh each launch.
 const SAVED_KEYS = ['companyId', 'divisionId', 'myReg', 'settings', 'profiles', 'companies', 'pilots', 'candidates',
-  'fleet', 'live', 'today', 'routes', 'logbook', 'issues', 'notices', 'txns', 'fines'];
+  'fleet', 'live', 'today', 'routes', 'logbook', 'issues', 'notices', 'txns', 'fines',
+  'staff', 'staffCandidates', 'incidents', 'coPilot', 'birthdayGreeted', 'simDate', 'myLoad', 'salaryV2'];
 
 // Changes between save versions go here, e.g. MIGRATIONS[2] = data => { ...; return data; }
 const MIGRATIONS: { [v: number]: (d: any) => any } = {};
