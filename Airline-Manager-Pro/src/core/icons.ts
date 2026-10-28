@@ -1,0 +1,43 @@
+// Line icons drawn for this app (24×24, stroke = currentColor).
+const ICON_PATHS: { [k: string]: string } = {
+  ops: '<path d="M4 15a8 8 0 1 1 16 0"/><path d="M12 15l4.5-5"/><circle cx="12" cy="15" r="1.4"/><path d="M4 19h16"/>',
+  map: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5S9.4 5.9 12 3.5z"/>',
+  fleet: '<path d="M21 12.5c0-.8-.7-1.3-1.5-1.3H15L10.5 4H8.6l2.2 7.2H6.4L4.8 9H3.2l1 3.5-1 3.5h1.6l1.6-2.2h4.4L8.6 21h1.9L15 13.8h4.5c.8 0 1.5-.5 1.5-1.3z"/>',
+  market: '<path d="M3.5 11.5V4.5a1 1 0 0 1 1-1h7l9 9-8 8-9-9z"/><circle cx="8" cy="8" r="1.6"/>',
+  pilots: '<circle cx="12" cy="9" r="3.6"/><path d="M5 20.5c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6"/><path d="M7.4 6.6C8 4.4 9.8 3.3 12 3.3s4 1.1 4.6 3.3"/>',
+  routes: '<circle cx="5.5" cy="18.5" r="2"/><circle cx="18.5" cy="5.5" r="2"/><path d="M7.4 17.6C14 16 7 9.5 13 7.4l3.6-1.2"/>',
+  logbook: '<path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v16H6.5A1.5 1.5 0 0 0 5 20.5z"/><path d="M5 20.5A1.5 1.5 0 0 0 6.5 22H19M9 7.5h6M9 11h6"/>',
+  wrench: '<path d="M14.6 6.1a4.2 4.2 0 0 0 5.3 5.3l-8.5 8.5a2.1 2.1 0 0 1-3-3z"/><path d="M14.6 6.1 17.3 3.4a4.2 4.2 0 0 1 3.3 3.3l-2.7 2.7"/>',
+  finance: '<path d="M4 20V10M10 20V5M16 20v-7M21 20H3"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.3"/>',
+  wifi: '<path d="M3 9.5a13 13 0 0 1 18 0M6 12.8a8.6 8.6 0 0 1 12 0M9 16a4.2 4.2 0 0 1 6 0"/><circle cx="12" cy="19" r="1"/>',
+  cell: '<path d="M5 19v-3M9.5 19v-6M14 19v-9M18.5 19V5"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  check: '<path d="M4.5 12.5 9.5 17.5 19.5 7"/>',
+  chevron: '<path d="M9 5.5 15.5 12 9 18.5"/>',
+  down: '<path d="M5.5 9 12 15.5 18.5 9"/>',
+  play: '<path d="M7.5 5v14l11-7z"/>',
+  stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="1.5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  alert: '<path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.4v.1"/>',
+  pin: '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5.2l3.4 2"/>',
+  land: '<path d="M3 20h18"/><path d="M4.5 9.5 18 14l1.3-1.6-6.2-3.6-1.4-5.6-1.7-.5.3 4.6-4.7-.9L4 4.6l-1-.3.5 3.7z"/>',
+  swap: '<path d="M7 4 3.5 7.5 7 11M3.5 7.5H17M17 13l3.5 3.5L17 20M20.5 16.5H7"/>',
+  radio: '<path d="M4 9h16v11H4z"/><path d="M7 9 17 4"/><circle cx="9" cy="14.5" r="2.2"/><path d="M14 13h3M14 16h3"/>',
+  user: '<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6"/>',
+  shield: '<path d="M12 3 19.5 6v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z"/>',
+  volume: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/>',
+  layers: '<path d="M12 3.5 21 8.5l-9 5-9-5z"/><path d="M3 12.5l9 5 9-5M3 16.5l9 5 9-5"/>',
+  sliders: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.1"/>',
+  pax: '<circle cx="9" cy="7" r="2.6"/><path d="M4.5 19c.4-3.4 2.1-5.3 4.5-5.3s4.1 1.9 4.5 5.3"/><circle cx="16.5" cy="8.5" r="2.1"/><path d="M15.5 13.6c2.3-.2 3.8 1.5 4.2 4.4"/>',
+  fuel: '<path d="M5 20.5V5a1.5 1.5 0 0 1 1.5-1.5h6A1.5 1.5 0 0 1 14 5v15.5M3.5 20.5h12M5 10h9"/><path d="M14 8.5h2.2a1.3 1.3 0 0 1 1.3 1.3v6.4a1.4 1.4 0 0 0 2.8 0V7.5L18 5"/>',
+  sync: '<path d="M19.5 9A8 8 0 0 0 5.3 7.2M4.5 15a8 8 0 0 0 14.2 1.8"/><path d="M19.8 4v5h-5M4.2 20v-5h5"/>',
+  pc: '<rect x="3" y="4.5" width="18" height="12" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/>',
+};
+
+function icon(name: string, cls?: string): string {
+  return `<svg class="ic ${cls || ''}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[name] || ''}</svg>`;
+}

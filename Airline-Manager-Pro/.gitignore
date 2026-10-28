@@ -1,0 +1,9 @@
+node_modules/
+build/
+dist/
+www/app.js
+www/index.html
+src/generated/
+capacitor.config.json
+android/
+src/**/*.js

@@ -1,0 +1,115 @@
+# Airline Manager Pro: features
+
+Legend: **Built** = in the app now (on demo data where it needs the simulator). **Planned** = agreed and coming in a later stage.
+
+## Platform
+
+| Feature | Status |
+|---|---|
+| Android app, landscape only (phones and tablets) | Built |
+| One app name in `app.config.json`, renamed everywhere from there | Built |
+| Interface written so it runs unchanged in a Windows app and the MSFS 2024 toolbar panel (next to ATC) | Built (foundation) |
+| Windows version | Planned |
+| In-sim toolbar panel | Planned |
+
+## Linking with the simulator
+
+| Feature | Status |
+|---|---|
+| PC bridge app that reads the simulator through SimConnect | Planned (next stage) |
+| Link over Wi-Fi (direct, same network) | Planned, settings in place |
+| Link over mobile data (through an online relay) | Planned, settings in place |
+| Pairing a PC with a code | Mock-up |
+| Detect which aircraft is loaded in the sim and match it to the aircraft you're flying | Mock-up |
+| Detect installed aircraft (default and add-ons such as PMDG, Fenix, iniBuilds, Aerosoft) | Planned; market shows demo list |
+| Passenger numbers from GSX Pro | Planned; shown in your flight card |
+
+## Companies and pilots
+
+| Feature | Status |
+|---|---|
+| Your own pilot profile, synced with your simulator flights | Built (demo) |
+| Several companies under one pilot profile, or a separate pilot profile per company (your choice) | Built |
+| Divisions inside a company with their own fleets, sharing money and reputation | Built |
+| Airlines, regional/cargo and bush outfits (VFR, IFR, small props) running in parallel | Built |
+| Quick animated company and division switcher | Built |
+| Hire pilots, assign routes and rules (duty time, landing limit, IFR only, return to base) | Built |
+| Watch hired pilots' flights live on the world map | Built (demo movement) |
+| You can't fly hired pilots' aircraft | Built |
+| You fly one aircraft at a time, chosen from your fleet | Built |
+
+## Overview widgets
+
+Each widget opens its own page.
+
+| Widget | Status |
+|---|---|
+| Fleet size (aircraft owned) | Built |
+| Active flights | Built |
+| Fleet availability in percent | Built |
+| Profit: daily, weekly, monthly, yearly (all years flown) | Built |
+| Fleet status per aircraft: in flight (green), available (blue), maintenance (red) | Built |
+
+## Fleet and market
+
+| Feature | Status |
+|---|---|
+| Detailed fleet cards with an original illustration per aircraft type in company colours | Built |
+| Buy aircraft from brands installed in the sim (Airbus, Boeing, Bombardier CRJ, ATR, de Havilland Canada, Cessna, Daher, Pilatus …) | Built |
+| Add-on aircraft (PMDG, Fenix, iniBuilds, Aerosoft, SimWorks Studios …) | Built (demo list) |
+| Buy several aircraft, including several identical ones | Built |
+| Purchase sound, vibration and delivery animation | Built |
+
+## Routes and schedule
+
+| Feature | Status |
+|---|---|
+| Routes to any country, departure and destination | Built |
+| Multi-stop routes (3, 4, 5 or more stops a day) | Built |
+| Your day's legs and a timeline of every aircraft | Built |
+
+## Flight logs
+
+| Feature | Status |
+|---|---|
+| Flight hours, landings, landing rate and G per flight | Built (demo) |
+| Crashes: choose to register or disregard | Built |
+
+## Maintenance and damage
+
+Only damage the simulator can actually detect.
+
+| Feature | Status |
+|---|---|
+| Tail strike, hard landing, flap/gear overspeed, engine failures, overstress | Planned detection; reports built |
+| Severe turbulence damage (extreme only, realistic results: inspection, overstress, cabin damage) | Planned detection; reports built |
+| Mechanic reports in the inbox and an animated mechanic pop-up | Built |
+| Fix now or fix later; serious damage grounds the aircraft | Built |
+| Mechanic voice, fully offline: recorded lines plus an optional neural voice pack | Planned; device voice used as stand-in |
+
+## ATC
+
+| Feature | Status |
+|---|---|
+| Built-in ATC (default) or BeyondATC, chosen in Settings | Built (setting) |
+| Clearance tracking from the built-in ATC data | Planned |
+| BeyondATC clearance tracking by listening to its audio, transcribed offline on the PC | Planned |
+| Fines for taking off, landing or taxiing without clearance, with transcript and contest option | Built (demo) |
+| ATC transcripts saved to the logbook | Planned |
+
+## Finance
+
+| Feature | Status |
+|---|---|
+| Balance, revenue, costs and profit per day, week, month and year | Built (demo) |
+| Real-world years or simulated years at a chosen speed | Built (setting) |
+| Transactions list | Built |
+
+## Interface
+
+| Feature | Status |
+|---|---|
+| Main navigation: Overview, Fleet, Routes, Schedule, Maintenance, Finance, Flight logs, Pilots, Settings | Built |
+| Notification bell with unread count and grouped inbox | Built |
+| Modular settings with toggles, easy to extend | Built |
+| Animated screens, pop-ups and transitions; reduce-motion option | Built |

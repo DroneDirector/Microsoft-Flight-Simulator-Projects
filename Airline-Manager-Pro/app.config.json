@@ -1,0 +1,8 @@
+{
+  "_comment": "Single source for the app's name and identity. Change these values to rename the app; the build copies them everywhere they are needed.",
+  "appName": "Airline Manager Pro",
+  "shortName": "Airline Manager",
+  "appId": "com.dronedirector.airlinemanagerpro",
+  "version": "0.1.0",
+  "versionCode": 1
+}

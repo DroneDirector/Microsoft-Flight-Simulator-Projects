@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["ES2017", "DOM", "DOM.Iterable"],
+    "module": "commonjs",
+    "rootDir": "src",
+    "outDir": "build/js",
+    "strict": false,
+    "noImplicitAny": false,
+    "removeComments": true,
+    "skipLibCheck": true
+  },
+  "files": [
+    "src/generated/config.ts",
+    "src/core/util.ts",
+    "src/core/icons.ts",
+    "src/core/sound.ts",
+    "src/data/airports.ts",
+    "src/data/aircraft.ts",
+    "src/data/demo.ts",
+    "src/graphics/aircraft-art.ts",
+    "src/graphics/land.ts",
+    "src/graphics/worldmap.ts",
+    "src/ui/shell.ts",
+    "src/ui/overlays.ts",
+    "src/screens/dashboard.ts",
+    "src/screens/map.ts",
+    "src/screens/fleet.ts",
+    "src/screens/market.ts",
+    "src/screens/pilots.ts",
+    "src/screens/routes.ts",
+    "src/screens/schedule.ts",
+    "src/screens/logbook.ts",
+    "src/screens/maintenance.ts",
+    "src/screens/finance.ts",
+    "src/screens/settings.ts",
+    "src/main.ts"
+  ]
+}

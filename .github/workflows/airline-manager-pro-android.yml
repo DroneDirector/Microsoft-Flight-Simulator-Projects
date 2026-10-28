@@ -1,0 +1,71 @@
+name: Airline Manager Pro – Android build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Airline-Manager-Pro/**'
+      - '.github/workflows/airline-manager-pro-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: airline-manager-pro-android
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Airline-Manager-Pro
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Prepare Android project
+        run: bash scripts/android-setup.sh
+
+      - name: Build APK
+        working-directory: Airline-Manager-Pro/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Name the APK
+        id: apk
+        run: |
+          V=$(node -p "require('./app.config.json').version")
+          N=$(node -p "require('./app.config.json').appName.replace(/\s+/g,'')")
+          F="${N}-${V}.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$F"
+          echo "file=Airline-Manager-Pro/$F" >> "$GITHUB_OUTPUT"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: airline-manager-pro-apk
+          path: ${{ steps.apk.outputs.file }}
+
+      - name: Publish pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: airline-manager-pro-v${{ steps.apk.outputs.version }}
+          name: Airline Manager Pro ${{ steps.apk.outputs.version }}
+          prerelease: true
+          body_path: Airline-Manager-Pro/release-notes/${{ steps.apk.outputs.version }}.md
+          files: ${{ steps.apk.outputs.file }}
