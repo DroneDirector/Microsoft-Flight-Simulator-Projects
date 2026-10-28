@@ -46,13 +46,18 @@ jobs:
         working-directory: Airline-Manager-Pro/android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Name the APK
+      - name: Sign with the fixed test key and name the APK
         id: apk
         run: |
           V=$(node -p "require('./app.config.json').version")
           N=$(node -p "require('./app.config.json').appName.replace(/\s+/g,'')")
           F="${N}-${V}.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$F"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
+          "$BT/zipalign" -f -p 4 android/app/build/outputs/apk/debug/app-debug.apk aligned.apk
+          "$BT/apksigner" sign --ks signing/test-signing.jks --ks-key-alias airlinemanagerpro-test \
+            --ks-pass file:signing/test-signing.password --key-pass file:signing/test-signing.password \
+            --out "$F" aligned.apk
+          "$BT/apksigner" verify --print-certs "$F" | head -n 3
           echo "file=Airline-Manager-Pro/$F" >> "$GITHUB_OUTPUT"
           echo "version=$V" >> "$GITHUB_OUTPUT"
 

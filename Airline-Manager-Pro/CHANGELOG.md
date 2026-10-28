@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 (2026-10-28)
+
+- Every test build is now signed with the same key, so a new APK installs straight over the previous one
+- Your airline is saved on the device (companies, fleet, pilots, routes, logbook, finances, settings) and kept through updates and restarts
+- New settings added in later versions are merged in automatically, so older saves keep working
+- Settings → About: "Start over" to delete the saved airline and begin again
+
 ## 0.1.3 (2026-10-28)
 
 - Layer button on the world map, both on the Overview map and the full-screen map: choose Street map or Satellite; tap it again to return to the classic map

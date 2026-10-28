@@ -116,6 +116,7 @@ Only damage the simulator can actually detect.
 | Hold-to-exit power button with farewell animation | Built |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
 | Version number in the bottom-left corner | Built |
+| Airline saved on the device and kept through updates; new versions install over the old one | Built |
 | Purchase and payment sounds; mute all sounds | Built |
 | World map layers from the layer button on the map: Classic (default, offline), Street (OpenStreetMap, light colours), Satellite (Sentinel-2 cloudless); tap again for Classic | Built |
 | Pilot messages open the map on that aircraft and follow it | Built |

@@ -1,6 +1,8 @@
 // Start-up: theme, landscape lock, shell and a short arrival message from the mechanic.
 (function boot() {
   document.title = APP.name;
+  Store.load();
+  Store.bind();
   if (reducedMotion()) State.settings.reduceMotion = true;
   document.documentElement.classList.toggle('calm', State.settings.reduceMotion);
   applyCompanyTheme(false);

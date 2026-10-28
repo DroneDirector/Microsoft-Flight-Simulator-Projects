@@ -4,11 +4,11 @@ A virtual airline manager for **Microsoft Flight Simulator 2024**, built for And
 
 Start your own airline or bush outfit, buy the aircraft you actually have installed in the simulator (default aircraft and add-ons), hire pilots who fly your routes on a live world map, and fly your own trips with a pilot profile that syncs with your simulator flights.
 
-> **Status: 0.1.3, early preview.** Every screen, graphic and animation is in place and runs on demo data. The simulator link (PC bridge) is the next build stage.
+> **Status: 0.1.4, early preview.** Every screen, graphic and animation is in place and runs on demo data. The simulator link (PC bridge) is the next build stage.
 
 ## Get the app
 
-Each push to `main` builds an APK in the cloud. Download it from **Releases** (pre-release `airline-manager-pro-v…`) or from the latest run under **Actions**.
+Each push to `main` builds an APK in the cloud, signed with the same test key every time (see `signing/`), so new versions install over the old one and keep your saved airline. Download it from **Releases** (pre-release `airline-manager-pro-v…`) or from the latest run under **Actions**.
 
 ## Project layout
 

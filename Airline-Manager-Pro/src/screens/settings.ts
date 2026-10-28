@@ -63,6 +63,7 @@ const SETTINGS: SetSection[] = [
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>
+      <div class="set-card"><span class="pc-ic">${icon('sync')}</span><span><b>Saved on this device</b><small>Your airline is saved automatically and kept when the app updates.</small></span><button class="btn ghost sm" data-act="reset-ask">Start over</button></div>
       <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p></div>` },
   ] },
 ];
@@ -141,3 +142,10 @@ ACTIONS['new-division'] = () => {
   c.divisions.push({ id: uid(), name: 'Division ' + (c.divisions.length + 1), color: '#5FD4A0' });
   rerenderSettingsBody(); renderTopbar(); toast(`New division added to ${c.name}`, 'ok');
 };
+
+ACTIONS['reset-ask'] = () => {
+  openLayer('modal', `<div class="modal-head"><h2>Start over?</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body"><p class="lede">This deletes your saved companies, fleet, pilots and settings on this device and starts again from the beginning. It can't be undone.</p>
+    <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Keep my airline</button><button class="btn danger" data-act="reset-do">Delete and start over</button></div></div>`, { cls: 'narrow' });
+};
+ACTIONS['reset-do'] = () => Store.reset();

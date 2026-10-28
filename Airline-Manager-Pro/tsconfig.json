@@ -18,6 +18,7 @@
     "src/data/airports.ts",
     "src/data/aircraft.ts",
     "src/data/demo.ts",
+    "src/core/store.ts",
     "src/graphics/aircraft-art.ts",
     "src/graphics/land.ts",
     "src/graphics/worldmap.ts",
