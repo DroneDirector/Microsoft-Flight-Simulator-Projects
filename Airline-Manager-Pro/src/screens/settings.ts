@@ -17,12 +17,6 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'timeMode', label: 'Company calendar', hint: 'Real-world years follow today’s date. Simulated years run faster, so your airline can build up several years of history.', options: [['real', 'Real-world years'], ['sim', 'Simulated years']] },
     { type: 'choice', key: 'simRate', label: 'Simulation speed', hint: 'How much company time passes for each real day.', options: [['week', '1 day = 1 week'], ['month', '1 day = 1 month'], ['quarter', '1 day = 3 months']], when: () => State.settings.timeMode === 'sim' },
   ] },
-  { id: 'map', title: 'Map', icon: 'map', items: [
-    { type: 'choice', key: 'mapStyle', label: 'World map style', hint: 'Classic works offline. The other styles load map images over the internet.',
-      options: [['classic', 'Classic'], ['street-dark', 'Street, dark'], ['street-light', 'Street, light'], ['satellite', 'Satellite']] },
-    { type: 'html', html: () => State.settings.mapStyle === 'classic' ? '' : `<p class="fine-print">${icon('info')}${State.settings.mapStyle === 'satellite'
-      ? 'Satellite images: NASA Blue Marble, via NASA GIBS.' : 'Street maps: © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap.'} If there's no internet, the Classic map is used.</p>` },
-  ] },
   { id: 'sync', title: 'Simulator link', icon: 'sync', items: [
     { type: 'html', html: () => `<div class="set-card link ${State.bridge.pc === 'connected' ? 'ok' : ''}"><span class="pc-ic">${icon('pc')}</span><span><b>${State.bridge.pc === 'connected' ? 'Connected to your PC' : 'Not connected'}</b><small>${esc(State.bridge.sim)}, ${State.bridge.link === 'wifi' ? 'Wi-Fi' : 'mobile data'}, ${State.bridge.latencyMs} ms</small></span><button class="btn ghost sm" data-act="pair">Pair a PC</button></div>` },
     { type: 'toggle', key: 'useWifi', label: 'Connect over Wi-Fi', hint: 'Direct link to the PC bridge on the same network. Fastest.' },
@@ -69,7 +63,7 @@ const SETTINGS: SetSection[] = [
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>
-      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>MapLibre GL JS, BSD 3-Clause License. Street maps © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite imagery: NASA Blue Marble, NASA GIBS.</p></div>` },
+      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p></div>` },
   ] },
 ];
 

@@ -3,20 +3,52 @@
 
 const MAP_LAT_MAX = 84, MAP_LAT_MIN = -58;
 
-// Optional online base maps (MapLibre). Classic dot map stays the default and the offline fallback.
+// Optional online base maps (MapLibre), chosen with the layer button on the map.
+// Classic dot map stays the default and the offline fallback.
+const EOX_ATTRIB = 'Sentinel-2 cloudless 2016 by <a href="https://cloudless.eox.at">EOX IT Services GmbH</a> (contains modified Copernicus Sentinel data 2016)';
 function baseMapStyle(): any {
   switch (State.settings.mapStyle) {
-    case 'street-dark': return 'https://tiles.openfreemap.org/styles/dark';
-    case 'street-light': return 'https://tiles.openfreemap.org/styles/liberty';
+    case 'street': return 'https://tiles.openfreemap.org/styles/liberty';
     case 'satellite': return {
       version: 8,
-      sources: { bm: { type: 'raster', tileSize: 256, maxzoom: 8, attribution: 'Imagery: NASA Blue Marble, NASA GIBS',
-        tiles: ['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_NextGeneration/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg'] } },
-      layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#050F1C' } }, { id: 'bm', type: 'raster', source: 'bm', paint: { 'raster-brightness-max': 0.8 } }],
+      sources: { s2: { type: 'raster', tileSize: 256, maxzoom: 14, attribution: EOX_ATTRIB,
+        tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{y}/{x}.jpg'] } },
+      layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0A1A2E' } }, { id: 's2', type: 'raster', source: 's2' }],
     };
     default: return null;
   }
 }
+
+// Familiar light street-map colours applied on top of the OpenStreetMap style.
+function streetLook(map: any) {
+  const layers = (map.getStyle() && map.getStyle().layers) || [];
+  const set = (id: string, k: string, v: any) => { try { map.setPaintProperty(id, k, v); } catch (e) { /* property not on this layer */ } };
+  for (const l of layers) {
+    const id = String(l.id).toLowerCase();
+    if (l.type === 'background') set(l.id, 'background-color', '#F8F7F3');
+    else if (l.type === 'fill') {
+      if (/water|ocean|sea|lake|river/.test(id)) set(l.id, 'fill-color', '#9CC0F9');
+      else if (/park|wood|forest|grass|wetland|scrub|garden|green|cemetery|golf|pitch/.test(id)) set(l.id, 'fill-color', '#CEEAD6');
+      else if (/glacier|ice|snow/.test(id)) set(l.id, 'fill-color', '#FFFFFF');
+      else if (/sand|beach|bare|rock/.test(id)) set(l.id, 'fill-color', '#F1EADB');
+      else if (/building/.test(id)) { set(l.id, 'fill-color', '#EEEDEA'); set(l.id, 'fill-outline-color', '#E0DED9'); }
+      else if (/aeroway|airport/.test(id)) set(l.id, 'fill-color', '#E6E8EC');
+      else if (/residential|landuse|urban|industrial|commercial|retail|school|hospital/.test(id)) set(l.id, 'fill-color', '#F1F0EC');
+    } else if (l.type === 'fill-extrusion') { set(l.id, 'fill-extrusion-color', '#EEEDEA'); }
+    else if (l.type === 'line') {
+      if (/water|river|stream|canal/.test(id)) set(l.id, 'line-color', '#9CC0F9');
+      else if (/boundary|admin/.test(id)) set(l.id, 'line-color', '#A8ABB0');
+      else if (/motorway|trunk/.test(id)) set(l.id, 'line-color', /casing|outline/.test(id) ? '#E9B949' : '#FDE293');
+      else if (/road|street|highway|primary|secondary|tertiary|minor|service|link|bridge|tunnel/.test(id)) set(l.id, 'line-color', /casing|outline/.test(id) ? '#DADCE0' : '#FFFFFF');
+      else if (/rail/.test(id)) set(l.id, 'line-color', '#C9CCD1');
+      else if (/aeroway|runway|taxiway/.test(id)) set(l.id, 'line-color', '#D3D6DB');
+    } else if (l.type === 'symbol') {
+      set(l.id, 'text-halo-color', '#FFFFFF'); set(l.id, 'text-halo-width', 1.4);
+      set(l.id, 'text-color', /water|ocean|sea|lake|river/.test(id) ? '#4C79B8' : /park|poi/.test(id) ? '#3E7E52' : /country|continent/.test(id) ? '#202124' : '#3C4043');
+    }
+  }
+}
+
 function baseMapAvailable(): boolean { return !!(window as any).maplibregl && navigator.onLine !== false && !!baseMapStyle(); }
 function millerY(lat: number): number { const p = lat * D2R; return 1.25 * Math.log(Math.tan(Math.PI / 4 + 0.4 * p)); }
 const MY_MAX = millerY(MAP_LAT_MAX), MY_MIN = millerY(MAP_LAT_MIN);
@@ -76,6 +108,7 @@ class WorldMap {
       this.ml.on('zoomstart', (e: any) => { if (e.originalEvent) this.userMoved = true; });
       this.ml.on('click', (e: any) => this.tapAt(e.point.x, e.point.y));
       this.ml.on('error', () => { /* tiles failing (offline): the overlay keeps working */ });
+      if (State.settings.mapStyle === 'street') this.ml.on('style.load', () => streetLook(this.ml));
     } catch (e) {
       this.ml = null; this.mlHost.remove(); this.cv.classList.remove('overlay');
     }
@@ -241,7 +274,7 @@ class WorldMap {
       c.fillRect(-s, -s, s * 2, s * 2); c.strokeRect(-s, -s, s * 2, s * 2);
       c.restore();
       if (degPx2 > 1.4 && this.opts.labels !== false) {
-        if (this.ml) { c.lineWidth = 3; c.strokeStyle = 'rgba(5,15,28,.85)'; c.strokeText(k, p[0] + 7, p[1] + 3.5); }
+        if (this.ml) { c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = 'rgba(5,15,28,.85)'; c.strokeText(k, p[0] + 7, p[1] + 3.5); }
         c.fillStyle = hub ? col.cyan : (this.ml ? col.ink : col.dim); c.fillText(k, p[0] + 7, p[1] + 3.5);
       }
     }
@@ -306,7 +339,8 @@ class WorldMap {
         c.beginPath(); c.arc(here[0], here[1], 10 + pulse * 16, 0, Math.PI * 2);
         c.strokeStyle = mine ? col.cyan : col.mag; c.globalAlpha = 0.5 * (1 - pulse); c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1;
       }
-      drawPlaneGlyph(c, here[0], here[1], hdg, mine ? 22 : 18, prop, mine ? col.cyan : col.ink, col.bg);
+      const light = this.ml && State.settings.mapStyle === 'street';
+      drawPlaneGlyph(c, here[0], here[1], hdg, mine ? 22 : 18, prop, mine ? (light ? '#0B8FB0' : col.cyan) : (light ? '#14243A' : col.ink), light ? '#FFFFFF' : col.bg);
       if (this.opts.labels !== false && (degPx > 3.2 || sel || mine)) {
         c.font = '600 11px Inter, sans-serif';
         const label = f.callsign, w = c.measureText(label).width;

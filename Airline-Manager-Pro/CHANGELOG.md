@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 (2026-10-28)
+
+- Layer button on the world map, both on the Overview map and the full-screen map: choose Street map or Satellite; tap it again to return to the classic map
+- Street map: OpenStreetMap with familiar light colours (blue water, green parks, yellow motorways, white roads)
+- Satellite map: Sentinel-2 cloudless imagery (about 10 m detail), replacing the NASA Blue Marble layer
+- Map style moved out of Settings onto the map itself
+- Separate "show all flights" button with its own icon on the full-screen map
+
 ## 0.1.2 (2026-10-28)
 
 - New payment sound that clearly sounds like money going out (register clunk, falling minor tones, low thud), louder than before

@@ -117,7 +117,7 @@ Only damage the simulator can actually detect.
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
 | Version number in the bottom-left corner | Built |
 | Purchase and payment sounds; mute all sounds | Built |
-| World map styles: Classic (offline), Street dark/light (OpenStreetMap), Satellite (NASA Blue Marble) | Built |
+| World map layers from the layer button on the map: Classic (default, offline), Street (OpenStreetMap, light colours), Satellite (Sentinel-2 cloudless); tap again for Classic | Built |
 | Pilot messages open the map on that aircraft and follow it | Built |
 | Google Maps style (needs your own Google Cloud billing account and API key) | Possible, not planned |
 | Bing Maps | Not possible: free Bing Maps accounts were shut down in June 2025 |

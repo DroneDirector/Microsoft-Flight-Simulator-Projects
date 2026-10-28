@@ -1130,3 +1130,24 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 @keyframes takeoff { 0% { opacity: 0; transform: translate(-80px, 40px) rotate(-20deg) scale(.8); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(140px, -90px) rotate(-30deg) scale(.5); } }
 .farewell b { font: 700 22px var(--display); opacity: 0; animation: rise .7s .35s var(--ease) both; }
 .farewell small { opacity: 0; animation: rise .7s .5s var(--ease) both; }
+
+/* ---------- Map layer button and picker ---------- */
+.map-tools { position: absolute; top: 10px; right: 10px; z-index: 3; padding: 3px; border-radius: 12px; background: rgba(5, 15, 28, .82); border: 1px solid var(--line); backdrop-filter: blur(8px); }
+.map-tools .icon-btn { width: 36px; height: 36px; }
+.layer-btn.on { color: #04212A; background: var(--cyan); box-shadow: 0 0 14px rgba(63, 208, 232, .45); }
+.layer-btn.on:hover { background: var(--cyan); color: #04212A; }
+.layer-pick .panel { padding: 12px; }
+.ly-head b { display: block; font: 600 15px var(--display); }
+.ly-head small { display: block; font-size: 11.5px; margin-top: 2px; }
+.ly-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.ly-opt { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 13px; background: var(--bg-2); border: 1px solid var(--line); transition: border-color .2s, transform .15s var(--ease); }
+.ly-opt:hover { border-color: var(--cyan); }
+.ly-opt:active { transform: scale(.97); }
+.ly-opt b { font-size: 13.5px; margin-top: 4px; }
+.ly-opt small { font-size: 11px; }
+.ly-swatch { position: relative; display: block; height: 54px; border-radius: 9px; overflow: hidden; }
+.ly-swatch.street { background: #F8F7F3; }
+.ly-swatch.street i:nth-child(1) { position: absolute; left: -10%; right: 40%; top: 0; bottom: 45%; background: #9CC0F9; border-radius: 0 0 60% 0; }
+.ly-swatch.street i:nth-child(2) { position: absolute; left: 0; right: 0; top: 62%; height: 6px; background: #FDE293; transform: rotate(-8deg); box-shadow: 0 0 0 1px #E9B949; }
+.ly-swatch.street i:nth-child(3) { position: absolute; right: 8%; top: 12%; width: 34%; height: 30%; background: #CEEAD6; border-radius: 40%; }
+.ly-swatch.sat { background: radial-gradient(60% 70% at 30% 40%, #5C6B3D, transparent 70%), radial-gradient(50% 60% at 75% 70%, #8A7A55, transparent 70%), radial-gradient(40% 50% at 80% 20%, #E8ECEF, transparent 70%), linear-gradient(135deg, #1D3B5C, #22466B 55%, #1B3550); }
