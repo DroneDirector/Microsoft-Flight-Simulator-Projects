@@ -100,6 +100,10 @@ function bindActions() {
     if (a) { ev.preventDefault(); a(el, ev); }
   });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeTop(); });
+  // Unlock audio on the first touch, so the first sound (a payment, a purchase) is never swallowed.
+  const unlock = () => { audio(); document.removeEventListener('pointerdown', unlock, true); };
+  document.addEventListener('pointerdown', unlock, true);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && _ctx && _ctx.state !== 'running') _ctx.resume(); });
 }
 
 ACTIONS.go = el => { Sound.tick(); go(el.getAttribute('data-screen')); };
@@ -107,7 +111,7 @@ ACTIONS.go = el => { Sound.tick(); go(el.getAttribute('data-screen')); };
 // Animated balance change in the top bar
 function animateBalance(from: number, to: number) {
   const el = $('[data-balance-val]'); if (!el) return;
-  const box = $('[data-balance]'); box.classList.remove('flash'); void box.offsetWidth; box.classList.add(to < from ? 'flash-down' : 'flash');
+  const box = $('[data-balance]'); box.classList.remove('flash', 'flash-down'); void box.offsetWidth; box.classList.add(to < from ? 'flash-down' : 'flash');
   const t0 = performance.now(), dur = reducedMotion() ? 1 : 900;
   const step = (now: number) => {
     const k = clamp((now - t0) / dur, 0, 1), e = 1 - Math.pow(1 - k, 3);

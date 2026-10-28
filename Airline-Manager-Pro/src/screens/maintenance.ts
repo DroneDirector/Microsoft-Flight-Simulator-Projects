@@ -23,7 +23,7 @@ SCREENS.maint = {
             <div class="ic-foot"><span><b>${money(i.cost)}</b><small>${i.days ? i.days + ' day' + (i.days > 1 ? 's' : '') + ' in the hangar' : 'Overnight job'}</small></span>
               <button class="btn ghost sm" data-act="open-issue" data-id="${i.id}">${icon('volume')}Mechanic</button>
               <button class="btn ghost sm" data-act="fix-later" data-id="${i.id}">Later</button>
-              <button class="btn primary sm" data-act="fix-now" data-id="${i.id}">Fix now</button></div>
+              <button class="btn danger sm" data-act="fix-now" data-id="${i.id}">Pay and fix now</button></div>
           </div>`;
         }).join('') || emptyState('No open reports', 'Damage the simulator detects after a flight shows up here.')}
         ${sched.length ? `<h3>In the hangar</h3>${sched.map(i => `<div class="mini-row">${statusChip('scheduled')}<b>${esc(i.reg)}</b><span>${esc(i.title)}</span><small>${i.days} d</small></div>`).join('')}` : ''}

@@ -54,21 +54,34 @@ const Sound = {
     bell(2093, t + 0.27, 0.36);
     noiseBurst(ctx, t + 0.27, 0.05, 0.12, 6000);
   },
-  /** Paying a bill or fine: coins sliding out, a falling two-note chime and a soft low thud. */
+  /** Paying a bill or fine: register drawer clunk, a falling minor "wah-wah" and a low thud. Clearly a loss. */
   payOut() {
     if (!State.settings.paySound) return;
     const ctx = audio(); if (!ctx) return;
     const t = ctx.currentTime + 0.02;
-    const bus = ctx.createGain(); bus.gain.value = 0.85; bus.connect(ctx.destination);
-    noiseBurst(ctx, t, 0.18, 0.18, 2600);
-    for (let i = 0; i < 4; i++) tone(ctx, 3200 - i * 260, t + 0.02 + i * 0.035, 0.07, 0.05, 'triangle', bus);
-    const bell = (f: number, st: number, g: number) => { tone(ctx, f, st, 0.7, g, 'sine', bus); tone(ctx, f * 2.4, st, 0.35, g * 0.3, 'sine', bus); };
-    bell(987.8, t + 0.18, 0.26);
-    bell(739.99, t + 0.34, 0.3);
+    const bus = ctx.createGain(); bus.gain.value = 1; bus.connect(ctx.destination);
+    // drawer clunk
+    noiseBurst(ctx, t, 0.09, 0.35, 900);
+    tone(ctx, 110, t, 0.12, 0.45, 'triangle', bus);
+    // falling minor phrase with a slight pitch sag on each note
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2200; lp.connect(bus);
+    const notes = [659.25, 523.25, 440, 349.23];
+    notes.forEach((f, i) => {
+      const st = t + 0.12 + i * 0.16, dur = i === notes.length - 1 ? 0.75 : 0.2;
+      for (const det of [-6, 6]) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sawtooth'; o.detune.value = det;
+        o.frequency.setValueAtTime(f, st); o.frequency.exponentialRampToValueAtTime(f * 0.94, st + dur);
+        g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.16, st + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
+        o.connect(g); g.connect(lp); o.start(st); o.stop(st + dur + 0.05);
+      }
+    });
+    // low thud under the last note
+    const end = t + 0.12 + 3 * 0.16;
     const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = 'sine'; o.frequency.setValueAtTime(140, t + 0.34); o.frequency.exponentialRampToValueAtTime(55, t + 0.6);
-    g.gain.setValueAtTime(0.0001, t + 0.34); g.gain.exponentialRampToValueAtTime(0.35, t + 0.36); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
-    o.connect(g); g.connect(bus); o.start(t + 0.34); o.stop(t + 0.7);
+    o.type = 'sine'; o.frequency.setValueAtTime(120, end); o.frequency.exponentialRampToValueAtTime(45, end + 0.35);
+    g.gain.setValueAtTime(0.0001, end); g.gain.exponentialRampToValueAtTime(0.6, end + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, end + 0.4);
+    o.connect(g); g.connect(bus); o.start(end); o.stop(end + 0.45);
   },
   /** Soft tick for toggles and taps. */
   tick() {

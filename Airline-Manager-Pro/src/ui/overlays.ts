@@ -197,7 +197,7 @@ function mechanicPopup(issueId: string) {
           </div>`).join('')}</div>
         <div class="modal-actions">
           <button class="btn ghost" data-act="fix-later" data-id="${issue.id}">Fix later</button>
-          <button class="btn primary" data-act="fix-now" data-id="${issue.id}">${icon('wrench')}Fix now, ${money(issue.cost)}</button>
+          <button class="btn danger" data-act="fix-now" data-id="${issue.id}">${icon('wrench')}Pay ${money(issue.cost)} and fix now</button>
         </div>
         ${issue.severity === 'grounding' ? `<p class="fine-print">${icon('alert')}Grounding damage: ${esc(issue.reg)} can't be flown until this is repaired.</p>` : ''}
       </div>
@@ -250,20 +250,20 @@ function finePopup(ref: string) {
     </div>`, { cls: 'narrow' });
 }
 ACTIONS['fine-pay'] = el => {
-  const ref = el.getAttribute('data-ref');
+  const ref = el.getAttribute('data-ref'); const f = State.fines[ref]; if (!f) return;
+  const c = company(), from = c.balance;
+  c.balance -= f.amount;
+  State.txns.unshift({ id: uid(), date: '2026-10-28', label: `Fine: ${f.title.toLowerCase()} (${f.flight})`, amount: -f.amount, kind: 'fine' });
   delete State.fines[ref];
   State.notices = State.notices.filter(n => n.ref !== ref);
-  closeAll(); Sound.payOut(); Haptics.pulse(30); refresh();
-  toast('Fine paid', 'info');
+  closeAll(); Sound.payOut(); Haptics.pulse(40); refresh(); animateBalance(from, c.balance);
+  toast(`Fine paid: ${money(f.amount)}`, 'warn');
 };
 ACTIONS['fine-contest'] = el => {
   const ref = el.getAttribute('data-ref');
-  const t = State.txns.filter(x => x.kind === 'fine')[0];
-  const c = company(); const from = c.balance;
-  if (t) { c.balance += -t.amount; State.txns.splice(State.txns.indexOf(t), 1); }
   delete State.fines[ref];
   State.notices = State.notices.filter(n => n.ref !== ref);
-  closeAll(); refresh(); animateBalance(from, c.balance);
+  closeAll(); Sound.tick(); refresh();
   toast('Fine contested and removed from your record', 'ok');
 };
 

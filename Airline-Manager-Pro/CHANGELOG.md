@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 (2026-10-28)
+
+- New payment sound that clearly sounds like money going out (register clunk, falling minor tones, low thud), louder than before
+- Fines are charged when you press "Accept and pay", with the balance flashing red; contesting costs nothing
+- All pay buttons for fines and repairs are red
+- Audio is unlocked on the first touch and resumed when you return to the app, so no sound is skipped
+
 ## 0.1.1 (2026-10-28)
 
 - Exit button (power icon, top right) with hold-to-exit, so the app never closes by an accidental tap; farewell animation

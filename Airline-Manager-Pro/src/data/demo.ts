@@ -160,7 +160,6 @@ const State = {
   txns: [
     { id: 't1', date: '2026-10-28', label: 'ATN201 ticket revenue', amount: 35280, kind: 'revenue' },
     { id: 't2', date: '2026-10-28', label: 'Fuel uplift EKVG', amount: -18420, kind: 'fuel' },
-    { id: 't3', date: '2026-10-28', label: 'Fine: takeoff without clearance (ATN540)', amount: -25000, kind: 'fine' },
     { id: 't4', date: '2026-10-27', label: 'ATN11 ticket revenue', amount: 231680, kind: 'revenue' },
     { id: 't5', date: '2026-10-27', label: 'Crew salaries (weekly)', amount: -71200, kind: 'crew' },
     { id: 't6', date: '2026-10-27', label: 'Landing & handling fees', amount: -22900, kind: 'fees' },
