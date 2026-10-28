@@ -57,13 +57,14 @@ const SETTINGS: SetSection[] = [
       const pl = pilot(pr.pilotId);
       return `<div class="set-card col"><div class="sc-h">${icon('user')}<span><b>${esc(pl.name)}</b><small>${esc(pr.label)}</small></span></div>
         ${State.companies.filter(c => c.profileId === pr.id).map(c => `<div class="sc-co"><span class="co-badge sm" style="--co:${c.color};--co2:${c.color2}">${esc(c.icao)}</span><b>${esc(c.name)}</b>
-          <small>${c.divisions.length ? c.divisions.map(d => esc(d.name)).join(' and ') + ' divisions, shared money and reputation' : 'Separate company'}</small></div>`).join('')}</div>`;
-    }).join('') + `<div class="btn-row"><button class="btn ghost" data-act="new-company">${icon('plus')}New company</button><button class="btn ghost" data-act="new-division">${icon('plus')}New division</button></div>` },
+          <small>${c.divisions.length ? c.divisions.map(d => esc(d.name)).join(' and ') + ' divisions, shared money and reputation' : 'Separate company'}, ${State.fleet.filter(a => a.companyId === c.id).length} aircraft, ${money(c.balance, { compact: true })}</small>
+          <button class="del-btn" data-act="delete-company" data-co="${c.id}" aria-label="Delete ${esc(c.name)}">${icon('trash')}</button></div>`).join('')}</div>`;
+    }).join('') + `<div class="btn-row"><button class="btn ghost" data-act="new-company">${icon('plus')}New company</button><button class="btn ghost" data-act="new-division">${icon('plus')}New division</button></div>
+      <div class="danger-zone"><span><b>Saved on this device</b><small>Your companies are saved automatically and kept when the app updates.</small></span><button class="btn ghost sm danger-txt" data-act="reset-ask">${icon('trash')}Delete everything</button></div>` },
   ] },
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>
-      <div class="set-card"><span class="pc-ic">${icon('sync')}</span><span><b>Saved on this device</b><small>Your airline is saved automatically and kept when the app updates.</small></span><button class="btn ghost sm" data-act="reset-ask">Start over</button></div>
       <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p></div>` },
   ] },
 ];
@@ -144,8 +145,50 @@ ACTIONS['new-division'] = () => {
 };
 
 ACTIONS['reset-ask'] = () => {
-  openLayer('modal', `<div class="modal-head"><h2>Start over?</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-    <div class="modal-body"><p class="lede">This deletes your saved companies, fleet, pilots and settings on this device and starts again from the beginning. It can't be undone.</p>
-    <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Keep my airline</button><button class="btn danger" data-act="reset-do">Delete and start over</button></div></div>`, { cls: 'narrow' });
+  Sound.tick();
+  openLayer('modal', `<div class="modal-head del-head"><span class="del-ic">${icon('trash')}</span><div><h2>Delete everything?</h2><small>All companies, pilot profiles, aircraft, routes, flight logs, finances and settings on this device</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body"><p class="lede warn">${icon('alert')}This can't be undone. The app starts again from the beginning.</p>
+    <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn danger" data-act="reset-do">Yes, delete everything</button></div></div>`, { cls: 'narrow' });
+};
+
+ACTIONS['delete-company'] = el => {
+  const c = company(el.getAttribute('data-co')); if (!c) return;
+  Sound.tick();
+  if (State.companies.length === 1) {
+    openLayer('modal', `<div class="modal-head"><h2>${esc(c.name)} is your only company</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+      <div class="modal-body"><p class="lede">${icon('info')}Create another company first, or delete everything to start from the beginning.</p>
+      <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn" data-act="new-company">${icon('plus')}New company</button></div></div>`, { cls: 'narrow' });
+    return;
+  }
+  const regs = State.fleet.filter(a => a.companyId === c.id).map(a => a.reg);
+  const routes = State.routes.filter(r => r.companyId === c.id).length;
+  const logs = State.logbook.filter(l => regs.indexOf(l.reg) >= 0).length;
+  openLayer('modal', `<div class="modal-head del-head"><span class="co-badge" style="--co:${c.color};--co2:${c.color2}">${esc(c.icao)}</span><div><h2>Delete ${esc(c.name)}?</h2><small>Are you sure? This can't be undone.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body">
+      <div class="kv-row">
+        <div><small>Aircraft</small><b>${regs.length}</b></div>
+        <div><small>Routes</small><b>${routes}</b></div>
+        <div><small>Flight log entries</small><b>${logs}</b></div>
+        <div><small>Balance</small><b>${money(c.balance, { compact: true })}</b></div>
+      </div>
+      <p class="lede warn">${icon('alert')}All of this is deleted with the company. Your pilot profile and other companies stay as they are.</p>
+      <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Keep ${esc(c.name)}</button><button class="btn danger" data-act="delete-company-do" data-co="${c.id}">${icon('trash')}Yes, delete ${esc(c.name)}</button></div>
+    </div>`, { cls: 'narrow' });
+};
+ACTIONS['delete-company-do'] = el => {
+  const id = el.getAttribute('data-co'), c = company(id);
+  const regs = State.fleet.filter(a => a.companyId === id).map(a => a.reg);
+  State.companies = State.companies.filter(x => x.id !== id);
+  State.fleet = State.fleet.filter(a => a.companyId !== id);
+  State.live = State.live.filter(f => regs.indexOf(f.reg) < 0);
+  State.routes = State.routes.filter(r => r.companyId !== id);
+  State.issues = State.issues.filter(i => regs.indexOf(i.reg) < 0);
+  State.logbook = State.logbook.filter(l => regs.indexOf(l.reg) < 0);
+  delete State.myReg[id];
+  if (State.companyId === id) { State.companyId = State.companies[0].id; State.divisionId = 'all'; applyCompanyTheme(true); }
+  closeTop();
+  Haptics.pulse(30); Store.save();
+  rerenderSettingsBody(); renderTopbar(); refresh();
+  toast(`${c.name} deleted`, 'warn');
 };
 ACTIONS['reset-do'] = () => Store.reset();

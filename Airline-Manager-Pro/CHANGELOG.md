@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5 (2026-10-28)
+
+- Delete a company from Settings → Profiles and companies, with a prompt that shows what will be deleted and asks you to confirm
+- "Delete everything" moved from About to Profiles and companies, with a confirmation prompt
+- The only remaining company can't be deleted by accident; the app suggests creating another or deleting everything instead
+
 ## 0.1.4 (2026-10-28)
 
 - Every test build is now signed with the same key, so a new APK installs straight over the previous one
