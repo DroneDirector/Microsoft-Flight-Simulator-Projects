@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.1 (2026-10-28)
+
+- Exit button (power icon, top right) with hold-to-exit, so the app never closes by an accidental tap; farewell animation
+- Full-screen mode on Android: status and navigation bars hidden, edge swipes only show them briefly, side edges protected from the back gesture where Android allows
+- Back gesture steps back through pop-ups and pages and only offers exit from the Overview
+- Version number in the bottom-left corner
+- Payment sound when paying repairs and fines, with its own setting
+- Mute all sounds (Settings → Sound and feel), with a quick unmute button in the top bar
+- World map styles: Classic (default, offline), Street dark, Street light (OpenStreetMap via OpenFreeMap) and Satellite (NASA Blue Marble)
+- Pilot messages such as "on final" or "departed" open the live map on that aircraft and follow it; pop-up with a Show button when they arrive
+
 ## 0.1.0 (2026-10-28)
 
 First preview. All screens, graphics and animations in place, running on demo data.

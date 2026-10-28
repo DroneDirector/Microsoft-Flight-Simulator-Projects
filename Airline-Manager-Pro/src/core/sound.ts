@@ -1,6 +1,7 @@
 // All sounds are synthesised in code (Web Audio), so there are no third-party audio files to license.
 let _ctx: AudioContext = null;
 function audio(): AudioContext {
+  if (State.settings.muteAll) return null;
   if (!_ctx) {
     const C = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!C) return null;
@@ -53,6 +54,22 @@ const Sound = {
     bell(2093, t + 0.27, 0.36);
     noiseBurst(ctx, t + 0.27, 0.05, 0.12, 6000);
   },
+  /** Paying a bill or fine: coins sliding out, a falling two-note chime and a soft low thud. */
+  payOut() {
+    if (!State.settings.paySound) return;
+    const ctx = audio(); if (!ctx) return;
+    const t = ctx.currentTime + 0.02;
+    const bus = ctx.createGain(); bus.gain.value = 0.85; bus.connect(ctx.destination);
+    noiseBurst(ctx, t, 0.18, 0.18, 2600);
+    for (let i = 0; i < 4; i++) tone(ctx, 3200 - i * 260, t + 0.02 + i * 0.035, 0.07, 0.05, 'triangle', bus);
+    const bell = (f: number, st: number, g: number) => { tone(ctx, f, st, 0.7, g, 'sine', bus); tone(ctx, f * 2.4, st, 0.35, g * 0.3, 'sine', bus); };
+    bell(987.8, t + 0.18, 0.26);
+    bell(739.99, t + 0.34, 0.3);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(140, t + 0.34); o.frequency.exponentialRampToValueAtTime(55, t + 0.6);
+    g.gain.setValueAtTime(0.0001, t + 0.34); g.gain.exponentialRampToValueAtTime(0.35, t + 0.36); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
+    o.connect(g); g.connect(bus); o.start(t + 0.34); o.stop(t + 0.7);
+  },
   /** Soft tick for toggles and taps. */
   tick() {
     if (!State.settings.uiSounds) return;
@@ -90,7 +107,7 @@ const Voice = {
   speaking: false,
   speak(text: string, onEnd?: () => void) {
     const s = (window as any).speechSynthesis;
-    if (!s) { if (onEnd) onEnd(); return false; }
+    if (!s || State.settings.muteAll) { if (onEnd) onEnd(); return false; }
     s.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.0; u.pitch = 0.92;

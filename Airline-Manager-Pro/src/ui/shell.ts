@@ -19,6 +19,7 @@ function renderShell() {
         </button>`).join('')}
       </div>
       <button class="rail-btn rail-set" data-act="settings" aria-label="Settings">${icon('gear')}<span>Settings</span></button>
+      <div class="rail-ver" title="${esc(APP.name)} version ${esc(APP.version)}">v${esc(APP.version)}</div>
     </nav>
     <header class="topbar"></header>
     <main class="view" id="view"></main>`;
@@ -48,8 +49,10 @@ function renderTopbar() {
     </div>
     <div class="top-spacer"></div>
     <div class="balance" data-balance><small>Balance</small><b data-balance-val>${money(c.balance, { compact: true })}</b></div>
+    ${State.settings.muteAll ? `<button class="icon-btn muted-btn" data-act="unmute" aria-label="Sounds are muted. Tap to turn sounds back on">${icon('mute')}</button>` : ''}
     <button class="icon-btn bell ${n ? 'has' : ''}" data-act="inbox" aria-label="Notifications, ${n} unread">${icon('bell')}${n ? `<span class="badge">${n}</span>` : ''}</button>
-    <button class="icon-btn" data-act="settings" aria-label="Settings">${icon('gear')}</button>`;
+    <button class="icon-btn" data-act="settings" aria-label="Settings">${icon('gear')}</button>
+    <button class="icon-btn power-btn" data-act="exit" aria-label="Exit ${esc(APP.name)}">${icon('power')}</button>`;
   const dot = $('[data-maint-dot]');
   if (dot) dot.style.display = State.issues.some(i => i.status === 'open' && plane(i.reg) && plane(i.reg).companyId === State.companyId) ? '' : 'none';
 }
@@ -141,3 +144,5 @@ function subHead(parent: string, title: string, sub: string, right?: string): st
   return `<div class="screen-head"><div class="sh-left"><button class="back-btn" data-act="go" data-screen="${parent}" aria-label="Back to ${esc(SCREENS[parent].title)}">${icon('chevron', 'flip')}<span>${esc(SCREENS[parent].title)}</span></button>
     <h1>${esc(title)}</h1><p class="sub">${esc(sub)}</p></div>${right || ''}</div>`;
 }
+
+ACTIONS.unmute = () => { State.settings.muteAll = false; renderTopbar(); Sound.tick(); toast('Sounds on', 'ok'); };

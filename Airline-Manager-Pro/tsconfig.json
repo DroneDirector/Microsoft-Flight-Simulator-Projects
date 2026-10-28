@@ -23,6 +23,7 @@
     "src/graphics/worldmap.ts",
     "src/ui/shell.ts",
     "src/ui/overlays.ts",
+    "src/ui/exit.ts",
     "src/screens/dashboard.ts",
     "src/screens/map.ts",
     "src/screens/fleet.ts",

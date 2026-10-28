@@ -7,3 +7,4 @@ src/generated/
 capacitor.config.json
 android/
 src/**/*.js
+www/vendor/

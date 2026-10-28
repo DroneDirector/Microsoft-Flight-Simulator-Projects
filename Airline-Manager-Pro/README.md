@@ -4,7 +4,7 @@ A virtual airline manager for **Microsoft Flight Simulator 2024**, built for And
 
 Start your own airline or bush outfit, buy the aircraft you actually have installed in the simulator (default aircraft and add-ons), hire pilots who fly your routes on a live world map, and fly your own trips with a pilot profile that syncs with your simulator flights.
 
-> **Status: 0.1.0, early preview.** Every screen, graphic and animation is in place and runs on demo data. The simulator link (PC bridge) is the next build stage.
+> **Status: 0.1.1, early preview.** Every screen, graphic and animation is in place and runs on demo data. The simulator link (PC bridge) is the next build stage.
 
 ## Get the app
 
@@ -38,5 +38,8 @@ The whole interface is plain HTML, CSS and TypeScript compiled to one classic sc
 ## Credits
 
 - Inter typeface by The Inter Project Authors, SIL Open Font License 1.1
+- MapLibre GL JS, BSD 3-Clause License (optional street and satellite maps)
+- Street maps © OpenStreetMap contributors, OpenMapTiles, served by OpenFreeMap
+- Satellite imagery: NASA Blue Marble via NASA GIBS
 - Aircraft illustrations, icons, map outlines and sounds are original to this project
 - Aircraft makers and add-on developers are named only to identify products installed in the simulator

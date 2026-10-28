@@ -48,10 +48,21 @@ function selectFlight(id: string) {
 
 ACTIONS['map-pick'] = el => {
   const id = el.getAttribute('data-id'); Sound.tick();
-  const f = State.live.filter(x => x.id === id)[0];
   selectFlight(id);
-  if (_bigMap && f) _bigMap.fit([apt(f.from).pos, apt(f.to).pos], 90, true);
+  if (_bigMap) _bigMap.follow(id);
 };
 ACTIONS['map-zoom'] = el => { if (_bigMap) _bigMap.zoomBy(parseFloat(el.getAttribute('data-f'))); };
-ACTIONS['map-fit'] = () => { if (_bigMap) fitAll(true); };
+ACTIONS['map-fit'] = () => { if (_bigMap) { _bigMap.following = null; fitAll(true); } };
 ACTIONS['go-routes'] = () => go('routes');
+
+/** Open the live map on one flight, zoomed in on the aircraft and following it. */
+function showFlightOnMap(id: string) {
+  const f = State.live.filter(x => x.id === id)[0]; if (!f) return;
+  const a = plane(f.reg);
+  if (a && a.companyId !== State.companyId) { State.companyId = a.companyId; State.divisionId = 'all'; applyCompanyTheme(true); renderTopbar(); }
+  closeAll(); Sound.tick();
+  const focus = () => { if (!_bigMap) return; selectFlight(id); _bigMap.follow(id); };
+  if (State.screen === 'map') focus();
+  else { go('map'); setTimeout(focus, 320); }
+}
+ACTIONS['show-flight'] = el => { const t = el.closest('.toast'); if (t) t.remove(); showFlightOnMap(el.getAttribute('data-id')); };

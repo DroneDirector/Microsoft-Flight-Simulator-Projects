@@ -3,7 +3,7 @@
 //  2. Compiles all TypeScript into one plain script (www/app.js) so the same
 //     output runs in Android, a Windows wrapper and the MSFS toolbar panel.
 //  3. With --preview, also writes dist/preview.html: one self-contained file.
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +26,13 @@ writeFileSync(join(root, 'capacitor.config.json'), JSON.stringify({
   plugins: { SplashScreen: { launchShowDuration: 0 } },
 }, null, 2) + '\n');
 
+// Map library for the optional street and satellite maps (BSD-3-Clause)
+const ml = join(root, 'node_modules/maplibre-gl/dist');
+if (existsSync(ml)) {
+  mkdirSync(join(root, 'www/vendor'), { recursive: true });
+  for (const f of ['maplibre-gl.js', 'maplibre-gl.css']) copyFileSync(join(ml, f), join(root, 'www/vendor', f));
+}
+
 const tpl = readFileSync(join(root, 'www/index.template.html'), 'utf8');
 writeFileSync(join(root, 'www/index.html'), tpl.replace(/%APP_NAME%/g, cfg.appName));
 
@@ -44,6 +51,8 @@ if (process.argv.includes('--preview')) {
     `url(data:font/woff;base64,${readFileSync(join(root, 'www/fonts', f)).toString('base64')})`);
   const js = readFileSync(join(root, 'www/app.js'), 'utf8');
   html = html
+    .replace(/\s*<link rel="stylesheet" href="vendor\/[^"]+">/g, '')
+    .replace(/\s*<script src="vendor\/[^"]+"><\/script>/g, '')
     .replace(/<link rel="stylesheet" href="styles.css">/, () => `<style>${css}</style>`)
     .replace(/<script src="app.js"><\/script>/, () => `<script>${js.replace(/<\/script/g, '<\\/script')}</script>`);
   mkdirSync(join(root, 'dist'), { recursive: true });

@@ -113,3 +113,11 @@ Only damage the simulator can actually detect.
 | Notification bell with unread count and grouped inbox | Built |
 | Modular settings with toggles, easy to extend | Built |
 | Animated screens, pop-ups and transitions; reduce-motion option | Built |
+| Hold-to-exit power button with farewell animation | Built |
+| Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
+| Version number in the bottom-left corner | Built |
+| Purchase and payment sounds; mute all sounds | Built |
+| World map styles: Classic (offline), Street dark/light (OpenStreetMap), Satellite (NASA Blue Marble) | Built |
+| Pilot messages open the map on that aircraft and follow it | Built |
+| Google Maps style (needs your own Google Cloud billing account and API key) | Possible, not planned |
+| Bing Maps | Not possible: free Bing Maps accounts were shut down in June 2025 |

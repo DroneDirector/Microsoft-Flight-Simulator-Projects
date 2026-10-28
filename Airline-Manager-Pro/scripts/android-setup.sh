@@ -10,6 +10,11 @@ npx cap sync android
 MAN=android/app/src/main/AndroidManifest.xml
 # landscape only (both directions), keep the app full screen while flying
 grep -q 'screenOrientation' "$MAN" || sed -i 's/<activity/<activity android:screenOrientation="sensorLandscape"/' "$MAN"
+# full-screen immersive activity (see scripts/android/MainActivity.java)
+APPID=$(node -p "require('./app.config.json').appId")
+JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
+mkdir -p "$JDIR"
+sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
 GR=android/app/build.gradle
 sed -i "s/versionCode [0-9]*/versionCode ${CODE}/; s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/" "$GR"
 sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">${NAME}</string>|; s|<string name=\"title_activity_main\">.*</string>|<string name=\"title_activity_main\">${NAME}</string>|" android/app/src/main/res/values/strings.xml

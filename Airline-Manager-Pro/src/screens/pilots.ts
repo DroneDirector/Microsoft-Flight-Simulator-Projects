@@ -61,7 +61,7 @@ SCREENS.pilots = {
 
 ACTIONS['pilot-tab'] = el => { _pilotTab = el.getAttribute('data-t'); Sound.tick(); refresh(); };
 ACTIONS['pilot-hire'] = () => { _pilotTab = 'hire'; refresh(); };
-ACTIONS['watch-pilot'] = el => { const id = el.getAttribute('data-id'); go('map'); setTimeout(() => { selectFlight(id); const f = State.live.filter(x => x.id === id)[0]; if (_bigMap && f) _bigMap.fit([apt(f.from).pos, apt(f.to).pos], 90, true); }, 260); };
+ACTIONS['watch-pilot'] = el => showFlightOnMap(el.getAttribute('data-id'));
 ACTIONS.hire = el => {
   const id = el.getAttribute('data-id');
   const p = State.candidates.filter(x => x.id === id)[0]; if (!p) return;

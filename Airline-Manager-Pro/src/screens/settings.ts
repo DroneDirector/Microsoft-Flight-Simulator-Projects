@@ -17,6 +17,12 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'timeMode', label: 'Company calendar', hint: 'Real-world years follow today’s date. Simulated years run faster, so your airline can build up several years of history.', options: [['real', 'Real-world years'], ['sim', 'Simulated years']] },
     { type: 'choice', key: 'simRate', label: 'Simulation speed', hint: 'How much company time passes for each real day.', options: [['week', '1 day = 1 week'], ['month', '1 day = 1 month'], ['quarter', '1 day = 3 months']], when: () => State.settings.timeMode === 'sim' },
   ] },
+  { id: 'map', title: 'Map', icon: 'map', items: [
+    { type: 'choice', key: 'mapStyle', label: 'World map style', hint: 'Classic works offline. The other styles load map images over the internet.',
+      options: [['classic', 'Classic'], ['street-dark', 'Street, dark'], ['street-light', 'Street, light'], ['satellite', 'Satellite']] },
+    { type: 'html', html: () => State.settings.mapStyle === 'classic' ? '' : `<p class="fine-print">${icon('info')}${State.settings.mapStyle === 'satellite'
+      ? 'Satellite images: NASA Blue Marble, via NASA GIBS.' : 'Street maps: © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap.'} If there's no internet, the Classic map is used.</p>` },
+  ] },
   { id: 'sync', title: 'Simulator link', icon: 'sync', items: [
     { type: 'html', html: () => `<div class="set-card link ${State.bridge.pc === 'connected' ? 'ok' : ''}"><span class="pc-ic">${icon('pc')}</span><span><b>${State.bridge.pc === 'connected' ? 'Connected to your PC' : 'Not connected'}</b><small>${esc(State.bridge.sim)}, ${State.bridge.link === 'wifi' ? 'Wi-Fi' : 'mobile data'}, ${State.bridge.latencyMs} ms</small></span><button class="btn ghost sm" data-act="pair">Pair a PC</button></div>` },
     { type: 'toggle', key: 'useWifi', label: 'Connect over Wi-Fi', hint: 'Direct link to the PC bridge on the same network. Fastest.' },
@@ -41,10 +47,13 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => State.settings.mechanicVoice && State.settings.voiceEngine === 'neural' ? `<div class="set-card"><span class="pc-ic">${icon('volume')}</span><span><b>Neural voice pack</b><small>${State.settings.voicePack ? 'Installed' : 'About 180 MB, downloaded once'}</small></span><button class="btn ${State.settings.voicePack ? 'ghost' : 'primary'} sm" data-act="voicepack">${State.settings.voicePack ? 'Remove' : 'Download'}</button></div>` : '' },
     { type: 'html', html: () => `<button class="btn ghost" data-act="voice-test">${icon('play')}Hear a sample</button>` },
   ] },
-  { id: 'sound', title: 'Sound and feel', icon: 'layers', items: [
-    { type: 'toggle', key: 'purchaseSound', label: 'Purchase sound', hint: 'Plays when you buy an aircraft.' },
-    { type: 'html', html: () => `<button class="btn ghost" data-act="sound-test">${icon('play')}Play purchase sound</button>` },
-    { type: 'toggle', key: 'uiSounds', label: 'Interface sounds' },
+  { id: 'sound', title: 'Sound and feel', icon: 'volume', items: [
+    { type: 'toggle', key: 'muteAll', label: 'Mute all sounds', hint: 'Silences every sound in the app, including the mechanic’s voice.' },
+    { type: 'toggle', key: 'purchaseSound', label: 'Purchase sound', hint: 'Plays when you buy an aircraft.', when: () => !State.settings.muteAll },
+    { type: 'html', html: () => State.settings.muteAll ? '' : `<button class="btn ghost" data-act="sound-test">${icon('play')}Play purchase sound</button>` },
+    { type: 'toggle', key: 'paySound', label: 'Payment sound', hint: 'Plays when you pay a bill, repair or fine.', when: () => !State.settings.muteAll },
+    { type: 'html', html: () => State.settings.muteAll ? '' : `<button class="btn ghost" data-act="pay-test">${icon('play')}Play payment sound</button>` },
+    { type: 'toggle', key: 'uiSounds', label: 'Interface sounds', when: () => !State.settings.muteAll },
     { type: 'toggle', key: 'haptics', label: 'Vibration feedback' },
     { type: 'toggle', key: 'reduceMotion', label: 'Reduce motion', hint: 'Shorter animations and a still map.' },
   ] },
@@ -60,7 +69,7 @@ const SETTINGS: SetSection[] = [
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>
-      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p></div>` },
+      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>MapLibre GL JS, BSD 3-Clause License. Street maps © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite imagery: NASA Blue Marble, NASA GIBS.</p></div>` },
   ] },
 ];
 
@@ -119,10 +128,12 @@ ACTIONS.toggle = el => {
   Sound.tick(); Haptics.pulse(8);
   if (key === 'mk-installed') { _mkInstalled = on; refresh(); return; }
   if (key === 'reduceMotion') document.documentElement.classList.toggle('calm', on);
+  if (key === 'muteAll') { if (on) Voice.stop(); renderTopbar(); }
   if (key in State.settings) setTimeout(() => rerenderSettingsBody(), 180);
 };
 
 ACTIONS['sound-test'] = () => { const was = State.settings.purchaseSound; State.settings.purchaseSound = true; Sound.purchase(); Haptics.success(); State.settings.purchaseSound = was; };
+ACTIONS['pay-test'] = () => { const was = State.settings.paySound; State.settings.paySound = true; Sound.payOut(); Haptics.pulse(30); State.settings.paySound = was; };
 ACTIONS['voice-test'] = () => { Voice.speak('Morning, captain. I had a look at your aircraft after that last flight. Everything is in good shape.'); };
 ACTIONS.voicepack = () => { State.settings.voicePack = !State.settings.voicePack; rerenderSettingsBody(); toast(State.settings.voicePack ? 'Voice pack installed' : 'Voice pack removed', 'ok'); };
 ACTIONS.pair = () => {

@@ -29,13 +29,14 @@ function closeAll() { while (_layers.length) closeTop(); }
 
 ACTIONS['close-layer'] = () => { Sound.tick(); closeTop(); };
 
-function toast(msg: string, kind?: 'ok' | 'warn' | 'info') {
+function toast(msg: string, kind?: 'ok' | 'warn' | 'info', action?: { label: string; act: string; data?: string }) {
   const t = document.createElement('div');
-  t.className = 'toast toast-' + (kind || 'info');
-  t.innerHTML = `${icon(kind === 'warn' ? 'alert' : 'check')}<span>${esc(msg)}</span>`;
+  t.className = 'toast toast-' + (kind || 'info') + (action ? ' has-act' : '');
+  t.innerHTML = `${icon(kind === 'warn' ? 'alert' : kind === 'info' && action ? 'fleet' : 'check')}<span>${esc(msg)}</span>${action
+    ? `<button class="toast-act" data-act="${action.act}" data-id="${esc(action.data || '')}">${esc(action.label)}${icon('chevron')}</button>` : ''}`;
   document.body.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
-  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2600);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, action ? 6000 : 2600);
 }
 
 /* ---------- Company switcher ---------- */
@@ -135,7 +136,7 @@ function inboxHtml(): string {
       <button class="notice ${n.read ? '' : 'unread'} k-${n.kind}" data-act="open-notice" data-id="${n.id}">
         <span class="n-ic">${icon(NOTICE_META[n.kind].icon)}</span>
         <span class="n-t"><b>${esc(n.title)}</b><small>${esc(n.body)}</small></span>
-        <span class="n-time">${esc(n.time)}</span>
+        <span class="n-time">${esc(n.time)}${n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref) ? `<i class="n-map">${icon('pin')}Map</i>` : ''}</span>
       </button>`).join('') : emptyState('Nothing here', 'New messages from your mechanic, pilots and the authorities show up here.')}</div>`;
 }
 
@@ -150,6 +151,7 @@ ACTIONS['open-notice'] = el => {
   if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref) crashPopup(n.ref);
+  else if (n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref)) showFlightOnMap(n.ref);
   else openLayer('modal', `<div class="modal-head"><h2>${esc(n.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div><div class="modal-body"><p class="lede">${esc(n.body)}</p></div>`, { cls: 'narrow' });
 };
 
@@ -182,7 +184,7 @@ function mechanicPopup(issueId: string) {
           <span class="vb-ic">${icon('play')}</span>
           <span class="wave">${'<i></i>'.repeat(14)}</span>
         </button>
-        <small class="voice-note">${State.settings.mechanicVoice ? 'Voice: ' + (State.settings.voiceEngine === 'neural' ? 'neural voice pack' : 'recorded lines') : 'Voice is off in Settings'}</small>
+        <small class="voice-note">${State.settings.muteAll ? 'All sounds are muted' : State.settings.mechanicVoice ? 'Voice: ' + (State.settings.voiceEngine === 'neural' ? 'neural voice pack' : 'recorded lines') : 'Voice is off in Settings'}</small>
       </div>
       <div class="mech-main">
         <div class="modal-head"><h2>${esc(issue.reg)}: ${esc(issue.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
@@ -201,7 +203,7 @@ function mechanicPopup(issueId: string) {
       </div>
     </div>`, { cls: 'wide mech-pop', onClose: () => Voice.stop() });
   (wrap as any)._speech = speech;
-  if (State.settings.mechanicVoice) setTimeout(() => { if (wrap.isConnected) ACTIONS['mech-voice']($('.voice-btn', wrap), null); }, 650);
+  if (State.settings.mechanicVoice && !State.settings.muteAll) setTimeout(() => { if (wrap.isConnected) ACTIONS['mech-voice']($('.voice-btn', wrap), null); }, 650);
 }
 
 ACTIONS['mech-voice'] = el => {
@@ -220,7 +222,7 @@ ACTIONS['fix-now'] = el => {
   if (i.severity === 'grounding' || i.days) a.status = 'maintenance';
   if (!State.issues.some(x => x.reg === i.reg && x.status === 'open' && x.severity === 'grounding') && a.status === 'grounded') a.status = 'maintenance';
   State.txns.unshift({ id: uid(), date: '2026-10-28', label: `Repair: ${i.title} (${i.reg})`, amount: -i.cost, kind: 'maint' });
-  Voice.stop(); closeAll(); Haptics.pulse(); refresh(); animateBalance(from, c.balance);
+  Voice.stop(); closeAll(); Sound.payOut(); Haptics.pulse(30); refresh(); animateBalance(from, c.balance);
   toast(i.days ? `${i.reg} is in the hangar, back in ${i.days} d` : `${i.title} fixed on ${i.reg}`, 'ok');
 };
 ACTIONS['fix-later'] = el => {
@@ -247,7 +249,13 @@ function finePopup(ref: string) {
       </div>
     </div>`, { cls: 'narrow' });
 }
-ACTIONS['fine-pay'] = () => { closeAll(); toast('Fine paid', 'info'); };
+ACTIONS['fine-pay'] = el => {
+  const ref = el.getAttribute('data-ref');
+  delete State.fines[ref];
+  State.notices = State.notices.filter(n => n.ref !== ref);
+  closeAll(); Sound.payOut(); Haptics.pulse(30); refresh();
+  toast('Fine paid', 'info');
+};
 ACTIONS['fine-contest'] = el => {
   const ref = el.getAttribute('data-ref');
   const t = State.txns.filter(x => x.kind === 'fine')[0];
