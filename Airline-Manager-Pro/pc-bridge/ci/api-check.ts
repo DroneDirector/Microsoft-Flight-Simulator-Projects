@@ -16,7 +16,7 @@ async function check() {
   handle.on('simObjectData', r => { const d = r.data; d.readFloat64(); d.readString256(); d.readString32(); d.readString64(); void r.requestID; });
   handle.on('event', e => { void e.clientEventId; void e.data; });
   handle.on('airportList', r => { r.airports.forEach(a => { void a.icao; void a.latitude; void a.longitude; }); });
-  handle.on('quit', () => {}); handle.on('close', () => {}); handle.on('exception', () => {});
+  handle.on('quit', () => {}); handle.on('close', () => {}); handle.on('exception', x => { void x.exception; void x.sendId; void x.index; });
   handle.close();
 }
 void check;

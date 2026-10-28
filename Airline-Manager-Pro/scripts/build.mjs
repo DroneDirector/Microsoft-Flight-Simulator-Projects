@@ -15,7 +15,7 @@ mkdirSync(join(root, 'src/generated'), { recursive: true });
 writeFileSync(
   join(root, 'src/generated/config.ts'),
   `// Generated from app.config.json. Do not edit by hand.\nconst APP = ${JSON.stringify({
-    name: cfg.appName, shortName: cfg.shortName, id: cfg.appId, version: cfg.version,
+    name: cfg.appName, shortName: cfg.shortName, id: cfg.appId, version: cfg.version, updates: cfg.updates || null,
   }, null, 2)};\n`
 );
 
@@ -37,7 +37,7 @@ if (existsSync(ml)) {
 }
 
 const tpl = readFileSync(join(root, 'www/index.template.html'), 'utf8');
-writeFileSync(join(root, 'www/index.html'), tpl.replace(/%APP_NAME%/g, cfg.appName));
+writeFileSync(join(root, 'www/index.html'), tpl.replace(/%APP_NAME%/g, cfg.appName).replace(/%APP_VERSION%/g, cfg.version));
 
 const tsc = existsSync(join(root, 'node_modules/.bin/tsc')) ? join(root, 'node_modules/.bin/tsc') : 'tsc';
 execSync(`"${tsc}" -p "${join(root, 'tsconfig.json')}"`, { stdio: 'inherit' });

@@ -1,6 +1,7 @@
 // Start-up: theme, landscape lock, shell and a short arrival message from the mechanic.
 (function boot() {
   document.title = APP.name;
+  ErrorLog.init();
   Store.load();
   loadKnownAirports();
   ensurePeople();
@@ -20,6 +21,7 @@
   scheduleBirthdayNotification();
   startConductClock();
   Link.init();
+  Updater.init();
   if ((State as any).linkedOnce) State.live = State.live.filter(f => !(f.you && !f.real));
   // Splash fades out once the first screen is painted
   const sp = document.createElement('div');

@@ -38,6 +38,8 @@ writeFileSync(join(pkg, 'README.txt'), [
   '   Phone and PC must be on the same Wi-Fi network.', '',
   'Keep the window open while you fly. Your flights, landings, fuel, weights and damage are sent to the phone.',
   'To try the link without Flight Simulator, run:  AirlineManagerPro-PC.exe --demo 30', '',
+  'If something goes wrong, the window stays open with the error, and the details are saved in',
+  '%APPDATA%\\Airline Manager Pro\\pc-app.log. Send that file so the problem can be looked at.', '',
   'Licences',
   '  node-simconnect (lib/node_modules/node-simconnect) is used unmodified under the GNU LGPL v3.',
   '  Its licence text is in that folder. You may replace that folder with another version of the library.', '',

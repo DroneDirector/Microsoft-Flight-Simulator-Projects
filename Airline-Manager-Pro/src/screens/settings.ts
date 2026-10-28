@@ -72,6 +72,20 @@ const SETTINGS: SetSection[] = [
     }).join('') + `<div class="btn-row"><button class="btn ghost" data-act="new-company">${icon('plus')}New company</button><button class="btn ghost" data-act="new-division">${icon('plus')}New division</button></div>
       <div class="danger-zone"><span><b>Saved on this device</b><small>Your companies are saved automatically and kept when the app updates.</small></span><button class="btn ghost sm danger-txt" data-act="reset-ask">${icon('trash')}Delete everything</button></div>` },
   ] },
+  { id: 'support', title: 'Updates and errors', icon: 'download', items: [
+    { type: 'html', html: () => {
+      const u = Updater, busy = u.state === 'checking' || u.state === 'downloading' || u.state === 'installing';
+      return `<div class="set-card"><span class="pc-ic">${icon('download')}</span><span><b>Version ${esc(APP.version)}</b><small>${esc(updateStatusText())}</small></span>
+        ${u.state === 'available' ? `<button class="btn primary sm" data-act="update-open">Install ${esc(u.info.version)}</button>` : `<button class="btn ghost sm" data-act="update-check" ${busy ? 'disabled' : ''}>Check for updates</button>`}</div>`;
+    } },
+    { type: 'html', html: () => {
+      const n = ErrorLog.list.length;
+      return `<div class="set-card col"><div class="sc-h">${icon('alert')}<span><b>Error log</b><small>${n ? n + ' saved, newest first. Tap one to see the details.' : 'No errors so far. If something goes wrong, the details show up here.'}</small></span></div>
+        ${ErrorLog.list.slice(0, 12).map(e => `<button class="err-row" data-act="err-open" data-id="${e.id}"><b>${esc(e.title)}</b><span>${esc(e.message)}</span><small>${esc(e.time)}</small></button>`).join('')}
+        ${n ? `<div class="btn-row"><button class="btn ghost sm" data-act="err-show-all">Show all</button><button class="btn ghost sm" data-act="err-copy">${icon('copy')}Copy</button><button class="btn ghost sm" data-act="err-share">${icon('share')}Share</button><button class="btn ghost sm danger-txt" data-act="err-clear">${icon('trash')}Clear</button></div>` : ''}</div>`;
+    } },
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}The error log stays on this device. Nothing is sent anywhere unless you copy or share it yourself.</p>` },
+  ] },
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>

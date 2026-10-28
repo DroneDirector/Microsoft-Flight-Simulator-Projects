@@ -117,7 +117,13 @@ export class SimConnectSource extends EventEmitter implements SimSource {
         .filter((a: Airport) => /^[A-Z0-9]{3,5}$/.test(a.icao));
       this.emit('airports', list);
     });
-    h.on('exception', () => { /* an unknown variable on this aircraft: ignore */ });
+    // usually a variable this aircraft doesn't have: carry on, but note it in the log
+    const seenEx: { [k: string]: boolean } = {};
+    h.on('exception', (x: any) => {
+      const key = `${x && x.exception}/${x && x.sendId}/${x && x.index}`;
+      if (seenEx[key]) return; seenEx[key] = true;
+      this.emit('note', `SimConnect exception ${x && x.exception} (send ${x && x.sendId}, index ${x && x.index})`);
+    });
     const lost = () => {
       if (this.handle !== h) return;
       this.handle = null; clearInterval(this.timer);
@@ -128,7 +134,7 @@ export class SimConnectSource extends EventEmitter implements SimSource {
     };
     h.on('quit', lost);
     h.on('close', lost);
-    h.on('error', lost);
+    h.on('error', (e: any) => { this.emit('note', 'SimConnect connection error: ' + (e && e.message ? e.message : String(e))); lost(); });
 
     this.requestAirports();
     clearInterval(this.timer);

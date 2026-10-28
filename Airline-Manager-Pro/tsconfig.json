@@ -28,6 +28,8 @@
     "src/graphics/worldmap.ts",
     "src/ui/shell.ts",
     "src/ui/overlays.ts",
+    "src/core/errlog.ts",
+    "src/core/update.ts",
     "src/ui/exit.ts",
     "src/ui/look-editor.ts",
     "src/ui/crew-ui.ts",

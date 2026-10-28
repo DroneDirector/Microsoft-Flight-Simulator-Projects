@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 (2026-10-28)
+
+- Error log: errors pop up with the details and Copy and Share buttons, and are saved in Settings → Updates and errors
+- If the app can't start, the error is shown with Copy and Share instead of a blank screen; Android crashes are reported on the next start
+- Updates from inside the app: check, download and install, with Android's exact reason if it refuses the install
+- PC app: log file (`%APPDATA%\Airline Manager Pro\pc-app.log`); on an error the window stays open with the details
+
 ## 0.3.0 (2026-10-28)
 
 First version that works with Microsoft Flight Simulator.

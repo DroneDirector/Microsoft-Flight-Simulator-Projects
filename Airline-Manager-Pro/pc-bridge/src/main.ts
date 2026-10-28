@@ -10,6 +10,7 @@ import { LINK_PORT } from './protocol';
 import type { Airport } from './protocol';
 
 import { VERSION } from './version';
+import { openLog, writeLog, fatal, catchEverything, logFile } from './errors';
 export { VERSION };
 
 export function dataDir(): string {
@@ -81,6 +82,7 @@ function banner(server: LinkServer, status: string, phones: number, lines: strin
     ...lines.slice(-8).map(l => '   ' + l),
     '',
     '  Keep this window open while you fly. Press Ctrl+C to quit.',
+    logFile() ? '  Log file: ' + logFile() : '',
   ];
   process.stdout.write('\x1b[2J\x1b[H' + out.join('\n') + '\n');
 }
@@ -88,17 +90,20 @@ function banner(server: LinkServer, status: string, phones: number, lines: strin
 export async function main() {
   const dir = dataDir();
   fs.mkdirSync(dir, { recursive: true });
+  openLog(dir);
+  catchEverything();
   const lines: string[] = [];
   let status = 'Starting…', phones = 0;
   const server = new LinkServer(dir, VERSION);
   const redraw = () => banner(server, status, phones, lines);
-  const log = (s: string) => { lines.push(new Date().toTimeString().slice(0, 8) + '  ' + s); if (lines.length > 200) lines.shift(); redraw(); };
+  const log = (s: string) => { writeLog(s); lines.push(new Date().toTimeString().slice(0, 8) + '  ' + s); if (lines.length > 200) lines.shift(); redraw(); };
   try { await server.start(); }
-  catch (e) { console.error(`Port ${LINK_PORT} is in use. Is the PC app already running?`); process.exit(1); }
+  catch (e) { fatal(`Port ${LINK_PORT} is in use. Is the PC app already running?`, e); return; }
   let lib: any;
-  try { lib = loadSimConnect(); } catch (e) { console.error('The SimConnect library is missing. Reinstall the PC app.'); process.exit(1); }
+  try { lib = loadSimConnect(); } catch (e) { fatal('The SimConnect library is missing or damaged. Unzip the PC app again, keeping the lib folder next to the .exe.', e); return; }
   const source = new SimConnectSource(lib);
-  source.on('status', (ok: boolean, text: string) => { status = text; redraw(); });
+  source.on('status', (ok: boolean, text: string) => { if (text !== status) writeLog('Flight Simulator: ' + text); status = text; redraw(); });
+  source.on('note', (t: string) => writeLog(t));
   server.on('clients', (n: number) => { phones = n; redraw(); });
   server.on('code', redraw);
   run(source, server, log);

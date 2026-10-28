@@ -1370,3 +1370,23 @@ button.link-pill:hover { border-color: var(--line-2); background: var(--panel-2)
 .pc-digit { width: 42px; height: 52px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line-2); color: var(--ink); text-align: center; font: 700 24px var(--display); caret-color: var(--cyan); user-select: text; -webkit-user-select: text; animation: pop .4s var(--spring) both; }
 .pc-digit:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(63, 208, 232, .2); }
 [data-pair-err], [data-ip-err] { min-height: 18px; }
+
+/* ---------- Error log and updates ---------- */
+.err-pop .lede { align-items: flex-start; }
+.err-box { margin: 4px 0 0; padding: 12px 14px; max-height: 26vh; overflow: auto; border-radius: var(--r-md); background: var(--bg); border: 1px solid var(--line);
+  color: var(--ink-2); font: 12px/1.5 ui-monospace, "Cascadia Mono", Consolas, "Roboto Mono", monospace; white-space: pre-wrap; word-break: break-word; user-select: text; -webkit-user-select: text; }
+.err-box.tall { max-height: 52vh; }
+.err-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: baseline; width: 100%; text-align: left; padding: 8px 10px; border-radius: var(--r-sm);
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink); }
+.err-row:active { background: var(--panel-2); }
+.err-row b { font-size: 13px; color: var(--red); white-space: nowrap; }
+.err-row span { font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.err-row small { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.upd-v { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: var(--r-md); background: var(--bg-2); border: 1px solid var(--line); }
+.upd-v small { display: block; font-size: 11px; color: var(--ink-3); }
+.upd-v b { font-size: 18px; }
+.upd-v > .ic { color: var(--ink-3); }
+.upd-v em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--ink-2); }
+.upd-notes { margin: 10px 0 0; padding: 10px 14px; max-height: 26vh; overflow: auto; border-radius: var(--r-md); border: 1px solid var(--line); color: var(--ink-2); font-size: 13px; white-space: pre-line; }
+.upd-bar { height: 6px; margin: 14px 0 4px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.upd-bar i { display: block; height: 100%; border-radius: 3px; background: var(--cyan); transition: width .3s; }

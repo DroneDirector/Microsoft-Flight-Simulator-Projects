@@ -19,6 +19,7 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | PC app (Windows) that reads the simulator through SimConnect, no SDK needed | Built |
 | Link over Wi-Fi only (phone and PC on the same network), discovery, 6-digit pairing, auto-reconnect | Built |
 | Pairing a PC with a code | Built |
+| PC app log file; errors keep the window open with the details | Built |
 | Detect which aircraft is loaded in the sim and match it to the aircraft you're flying | Built |
 | Detect installed aircraft (default and add-ons such as PMDG, Fenix, iniBuilds, Aerosoft) | Planned; market shows demo list |
 | Passenger numbers from GSX Pro (and the sim's payload stations without GSX) | Built |
@@ -118,6 +119,8 @@ Only damage the simulator can actually detect.
 | Airline saved on the device and kept through updates; new versions install over the old one | Built |
 | Delete a company or everything, from Profiles and companies, with a confirmation prompt | Built |
 | Purchase and payment sounds; mute all sounds | Built |
+| Error log: pop-up with the error, Copy and Share; saved list in Settings; start-up failures and Android crashes reported | Built |
+| Updates from inside the app, with Android's exact reason when an install is refused | Built |
 | World map layers from the layer button on the map: Classic (default, offline), Street (OpenStreetMap, light colours), Satellite (Sentinel-2 cloudless); tap again for Classic | Built |
 | Pilot messages open the map on that aircraft and follow it | Built |
 | Google Maps style (needs your own Google Cloud billing account and API key) | Possible, not planned |

@@ -11,7 +11,11 @@ import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -27,6 +31,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(LanLinkPlugin.class);
+        registerPlugin(AppToolsPlugin.class);
+        keepCrashReports();
         super.onCreate(savedInstanceState);
         enterImmersive();
         protectEdges();
@@ -49,6 +55,21 @@ public class MainActivity extends BridgeActivity {
         WindowInsetsControllerCompat c = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         c.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         c.hide(WindowInsetsCompat.Type.systemBars());
+    }
+
+    /** If the app crashes, the details are saved and shown in the error log on the next start. */
+    private void keepCrashReports() {
+        final Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        final File file = new File(getFilesDir(), AppToolsPlugin.CRASH_FILE);
+        Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
+            try (PrintWriter w = new PrintWriter(new FileWriter(file, false))) {
+                w.println("Time: " + new Date());
+                w.println("Android " + Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + "), " + Build.MANUFACTURER + " " + Build.MODEL);
+                w.println("Thread: " + thread.getName());
+                error.printStackTrace(w);
+            } catch (Exception ignored) { }
+            if (previous != null) previous.uncaughtException(thread, error);
+        });
     }
 
     private void protectEdges() {
