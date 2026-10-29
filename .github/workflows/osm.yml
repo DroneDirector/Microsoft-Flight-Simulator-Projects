@@ -29,14 +29,16 @@ jobs:
               await p.goto('http://127.0.0.1:8124/index.html'); await p.waitForTimeout(9000);
               await p.evaluate(s => { closeAll(); State.settings.mapStyle = s; go('map', true); }, style); await p.waitForTimeout(4000);
               const ml = await p.evaluate(() => !!(_bigMap && _bigMap.ml)); log.push(style + ' maplibre=' + ml);
-              for (const z of [2, 4, 5, 6, 8, 11]) {
+              await p.evaluate(() => { window.__mlErr = []; _bigMap.ml.on('error', e => window.__mlErr.push(String((e && e.error && e.error.message) || e))); });
+              for (const z of [2, 4, 5, 6, 8, 11, 13]) {
                 await p.evaluate(z => { _bigMap.following = null; _bigMap.ml.jumpTo({ center: [-7.0, 62.0], zoom: z }); }, z);
                 await p.waitForTimeout(z >= 8 ? 6000 : 4000);
                 await p.screenshot({ path: `out/${style}-z${z}.png` });
               }
-              await p.evaluate(() => _bigMap.flyToAirport('EKVG')); await p.waitForTimeout(12000);
+              await p.evaluate(() => _bigMap.flyToAirport('EKVG')); await p.waitForTimeout(20000);
               log.push(style + ' after fly: zoom ' + (await p.evaluate(() => _bigMap.ml.getZoom().toFixed(2))) + ' scenes ' + (await p.evaluate(() => Object.keys(_bigMap.scenes).map(k => k + ':' + (_bigMap.scenes[k].L ? _bigMap.scenes[k].L.source : 'none')).join(','))));
               await p.screenshot({ path: `out/${style}-ekvg.png` });
+              log.push(style + ' map errors: ' + JSON.stringify(await p.evaluate(() => (window.__mlErr || []).slice(0, 5))));
               await p.evaluate(() => _bigMap.flyToAirport('EKCH')); await p.waitForTimeout(14000);
               await p.screenshot({ path: `out/${style}-ekch.png` });
               await p.close();
