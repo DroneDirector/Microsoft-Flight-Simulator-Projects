@@ -1756,3 +1756,19 @@ button.coop-e:hover { border-color: var(--line-2); }
 .apv-row.away { border-style: dashed; cursor: default; } .apv-row.away b { color: var(--magenta); }
 .sel-pop { position: relative; } .sel-pop .sel-x { position: absolute; right: 8px; top: 8px; z-index: 2; width: 30px; height: 30px; }
 .sel-pop .card-h { padding-right: 34px; }
+
+/* Leasing */
+.mk-mode { display: inline-flex; margin: 0 0 12px; }
+.mk-mode button { display: inline-flex; align-items: center; gap: 6px; }
+.mk-mode .ic { width: 16px; height: 16px; }
+.mk-price small { font-size: 12px; font-weight: 500; color: var(--ink-2); }
+.lease-tag { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; color: var(--cyan); border: 1px solid rgba(63,208,232,.4); white-space: nowrap; }
+.lease-terms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 10px; }
+.lease-terms > div { padding: 8px 10px; border-radius: 11px; background: var(--bg-2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.lease-terms small { font-size: 11px; color: var(--ink-2); } .lease-terms b { font-size: 14px; } .lease-terms em { font-style: normal; font-size: 10.5px; color: var(--ink-3); }
+.lease-box { margin: 10px 0; padding: 12px 14px; border-radius: 14px; background: var(--bg-2); border: 1px solid rgba(63,208,232,.3); }
+.lease-box .lb-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.lease-box .lb-h .ic { color: var(--cyan); width: 18px; height: 18px; } .lease-box .lb-h small { color: var(--ink-2); font-size: 12px; }
+.btn-row.nowrap { flex-wrap: nowrap; }
+@media (max-width: 700px) { .lease-terms { grid-template-columns: 1fr; } }
+.buy-sum > div { display: flex; flex-direction: column; gap: 2px; } .buy-sum small { color: var(--ink-2); font-size: 12px; }

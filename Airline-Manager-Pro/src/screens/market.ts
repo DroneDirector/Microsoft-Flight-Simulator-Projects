@@ -1,16 +1,18 @@
-// Aircraft market: buy one or several aircraft of any type the simulator has installed.
+// Aircraft market: buy or lease one or several aircraft of any type the simulator has installed.
 let _mkMaker = 'All';
+let _mkMode: 'buy' | 'lease' = 'buy';
 let _mkInstalled = true;
 
 SCREENS.market = {
-  title: 'Buy aircraft', icon: 'market', nav: false,
+  title: 'Aircraft market', icon: 'market', nav: false,
   render() {
     const c = company();
     const makers = ['All'].concat(AIRCRAFT.map(a => a.maker).filter((m, i, arr) => arr.indexOf(m) === i));
     const list = AIRCRAFT.filter(a => (_mkMaker === 'All' || a.maker === _mkMaker) && (!_mkInstalled || a.installed));
     return `
-    ${subHead('fleet', 'Buy aircraft', `${AIRCRAFT.filter(a => a.installed).length} types found in your simulator, including add-ons`,
+    ${subHead('fleet', _mkMode === 'lease' ? 'Lease aircraft' : 'Buy aircraft', _mkMode === 'lease' ? 'Pay a monthly rent instead of the full price, for 1, 3 or 6 years' : `${AIRCRAFT.filter(a => a.installed).length} types found in your simulator, including add-ons`,
       `<label class="tg-inline"><span>Only what I have installed</span>${toggle('mk-installed', _mkInstalled)}</label>`)}
+    <div class="mk-mode seg">${[['buy', 'Buy'], ['lease', 'Lease']].map(m => `<button class="${_mkMode === m[0] ? 'on' : ''}" data-act="mk-mode" data-m="${m[0]}">${icon(m[0] === 'buy' ? 'market' : 'key')}${m[1]}</button>`).join('')}</div>
     <div class="filter-row">${makers.map(m => `<button class="fchip ${_mkMaker === m ? 'on' : ''}" data-act="mk-maker" data-m="${esc(m)}">${esc(m)}</button>`).join('')}</div>
     <div class="mk-grid">${list.map((t, i) => {
       const owned = State.fleet.filter(a => a.typeId === t.id && a.companyId === c.id).length;
@@ -20,9 +22,9 @@ SCREENS.market = {
           <div class="mk-name"><b>${esc(t.maker)} ${esc(t.model)}</b><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span></div>
           <div class="mk-specs"><span><small>Seats</small>${t.seats}</span><span><small>Range</small>${num(t.rangeNm)} nm</span><span><small>Cruise</small>${t.cruiseKt} kt</span><span><small>Per hour</small>${money(t.costPerHr)}</span></div>
           <div class="mk-foot">
-            <b class="mk-price">${money(t.price, { compact: true })}</b>
-            ${owned ? `<small class="owned">You own ${owned}</small>` : ''}
-            ${t.installed ? `<button class="btn primary" data-act="buy" data-id="${t.id}">Buy</button>` : `<small class="muted">Not installed in your sim</small>`}
+            ${_mkMode === 'lease' ? `<b class="mk-price"><small>from </small>${money(leaseMonthly(t.price, 6), { compact: true })}<small> /month</small></b>` : `<b class="mk-price">${money(t.price, { compact: true })}</b>`}
+            ${owned ? `<small class="owned">You have ${owned}</small>` : ''}
+            ${t.installed ? (_mkMode === 'lease' ? `<button class="btn primary" data-act="lease" data-id="${t.id}">Lease</button>` : `<button class="btn primary" data-act="buy" data-id="${t.id}">Buy</button>`) : `<small class="muted">Not installed in your sim</small>`}
           </div>
         </div>
       </div>`;
@@ -30,6 +32,7 @@ SCREENS.market = {
   },
 };
 
+ACTIONS['mk-mode'] = el => { _mkMode = el.getAttribute('data-m') as any; Sound.tick(); refresh(); };
 ACTIONS['mk-maker'] = el => { _mkMaker = el.getAttribute('data-m'); Sound.tick(); refresh(); };
 
 let _buy = { id: '', qty: 1, div: '' };

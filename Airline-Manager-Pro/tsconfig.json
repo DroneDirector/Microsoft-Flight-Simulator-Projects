@@ -59,6 +59,7 @@
     "src/screens/airport-view.ts",
     "src/screens/fleet.ts",
     "src/screens/market.ts",
+    "src/screens/leasing.ts",
     "src/screens/pilots.ts",
     "src/screens/ranking.ts",
     "src/screens/coop.ts",

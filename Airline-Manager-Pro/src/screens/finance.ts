@@ -1,8 +1,8 @@
 // Finance: balance, profit by day, week, month and year, and every transaction.
 let _finPeriod = 'day';
 let _txFilter = 'all';
-const TX_KINDS: { [k: string]: string } = { revenue: 'Revenue', fuel: 'Fuel', crew: 'Crew', maint: 'Maintenance', fine: 'Fine', purchase: 'Aircraft', fees: 'Fees', salary: 'Salary', payroll: 'Salaries' };
-const TX_FILTERS = [['all', 'All'], ['revenue', 'Revenue'], ['salary', 'Salaries'], ['maint', 'Maintenance'], ['fuel', 'Fuel'], ['fees', 'Fees'], ['fine', 'Fines'], ['purchase', 'Aircraft']];
+const TX_KINDS: { [k: string]: string } = { revenue: 'Revenue', fuel: 'Fuel', crew: 'Crew', maint: 'Maintenance', fine: 'Fine', purchase: 'Aircraft', lease: 'Lease', fees: 'Fees', salary: 'Salary', payroll: 'Salaries' };
+const TX_FILTERS = [['all', 'All'], ['revenue', 'Revenue'], ['salary', 'Salaries'], ['maint', 'Maintenance'], ['fuel', 'Fuel'], ['fees', 'Fees'], ['fine', 'Fines'], ['purchase', 'Aircraft'], ['lease', 'Leases']];
 
 function staffCountFor(cid: string): number { return State.pilots.filter((p: any) => !p.you && pilotCompany(p) === cid).length + staffOf(cid).length; }
 
