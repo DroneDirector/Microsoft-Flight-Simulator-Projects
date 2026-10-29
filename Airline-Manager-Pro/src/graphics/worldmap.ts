@@ -6,6 +6,26 @@ const MAP_LAT_MAX = 84, MAP_LAT_MIN = -58;
 // Optional online base maps (MapLibre), chosen with the layer button on the map.
 // Classic dot map stays the default and the offline fallback.
 const EOX_ATTRIB = 'Sentinel-2 cloudless 2016 by <a href="https://cloudless.eox.at">EOX IT Services GmbH</a> (contains modified Copernicus Sentinel data 2016)';
+const OFM_ATTRIB = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, <a href="https://openmaptiles.org">OpenMapTiles</a>, <a href="https://openfreemap.org">OpenFreeMap</a>';
+/** The classic look with real geography underneath: zoomed out it is the dotted world (drawn on the
+ *  overlay); zooming in, the dots give way to coastlines, water, borders and main roads in the same
+ *  dark colours, from OpenStreetMap vector tiles (OpenFreeMap, free to use with credit). */
+function classicVectorStyle(): any {
+  const fade = (a: number, b: number) => ['interpolate', ['linear'], ['zoom'], a, 0, b, 1];
+  return {
+    version: 8,
+    sources: { omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: OFM_ATTRIB } },
+    layers: [
+      { id: 'land', type: 'background', paint: { 'background-color': ['interpolate', ['linear'], ['zoom'], 4.2, '#050F1C', 5.6, '#0B1D33'] } },
+      { id: 'water', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': '#040B16', 'fill-opacity': fade(4.2, 5.6) } },
+      { id: 'coast', type: 'line', source: 'omt', 'source-layer': 'water', paint: { 'line-color': '#3FD0E8', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 4.2, 0, 5.6, 0.45, 12, 0.3], 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 12, 1.2] } },
+      { id: 'rivers', type: 'line', source: 'omt', 'source-layer': 'waterway', minzoom: 8, paint: { 'line-color': '#1E4A73', 'line-opacity': 0.5, 'line-width': 0.8 } },
+      { id: 'roads', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 7, filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary']]], paint: { 'line-color': '#24486F', 'line-opacity': fade(7, 9), 'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.5, 14, 2] } },
+      { id: 'borders-region', type: 'line', source: 'omt', 'source-layer': 'boundary', minzoom: 5, filter: ['all', ['>=', ['get', 'admin_level'], 3], ['<=', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': ['*', 0.18, fade(5, 6.5)], 'line-width': 0.7, 'line-dasharray': [3, 3] } },
+      { id: 'borders', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['all', ['<=', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': ['*', 0.45, fade(3.5, 5.2)], 'line-width': 1, 'line-dasharray': [4, 3] } },
+    ],
+  };
+}
 function baseMapStyle(): any {
   switch (State.settings.mapStyle) {
     case 'street': return 'https://tiles.openfreemap.org/styles/liberty';
@@ -15,7 +35,7 @@ function baseMapStyle(): any {
         tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{y}/{x}.jpg'] } },
       layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0A1A2E' } }, { id: 's2', type: 'raster', source: 's2' }],
     };
-    default: return null;
+    default: return classicVectorStyle();
   }
 }
 
@@ -278,7 +298,10 @@ class WorldMap {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.clearRect(0, 0, this.w, this.h);
     if (!this.ml) { c.fillStyle = col.bg; c.fillRect(0, 0, this.w, this.h); }
-    if (!this.ml) {
+    // the dotted world: always offline; online in the classic look only zoomed out, giving way to real coastlines
+    const dz = this.degPx(), dots = !this.ml ? 1 : State.settings.mapStyle === 'classic' ? clamp((34 - dz) / 18, 0, 1) : 0;
+    if (dots > 0) {
+      c.globalAlpha = dots;
       // graticule every 15°
       c.strokeStyle = col.grid; c.lineWidth = 1;
       c.beginPath();
@@ -301,6 +324,7 @@ class WorldMap {
         c.moveTo(p[0] + r, p[1]); c.arc(p[0], p[1], r, 0, Math.PI * 2);
       }
       c.fill();
+      c.globalAlpha = 1;
     }
     // only the airports that matter: on your routes (yours, your hired pilots' and co-op pilots'), where
     // flights are going right now, and the airport you searched for; the other 49,000 stay hidden
