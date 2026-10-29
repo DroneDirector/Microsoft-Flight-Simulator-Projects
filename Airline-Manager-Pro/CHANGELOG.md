@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1 (2026-10-29)
+
+- Departures, arrivals and ILS/RNP approaches: one path per flight from runway to runway, runway in use by wind, shown and named on the map
+- Followed aircraft stay in view at every zoom (one position for map and airport)
+- Airport layouts prepared once and drawn in one go: much faster zoomed in
+
 ## 0.7.0 (2026-10-29)
 
 - World map zooms down to airport level: dots give way to coastlines, water, borders and roads (OpenFreeMap vector tiles), airport layouts drawn in place with aircraft taxiing, taking off and landing; airport buttons fly the map there and keep following the aircraft; satellite too

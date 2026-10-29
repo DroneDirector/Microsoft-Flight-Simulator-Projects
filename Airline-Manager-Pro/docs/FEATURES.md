@@ -139,6 +139,7 @@ Only damage the simulator can actually detect.
 | World map that zooms from the whole world down to airport level, with real coastlines and borders | Built |
 | Bases and stands: aircraft per base limited to the airport's real stands | Built |
 | Battery indicator with charging and wireless charging | Built |
+| Departures, arrivals and ILS/RNP approaches for hired and co-op pilots, shown on the map | Built |
 | Fly for a real-world airline (names and codes only, no logos) | Built |
 | Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |

@@ -74,7 +74,7 @@ function baseMapAvailable(): boolean { return !!(window as any).maplibregl && na
 function millerY(lat: number): number { const p = lat * D2R; return 1.25 * Math.log(Math.tan(Math.PI / 4 + 0.4 * p)); }
 function millerLat(y: number): number { return (Math.atan(Math.exp(y / 1.25)) - Math.PI / 4) / 0.4 / D2R; }
 /** Zoomed in to airport level the map is drawn (pixels per radian) down to a few pixels per metre. */
-const MAP_R_MAX = 4e7;
+const MAP_R_MAX = 1.6e7;
 /** From this zoom (screen pixels per degree) airports are drawn with their real layout. */
 const AIRPORT_DEG_PX = 1800;
 const MY_MAX = millerY(MAP_LAT_MAX), MY_MIN = millerY(MAP_LAT_MIN);
@@ -84,6 +84,7 @@ interface MapOpts { interactive?: boolean; labels?: boolean; onSelect?: (id: str
 /** Where a flight is now: its real position when it comes from the simulator, otherwise along its route. */
 function flightPos(f: LiveFlight): number[] {
   if (f.pos) return f.pos;
+  const fp = flightPathPos(f); if (fp) return fp.pos;   // along its departure, route, arrival and approach
   return gcInterpolate(apt(f.from).pos, apt(f.to).pos, f.t);
 }
 
@@ -99,7 +100,7 @@ class WorldMap {
   ro: any; ml: any = null; mlHost: HTMLElement = null;
   following: string = null; followT = 0;
   /** Airports drawn with their real layout when zoomed in to airport level. */
-  scenes: { [icao: string]: AirportView } = {}; scenesT = 0; inScene: { [flightId: string]: number[] } = {};
+  scenes: { [icao: string]: AirportView } = {}; scenesT = 0; inScene: { [flightId: string]: number[] } = {}; sceneDraws = false;
 
   constructor(el: HTMLElement, opts?: MapOpts) {
     this.el = el; this.opts = opts || {};
@@ -135,7 +136,7 @@ class WorldMap {
       this.ml = new ML.Map({
         container: this.mlHost, style: baseMapStyle(), center: [-10, 58], zoom: 2,
         attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, touchPitch: false,
-        renderWorldCopies: false, interactive: !!this.opts.interactive,
+        renderWorldCopies: false, interactive: !!this.opts.interactive, maxZoom: 18,
       });
       this.ml.touchZoomRotate.disableRotation();
       this.ml.on('move', () => { this.baseDirty = true; });
@@ -388,29 +389,34 @@ class WorldMap {
     c.drawImage(this.base, 0, 0);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const degPx = this.degPx();
-    this.inScene = {};
+    this.inScene = {}; this.sceneDraws = false;
     if (degPx >= AIRPORT_DEG_PX * 0.5) {
       if (now - this.scenesT > 700) { this.scenesT = now; this.pickScenes(); }
-      if (degPx >= AIRPORT_DEG_PX) {
-        const ppm = this.pxPerM();
-        c.globalAlpha = clamp((degPx - AIRPORT_DEG_PX) / AIRPORT_DEG_PX, 0, 1) * 0.8 + 0.2;
-        for (const icao of Object.keys(this.scenes)) {
-          const sc = this.scenes[icao]; if (!sc.L) continue;
-          const p0 = this.px(sc.L.lon, sc.L.lat); if (p0[0] < -this.w || p0[0] > this.w * 2 || p0[1] < -this.h || p0[1] > this.h * 2) continue;
-          sc.ctx = c; sc.s = ppm; sc.track = this.following || this.selected;
-          sc.computePlanes(Date.now());
-          sc.draw(now);
-          for (const pl of sc.planes) if (!pl.parked) this.inScene[pl.id] = sc.lonLat(pl.x, pl.y);
-        }
-        c.globalAlpha = 1;
+      // the aircraft at an airport are placed by the airport (taxiing, take-off, landing) whatever the zoom,
+      // so a followed aircraft never jumps; the layout itself fades in from airport level
+      const ppm = this.pxPerM(), fade = clamp((degPx - AIRPORT_DEG_PX) / AIRPORT_DEG_PX, 0, 1);
+      for (const icao of Object.keys(this.scenes)) {
+        const sc = this.scenes[icao]; if (!sc.L || !sc.graph) continue;
+        sc.ctx = c; sc.s = ppm; sc.track = this.following || this.selected;
+        sc.computePlanes(Date.now());
+        if (fade > 0) sc.drawLayoutEmbedded(c, fade);
+        for (const pl of sc.planes) if (!pl.parked) this.inScene[pl.id] = sc.lonLat(pl.x, pl.y);
       }
+      this.sceneDraws = fade > 0;
+      if (fade > 0) for (const icao of Object.keys(this.scenes)) { const sc = this.scenes[icao]; if (sc.L && sc.graph) sc.drawAircraftTo(c, now); }
     }
     for (const f of liveOf()) {
       if (!f.real && !aiOn(f)) { f.t = f.t + f.rate * dt * (State.settings.reduceMotion ? 0 : 1); if (f.t > 1) f.t = 0.02; }
       const a = apt(f.from).pos, b = apt(f.to).pos;
       const N = 48;
-      const pts: number[][] = [];
-      if (!f.noDest) for (let i = 0; i <= N; i++) pts.push(this.px.apply(this, gcInterpolate(a, b, i / N)));
+      let pts: number[][] = [], cut = -1;
+      const fpp = !f.noDest ? flightPathPos(f) : null;
+      if (fpp) {
+        // the flight's own path: departure, route, arrival and approach
+        pts = fpp.fp.pts.map(q => this.px(q[0], q[1]));
+        let i = 1; while (i < fpp.fp.cum.length && fpp.fp.cum[i] < fpp.d) i++; cut = i - 1;
+        this.procLabels(c, fpp.fp, f, degPx);
+      } else if (!f.noDest) for (let i = 0; i <= N; i++) pts.push(this.px.apply(this, gcInterpolate(a, b, i / N)));
       const sel = this.selected === f.id, mine = !!f.you;
       const here = this.px.apply(this, this.inScene[f.id] || flightPos(f));
       if (pts.length) {
@@ -421,15 +427,16 @@ class WorldMap {
         c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
         // flown part: solid
         c.setLineDash([]); c.globalAlpha = rf; c.lineWidth = sel || mine ? 2.4 : 1.8;
-        const cut = Math.max(1, Math.floor(f.t * N));
-        c.beginPath(); for (let i = 0; i <= cut; i++) i ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]);
+        const upto = cut >= 0 ? cut : Math.max(1, Math.floor(f.t * N));
+        c.beginPath(); for (let i = 0; i <= upto; i++) i ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]);
         c.lineTo(here[0], here[1]); c.stroke();
       }
       c.setLineDash([]); c.globalAlpha = 1;
-      if (this.inScene[f.id]) continue;   // drawn by the airport, on its taxiway or runway
+      if (this.inScene[f.id] && this.sceneDraws) continue;   // drawn by the airport, on its taxiway or runway
       // heading: the real one for your flight, otherwise from a point just ahead on the route
       let hdg: number;
       if (f.real && f.hdg != null) hdg = f.hdg;
+      else if (fpp) { const h2 = this.px.apply(this, geoDest(fpp.pos, fpp.hdg, 0.5)); hdg = Math.atan2(h2[0] - here[0], -(h2[1] - here[1])) / D2R; }
       else { const ah = this.px.apply(this, gcInterpolate(a, b, Math.min(f.t + 0.01, 1))); hdg = Math.atan2(ah[0] - here[0], -(ah[1] - here[1])) / D2R; }
       const t = acType(flightTypeId(f));
       const prop = t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga';
@@ -452,6 +459,22 @@ class WorldMap {
     this.placeBubble();
   }
 
+  /** Names of the departure, arrival and approach along a flight's path, when zoomed in enough to read them. */
+  procLabels(c: CanvasRenderingContext2D, fp: FlightPath, f: LiveFlight, degPx: number) {
+    const sel = this.selected === f.id || this.following === f.id;
+    if (degPx < (sel ? 60 : 300) || this.opts.labels === false) return;
+    c.save(); c.font = '600 10px Inter, sans-serif'; c.textAlign = 'center';
+    for (const part of fp.parts) {
+      if (part.kind === 'route' || !part.name) continue;
+      const mid = pathAt(fp, (part.from + part.to) / 2), q = this.px(mid.pos[0], mid.pos[1]);
+      if (q[0] < 0 || q[1] < 0 || q[0] > this.w || q[1] > this.h) continue;
+      const text = part.name, w = c.measureText(text).width;
+      c.fillStyle = 'rgba(6,16,30,.78)'; c.fillRect(q[0] - w / 2 - 5, q[1] - 17, w + 10, 15);
+      c.fillStyle = part.kind === 'app' ? (f.you ? this.colors.cyan : this.colors.mag) : this.colors.dim; c.fillText(text, q[0], q[1] - 6);
+    }
+    c.restore();
+  }
+
   /** The airports in view (up to three, nearest the centre first) get their real layout. */
   pickScenes() {
     const a = this.ll(-this.w * 0.25, -this.h * 0.25), b = this.ll(this.w * 1.25, this.h * 1.25), c = this.ll(this.w / 2, this.h / 2);
@@ -461,7 +484,10 @@ class WorldMap {
     for (const k of Object.keys(AIRPORTS)) look(AIRPORTS[k]);
     if (World.ready) for (const ap of World.list) if (!AIRPORTS[ap.icao] && (ap.size || 0) >= 1) look(ap);
     near.sort((x, y) => x[0] - y[0]);
-    const want = near.slice(0, 3).map(n => n[1]).filter((k, i, l) => l.indexOf(k) === i);
+    const want = near.slice(0, 3).map(n => n[1]);
+    // the airports of the aircraft you follow, while it is near them, even with the airport off-screen
+    const ff: any = this.following && State.live.filter(x => x.id === this.following)[0];
+    if (ff) { const p = flightPos(ff); for (const k of [ff.from, ff.noDest ? null : ff.to]) { const ap = k && apt(k); if (ap && gcDistanceNm(p, ap.pos) < 25 && want.indexOf(k) < 0) want.unshift(k); } }
     for (const k of want) if (!this.scenes[k]) this.scenes[k] = makeAirportScene(k, this);
     // keep a few recent ones, let the rest go
     const keys = Object.keys(this.scenes);

@@ -78,7 +78,7 @@ class AirportView {
   fetching = false;
   setLayout(L: AirportLayout, upgrade?: boolean) {
     this.L = L; this.routes = {};
-    if (this.embedded) { this.buildGraph(); this.pickRunway(); return; }
+    if (this.embedded) { this.buildGraph(); this.pickRunway(); this.pc = null; return; }
     if (L.source !== 'runways') this.fetching = false;
     this.labelSource();
     this.buildGraph(); this.pickRunway();
@@ -138,9 +138,10 @@ class AirportView {
     const sw: any = Link.sim && Link.sim.wx && Link.sim.lat && gcDistanceNm([Link.sim.lon, Link.sim.lat], [L.lon, L.lat]) < 60 ? Link.sim.wx : null;
     const wind = sw ? sw.windDir : (_hashStr(this.icao + new Date().toDateString()) % 360), windKt = sw ? Math.round(sw.windKt) : 6 + (_hashStr(this.icao) % 12);
     let best: any = null, bs = -1e9;
+    const ar = typeof activeRunway === 'function' ? activeRunway(this.icao) : null;   // the one the flights use
     for (const r of L.runways) for (const dir of [0, 1]) {
       const hd = (r.hdg + dir * 180) % 360, head = Math.cos((wind - hd) * Math.PI / 180);
-      const score = head * 2 + Math.min(r.len, 4000) / 1500;
+      const score = ar ? -Math.abs(angDiff(ar.hdg, hd)) * 10 + Math.min(r.len, 4000) / 1500 : head * 2 + Math.min(r.len, 4000) / 1500;
       if (score > bs) { bs = score; best = { r, dir, hd }; }
     }
     const r = best.r, c = this.xy(r.lat, r.lon), h = best.hd * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
@@ -239,8 +240,9 @@ class AirportView {
           const fr = (el - to[0]) / Math.max(1, to[1] - to[0]), d = roll * fr * fr;
           pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; phase = 'Take-off roll'; kt = Math.round(150 * fr);
         } else if (cl) {
-          const tt = el - (to ? to[1] : cl[0]), d = roll + tt * 80;
-          if (d < APV_RANGE) { pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(tt * 30); phase = 'Climbing out'; kt = 170; }
+          const tt = el - (to ? to[1] : cl[0]), fpp = flightPathPos(F, now);
+          if (fpp) { const q = this.xy(fpp.pos[1], fpp.pos[0]); if (Math.hypot(q[0], q[1]) < APV_RANGE) { pos = [q[0], q[1], fpp.hdg]; alt = Math.round(tt * 30); phase = fpp.fp.parts[0].name; kt = 170; } }
+          else { const d = roll + tt * 80; if (d < APV_RANGE) { pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(tt * 30); phase = 'Climbing out'; kt = 170; } }
         }
       }
       // arriving here
@@ -248,8 +250,15 @@ class AirportView {
         const ld = this.span(prof, 'Landing'), ti = this.span(prof, 'Taxi in');
         const td = ld ? ld[0] : prof.totalS;
         if (el < td) {
+          const fpp = flightPathPos(F, now);
+          if (fpp) {
+            const q = this.xy(fpp.pos[1], fpp.pos[0]), dist = Math.hypot(q[0], q[1]), left = (fpp.fp.len - fpp.d) * NM;
+            const part = fpp.fp.parts.filter(x => fpp.d >= x.from && fpp.d <= x.to + 0.01)[0];
+            if (dist < APV_RANGE) { pos = [q[0], q[1], fpp.hdg]; alt = Math.round(Math.min(left * 0.0525 * 3.28, 6000)); phase = part && part.kind === 'app' ? (left < 10000 ? 'Final' : '') + (left < 10000 ? ' · ' : '') + part.name : part && part.kind === 'star' ? part.name : 'Approach'; kt = 140; }
+          } else {
           const d = (td - el) * 72;
           if (d < APV_RANGE) { pos = [A.tx - A.ux * d, A.ty - A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(d * 0.0525 * 3.28); phase = d < 6000 ? 'Final' : 'Approach'; kt = 140; }
+          }
         } else if (ld && el < ld[1]) {
           const fr = (el - ld[0]) / Math.max(1, ld[1] - ld[0]), d = A.len * 0.55 * (1 - (1 - fr) * (1 - fr));
           pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; phase = 'Landing roll'; kt = Math.round(130 * (1 - fr) + 20);
@@ -389,6 +398,137 @@ class AirportView {
     const m = [50, 100, 200, 500, 1000, 2000, 5000].filter(v => v * s >= 50)[0] || 5000;
     c.fillStyle = col.dim3; c.font = '500 10px Inter, sans-serif';
     c.fillRect(14, this.h - 18, m * s, 2); c.fillText(m >= 1000 ? m / 1000 + ' km' : m + ' m', 14, this.h - 24);
+  }
+
+  /* ---------- drawn inside the world map: prepared once, drawn in one go ---------- */
+  pc: any = null;   // the static layout as ready-made shapes, in metres
+  bbox: number[] = null;
+  prepare() {
+    const L = this.L, g = this.graph; if (!L || !g) return;
+    const P = (pts: number[][], close?: boolean) => { const q = new Path2D(); pts.forEach((p, i) => i ? q.lineTo(p[0], p[1]) : q.moveTo(p[0], p[1])); if (close) q.closePath(); return q; };
+    const pc: any = { aprons: new Path2D(), terms: new Path2D(), pave: {} as { [w: string]: Path2D }, centre: new Path2D(), lanes: new Path2D(), bars: new Path2D(), leads: new Path2D(), dots: new Path2D() };
+    for (const ar of L.areas || []) (ar.k === 'apron' ? pc.aprons : pc.terms).addPath(P(ar.pts, true));
+    const seg = (to: Path2D, a: number[], b: number[]) => { to.moveTo(a[0], a[1]); to.lineTo(b[0], b[1]); };
+    const pave = (w: number) => { const k = String(Math.max(5, Math.round(w / 5) * 5)); return pc.pave[k] || (pc.pave[k] = new Path2D()); };
+    if (!g.schematic) {
+      for (const p of L.paths) {
+        const [type, wid, st, en] = p, a = g.pts[st];
+        if (type === 1 || type === 4) { const b = g.pts[en]; if (a && b) { seg(pave(wid || 20), a, b); seg(pc.centre, a, b); } }
+        else if (type === 3 && L.source !== 'osm') { const k = g.parks[en]; if (a && k) seg(pave(Math.max(10, wid || 15)), a, k); }
+        else if (type === 9) { const b = g.pts[en]; if (a && b) seg(pc.lanes, a, b); }
+      }
+    } else {
+      const seen: { [k: string]: boolean } = {};
+      for (const k in g.adj) for (const [v] of g.adj[k]) { const key = k < v ? k + v : v + k; if (seen[key]) continue; seen[key] = true; seg(pave(22), this.nodeXY(k), this.nodeXY(v)); }
+    }
+    g.parks.forEach(p => {
+      const r = p[3] || 15, h = (p[2] || 0) * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
+      const at = (al: number, ac: number) => [p[0] + ux * al + uy * ac, p[1] + uy * al - ux * ac];
+      seg(pc.bars, at(0, -r * 0.35), at(0, r * 0.35));
+      if (L.source !== 'osm') seg(pc.leads, at(-r * 2.2, 0), [p[0], p[1]]);
+      if (g.schematic) { pc.dots.moveTo(p[0] + r, p[1]); pc.dots.arc(p[0], p[1], r, 0, Math.PI * 2); }
+    });
+    // extent, for leaving out airports that are off-screen
+    const xs: number[] = [], ys: number[] = [];
+    const add = (q: number[]) => { xs.push(q[0]); ys.push(q[1]); };
+    g.pts.forEach(add); g.parks.forEach(add); (L.areas || []).forEach(a => a.pts.forEach(add));
+    for (const r of L.runways) { const c = this.xy(r.lat, r.lon), h = r.hdg * Math.PI / 180; add([c[0] + Math.sin(h) * r.len / 2, c[1] + Math.cos(h) * r.len / 2]); add([c[0] - Math.sin(h) * r.len / 2, c[1] - Math.cos(h) * r.len / 2]); }
+    this.bbox = xs.length ? [Math.min.apply(null, xs) - 300, Math.min.apply(null, ys) - 300, Math.max.apply(null, xs) + 300, Math.max.apply(null, ys) + 300] : [-3000, -3000, 3000, 3000];
+    this.pc = pc;
+  }
+
+  /** Is any part of the airport on screen? */
+  onScreen(): boolean {
+    if (!this.bbox) return true;
+    const b = this.bbox, cs = [this.scr(b[0], b[1]), this.scr(b[2], b[1]), this.scr(b[0], b[3]), this.scr(b[2], b[3])], m = this.map;
+    const x0 = Math.min(cs[0][0], cs[1][0], cs[2][0], cs[3][0]), x1 = Math.max(cs[0][0], cs[1][0], cs[2][0], cs[3][0]), y0 = Math.min(cs[0][1], cs[1][1], cs[2][1], cs[3][1]), y1 = Math.max(cs[0][1], cs[1][1], cs[2][1], cs[3][1]);
+    return x1 >= 0 && y1 >= 0 && x0 <= m.w && y0 <= m.h;
+  }
+
+  /** The layout (runways, taxiways, stands): skipped when the airport is off-screen. `fade` 0-1. */
+  drawLayoutEmbedded(c: CanvasRenderingContext2D, fade: number) {
+    if (!this.L || !this.graph) return;
+    if (!this.pc) this.prepare();
+    if (!this.onScreen()) return;
+    const s = this.s, col = this.col, L = this.L, pc = this.pc, dpr = this.map.dpr;
+    const sat = State.settings.mapStyle === 'satellite';
+    // the map's projection is a plain linear one at airport scale: metres -> screen
+    const o = this.scr(0, 0), ex = this.scr(1000, 0), ey = this.scr(0, 1000);
+    const a = (ex[0] - o[0]) / 1000, b = (ex[1] - o[1]) / 1000, cc = (ey[0] - o[0]) / 1000, d = (ey[1] - o[1]) / 1000;
+    c.save();
+    c.setTransform(a * dpr, b * dpr, cc * dpr, d * dpr, o[0] * dpr, o[1] * dpr);
+    c.globalAlpha = fade * (sat ? 0.62 : 1);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const px = (n: number) => n / s;   // n screen pixels, in metres
+    c.fillStyle = '#0f2238'; c.fill(pc.aprons); c.strokeStyle = 'rgba(147,169,193,.18)'; c.lineWidth = px(1); c.stroke(pc.aprons);
+    c.fillStyle = '#1a3352'; c.fill(pc.terms); c.strokeStyle = 'rgba(63,208,232,.35)'; c.stroke(pc.terms);
+    for (const w of Object.keys(pc.pave)) { c.strokeStyle = this.graph.schematic ? '#122840' : '#1a3554'; c.lineWidth = Math.max(px(1.5), +w); c.stroke(pc.pave[w]); }
+    if (s > 0.25 && !this.graph.schematic) { c.strokeStyle = 'rgba(242,179,61,.45)'; c.lineWidth = px(1.5); c.stroke(pc.centre); }
+    if (s > 0.12) { c.strokeStyle = 'rgba(242,179,61,.55)'; c.lineWidth = Math.max(px(1), 0.3); c.stroke(pc.lanes); }
+    if (this.graph.schematic) { c.fillStyle = '#10243c'; c.fill(pc.dots); }
+    c.strokeStyle = 'rgba(242,179,61,.8)'; c.lineWidth = Math.max(px(1.2), 0.5); c.stroke(pc.leads);
+    c.lineWidth = Math.max(px(1.6), 0.9); c.stroke(pc.bars);
+    c.restore();
+    c.save(); c.globalAlpha = fade;
+    // runways (a handful: drawn directly), stand names (only those on screen), approach line
+    this.drawRunwaysTo(c, s, col);
+    if (s > 0.45) {
+      const g = this.graph, m = this.map;
+      c.fillStyle = col.dim; c.font = `600 ${s > 1.5 ? 11 : 9.5}px Inter, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      g.parks.forEach((p, i) => {
+        const name = L.parkNames && L.parkNames[i] ? L.parkNames[i] : p[6] ? standName(p) : ''; if (!name) return;
+        const r = p[3] || 15, h = (p[2] || 0) * Math.PI / 180, al = Math.max(6 / s, r * 0.45), t = this.scr(p[0] + Math.sin(h) * al, p[1] + Math.cos(h) * al);
+        if (t[0] < -20 || t[1] < -20 || t[0] > m.w + 20 || t[1] > m.h + 20) return;
+        c.fillText(name, t[0], t[1]);
+      });
+      c.textBaseline = 'alphabetic'; c.textAlign = 'left';
+    }
+    c.restore();
+  }
+
+  drawRunwaysTo(c: CanvasRenderingContext2D, s: number, col: any) {
+    const L = this.L;
+    for (const r of L.runways) {
+      const cc = this.xy(r.lat, r.lon), h = r.hdg * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h), px = Math.cos(h), py = -Math.sin(h);
+      const corner = (a: number, b: number) => this.scr(cc[0] + ux * a + px * b, cc[1] + uy * a + py * b);
+      const hl = r.len / 2, hw = Math.max(r.wid / 2, 1.5 / s);
+      const act = this.active && Math.abs(Math.abs(((this.active.ux * ux + this.active.uy * uy))) - 1) < 1e-3 && Math.hypot(this.active.tx + this.active.ux * this.active.len / 2 - cc[0], this.active.ty + this.active.uy * this.active.len / 2 - cc[1]) < 5;
+      c.fillStyle = r.surf === 1 ? '#1d3a2c' : r.surf === 9 ? '#123553' : '#1f3049';
+      c.beginPath(); [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]].forEach((k, i) => { const p = corner(k[0], k[1]); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath(); c.fill();
+      c.strokeStyle = act ? col.cyan : 'rgba(230,238,247,.55)'; c.lineWidth = act ? 1.6 : 1; c.stroke();
+      if (s * r.wid > 6) {
+        c.setLineDash([Math.max(3, 30 * s), Math.max(3, 20 * s)]); c.strokeStyle = 'rgba(230,238,247,.6)'; c.lineWidth = 1;
+        const a = corner(-hl + 60, 0), b = corner(hl - 60, 0); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.setLineDash([]);
+        c.lineWidth = Math.max(1, 1.8 * s); c.beginPath();
+        for (const e of [-1, 1]) for (let k = -3; k <= 3; k++) { if (!k) continue; const o = (k / 3.6) * hw, p = corner(e * (hl - 8), o), q = corner(e * (hl - 40), o); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); }
+        c.stroke();
+      }
+      c.font = '700 11px Inter, sans-serif'; c.textAlign = 'center';
+      for (const [e, name] of [[-1, r.a], [1, r.b]] as [number, string][]) {
+        if (!name) continue; const p = corner(e * (hl + 70 / Math.max(s, 0.05) * 0.02 + 30), 0);
+        c.fillStyle = act && this.active.name === name ? col.cyan : col.dim; c.fillText(name, p[0], p[1] + 4);
+      }
+      c.textAlign = 'left';
+    }
+  }
+
+  /** The aircraft at the airport: always drawn, at full strength, whatever the zoom. */
+  drawAircraftTo(c: CanvasRenderingContext2D, now: number) {
+    const s = this.s, col = this.col;
+    for (const p of this.planes) {
+      const q = this.scr(p.x, p.y), size = Math.max(p.parked ? 14 : 19, p.span * s * 1.05);
+      if (q[0] < -60 || q[1] < -60 || q[0] > this.map.w + 60 || q[1] > this.map.h + 60) continue;
+      const tracked = p.id === this.track;
+      if (tracked) { const pulse = (now / 1000) % 1.6 / 1.6; c.beginPath(); c.arc(q[0], q[1], size * 0.7 + 6 + pulse * 14, 0, Math.PI * 2); c.strokeStyle = col.mag; c.globalAlpha = 0.6 * (1 - pulse); c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }
+      if (p.alt > 50) { c.globalAlpha = 0.25; drawPlaneGlyph(c, q[0] + Math.min(18, p.alt / 120), q[1] + Math.min(18, p.alt / 120), p.hdg, size, p.prop, '#000', 'transparent'); c.globalAlpha = 1; }
+      drawPlaneGlyph(c, q[0], q[1], p.hdg, size, p.prop, p.you ? col.cyan : p.parked ? col.dim : col.ink, col.bg);
+      if (!p.parked || s > 0.5 || tracked) {
+        c.font = '600 10.5px Inter, sans-serif';
+        const text = p.label + (p.parked ? '' : ' · ' + p.phase), w = c.measureText(text).width, lx = q[0] + size * 0.55 + 6, ly = q[1] - size * 0.4;
+        c.fillStyle = 'rgba(6,16,30,.82)'; c.fillRect(lx - 4, ly - 10, w + 8, 15);
+        c.fillStyle = p.you ? col.cyan : tracked ? col.mag : p.parked ? col.dim : col.ink; c.fillText(text, lx, ly + 1);
+      }
+    }
   }
 
   renderList() {
