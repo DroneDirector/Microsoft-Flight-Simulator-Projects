@@ -168,7 +168,7 @@ ACTIONS['map-find'] = el => { closeAll(); Sound.tick(); focusAirport(el.getAttri
 ACTIONS['map-unmark'] = () => { const m = _curMap(); if (m) { m.mark = null; m.baseDirty = true; } const box = $(State.screen === 'map' ? '#map-detail' : '#ops-sel'); if (box) box.innerHTML = ''; };
 
 /** The airport view is switched on once it is finished. */
-const AIRPORT_VIEW = false;
+const AIRPORT_VIEW = true;
 
 /* ---------- The flight's speech bubble ---------- */
 function flightBubbleHtml(id: string, following: boolean): string {
