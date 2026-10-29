@@ -50,6 +50,26 @@ public class AppToolsPlugin extends Plugin {
     private BroadcastReceiver statusReceiver;
     private volatile boolean busy = false;
 
+    /* ---------- Battery ---------- */
+
+    /** Charge level, whether it is charging, and how: cable (AC or USB), wireless or not plugged in. */
+    @PluginMethod
+    public void battery(PluginCall call) {
+        try {
+            Intent b = getContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            JSObject r = new JSObject();
+            if (b == null) { r.put("present", false); call.resolve(r); return; }
+            int level = b.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1), scale = b.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100);
+            int status = b.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1), plugged = b.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0);
+            r.put("present", b.getBooleanExtra(android.os.BatteryManager.EXTRA_PRESENT, true));
+            r.put("level", level >= 0 && scale > 0 ? level * 100 / scale : -1);
+            r.put("charging", status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL);
+            r.put("full", status == android.os.BatteryManager.BATTERY_STATUS_FULL);
+            r.put("plugged", plugged == android.os.BatteryManager.BATTERY_PLUGGED_WIRELESS ? "wireless" : plugged == android.os.BatteryManager.BATTERY_PLUGGED_USB ? "usb" : plugged == android.os.BatteryManager.BATTERY_PLUGGED_AC ? "ac" : plugged != 0 ? "other" : "none");
+            call.resolve(r);
+        } catch (Exception e) { call.reject(describe(e)); }
+    }
+
     /* ---------- This device (for registration) ---------- */
 
     /** Android's ID for this app on this phone: the same after updates and reinstalls, new after a factory reset. */

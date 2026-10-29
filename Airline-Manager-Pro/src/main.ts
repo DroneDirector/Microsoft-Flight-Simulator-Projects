@@ -46,6 +46,7 @@
   startAiClock();
   startCoopClock();
   startBases();
+  Battery.init();
   Backup.offerRestoreOnFirstStart();
   whatsNewOnStart();
   if ((State as any).linkedOnce) State.live = State.live.filter(f => !(f.you && !f.real));
