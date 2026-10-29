@@ -85,7 +85,9 @@ ACTIONS['buy-qty'] = el => { _buy.qty = clamp(_buy.qty + parseInt(el.getAttribut
 ACTIONS['buy-div'] = el => { _buy.div = el.getAttribute('data-div'); Sound.tick(); rerenderBuy(); };
 
 ACTIONS['buy-confirm'] = () => {
+  if (!coopCanBuy()) { toast('In this co-op only the owner buys aircraft', 'warn'); return; }
   const t = acType(_buy.id), c = company();
+  try { coopAfterBuy(`${_buy.qty}× ${t.maker} ${t.model}`, t.price * _buy.qty); } catch (e) { /* ignore */ }
   const regs = nextRegs(c, _buy.qty);
   const from = c.balance;
   c.balance -= t.price * _buy.qty;

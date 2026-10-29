@@ -105,7 +105,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   const net = m.net, d = new Date(at), ds = dateStr(d);
   const txId = uid(); (summary.tx = summary.tx || []).push(txId);
   State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.callsign} ${f.from} to ${f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
-    amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: m.lines } as any);
+    amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: m.lines, byPilot: f.pilotId } as any);
   c.balance += net;
   // keep the day's flown legs for the schedule (the last two days)
   const S: any = State; S.aiDay = (S.aiDay || []).filter((x: any) => x.end > Date.now() - 2 * 864e5);

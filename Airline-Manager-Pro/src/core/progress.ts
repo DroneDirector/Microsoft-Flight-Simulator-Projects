@@ -2,6 +2,8 @@
 // Badges come in ladders (1, 5, 10, 25… flights; hours; smooth landings; every aircraft type, airport and
 // country; fleet size, revenue, staff…), well over a thousand in all, in six tiers from Bronze to Legendary.
 // Everything is worked out from what is already saved (flight log, fleet, money, staff), so nothing is lost.
+// Badges are yours: only flights you fly yourself count. Hired pilots don't earn badges, and in co-op every
+// pilot earns their own badges on their own device, from their own flights.
 
 interface BadgeDef { id: string; group: 'pilot' | 'airline' | 'crew'; cat: string; title: string; desc: string; tier: number; metric: string; need: number; icon: string }
 
@@ -59,15 +61,15 @@ function badgeDefs(): BadgeDef[] {
   // ---- the airline
   ladder('airline', 'Fleet', 'a.fleet', [1, 2, 3, 5, 8, 10, 15, 20, 30, 50, 75, 100, 150, 200], 'fleet', v => `Fleet of ${v}`, v => `Own ${v} ${v === 1 ? 'aircraft' : 'aircraft'} at once.`);
   for (const t of AIRCRAFT) ladder('airline', 'Fleet', 'a.ftype.' + t.id, LADDERS.fleetType, 'fleet', v => `${t.model} operator${v > 1 ? ' ×' + v : ''}`, v => `Have ${v} ${t.maker} ${t.model} in the fleet.`);
-  for (const t of AIRCRAFT) ladder('airline', 'Operations', 'a.tlegs.' + t.id, [10, 50, 100, 250, 500, 1000, 2500], 'clock', v => `${t.model} fleet: ${_fmtN(v)} flights`, v => `Your airline's ${t.maker} ${t.model} aircraft complete ${_fmtN(v)} flights.`);
+  for (const t of AIRCRAFT) ladder('airline', 'Operations', 'a.tlegs.' + t.id, [10, 50, 100, 250, 500, 1000, 2500], 'clock', v => `${t.model} fleet: ${_fmtN(v)} flights`, v => `Fly your airline's ${t.maker} ${t.model} ${_fmtN(v)} times yourself.`);
   for (const k of Object.keys(AIRPORTS)) { const a = AIRPORTS[k]; if (!a || k === 'DEP') continue;
-    ladder('airline', 'Airports', 'a.apt.' + k, [10, 100, 500, 1000], 'pin', v => `${a.city} station ×${_fmtN(v)}`, v => `Your airline lands at ${a.name} (${k}) ${_fmtN(v)} times.`); }
+    ladder('airline', 'Airports', 'a.apt.' + k, [10, 100, 500, 1000], 'pin', v => `${a.city} station ×${_fmtN(v)}`, v => `Land your airline at ${a.name} (${k}) ${_fmtN(v)} times yourself.`); }
   ladder('airline', 'Money', 'a.revenue', LADDERS.money, 'finance', v => `${money(v, { compact: true })} revenue`, v => `Earn ${money(v)} in revenue.`);
   ladder('airline', 'Money', 'a.balance', LADDERS.money, 'finance', v => `${money(v, { compact: true })} in the bank`, v => `Have a balance of ${money(v)}.`);
   ladder('airline', 'Network', 'a.routes', [1, 2, 3, 5, 10, 15, 20, 30, 50, 75, 100], 'routes', v => v === 1 ? 'First route' : `${v} routes`, v => `Run ${v} ${v === 1 ? 'route' : 'routes'}.`);
   ladder('airline', 'Network', 'a.dests', [2, 3, 5, 10, 15, 20, 30, 50, 75, 100], 'pin', v => `${v} destinations`, v => `Fly to ${v} different airports as an airline.`);
-  ladder('airline', 'Operations', 'a.legs', LADDERS.count, 'clock', v => `${_fmtN(v)} airline ${v === 1 ? 'flight' : 'flights'}`, v => `Your airline completes ${_fmtN(v)} ${v === 1 ? 'flight' : 'flights'} (you and your hired pilots).`);
-  ladder('airline', 'Operations', 'a.pax', LADDERS.pax, 'pax', v => `${_fmtN(v)} passengers`, v => `Your airline carries ${_fmtN(v)} passengers.`);
+  ladder('airline', 'Operations', 'a.legs', LADDERS.count, 'clock', v => `${_fmtN(v)} airline ${v === 1 ? 'flight' : 'flights'}`, v => `Fly ${_fmtN(v)} ${v === 1 ? 'flight' : 'flights'} for your airline yourself.`);
+  ladder('airline', 'Operations', 'a.pax', LADDERS.pax, 'pax', v => `${_fmtN(v)} passengers`, v => `Carry ${_fmtN(v)} passengers for your airline on your own flights.`);
   ladder('airline', 'Staff', 'a.staff', [1, 5, 10, 25, 50, 100, 250, 500, 1000], 'pilots', v => `${v} ${v === 1 ? 'employee' : 'employees'}`, v => `Employ ${v} people.`);
   ladder('airline', 'Staff', 'a.pilots', [1, 2, 3, 5, 10, 20, 50, 100], 'pilots', v => `${v} hired ${v === 1 ? 'pilot' : 'pilots'}`, v => `Hire ${v} ${v === 1 ? 'pilot' : 'pilots'}.`);
   ladder('airline', 'Popularity', 'a.pop', LADDERS.pop, 'star', v => v === 100 ? 'Everyone\'s favourite' : `Popularity ${v}`, v => `Reach a popularity of ${v} out of 100.`);
@@ -86,7 +88,8 @@ const Progress = {
   compute(): { [k: string]: number } {
     const S: any = State, st: { [k: string]: number } = {}, c = company(), me: any = myPilot();
     const inc = (k: string, v?: number) => { st[k] = (st[k] || 0) + (v == null ? 1 : v); };
-    const mine = State.logbook.filter(l => l.result !== 'crash');
+    // only your own flights: not hired pilots' and not other co-op pilots'
+    const mine = State.logbook.filter((l: any) => l.result !== 'crash' && !l.coopBy && l.atc !== 'Co-op');
     const apts = new Set<string>(), ctys = new Set<string>(), types = new Set<string>();
     let streak = 0, best = 0;
     for (const l of mine.slice().reverse()) {
@@ -105,17 +108,15 @@ const Progress = {
     // airline
     const fl = State.fleet.filter(a => a.companyId === c.id);
     st['a.fleet'] = fl.length; fl.forEach(a => inc('a.ftype.' + a.typeId));
-    st['a.revenue'] = State.txns.filter(t => t.companyId === c.id && t.amount > 0).reduce((s, t) => s + t.amount, 0);
+    st['a.revenue'] = State.txns.filter(t => t.companyId === c.id && t.amount > 0 && !txByOthers(t)).reduce((s, t) => s + t.amount, 0);
     st['a.balance'] = c.balance;
     st['a.routes'] = State.routes.filter(r => r.companyId === c.id).length;
-    const dests = new Set<string>(); State.routes.filter(r => r.companyId === c.id).forEach(r => r.legs.forEach(x => dests.add(x))); (S.aiDay || []).forEach((x: any) => dests.add(x.to)); apts.forEach(x => dests.add(x));
+    const dests = new Set<string>(); State.routes.filter(r => r.companyId === c.id).forEach(r => r.legs.forEach(x => dests.add(x))); apts.forEach(x => dests.add(x));
     st['a.dests'] = dests.size;
     const pr = S.progress || {};
-    st['a.legs'] = (pr.aiLegs || 0) + mine.length;
-    st['a.pax'] = (pr.aiPax || 0) + (st['p.pax'] || 0);
-    for (const k of Object.keys(pr.tlegs || {})) st['a.tlegs.' + k] = pr.tlegs[k];
+    st['a.legs'] = mine.length;
+    st['a.pax'] = st['p.pax'] || 0;
     for (const t of Object.keys(st)) if (t.indexOf('p.type.') === 0) st['a.tlegs.' + t.slice(7)] = (st['a.tlegs.' + t.slice(7)] || 0) + st[t];
-    for (const k of Object.keys(pr.alegs || {})) st['a.apt.' + k] = pr.alegs[k];
     for (const t of Object.keys(st)) if (t.indexOf('p.apt.') === 0) st['a.apt.' + t.slice(6)] = (st['a.apt.' + t.slice(6)] || 0) + st[t];
     const staff = staffOf(c.id), pilots = State.pilots.filter((p: any) => p.companyId === c.id && !p.you);
     st['a.staff'] = staff.length + pilots.length; st['a.pilots'] = pilots.filter((p: any) => !p.coPilotFor).length;
@@ -180,6 +181,13 @@ const Progress = {
     if (Math.random() < 0.3) this.popularity(0.1, 'Flights on time');
   },
 };
+
+/** Money earned by hired pilots or other co-op pilots: it goes to the airline but doesn't earn you badges. */
+function txByOthers(t: any): boolean {
+  if (t.coopBy || t.byPilot) return true;
+  // older entries from hired pilots name the pilot in brackets after the route
+  return t.kind === 'revenue' && !!t.flight && / \([^)]+\)$/.test(t.label || '');
+}
 
 /** How likely a crew member is to misbehave, from their rating: top-rated staff rarely do, poorly rated ones often. */
 function conductFactor(rating: number): number { return clamp((5.4 - (rating || 3.5)) / 1.6, 0.15, 1.8); }
