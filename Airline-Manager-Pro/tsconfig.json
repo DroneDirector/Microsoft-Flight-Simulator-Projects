@@ -46,6 +46,7 @@
     "src/core/court.ts",
     "src/core/staffing.ts",
     "src/core/coop.ts",
+    "src/core/levels.ts",
     "src/core/progress.ts",
     "src/core/condition.ts",
     "src/core/passengers.ts",

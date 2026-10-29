@@ -147,7 +147,8 @@ const Progress = {
   check(quiet?: boolean) {
     const S: any = State; S.badges = S.badges || {}; S.progress = S.progress || { since: Date.now() };
     const st = this.compute(), fresh: BadgeDef[] = [];
-    for (const b of badgeDefs()) if (!S.badges[b.id] && (st[b.metric] || 0) >= b.need) { S.badges[b.id] = Date.now(); fresh.push(b); }
+    // only your personal badges are awarded
+    for (const b of badgeDefs()) if (b.group === 'pilot' && !S.badges[b.id] && (st[b.metric] || 0) >= b.need) { S.badges[b.id] = Date.now(); fresh.push(b); }
     if (!fresh.length) return;
     Store.soon();
     if (quiet) return;

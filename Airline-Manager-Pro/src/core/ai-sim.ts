@@ -133,6 +133,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       aiLand(f, at, summary);
       try { const pa: any = plane(f.reg); if (pa) { conditionAfterFlight(pa, F.durMs / 60000); conditionRisk(pa, f); } } catch (e) { /* ignore */ }
       try { paxOnAiLanding(f); Progress.afterAiLeg(f.pax, (plane(f.reg) || {} as any).typeId, f.to); } catch (e) { /* ignore */ }
+      try { const pa: any = plane(f.reg); if (pa) crewAfterLeg(pa.companyId, { pilotId: f.pilotId, typeId: pa.typeId, from: f.from, to: f.to, blockMin: F.durMs / 60000 }); } catch (e) { /* ignore */ }
       State.live = State.live.filter(x => x !== f);
       // duty: rest once the next leg would take the pilot past the duty limit, otherwise turn around
       const p: any = pilot(f.pilotId), maxDuty = ((p && p.rules && p.rules.maxDutyHrs) || 10) * 60;

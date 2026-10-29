@@ -280,6 +280,7 @@ function finishLeg(e: FlightEvent) {
   removeMyLiveFlight();
   try { Progress.afterMyLeg(sm.landingFpm, grounded ? 'incident' : hard ? 'hard' : 'ok'); } catch (er) { /* ignore */ }
   try { coopAfterMyLeg(from, to, sm.blockMin, m.net, txId); } catch (er) { /* ignore */ }
+  try { crewAfterLeg(c.id, { coPilot: true, typeId: a.typeId, from, to, blockMin: sm.blockMin }); } catch (er) { /* ignore */ }
   Store.save(); refresh(); animateBalance(before, c.balance);
   toast(`Flight logged: ${from} to ${to}, ${money(rev - fuel - fees, { sign: true })}`, 'ok');
   // the mechanic gets back to you about anything found on this leg

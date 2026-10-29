@@ -139,6 +139,7 @@ function coopLand(f: any, at: number) {
   const a = f.reg ? plane(f.reg) : null;
   if (a) { a.status = 'parked'; a.location = f.to; a.hoursMin += blockMin; a.cycles += 1; try { conditionAfterFlight(a, blockMin); } catch (e) { /* ignore */ } }
   const p = pilot(f.pilotId); if (p) { p.status = 'standby'; p.hoursMin += blockMin; p.landings += 1; }
+  try { crewAfterLeg(co.id, { typeId: f.typeId, from: f.from, to: f.to, blockMin }); } catch (e) { /* ignore */ }
   if (m) { m.flights++; m.hoursMin += blockMin; m.revenue += money0.net; m.lastSeen = at; m.base = f.to; }
   try { Progress.popularity(fpm > -250 ? 0.2 : 0, 'A good co-op flight'); } catch (e) { /* ignore */ }
   coopRecord({ id: 'fl-' + f.id, at, by: f.pilotId, type: 'flight', text: `${m ? m.name : 'A co-op pilot'} landed at ${f.to} from ${f.from}`, amount: money0.net, tx: txId });

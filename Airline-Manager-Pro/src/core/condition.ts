@@ -68,6 +68,7 @@ function conditionAdvance() {
     if (k >= 1) {
       i.status = 'fixed';
       if (!State.issues.some((x: any) => x.reg === a.reg && x.status === 'scheduled')) a.status = State.issues.some((x: any) => x.reg === a.reg && x.status === 'open' && x.severity === 'grounding') ? 'grounded' : 'parked';
+      try { crewAfterRepair(a.companyId, a.location || a.base, i.durMin); } catch (e) { /* ignore */ }
       State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${a.reg} is out of the hangar`, body: `${i.title} done in ${i.durMin} minutes. Condition ${Math.round(a.condition)}%.`, time: 'Now', read: false } as any);
     }
   }

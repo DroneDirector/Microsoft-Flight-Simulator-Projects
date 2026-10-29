@@ -41,7 +41,7 @@ SCREENS.pilots = {
         const route = State.routes.filter(r => r.pilotId === p.id)[0];
         return `<div class="crew-row" style="--i:${i}">
           <button class="avatar av-btn" data-act="staff-detail" data-id="${p.id}" aria-label="${esc(p.name)}">${avatarSvg(p.look, personRole(p), { view: 'bust', accent: c.color })}</button>
-          <span class="cr-name"><b>${esc(p.name)}</b><small>${esc(p.rank)}, ${flag(p.nat)} ${ageOf(p.dob)}, ${num(p.hoursMin / 60)} h, ${esc(p.base)}</small></span>
+          <span class="cr-name"><b>${esc(p.name)} ${levelChip(p)}</b><small>${esc(levelTitle(p))}, ${flag(p.nat)} ${ageOf(p.dob)}, ${num(p.hoursMin / 60)} h, ${esc(p.base)}</small></span>
           <span class="cr-now">${f ? `${statusChip('flying')}<small>${esc(f.callsign)} ${esc(f.from)} to ${esc(f.to)}, ${Math.round(f.t * 100)}%</small>` : `${statusChip(p.status)}<small>${route ? 'Next: ' + esc(route.code) : 'No route assigned'}</small>`}</span>
           <span class="cr-rules">${p.rules ? `<i>${p.rules.maxDutyHrs} h duty</i><i>${p.rules.maxLandingFpm} fpm limit</i>${p.rules.ifrOnly ? '<i>IFR only</i>' : '<i>VFR allowed</i>'}` : ''}</span>
           <span class="cr-btns">${f ? `<button class="btn ghost sm" data-act="watch-pilot" data-id="${f.id}">${icon('map')}Watch</button>` : ''}<button class="btn sm" data-act="pilot-rules" data-id="${p.id}">Assign</button></span>
