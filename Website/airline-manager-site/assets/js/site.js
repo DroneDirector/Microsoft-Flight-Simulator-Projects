@@ -60,7 +60,7 @@
       return [ox + (lon + 180) / 360 * COLS * k, oy + (MY_N - millerY(Math.max(LAT_S, Math.min(LAT_N, lat)))) / (MY_N - MY_S) * landRows.length * k];
     }
     function size() {
-      var r = host.getBoundingClientRect(); w = r.width; h = r.height; dpr = Math.min(2, W.devicePixelRatio || 1);
+      var r = cv.getBoundingClientRect(); w = r.width; h = r.height; dpr = Math.min(2, W.devicePixelRatio || 1);
       cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
       // cover the area; keep the North Atlantic (where the demo airline lives) in view
       k = Math.max(w / COLS, h / landRows.length) * (w < 700 ? 1.6 : 1.08);

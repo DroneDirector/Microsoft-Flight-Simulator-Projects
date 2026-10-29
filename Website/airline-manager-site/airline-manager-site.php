@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Airline Manager Pro Website
  * Description: The Airline Manager Pro website for Elementor: a showcase home page with a live route map, the app on Android and Windows, downloads that follow the newest release, and the full feature list. Every section is an Elementor widget.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: elementor
@@ -13,7 +13,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('AMS_VERSION', '1.0.0');
+define('AMS_VERSION', '1.0.1');
 define('AMS_FILE', __FILE__);
 define('AMS_DIR', plugin_dir_path(__FILE__));
 define('AMS_URL', plugin_dir_url(__FILE__));

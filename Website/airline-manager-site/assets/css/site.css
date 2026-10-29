@@ -65,7 +65,8 @@ html:has(body.ams-page) { background: var(--ams-bg); scroll-behavior: smooth; sc
 .ams-head .ams-lead { margin-inline: auto; }
 .ams-center { text-align: center; margin-top: clamp(28px, 4vw, 48px) !important; }
 
-/* reveal */
+/* reveal (always visible while editing in Elementor) */
+.elementor-editor-active [data-reveal], .elementor-edit-area [data-reveal] { opacity: 1 !important; transform: none !important; }
 .ams-js [data-reveal] { opacity: 0; transform: translateY(26px); transition: opacity .9s var(--ams-ease), transform .9s var(--ams-ease); transition-delay: calc(var(--d, 0) * 90ms); }
 .ams-js [data-reveal].is-in { opacity: 1; transform: none; }
 
@@ -132,7 +133,7 @@ html:has(body.ams-page) { background: var(--ams-bg); scroll-behavior: smooth; sc
 /* ---------------------------------------------------------------- hero */
 .ams-hero { overflow: hidden; padding: clamp(104px, 9vw, 160px) 0 clamp(40px, 5vw, 80px); min-height: min(100svh, 1400px); background: radial-gradient(120% 70% at 50% 0%, #0b2140 0%, var(--ams-bg) 60%); }
 .ams-routes { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; -webkit-mask-image: linear-gradient(180deg, #000 40%, transparent 96%); mask-image: linear-gradient(180deg, #000 40%, transparent 96%); }
-.ams-routes--soft { opacity: .5; -webkit-mask-image: linear-gradient(180deg, #000, transparent 70%); mask-image: linear-gradient(180deg, #000, transparent 70%); }
+.ams-routes--soft { height: min(100vh, 1100px); bottom: auto; opacity: .5; -webkit-mask-image: linear-gradient(180deg, #000, transparent 70%); mask-image: linear-gradient(180deg, #000, transparent 70%); }
 .ams-hero__glow { position: absolute; inset: 0; pointer-events: none; }
 .ams-hero__glow i { position: absolute; border-radius: 50%; filter: blur(80px); opacity: .5; }
 .ams-hero__glow i:nth-child(1) { width: 46vw; height: 46vw; left: -12vw; top: 20%; background: radial-gradient(circle, rgba(224, 75, 214, .35), transparent 65%); animation: ams-drift 18s ease-in-out infinite alternate; }

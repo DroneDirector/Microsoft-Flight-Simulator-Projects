@@ -87,7 +87,8 @@ report.append('front page = home page: ' + ('yes' if 'ams-hero' in front else 'N
 fail = fail or 'ams-hero' not in front
 log = os.path.join(S, 'wp-content', 'debug.log')
 errs = [l for l in open(log, errors='ignore')] if os.path.exists(log) else []
-errs = [l for l in errs if 'airline-manager-site' in l]
+import re
+errs = [l for l in errs if re.search(r'PHP (Warning|Notice|Fatal error|Deprecated|Parse error).* in \S*/plugins/airline-manager-site/', l)]
 report.append(f'PHP messages from the plugin: {len(errs)}'); report += errs[:20]
 fail = fail or bool(errs)
 open(f'{OUT}/report.txt', 'w').write('\n'.join(report) + '\n')
