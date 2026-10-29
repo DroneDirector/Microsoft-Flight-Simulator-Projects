@@ -12,9 +12,21 @@ S = os.path.expanduser('~/site')
 def wp(*a):
     return subprocess.run(['wp', '--path=' + S, *a], capture_output=True, text=True).stdout.strip()
 
-ids = json.loads(wp('option', 'get', 'ams_pages', '--format=json') or '{}')
-urls = {k: wp('post', 'url', str(v)).splitlines()[-1] for k, v in ids.items()}
-report, fail = [f'pages: {json.dumps(urls)}'], False
+report, fail = [], False
+raw = wp('option', 'get', 'ams_pages', '--format=json')
+report.append(f'ams_pages option: {raw!r}')
+try:
+    ids = json.loads(raw[raw.index('{'):raw.rindex('}') + 1])
+except Exception:
+    ids = {}
+urls = {}
+for k, v in ids.items():
+    out = [l.strip() for l in wp('post', 'url', str(v)).splitlines() if l.strip().startswith('http')]
+    urls[k] = out[-1] if out else f'{BASE}/?page_id={v}'
+report.append(f'pages: {json.dumps(urls)}')
+if not urls:
+    fail = True
+    report.append('pages in WordPress: ' + wp('post', 'list', '--post_type=page', '--fields=ID,post_name,post_status'))
 
 SIZES = [('phone-360', 360, 780, 3, True), ('phone-412', 412, 915, 2.6, True), ('phone-landscape', 844, 390, 3, True),
          ('tablet-portrait', 800, 1280, 2, True), ('tablet-landscape', 1280, 800, 2, True), ('laptop', 1440, 900, 1, False),
@@ -65,7 +77,11 @@ async def main():
             report.append(f'editor: {ex!r}')
         await b.close()
 
-asyncio.run(main())
+try:
+    asyncio.run(main())
+except Exception:
+    import traceback
+    report.append('check stopped: ' + traceback.format_exc()); fail = True
 front = subprocess.run(['curl', '-s', BASE + '/'], capture_output=True, text=True).stdout
 report.append('front page = home page: ' + ('yes' if 'ams-hero' in front else 'NO'))
 fail = fail or 'ams-hero' not in front
