@@ -130,6 +130,7 @@ Only damage the simulator can actually detect.
 | Fly for a real-world airline (names and codes only, no logos) | Built |
 | Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
+| Animated start-up screen: detailed compass-star mark, loading steps and a progress bar with sparks; opens on the Overview after five seconds | Built |
 | Version number in the bottom-left corner | Built |
 | What's new after every update: the newest version's changes open, the two before it folded; again from Settings → General | Built |
 | Airline saved on the device and kept through updates; new versions install over the old one | Built |

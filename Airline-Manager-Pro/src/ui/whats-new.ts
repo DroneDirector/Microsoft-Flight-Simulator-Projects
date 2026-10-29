@@ -41,10 +41,10 @@ function whatsNewOnStart() {
   // wait until the start-up is done and no other pop-up (birthday, restore…) is open
   let tries = 0;
   const show = () => {
-    if (_layers.length && tries++ < 60) { setTimeout(show, 1500); return; }
+    if ((_layers.length || splashShowing()) && tries++ < 60) { setTimeout(show, 1500); return; }
     openWhatsNew();
   };
-  setTimeout(show, reducedMotion() ? 600 : 2200);
+  setTimeout(show, SPLASH_MS + 900);
 }
 
 ACTIONS['whats-new'] = () => { Sound.tick(); openWhatsNew(); };

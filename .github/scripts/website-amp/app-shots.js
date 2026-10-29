@@ -30,7 +30,7 @@ const plan = [
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   const p = await b.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1.5 });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
-  await p.goto('file://' + file); await p.waitForTimeout(4500);
+  await p.goto('file://' + file); await p.waitForTimeout(7000);   // after the five-second start-up screen
   // no "What's new" or welcome pop-ups in the pictures
   await p.evaluate(`try { closeAll(); } catch (e) {}`);
   let failed = 0;

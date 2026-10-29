@@ -18,8 +18,9 @@
   } catch (e) { /* not available in a browser */ }
   bindActions();
   bindBack();
+  State.screen = 'ops';   // the app always opens on the Overview
   renderShell();
-  checkBirthday();
+  setTimeout(checkBirthday, SPLASH_MS + 400);   // after the start-up screen
   scheduleBirthdayNotification();
   startConductClock();
   startCourtClock();
@@ -33,11 +34,6 @@
   Backup.offerRestoreOnFirstStart();
   whatsNewOnStart();
   if ((State as any).linkedOnce) State.live = State.live.filter(f => !(f.you && !f.real));
-  // Splash fades out once the first screen is painted
-  const sp = document.createElement('div');
-  sp.className = 'splash';
-  sp.innerHTML = `<div class="sp-mark">${brandMark()}</div><b>${esc(APP.name)}</b>`;
-  document.body.appendChild(sp);
-  setTimeout(() => sp.classList.add('out'), reducedMotion() ? 50 : 900);
-  setTimeout(() => sp.remove(), 1600);
+  // Start-up screen for five seconds, then the Overview
+  showSplash(() => { if (State.screen !== 'ops' && !_layers.length) go('ops', true); });
 })();

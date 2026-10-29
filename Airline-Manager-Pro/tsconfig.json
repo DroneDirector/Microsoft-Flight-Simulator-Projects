@@ -42,6 +42,7 @@
     "src/ui/look-editor.ts",
     "src/ui/crew-ui.ts",
     "src/ui/whats-new.ts",
+    "src/ui/splash.ts",
     "src/core/court.ts",
     "src/core/staffing.ts",
     "src/core/progress.ts",

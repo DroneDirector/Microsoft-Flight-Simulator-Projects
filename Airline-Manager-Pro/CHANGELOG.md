@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.5 (2026-10-29)
+
+- Animated start-up screen (five seconds): detailed compass-star mark, loading steps and a route-line progress bar with sparks and a take-off at 100%; the app then opens on the Overview
+
 ## 0.5.4 (2026-10-29)
 
 - What's new pop-up after every update: the three newest versions from the release notes, the newest open (can be folded away until the next update), the two before it folded; also in Settings → General
