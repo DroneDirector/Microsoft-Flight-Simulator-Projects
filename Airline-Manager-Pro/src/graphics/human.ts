@@ -453,32 +453,54 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     }
     const strands = [];
     if (!G.length) return strands;
-    const cell = 0.03, buckets = new Map(), bk = (x, y, z) => x * 1000003 + y * 1009 + z;
-    for (const g of G) { const k = bk(Math.floor(g.R.p.x / cell), Math.floor(g.R.p.y / cell), Math.floor(g.R.p.z / cell)); (buckets.get(k) || buckets.set(k, []).get(k)).push(g); }
-    const near = R => { let best = null, bd = 1e9; const cx = Math.floor(R.p.x / cell), cy = Math.floor(R.p.y / cell), cz = Math.floor(R.p.z / cell);
-      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) { const L = buckets.get(bk(cx + dx, cy + dy, cz + dz)); if (!L) continue; for (const g of L) { const d = g.R.p.distanceToSquared(R.p); if (d < bd) { bd = d; best = g; } } }
-      if (!best) for (const g of G) { const d = g.R.p.distanceToSquared(R.p); if (d < bd) { bd = d; best = g; } }
-      return best; };
-    const a1 = new THREE.Vector3(), a2 = new THREE.Vector3(), dir = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    // guide points as flat arrays
-    for (const g of G) { const f = new Float32Array(g.pts.length * 3); g.pts.forEach((v, k) => { f[k * 3] = v.x; f[k * 3 + 1] = v.y; f[k * 3 + 2] = v.z; }); g.f = f; }
+    // nearest guide for each root: guides sorted into a small 3D grid (no allocation per lookup)
+    const cell = 0.03, nG = G.length, gx = new Float32Array(nG * 3);
+    let mnx = 1e9, mny = 1e9, mnz = 1e9, mxx = -1e9, mxy = -1e9, mxz = -1e9;
+    for (let i = 0; i < nG; i++) { const p = G[i].R.p; gx[i * 3] = p.x; gx[i * 3 + 1] = p.y; gx[i * 3 + 2] = p.z;
+      if (p.x < mnx) mnx = p.x; if (p.y < mny) mny = p.y; if (p.z < mnz) mnz = p.z; if (p.x > mxx) mxx = p.x; if (p.y > mxy) mxy = p.y; if (p.z > mxz) mxz = p.z; }
+    const NX = Math.floor((mxx - mnx) / cell) + 1, NY = Math.floor((mxy - mny) / cell) + 1, NZ = Math.floor((mxz - mnz) / cell) + 1;
+    const head = new Int32Array(NX * NY * NZ).fill(-1), next = new Int32Array(nG);
+    const cellOf = (x, y, z) => { const cx = Math.min(NX - 1, Math.max(0, Math.floor((x - mnx) / cell))), cy = Math.min(NY - 1, Math.max(0, Math.floor((y - mny) / cell))), cz = Math.min(NZ - 1, Math.max(0, Math.floor((z - mnz) / cell))); return [cx, cy, cz]; };
+    for (let i = 0; i < nG; i++) { const c = cellOf(gx[i * 3], gx[i * 3 + 1], gx[i * 3 + 2]), k = (c[0] * NY + c[1]) * NZ + c[2]; next[i] = head[k]; head[k] = i; }
+    const near = R => {
+      const x = R.p.x, y = R.p.y, z = R.p.z, c = cellOf(x, y, z); let best = -1, bd = 1e9;
+      for (let r = 1; best < 0 && r < 64; r++) {
+        for (let ix = Math.max(0, c[0] - r); ix <= Math.min(NX - 1, c[0] + r); ix++) for (let iy = Math.max(0, c[1] - r); iy <= Math.min(NY - 1, c[1] + r); iy++) for (let iz = Math.max(0, c[2] - r); iz <= Math.min(NZ - 1, c[2] + r); iz++) {
+          for (let i = head[(ix * NY + iy) * NZ + iz]; i >= 0; i = next[i]) { const dx = gx[i * 3] - x, dy = gx[i * 3 + 1] - y, dz = gx[i * 3 + 2] - z, d = dx * dx + dy * dy + dz * dz; if (d < bd) { bd = d; best = i; } }
+        }
+      }
+      return G[best < 0 ? 0 : best];
+    };
+    const up = new THREE.Vector3(0, 1, 0), a1 = new THREE.Vector3(), a2 = new THREE.Vector3(), dir = new THREE.Vector3();
+    // guide points as flat arrays, plus (for curls) a frame around each point and the length along the guide, shared by all its children
+    for (const g of G) {
+      const n = g.pts.length, f = new Float32Array(n * 3); g.pts.forEach((v, k) => { f[k * 3] = v.x; f[k * 3 + 1] = v.y; f[k * 3 + 2] = v.z; }); g.f = f;
+      if (spec.curl) {
+        const fr = new Float32Array(n * 6), al = new Float32Array(n); let along = 0;
+        for (let k = 0; k < n; k++) {
+          const k1 = Math.min(n - 1, k + 1) * 3, k0 = Math.max(0, k - 1) * 3;
+          dir.set(f[k1] - f[k0], f[k1 + 1] - f[k0 + 1], f[k1 + 2] - f[k0 + 2]).normalize();
+          a1.crossVectors(up, dir); if (a1.lengthSq() < 1e-6) a1.set(1, 0, 0); a1.normalize(); a2.crossVectors(dir, a1);
+          fr[k * 6] = a1.x; fr[k * 6 + 1] = a1.y; fr[k * 6 + 2] = a1.z; fr[k * 6 + 3] = a2.x; fr[k * 6 + 4] = a2.y; fr[k * 6 + 5] = a2.z;
+          if (k) { const dx = f[k * 3] - f[k * 3 - 3], dy = f[k * 3 + 1] - f[k * 3 - 2], dz = f[k * 3 + 2] - f[k * 3 - 1]; along += Math.sqrt(dx * dx + dy * dy + dz * dz); }
+          al[k] = along;
+        }
+        g.fr = fr; g.al = al;
+      }
+    }
     for (const R of spec.roots) {
       const g = near(R), gf = g.f, K = g.pts.length - 1;
       const ox = R.p.x - g.R.p.x, oy = R.p.y - g.R.p.y, oz = R.p.z - g.R.p.z;
       const phase = rnd() * Math.PI * 2, cr = spec.curl ? spec.curl.r * (0.7 + 0.6 * rnd()) : 0, cf = spec.curl ? spec.curl.f * (0.85 + 0.3 * rnd()) : 0;
       const fx = (rnd() - 0.5) * spec.fuzz, fy = (rnd() - 0.5) * spec.fuzz, fzz = (rnd() - 0.5) * spec.fuzz;
       const lenK = Math.max(2, Math.round(K * (0.75 + 0.25 * rnd())));
-      const pts = new Float32Array((lenK + 1) * 3); let along = 0;
+      const pts = new Float32Array((lenK + 1) * 3);
       for (let k = 0; k <= lenK; k++) {
         const t = k / K, keep = 1 - spec.clump * Math.min(1, t * 1.6);
         let x = gf[k * 3] + ox * keep + fx * t, y = gf[k * 3 + 1] + oy * keep + fy * t, z = gf[k * 3 + 2] + oz * keep + fzz * t;
         if (cr) {
-          const k1 = Math.min(K, k + 1) * 3, k0 = Math.max(0, k - 1) * 3;
-          dir.set(gf[k1] - gf[k0], gf[k1 + 1] - gf[k0 + 1], gf[k1 + 2] - gf[k0 + 2]).normalize();
-          a1.crossVectors(up, dir); if (a1.lengthSq() < 1e-6) a1.set(1, 0, 0); a1.normalize(); a2.crossVectors(dir, a1);
-          if (k) { const dx = gf[k * 3] - gf[k * 3 - 3], dy = gf[k * 3 + 1] - gf[k * 3 - 2], dz = gf[k * 3 + 2] - gf[k * 3 - 1]; along += Math.sqrt(dx * dx + dy * dy + dz * dz); }
-          const ang = phase + along * cf * Math.PI * 2, rr = cr * Math.min(1, t * 4), ca = Math.cos(ang) * rr, sa = Math.sin(ang) * rr;
-          x += a1.x * ca + a2.x * sa; y += a1.y * ca + a2.y * sa; z += a1.z * ca + a2.z * sa;
+          const fr = g.fr, ang = phase + g.al[k] * cf * Math.PI * 2, rr = cr * Math.min(1, t * 4), ca = Math.cos(ang) * rr, sa = Math.sin(ang) * rr;
+          x += fr[k * 6] * ca + fr[k * 6 + 3] * sa; y += fr[k * 6 + 1] * ca + fr[k * 6 + 4] * sa; z += fr[k * 6 + 2] * ca + fr[k * 6 + 5] * sa;
         }
         pts[k * 3] = x; pts[k * 3 + 1] = y; pts[k * 3 + 2] = z;
       }
@@ -490,24 +512,42 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
   function strandMesh(strands, color, opts) {
     opts = opts || {};
     const toFlat = P => { if (P instanceof Float32Array) return P; const f = new Float32Array(P.length * 3); P.forEach((v, k) => { f[k * 3] = v.x; f[k * 3 + 1] = v.y; f[k * 3 + 2] = v.z; }); return f; };
-    const smooth = f => { const n = f.length / 3; if (!(opts.per > 1) || n < 3) return f; const vs = []; for (let k = 0; k < n; k++) vs.push(new THREE.Vector3(f[k * 3], f[k * 3 + 1], f[k * 3 + 2])); return toFlat(new THREE.CatmullRomCurve3(vs, false, 'centripetal').getPoints((n - 1) * opts.per)); };
-    let nPts = 0; const lists = strands.map(s => { const P = smooth(toFlat(s.pts)); nPts += P.length / 3; return P; });
-    const pos = new Float32Array(nPts * 6), tan = new Float32Array(nPts * 6), side = new Float32Array(nPts * 2), tt = new Float32Array(nPts * 2), shd = new Float32Array(nPts * 2), wid = new Float32Array(nPts * 2);
-    const idx = []; let v = 0;
-    strands.forEach((s, si) => {
-      const P = lists[si], K = P.length / 3 - 1, base = v;
-      for (let k = 0; k <= K; k++) {
-        const a = Math.max(0, k - 1) * 3, b = Math.min(K, k + 1) * 3;
-        let tx = P[b] - P[a], ty = P[b + 1] - P[a + 1], tz = P[b + 2] - P[a + 2]; const tl = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1; tx /= tl; ty /= tl; tz /= tl;
-        for (let sd = -1; sd <= 1; sd += 2) { pos[v * 3] = P[k * 3]; pos[v * 3 + 1] = P[k * 3 + 1]; pos[v * 3 + 2] = P[k * 3 + 2]; tan[v * 3] = tx; tan[v * 3 + 1] = ty; tan[v * 3 + 2] = tz; side[v] = sd; tt[v] = k / K; shd[v] = s.shade; wid[v] = s.w; v++; }
-        if (k < K) { const i = base + k * 2; idx.push(i, i + 1, i + 2, i + 1, i + 3, i + 2); }
+    const per = opts.per > 1 ? opts.per : 1;
+    // smooth with a Catmull-Rom spline through the points, `per` samples per segment
+    const smooth = f => {
+      const n = f.length / 3; if (per === 1 || n < 3) return f;
+      const out = new Float32Array(((n - 1) * per + 1) * 3); let o = 0;
+      for (let i = 0; i < n - 1; i++) {
+        const i0 = Math.max(0, i - 1) * 3, i1 = i * 3, i2 = (i + 1) * 3, i3 = Math.min(n - 1, i + 2) * 3;
+        for (let s = 0; s < per; s++) {
+          const t = s / per, t2 = t * t, t3 = t2 * t;
+          const w0 = -0.5 * t3 + t2 - 0.5 * t, w1 = 1.5 * t3 - 2.5 * t2 + 1, w2 = -1.5 * t3 + 2 * t2 + 0.5 * t, w3 = 0.5 * t3 - 0.5 * t2;
+          out[o++] = f[i0] * w0 + f[i1] * w1 + f[i2] * w2 + f[i3] * w3;
+          out[o++] = f[i0 + 1] * w0 + f[i1 + 1] * w1 + f[i2 + 1] * w2 + f[i3 + 1] * w3;
+          out[o++] = f[i0 + 2] * w0 + f[i1 + 2] * w1 + f[i2 + 2] * w2 + f[i3 + 2] * w3;
+        }
       }
-    });
+      out[o++] = f[(n - 1) * 3]; out[o++] = f[(n - 1) * 3 + 1]; out[o++] = f[(n - 1) * 3 + 2];
+      return out;
+    };
+    let nPts = 0, nSeg = 0; const lists = strands.map(s => { const P = smooth(toFlat(s.pts)); nPts += P.length / 3; nSeg += P.length / 3 - 1; return P; });
+    const nV = nPts * 2, pos = new Float32Array(nV * 3), tan = new Float32Array(nV * 3), side = new Float32Array(nV), tt = new Float32Array(nV), shd = new Float32Array(nV), wid = new Float32Array(nV);
+    const idx = nV > 65535 ? new Uint32Array(nSeg * 6) : new Uint16Array(nSeg * 6); let v = 0, ii = 0;
+    for (let si = 0; si < strands.length; si++) {
+      const s = strands[si], P = lists[si], K = P.length / 3 - 1, base = v, sh = s.shade, w = s.w;
+      for (let k = 0; k <= K; k++) {
+        const a = (k > 0 ? k - 1 : 0) * 3, b = (k < K ? k + 1 : K) * 3;
+        let tx = P[b] - P[a], ty = P[b + 1] - P[a + 1], tz = P[b + 2] - P[a + 2]; const tl = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+        const px = P[k * 3], py = P[k * 3 + 1], pz = P[k * 3 + 2], tk = k / K;
+        for (let sd = -1; sd <= 1; sd += 2) { const o = v * 3; pos[o] = px; pos[o + 1] = py; pos[o + 2] = pz; tan[o] = tx; tan[o + 1] = ty; tan[o + 2] = tz; side[v] = sd; tt[v] = tk; shd[v] = sh; wid[v] = w; v++; }
+        if (k < K) { const i = base + k * 2; idx[ii++] = i; idx[ii++] = i + 1; idx[ii++] = i + 2; idx[ii++] = i + 1; idx[ii++] = i + 3; idx[ii++] = i + 2; }
+      }
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('tangent3', new THREE.BufferAttribute(tan, 3));
     g.setAttribute('side', new THREE.BufferAttribute(side, 1)); g.setAttribute('tt', new THREE.BufferAttribute(tt, 1));
     g.setAttribute('shd', new THREE.BufferAttribute(shd, 1)); g.setAttribute('wid', new THREE.BufferAttribute(wid, 1));
-    g.setIndex(v > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
     const c = new THREE.Color(color);
     const m = new THREE.ShaderMaterial({
       uniforms: {
