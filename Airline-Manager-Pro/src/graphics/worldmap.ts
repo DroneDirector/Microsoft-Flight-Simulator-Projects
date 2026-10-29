@@ -393,7 +393,8 @@ class WorldMap {
     const off = p[0] < -20 || p[1] < -20 || p[0] > this.w + 20 || p[1] > this.h + 20;
     this.bubbleEl.style.visibility = off ? 'hidden' : '';
     // keep the box inside the map; the pointer line still ends on the aircraft
-    const half = Math.min(110, (this.bubbleEl.firstElementChild as HTMLElement || this.bubbleEl).offsetWidth / 2 || 100);
+    // the box is as wide as its buttons need; it stays centred over the aircraft unless that would push it off the map
+    const half = ((this.bubbleEl.firstElementChild as HTMLElement || this.bubbleEl).offsetWidth / 2) || 100;
     const shift = clamp(p[0], half + 6, Math.max(half + 6, this.w - half - 6)) - p[0];
     this.bubbleEl.style.transform = `translate(${p[0].toFixed(1)}px, ${p[1].toFixed(1)}px)`;
     this.bubbleEl.style.setProperty('--shift', shift.toFixed(1) + 'px');

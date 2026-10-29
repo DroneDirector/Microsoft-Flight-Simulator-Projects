@@ -44,7 +44,10 @@ const AirportLayouts = {
 
   /** A layout kept on the device from an earlier download. */
   kept(icao: string): AirportLayout {
-    try { const k = JSON.parse(localStorage.getItem('amp-osm:' + icao) || 'null'); if (k && k.l && Date.now() - k.at < this.OSM_KEEP_MS) return (this.cache[icao] = k.l); } catch (e) { /* none */ }
+    // the simulator's layout (saved when the app was linked) first, then OpenStreetMap's
+    for (const key of ['amp-sim:' + icao, 'amp-osm:' + icao]) {
+      try { const k = JSON.parse(localStorage.getItem(key) || 'null'); if (k && k.l && (key.indexOf('amp-sim') === 0 || Date.now() - k.at < this.OSM_KEEP_MS)) return (this.cache[icao] = k.l); } catch (e) { /* none */ }
+    }
     return null;
   },
 
@@ -54,7 +57,7 @@ const AirportLayouts = {
     const ws = this.waiting[icao] || []; delete this.waiting[icao];
     ws.forEach(w => clearTimeout(w.timer));
     let l: AirportLayout = null;
-    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; }
+    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; this.keep('amp-sim:' + icao, l); }
     ws.forEach(w => w.ok(l));
   },
 
@@ -85,7 +88,9 @@ const AirportLayouts = {
   },
 
   /* ---------- OpenStreetMap ---------- */
-  OSM_SERVERS: ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'],
+  OSM_SERVERS: ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'],
+  /** Why the last OpenStreetMap download for an airport gave nothing: 'busy' (no server answered) or 'none' (not mapped). */
+  osmWhy: {} as { [icao: string]: 'busy' | 'none' },
   OSM_KEEP_MS: 90 * 864e5,
 
   fromOsm(icao: string): Promise<AirportLayout> {
@@ -106,6 +111,7 @@ const AirportLayouts = {
     const q = `[out:json][timeout:25][bbox:${bb}];(way["aeroway"~"^(runway|taxiway|taxilane|apron|parking_position|terminal)$"];node["aeroway"~"^(parking_position|gate)$"];);out body geom qt;`;
     return this.overpass(q).then(d => {
       const l = d ? this.parseOsm(icao, a, d.elements || []) : null;
+      if (!d) this.osmWhy[icao] = 'busy'; else if (!l) this.osmWhy[icao] = 'none'; else delete this.osmWhy[icao];
       if (!l) return null;
       this.cache[icao] = l;
       this.keep(key, l);
@@ -113,13 +119,16 @@ const AirportLayouts = {
     });
   },
 
-  overpass(q: string, n = 0): Promise<any> {
-    const url = this.OSM_SERVERS[n]; if (!url) return Promise.resolve(null);
+  overpass(q: string, n = 0, round = 0): Promise<any> {
+    const url = this.OSM_SERVERS[n];
+    // every server busy: one more round after a short pause
+    if (!url) return round ? Promise.resolve(null) : new Promise(ok => setTimeout(ok, 3000)).then(() => this.overpass(q, 0, 1));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const t = setTimeout(() => ctl && ctl.abort(), 20000);
     return fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl ? ctl.signal : undefined } as any)
       .then(r => { clearTimeout(t); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .catch(() => { clearTimeout(t); return this.overpass(q, n + 1); });
+      .then(d => { if (d && d.remark && /timed out|runtime error|out of memory/i.test(d.remark) && !(d.elements || []).length) throw new Error(d.remark); return d; })
+      .catch(() => { clearTimeout(t); return this.overpass(q, n + 1, round); });
   },
 
   /** Keep up to 30 airports on the device, the oldest go first. */
@@ -237,8 +246,11 @@ const AirportLayouts = {
       if (hdg == null) { const q = j >= 0 ? l.points[j] : null; hdg = q ? Math.atan2(p[0] - q[0], p[1] - q[1]) * 180 / Math.PI : 0; }
       standAt(p, hdg, n.tags.ref || n.tags.name || '', j == null ? -1 : j);
     }
+    const stopRefs: { [ref: string]: boolean } = {}; stopNodes.forEach(n => { const r = n.tags.ref || n.tags.name; if (r) stopRefs[String(r)] = true; });
     for (const ref of Object.keys(loose)) {
       const group = loose[ref];
+      // more lead-in lines for a stand that already has its stop point
+      if (stopRefs[ref] && !group[0].area) { group.forEach(w => { addLine(w); joinEnd(w); }); continue; }
       if (group[0].area) { const g0 = group[0], j = near(g0.area, 250, taxiPts); standAt(g0.area, 0, g0.ref, j); continue; }
       // the stop: of all the line ends, the one furthest from the taxiways
       let best: any = null, bd = -1;

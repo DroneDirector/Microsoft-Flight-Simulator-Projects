@@ -178,6 +178,8 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       S.aiNext = S.aiNext.filter((x: any) => x !== n);
       // an aircraft that went to maintenance, was sold or lost its pilot stays on the ground
       if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || p.status === 'off') continue;
+      // no stand at its base: refused take-off until it gets a base with a free stand
+      if ((a as any).noBase) { p.status = 'standby'; S.aiNext.push(Object.assign({}, n, { depAt: now + 15 * 60e3 })); continue; }
       // operating certificate suspended by a court: the airline's aircraft stay on the ground
       const gu = (S.groundedUntil || {})[a.companyId]; if (gu && gu > n.depAt) { S.aiNext.push(Object.assign({}, n, { depAt: gu })); continue; }
       // never off and back onto the same airport, except a test flight you set up

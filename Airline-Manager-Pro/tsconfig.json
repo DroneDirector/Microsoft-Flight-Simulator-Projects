@@ -54,6 +54,7 @@
     "src/core/progress.ts",
     "src/core/condition.ts",
     "src/core/passengers.ts",
+    "src/core/bases.ts",
     "src/screens/dashboard.ts",
     "src/screens/map.ts",
     "src/screens/airport-view.ts",

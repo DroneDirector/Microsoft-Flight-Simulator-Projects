@@ -76,8 +76,12 @@ class AirportView {
     this.buildGraph(); this.pickRunway();
     if (!upgrade || !this.userMoved) { const keepS = upgrade ? this.s : 0; this.fit(); if (keepS && this.track) this.s = keepS; }
     const note = $('#apv-note');
-    if (note) note.innerHTML = L.source !== 'runways' || this.fetching ? '' : `${icon('info')}<span>${navigator.onLine === false ? 'You\'re offline: showing the real runways. The full layout loads when you\'re back online.' : 'No detailed layout is available for this airport, so the real runways are shown.'}</span>`;
-    if (note && note.innerHTML) { note.style.opacity = '1'; setTimeout(() => { note.style.transition = 'opacity .6s'; note.style.opacity = '0'; }, 7000); }
+    const why = AirportLayouts.osmWhy[this.icao];
+    if (note) note.innerHTML = L.source !== 'runways' || this.fetching ? ''
+      : navigator.onLine === false ? `${icon('info')}<span>You're offline: showing the real runways. The full layout loads when you're back online.</span><button class="text-btn" data-act="apv-retry">Try again</button>`
+      : why === 'busy' ? `${icon('info')}<span>The map servers are busy right now, so the real runways are shown.</span><button class="text-btn" data-act="apv-retry">Try again</button>`
+      : `${icon('info')}<span>${this.icao} isn't mapped in detail on OpenStreetMap yet, so the real runways are shown.${Link.status === 'connected' ? '' : ' Link the app to the simulator for its full layout.'}</span>`;
+    if (note && note.innerHTML) { note.style.transition = ''; note.style.opacity = '1'; if (why !== 'busy' && navigator.onLine !== false) setTimeout(() => { note.style.transition = 'opacity .6s'; note.style.opacity = '0'; }, 9000); }
   }
   labelSource() {
     const src = $('#apv-src'), L = this.L; if (!src || !L) return;
@@ -431,3 +435,10 @@ ACTIONS['apv-close'] = () => { if (_apv) { const t = _apv.track; _apv.close(!!t)
 ACTIONS['apv-zoom'] = el => { if (_apv) _apv.zoom(parseFloat(el.getAttribute('data-f'))); };
 ACTIONS['apv-fit'] = () => { if (_apv) _apv.fit(); };
 ACTIONS['apv-track'] = el => { if (_apv) { _apv.track = el.getAttribute('data-id'); _apv.userMoved = false; _apv.renderList(); Sound.tick(); } };
+ACTIONS['apv-retry'] = () => {
+  const v = _apv; if (!v) return;
+  Sound.tick(); v.fetching = true; v.labelSource(); const note = $('#apv-note'); if (note) note.innerHTML = '';
+  delete AirportLayouts.osmWhy[v.icao];
+  AirportLayouts.fromOsm(v.icao).then(L => { if (!v.alive) return; v.fetching = false; if (L) { v.setLayout(L, true); toast('Real airport layout loaded', 'ok'); } else v.setLayout(v.L, true); })
+    .catch(() => { if (v.alive) { v.fetching = false; v.setLayout(v.L, true); } });
+};
