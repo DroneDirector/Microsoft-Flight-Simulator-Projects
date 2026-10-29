@@ -1052,7 +1052,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 
 #rotate-hint { display: none; }
 @media (orientation: portrait) and (max-width: 700px) {
-  #rotate-hint { display: grid; place-items: center; position: fixed; inset: 0; z-index: 200; padding: 30px; text-align: center; background: var(--bg); color: var(--ink-2); font-size: 15px; }
+  html:not(.split) #rotate-hint { display: grid; place-items: center; position: fixed; inset: 0; z-index: 200; padding: 30px; text-align: center; background: var(--bg); color: var(--ink-2); font-size: 15px; }
 }
 
 /* ---------- Size adaptations ---------- */
@@ -1772,3 +1772,29 @@ button.coop-e:hover { border-color: var(--line-2); }
 .btn-row.nowrap { flex-wrap: nowrap; }
 @media (max-width: 700px) { .lease-terms { grid-template-columns: 1fr; } }
 .buy-sum > div { display: flex; flex-direction: column; gap: 2px; } .buy-sum small { color: var(--ink-2); font-size: 12px; }
+.apv-spin { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 50%; border: 2px solid rgba(63,208,232,.3); border-top-color: var(--cyan); animation: apvSpin .8s linear infinite; }
+@keyframes apvSpin { to { transform: rotate(360deg); } }
+
+/* ---------- Narrow windows (split screen on a phone, pop-up windows) ---------- */
+@media (max-width: 560px) {
+  :root { --rail: 62px; --top: 48px; }
+  .rail-btn span { font-size: 8.5px; letter-spacing: -.01em; }
+  .w-seg { transform: scale(.82); transform-origin: right center; }
+  .w-seg span { padding-left: 6px; padding-right: 6px; }
+  .topbar { gap: 4px; padding-left: 8px; padding-right: 6px; }
+  .co-switch { flex: none; padding-right: 4px; }
+  .co-switch .co-text, .co-switch .co-chev { display: none; }
+  .link-pill { flex: none; padding: 0 9px; }
+  .link-pill span, .link-pill em { display: none; }
+  .sound-btn, .power-btn { display: none; }
+  .balance b { font-size: 15px; }
+  .screen { padding: 10px 10px 24px; }
+  .w-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; }
+  .w-legend { display: none; }
+  .ov-main { grid-template-columns: minmax(0, 1fr) !important; height: auto !important; }
+  .ov-main .ops-map { height: 300px !important; min-height: 240px; }
+  .screen-head { flex-wrap: wrap; gap: 8px; }
+  .screen-head .btn-row.nowrap { flex-wrap: wrap; }
+  .ac-grid, .mk-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .modal .panel, .layer .panel { max-width: calc(100vw - 16px); }
+}

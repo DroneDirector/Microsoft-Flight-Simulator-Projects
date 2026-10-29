@@ -14,6 +14,8 @@ run npx cap sync android
 MAN=android/app/src/main/AndroidManifest.xml
 # landscape only (both directions), keep the app full screen while flying
 grep -q 'screenOrientation' "$MAN" || sed -i 's/<activity/<activity android:screenOrientation="sensorLandscape"/' "$MAN"
+# split screen and pop-up windows: the app resizes instead of restarting
+grep -q 'resizeableActivity' "$MAN" || sed -i 's/<activity/<activity android:resizeableActivity="true"/' "$MAN"
 # full-screen immersive activity (see scripts/android/MainActivity.java)
 APPID=$(node -p "require('./app.config.json').appId")
 JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"

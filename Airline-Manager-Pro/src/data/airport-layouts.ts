@@ -22,22 +22,29 @@ const AirportLayouts = {
   cache: {} as { [icao: string]: AirportLayout },
   waiting: {} as { [icao: string]: { ok: (l: AirportLayout) => void; timer: any }[] },
 
-  get(icao: string): Promise<AirportLayout> {
+  /** The best layout to show right now (straight away: the real runways if nothing better is kept), and
+   *  `better` is called when a fuller one arrives: the simulator's when linked, else OpenStreetMap's. */
+  get(icao: string, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     icao = String(icao || '').toUpperCase();
-    const c = this.cache[icao];
-    // a layout from the simulator is the best there is; others are replaced by it when linked
-    if (c && (c.source === 'sim' || (Link.status !== 'connected' && c.source === 'osm'))) return Promise.resolve(c);
-    return new Promise(ok => {
-      if (Link.status === 'connected' && linkSend({ type: 'layout', icao })) {
-        const w = { ok, timer: setTimeout(() => this.received(icao, null, 'timeout'), 15000) };
+    const linked = Link.status === 'connected';
+    const c = this.cache[icao] || this.kept(icao);
+    if (c && (c.source === 'sim' || (!linked && c.source === 'osm'))) return Promise.resolve(c);
+    const now = c ? Promise.resolve(c) : this.fromRunways(icao);
+    now.then(first => {
+      const upgrade = (l: AirportLayout) => { if (l && l !== first && l.source !== 'runways' && better) better(l); };
+      const viaOsm = () => (c && c.source === 'osm' ? Promise.resolve(c) : this.fromOsm(icao)).then(l => { if (l && (!c || c.source !== 'osm')) upgrade(l); }).catch(() => { /* runways stay */ });
+      if (linked && linkSend({ type: 'layout', icao })) {
+        const w = { ok: (l: AirportLayout) => { if (l && l.source === 'sim') upgrade(l); else viaOsm(); }, timer: setTimeout(() => this.received(icao, null, 'timeout'), 8000) };
         (this.waiting[icao] = this.waiting[icao] || []).push(w);
-      } else this.fallback(icao).then(ok);
+      } else viaOsm();
     });
+    return now;
   },
 
-  /** Without the simulator: OpenStreetMap, else the runways. */
-  fallback(icao: string): Promise<AirportLayout> {
-    return this.fromOsm(icao).then(l => l || this.fromRunways(icao)).catch(() => this.fromRunways(icao));
+  /** A layout kept on the device from an earlier download. */
+  kept(icao: string): AirportLayout {
+    try { const k = JSON.parse(localStorage.getItem('amp-osm:' + icao) || 'null'); if (k && k.l && Date.now() - k.at < this.OSM_KEEP_MS) return (this.cache[icao] = k.l); } catch (e) { /* none */ }
+    return null;
   },
 
   /** The PC app answered (a layout, or why there isn't one). */
@@ -45,11 +52,9 @@ const AirportLayouts = {
     icao = String(icao || '').toUpperCase();
     const ws = this.waiting[icao] || []; delete this.waiting[icao];
     ws.forEach(w => clearTimeout(w.timer));
-    const done = (l: AirportLayout) => ws.forEach(w => w.ok(l));
-    if (layout && (layout.runways || []).length) {
-      const l: AirportLayout = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const });
-      this.cache[icao] = l; done(l);
-    } else this.fallback(icao).then(done);
+    let l: AirportLayout = null;
+    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; }
+    ws.forEach(w => w.ok(l));
   },
 
   /** A layout with the airport's real runways (world airport data), when the simulator can't give one. */
@@ -84,18 +89,21 @@ const AirportLayouts = {
 
   fromOsm(icao: string): Promise<AirportLayout> {
     const key = 'amp-osm:' + icao;
-    try { const k = JSON.parse(localStorage.getItem(key) || 'null'); if (k && k.l && Date.now() - k.at < this.OSM_KEEP_MS) { this.cache[icao] = k.l; return Promise.resolve(k.l); } } catch (e) { /* not kept */ }
+    const kept = this.kept(icao); if (kept) return Promise.resolve(kept);
     if (navigator.onLine === false) return Promise.resolve(null);
     const a: any = apt(icao); if (!a) return Promise.resolve(null);
     return World.loadRunways().then(() => this.osmFetch(icao, a, key));
   },
 
   osmFetch(icao: string, a: any, key: string): Promise<AirportLayout> {
-    const kinds = '^(runway|taxiway|taxilane|apron|parking_position|terminal)$';
-    const byArea = `[out:json][timeout:40];area["aeroway"="aerodrome"]["icao"="${icao}"]->.a;(way["aeroway"~"${kinds}"](area.a);node["aeroway"~"^(parking_position|gate)$"](area.a););out body geom qt;`;
-    const r = a.size === 2 ? 5000 : 3000;
-    const around = `[out:json][timeout:40];(way["aeroway"~"${kinds}"](around:${r},${a.pos[1]},${a.pos[0]});node["aeroway"~"^(parking_position|gate)$"](around:${r},${a.pos[1]},${a.pos[0]}););out body geom qt;`;
-    return this.overpass(byArea).then(d => d && d.elements && d.elements.some((e: any) => e.tags && e.tags.aeroway === 'runway') ? d : this.overpass(around)).then(d => {
+    // a box around the airport, sized from its runways: much quicker for the server than an outline search
+    const k = Math.cos(a.pos[1] * Math.PI / 180);
+    let far = 1500;
+    for (const r of ((World.runways || {})[icao] || []) as any[]) for (const e of [[r[5], r[6]], [r[7], r[8]]]) if (e[0] != null) far = Math.max(far, Math.hypot((e[1] - a.pos[0]) * 111320 * k, (e[0] - a.pos[1]) * 110540));
+    const R = Math.min(9000, far + 1200), dLat = R / 110540, dLon = R / (111320 * k);
+    const bb = [a.pos[1] - dLat, a.pos[0] - dLon, a.pos[1] + dLat, a.pos[0] + dLon].map(v => v.toFixed(5)).join(',');
+    const q = `[out:json][timeout:25][bbox:${bb}];(way["aeroway"~"^(runway|taxiway|taxilane|apron|parking_position|terminal)$"];node["aeroway"~"^(parking_position|gate)$"];);out body geom qt;`;
+    return this.overpass(q).then(d => {
       const l = d ? this.parseOsm(icao, a, d.elements || []) : null;
       if (!l) return null;
       this.cache[icao] = l;
@@ -107,7 +115,7 @@ const AirportLayouts = {
   overpass(q: string, n = 0): Promise<any> {
     const url = this.OSM_SERVERS[n]; if (!url) return Promise.resolve(null);
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const t = setTimeout(() => ctl && ctl.abort(), 30000);
+    const t = setTimeout(() => ctl && ctl.abort(), 20000);
     return fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl ? ctl.signal : undefined } as any)
       .then(r => { clearTimeout(t); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .catch(() => { clearTimeout(t); return this.overpass(q, n + 1); });
