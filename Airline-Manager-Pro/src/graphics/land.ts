@@ -92,6 +92,14 @@ function isLand(lon: number, lat: number): boolean {
 }
 
 const _dotCache: { [step: string]: number[][] } = {};
+/** The land dots in 2°-wide longitude bands, so only the bands in view are looked at. */
+const _dotBands: { [k: string]: number[][][] } = {};
+function landDotBands(step: number): number[][][] {
+  const k = String(step); if (_dotBands[k]) return _dotBands[k];
+  const bands: number[][][] = []; for (let i = 0; i < 180; i++) bands.push([]);
+  for (const d of landDots(step)) bands[clamp(Math.floor((d[0] + 180) / 2), 0, 179)].push(d);
+  return (_dotBands[k] = bands);
+}
 function landDots(step: number): number[][] {
   const k = String(step);
   if (_dotCache[k]) return _dotCache[k];

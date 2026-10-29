@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.6 (2026-10-29)
+
+- Much faster zoomed in on airports: route lines clipped to the screen, indexed airport and background lookups, map canvas at up to 2x resolution
+
 ## 0.7.5 (2026-10-29)
 
 - Delays only for hired (AI) pilots, never for co-op players or your own flights

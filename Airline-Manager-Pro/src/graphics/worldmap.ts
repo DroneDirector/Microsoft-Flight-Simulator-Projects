@@ -153,7 +153,8 @@ class WorldMap {
   resize() {
     const r = this.el.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    this.dpr = Math.min((window.devicePixelRatio || 1) * uiScale(), 3);
+    // at most 2 canvas pixels per screen point: as sharp to the eye on a phone, and less than half the pixels to fill each frame
+    this.dpr = Math.min((window.devicePixelRatio || 1) * uiScale(), 2);
     this.w = r.width; this.h = r.height;
     for (const c of [this.cv, this.base]) { c.width = Math.round(this.w * this.dpr); c.height = Math.round(this.h * this.dpr); }
     this.cv.style.width = this.w + 'px'; this.cv.style.height = this.h + 'px';
@@ -319,7 +320,8 @@ class WorldMap {
       // only the dots in view (zoomed in, that is a tiny part of the world)
       const ca = this.ll(-8, -8), cb = this.ll(this.w + 8, this.h + 8);
       const lo0 = Math.min(ca[0], cb[0]), lo1 = Math.max(ca[0], cb[0]), la0 = Math.min(ca[1], cb[1]), la1 = Math.max(ca[1], cb[1]);
-      for (const d of landDots(step)) {
+      const bands = landDotBands(step), b0 = clamp(Math.floor((lo0 + 180) / 2), 0, 179), b1 = clamp(Math.floor((lo1 + 180) / 2), 0, 179);
+      for (let bi = b0; bi <= b1; bi++) for (const d of bands[bi]) {
         if (d[0] < lo0 || d[0] > lo1 || d[1] < la0 || d[1] > la1) continue;
         const p = this.px(d[0], d[1]);
         if (p[0] < -4 || p[1] < -4 || p[0] > this.w + 4 || p[1] > this.h + 4) continue;
@@ -423,13 +425,13 @@ class WorldMap {
         // remaining route: dashed
         // at airport level the long route lines fade, so the airport stays readable
         const rf = degPx >= AIRPORT_DEG_PX ? 0.22 : 1;
+        // only the parts on screen are drawn: zoomed in, a route is millions of pixels long
         c.setLineDash([4, 5]); c.lineWidth = 1.2; c.strokeStyle = mine ? col.cyan : col.mag; c.globalAlpha = 0.45 * rf;
-        c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+        c.beginPath(); this.clippedLine(c, pts); c.stroke();
         // flown part: solid
         c.setLineDash([]); c.globalAlpha = rf; c.lineWidth = sel || mine ? 2.4 : 1.8;
         const upto = cut >= 0 ? cut : Math.max(1, Math.floor(f.t * N));
-        c.beginPath(); for (let i = 0; i <= upto; i++) i ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]);
-        c.lineTo(here[0], here[1]); c.stroke();
+        c.beginPath(); this.clippedLine(c, pts.slice(0, upto + 1).concat([here])); c.stroke();
       }
       c.setLineDash([]); c.globalAlpha = 1;
       if (this.inScene[f.id] && this.sceneDraws) continue;   // drawn by the airport, on its taxiway or runway
@@ -459,6 +461,23 @@ class WorldMap {
     this.placeBubble();
   }
 
+  /** Add a polyline to the current path, cut to the screen (plus a margin). */
+  clippedLine(c: CanvasRenderingContext2D, pts: number[][]) {
+    const m = 40, x0 = -m, y0 = -m, x1 = this.w + m, y1 = this.h + m;
+    let open = false;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      if (!a || !b || !isFinite(a[0] + a[1] + b[0] + b[1])) { open = false; continue; }
+      // Liang-Barsky
+      let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
+      const edge = (p: number, q: number) => { if (p === 0) return q >= 0; const r = q / p; if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; } return true; };
+      if (!(edge(-dx, a[0] - x0) && edge(dx, x1 - a[0]) && edge(-dy, a[1] - y0) && edge(dy, y1 - a[1]))) { open = false; continue; }
+      const sx = a[0] + dx * t0, sy = a[1] + dy * t0, ex = a[0] + dx * t1, ey = a[1] + dy * t1;
+      if (!open || t0 > 0) c.moveTo(sx, sy);
+      c.lineTo(ex, ey); open = t1 >= 1;
+    }
+  }
+
   /** Names of the departure, arrival and approach along a flight's path, when zoomed in enough to read them. */
   procLabels(c: CanvasRenderingContext2D, fp: FlightPath, f: LiveFlight, degPx: number) {
     const sel = this.selected === f.id || this.following === f.id;
@@ -482,7 +501,10 @@ class WorldMap {
     const near: [number, string][] = [];
     const look = (ap: any) => { const p = ap.pos; if (p[0] >= lo0 && p[0] <= lo1 && p[1] >= la0 && p[1] <= la1) near.push([(p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2, ap.icao]); };
     for (const k of Object.keys(AIRPORTS)) look(AIRPORTS[k]);
-    if (World.ready) for (const ap of World.list) if (!AIRPORTS[ap.icao] && (ap.size || 0) >= 1) look(ap);
+    if (World.ready) {
+      const G: any = (World as any)._grid || ((World as any)._grid = (() => { const g: { [k: string]: any[] } = {}; for (const ap of World.list) if ((ap.size || 0) >= 1 && !AIRPORTS[ap.icao]) { const k = Math.floor(ap.pos[0] / 2) + ',' + Math.floor(ap.pos[1] / 2); (g[k] = g[k] || []).push(ap); } return g; })());
+      for (let gx = Math.floor(lo0 / 2); gx <= Math.floor(lo1 / 2); gx++) for (let gy = Math.floor(la0 / 2); gy <= Math.floor(la1 / 2); gy++) for (const ap of G[gx + ',' + gy] || []) look(ap);
+    }
     near.sort((x, y) => x[0] - y[0]);
     const want = near.slice(0, 3).map(n => n[1]);
     // the airports of the aircraft you follow, while it is near them, even with the airport off-screen
