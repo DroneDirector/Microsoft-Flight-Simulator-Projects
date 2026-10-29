@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0 (2026-10-29)
+
+- World map zooms down to airport level: dots give way to coastlines, water, borders and roads (OpenFreeMap vector tiles), airport layouts drawn in place with aircraft taxiing, taking off and landing; airport buttons fly the map there and keep following the aircraft; satellite too
+- Bases and stands: aircraft per base limited to the airport's stands, choose bases, no take-off or passengers without a stand, notifications
+- Stands read from OpenStreetMap stop points with lead-in lines, drawn as stand markings with numbers
+- More map servers with retry, clear messages and Try again; simulator layouts kept on the device
+- Battery indicator (level, charging, wireless charging); wider flight menu bubble
+
 ## 0.6.0 (2026-10-29)
 
 - Lease aircraft: 1, 3 or 6 years, monthly rent, deposit, extend, buy out or return early; Leases in Finance
