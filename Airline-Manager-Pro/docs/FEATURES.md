@@ -110,6 +110,9 @@ Only damage the simulator can actually detect.
 |---|---|
 | Balance, revenue, costs and profit per day, week, month and year | Built (demo) |
 | Tap the balance in the top bar to open Finance | Built |
+| Real-world fares (distance, domestic or international, aircraft type, cabin mix), on-board sales, bags, cargo | Built |
+| Real-world costs per leg: fuel, landing, handling, navigation, maintenance by part, sales fees, catering, crew hotels, overheads | Built |
+| Landing messages open the flight's income and expenses | Built |
 | Real-world years or simulated years at a chosen speed | Built (setting) |
 | Transactions list | Built |
 
@@ -122,6 +125,9 @@ Only damage the simulator can actually detect.
 | Modular settings with toggles, easy to extend | Built |
 | Animated screens, pop-ups and transitions; reduce-motion option | Built |
 | Hold-to-exit power button with farewell animation | Built |
+| Ranking screen: pilot and airline ranks, pilot rating, airline popularity, 1,197 badges in six tiers | Built |
+| Fly for a real-world airline (names and codes only, no logos) | Built |
+| Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
 | Version number in the bottom-left corner | Built |
 | Airline saved on the device and kept through updates; new versions install over the old one | Built |
@@ -151,6 +157,9 @@ Only damage the simulator can actually detect.
 | Co-pilot on two-pilot aircraft: choose male or female, look generated | Built |
 | Weekly salaries for all staff, paid from the company balance, shown in Finance | Built (demo payroll) |
 | Conduct reports: discipline or dismiss; adjustable frequency | Built |
+| Warnings recorded as light, moderate or severe; most staff improve after a warning; ratings lower the chance of misconduct | Built |
+| Rare criminal cases for AI crew and passengers: police, aviation authority, court over 2-3 real days, verdict and sentence | Built |
+| Drunk passengers at the gate on your flights: deny or allow boarding, with consequences | Built |
 | Real-world crew rules (attendants per seats, co-pilot, mechanics per base and fleet) block flights | Built |
 | Birthday greeting in the app and as a phone notification | Built |
 

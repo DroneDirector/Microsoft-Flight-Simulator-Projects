@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.1 (2026-10-29)
+
+- Ranking screen: pilot and airline ranks, pilot rating, airline popularity, 1,197 badges in six tiers
+- Fly for a real-world airline (51 airlines, names and codes only)
+- Real-world fares, on-board sales, bags and costs (fuel, landing, handling, navigation, maintenance by part, catering, crew, overheads); landing messages open the breakdown
+- Per-model descent, approach and final distances; top-of-descent and on-final messages
+- Schedule per aircraft, following hired pilots and your own sim flights
+- Weather and graded turbulence from the sim (PC app)
+- Aircraft condition from age, use and mechanics; four bands; emergencies and accidents; court case against the airline when maintenance is to blame
+- Timed repairs (5-120 minutes) that continue while the app is closed; hangar drawing; Maintenance without red backgrounds; Aircraft types view
+- Warnings with severity and learning; ratings affect conduct; rare criminal cases with police, authority and court over 2-3 days (AI crew only)
+- Drunk and unruly passengers
+- Natural skin colours; outfits by sex; skirt fix; look editor camera and smooth animation
+- Settings saved immediately, last screen restored; backup folder, backup files and restore on a fresh install
+
 ## 0.5.0 (2026-10-29)
 
 - Human crew figures: real body proportions, skin with pores and colour variation, strand-grown hair, shell-rendered beards with a growth map from facial landmarks, moustaches, detailed fabrics; proportions switchable (Natural, In-between, Stylised)

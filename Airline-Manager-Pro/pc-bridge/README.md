@@ -25,3 +25,7 @@ npm run demo      # PC app with a simulated flight
 ```
 
 `ci/package-pc.mjs` builds the Windows package on GitHub: a single `.exe`, plus node-simconnect as its own unmodified library folder (GNU LGPL v3).
+
+## Weather
+
+The PC app also sends the weather around your aircraft from Flight Simulator to the phone: wind, visibility, temperature, pressure, cloud and precipitation, and how turbulent the flight is (graded from the aircraft's load-factor swings: light, moderate, severe).

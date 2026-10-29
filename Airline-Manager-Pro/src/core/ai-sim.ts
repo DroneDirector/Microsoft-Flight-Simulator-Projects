@@ -92,7 +92,7 @@ function aiNextLeg(pilotId: string, from: string, at: string): string {
 }
 
 /** Book a hired pilot's landing: hours, landings, aircraft, revenue, fuel and fees. */
-function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number; names: string[] }) {
+function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number; names: string[]; tx?: string[] }) {
   const F: any = f, a = plane(f.reg), p: any = pilot(f.pilotId);
   if (!a) return;
   const t = acType(a.typeId), c = company(a.companyId), prof = aiProfile(F), blockMin = Math.round(prof.totalS / 60);
@@ -103,7 +103,8 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
   const m = legEconomics(a.typeId, f.from, f.to, f.pax, 0, blockMin, burnKg);
   const net = m.net, d = new Date(at), ds = dateStr(d);
-  State.txns.unshift({ id: uid(), companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.callsign} ${f.from} to ${f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
+  const txId = uid(); (summary.tx = summary.tx || []).push(txId);
+  State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.callsign} ${f.from} to ${f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
     amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: m.lines } as any);
   c.balance += net;
   // keep the day's flown legs for the schedule (the last two days)
@@ -119,7 +120,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
   S.aiNext = S.aiNext || [];
   aiAdopt(now);
   const earliest = now - AI_MAX_CATCHUP_D * 864e5;
-  const summary = { legs: 0, net: 0, names: [] as string[] };
+  const summary = { legs: 0, net: 0, names: [] as string[], tx: [] as string[] };
   const before = company().balance;
   for (let guard = 0; guard < 2000; guard++) {
     // the next thing that happens, in time order
@@ -161,7 +162,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
   if (summary.legs) {
     if (!quiet) {
       State.notices.unshift({ id: uid(), kind: 'pilot', title: away ? `While you were away: ${summary.legs} flight${summary.legs > 1 ? 's' : ''} landed` : summary.legs > 1 ? `${summary.legs} flights landed` : `${summary.names[0] || 'A hired pilot'} landed`,
-        body: `${summary.names.slice(0, 3).join(', ')}${summary.names.length > 3 ? ' and others' : ''}. ${money(summary.net, { sign: true })} after fuel and fees.`, time: 'Now', read: false } as any);
+        body: `${summary.names.slice(0, 3).join(', ')}${summary.names.length > 3 ? ' and others' : ''}. ${money(summary.net, { sign: true })} after fuel and fees. Tap for the money in and out.`, time: 'Now', read: false, tx: summary.tx.length === 1 ? summary.tx[0] : undefined, txs: summary.tx.length > 1 ? summary.tx.slice() : undefined } as any);
       try { Sound.chime(); } catch (e) { /* sound not ready */ }
     }
     Store.save();

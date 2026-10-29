@@ -154,7 +154,9 @@ function rerenderInbox() { const p = $('.layer-drawer.inbox .panel'); if (p) p.i
 ACTIONS['open-notice'] = el => {
   const n = State.notices.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!n) return;
   n.read = true; rerenderInbox(); renderTopbar(); Sound.tick();
-  if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
+  if ((n as any).tx) ACTIONS['tx-detail']({ getAttribute: () => (n as any).tx } as any, null);
+  else if ((n as any).txs) flightsMoneyPopup((n as any).txs);
+  else if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref) crashPopup(n.ref);
   else if (n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref)) showFlightOnMap(n.ref);

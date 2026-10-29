@@ -96,10 +96,28 @@ ACTIONS['tx-detail'] = el => {
         ${t.route ? `<div><small>Route</small><b>${esc(t.route)}</b></div>` : ''}
         <div><small>Category</small><b>${esc(TX_KINDS[t.kind])}</b></div>
       </div>
-      ${t.lines && t.lines.length ? `<div class="txd-lines">${t.lines.map(l => `<div><span>${esc(l[0])}</span><b class="${l[1] >= 0 ? 'green' : ''}">${money(l[1], { sign: true })}</b></div>`).join('')}</div>` : ''}
+      ${txLinesHtml(t.lines)}
       <div class="txd-total"><span>Total</span><b class="${t.amount >= 0 ? 'green' : 'red'}">${money(t.amount, { sign: true })}</b></div>
       <div class="modal-actions">${linkBtn}<button class="btn primary" data-act="close-layer">Done</button></div>
     </div>`, { cls: 'narrow' });
 };
+/** Money in and money out, each with its subtotal. */
+function txLinesHtml(lines: [string, number][]): string {
+  if (!lines || !lines.length) return '';
+  const inc = lines.filter(l => l[1] >= 0), exp = lines.filter(l => l[1] < 0);
+  const sec = (title: string, ls: [string, number][], cls: string) => ls.length ? `<div class="txd-sec"><div class="txd-sh"><b>${title}</b><b class="${cls}">${money(ls.reduce((s, l) => s + l[1], 0), { sign: true })}</b></div>
+    <div class="txd-lines">${ls.map(l => `<div><span>${esc(l[0])}</span><b class="${l[1] >= 0 ? 'green' : ''}">${money(l[1], { sign: true })}</b></div>`).join('')}</div></div>` : '';
+  return sec('Income', inc, 'green') + sec('Expenses', exp, 'red');
+}
+
+/** Several flights at once (landed while you were away): each one opens its own breakdown. */
+function flightsMoneyPopup(ids: string[]) {
+  const ts = ids.map(id => State.txns.filter(x => x.id === id)[0]).filter(Boolean);
+  closeAll();
+  openLayer('modal', `<div class="modal-head"><div><h2>${ts.length} flights</h2><small>Tap a flight for its income and expenses</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body"><div class="tx-list">${ts.map(t => `<button class="tx" data-act="tx-detail" data-id="${t.id}"><span class="tx-k k-${t.kind}">${esc(TX_KINDS[t.kind])}</span><span class="tx-l"><b>${esc(t.label)}</b><small>${esc(t.date)} ${esc(t.time || '')}</small></span><b class="${t.amount >= 0 ? 'green' : 'red'}">${money(t.amount, { sign: true })}</b></button>`).join('')}</div>
+    <div class="txd-total"><span>Total</span><b class="${ts.reduce((s, t) => s + t.amount, 0) >= 0 ? 'green' : 'red'}">${money(ts.reduce((s, t) => s + t.amount, 0), { sign: true })}</b></div></div>`, { cls: 'narrow' });
+}
+
 ACTIONS['tx-open-log'] = () => { closeAll(); go('logbook'); };
 ACTIONS['fin-period'] = el => { _finPeriod = el.getAttribute('data-p'); _ovPeriod = _finPeriod; Sound.tick(); refresh(); };

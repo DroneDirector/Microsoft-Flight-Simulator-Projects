@@ -34,7 +34,7 @@ const Backup = {
   writeFolder() {
     const T = this.tools(), json = this._pending; if (!T || !json) return;
     this._pending = ''; this._last = Date.now();
-    T.backupFolderWrite({ data: json }).then(() => { if (this.folder) this.folder.lastWrite = Date.now(); })
+    T.backupFolderWrite({ data: json }).then(() => { if (this.folder) this.folder.lastWrite = Date.now(); if ($('#set-body')) rerenderSettingsBody(); })
       .catch((e: any) => ErrorLog.add('backup', 'The backup couldn\'t be saved to your backup folder', (e && e.message) || String(e), 'Choose the folder again in Settings, Backup and restore.', false));
   },
 

@@ -268,13 +268,14 @@ function finishLeg(e: FlightEvent) {
   const now = new Date(), day = dateStr(now).slice(0, 10), time = dateStr(now).slice(11);
   const flight = c.icao + (100 + (_hashStr(a.reg) % 800));
   const rev = m.revenue, fuel = m.costs, fees = 0;
-  State.txns.unshift({ id: uid(), companyId: c.id, date: day, time, label: `${flight} ${from} to ${to}`, amount: m.net, kind: m.net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight, route: `${from} → ${to}`, lines: m.lines } as any);
+  const txId = uid();
+  State.txns.unshift({ id: txId, companyId: c.id, date: day, time, label: `${flight} ${from} to ${to}`, amount: m.net, kind: m.net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight, route: `${from} → ${to}`, lines: m.lines } as any);
   const before = c.balance;
   c.balance += rev - fuel - fees;
   // today's legs
   State.today.forEach(l => { if (l.status === 'active') { if (l.to !== to) (l as any).planned = l.to; l.to = to; l.status = 'done'; (l as any).arr = time; (l as any).blockMin = sm.blockMin; } });
   const nxt = State.today.filter(l => l.status === 'planned')[0]; if (nxt && !State.today.some(l => l.status === 'next')) nxt.status = 'next';
-  State.notices.unshift({ id: uid(), kind: 'flight', title: `Landed at ${to}: ${sm.landingFpm} fpm`, body: `${from} to ${to}, ${hours(sm.blockMin)} block, ${num(sm.distanceNm)} nm, ${sm.pax} passengers. ${money(rev - fuel - fees, { sign: true })}.`, time: time, read: false });
+  State.notices.unshift({ id: uid(), kind: 'flight', title: `Landed at ${to}: ${sm.landingFpm} fpm`, body: `${from} to ${to}, ${hours(sm.blockMin)} block, ${num(sm.distanceNm)} nm, ${sm.pax} passengers. ${money(rev - fuel - fees, { sign: true })}. Tap for the money in and out.`, time: time, read: false, tx: txId } as any);
   removeMyLiveFlight();
   try { Progress.afterMyLeg(sm.landingFpm, grounded ? 'incident' : hard ? 'hard' : 'ok'); } catch (er) { /* ignore */ }
   Store.save(); refresh(); animateBalance(before, c.balance);
