@@ -6,6 +6,27 @@ const MAP_LAT_MAX = 84, MAP_LAT_MIN = -58;
 // Optional online base maps (MapLibre), chosen with the layer button on the map.
 // Classic dot map stays the default and the offline fallback.
 const EOX_ATTRIB = 'Sentinel-2 cloudless 2016 by <a href="https://cloudless.eox.at">EOX IT Services GmbH</a> (contains modified Copernicus Sentinel data 2016)';
+const OFM_ATTRIB = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, <a href="https://openmaptiles.org">OpenMapTiles</a>, <a href="https://openfreemap.org">OpenFreeMap</a>';
+/** The classic look with real geography underneath: zoomed out it is the dotted world (drawn on the
+ *  overlay); zooming in, the dots give way to coastlines, water, borders and main roads in the same
+ *  dark colours, from OpenStreetMap vector tiles (OpenFreeMap, free to use with credit). */
+function classicVectorStyle(): any {
+  // zoom-dependent values must be a top-level interpolate, so each fade carries its own end value
+  const fade = (a: number, b: number, to = 1) => ['interpolate', ['linear'], ['zoom'], a, 0, b, to];
+  return {
+    version: 8,
+    sources: { omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: OFM_ATTRIB } },
+    layers: [
+      { id: 'land', type: 'background', paint: { 'background-color': ['interpolate', ['linear'], ['zoom'], 4.2, '#050F1C', 5.6, '#0B1D33'] } },
+      { id: 'water', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': '#040B16', 'fill-opacity': fade(4.2, 5.6) } },
+      { id: 'coast', type: 'line', source: 'omt', 'source-layer': 'water', paint: { 'line-color': '#3FD0E8', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 4.2, 0, 5.6, 0.45, 12, 0.3], 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 12, 1.2] } },
+      { id: 'rivers', type: 'line', source: 'omt', 'source-layer': 'waterway', minzoom: 8, paint: { 'line-color': '#1E4A73', 'line-opacity': 0.5, 'line-width': 0.8 } },
+      { id: 'roads', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 7, filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary']]], paint: { 'line-color': '#24486F', 'line-opacity': fade(7, 9), 'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.5, 14, 2] } },
+      { id: 'borders-region', type: 'line', source: 'omt', 'source-layer': 'boundary', minzoom: 5, filter: ['all', ['>=', ['get', 'admin_level'], 3], ['<=', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': fade(5, 6.5, 0.18), 'line-width': 0.7, 'line-dasharray': [3, 3] } },
+      { id: 'borders', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['all', ['<=', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': fade(3.5, 5.2, 0.45), 'line-width': 1, 'line-dasharray': [4, 3] } },
+    ],
+  };
+}
 function baseMapStyle(): any {
   switch (State.settings.mapStyle) {
     case 'street': return 'https://tiles.openfreemap.org/styles/liberty';
@@ -15,7 +36,7 @@ function baseMapStyle(): any {
         tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/{z}/{y}/{x}.jpg'] } },
       layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0A1A2E' } }, { id: 's2', type: 'raster', source: 's2' }],
     };
-    default: return null;
+    default: return classicVectorStyle();
   }
 }
 
@@ -51,6 +72,11 @@ function streetLook(map: any) {
 
 function baseMapAvailable(): boolean { return !!(window as any).maplibregl && navigator.onLine !== false && !!baseMapStyle(); }
 function millerY(lat: number): number { const p = lat * D2R; return 1.25 * Math.log(Math.tan(Math.PI / 4 + 0.4 * p)); }
+function millerLat(y: number): number { return (Math.atan(Math.exp(y / 1.25)) - Math.PI / 4) / 0.4 / D2R; }
+/** Zoomed in to airport level the map is drawn (pixels per radian) down to a few pixels per metre. */
+const MAP_R_MAX = 4e7;
+/** From this zoom (screen pixels per degree) airports are drawn with their real layout. */
+const AIRPORT_DEG_PX = 1800;
 const MY_MAX = millerY(MAP_LAT_MAX), MY_MIN = millerY(MAP_LAT_MIN);
 
 interface MapOpts { interactive?: boolean; labels?: boolean; onSelect?: (id: string) => void; compact?: boolean; insetRight?: number }
@@ -72,6 +98,8 @@ class WorldMap {
   anim: any = null; colors: any; lastFit: any = null; userMoved = false;
   ro: any; ml: any = null; mlHost: HTMLElement = null;
   following: string = null; followT = 0;
+  /** Airports drawn with their real layout when zoomed in to airport level. */
+  scenes: { [icao: string]: AirportView } = {}; scenesT = 0; inScene: { [flightId: string]: number[] } = {};
 
   constructor(el: HTMLElement, opts?: MapOpts) {
     this.el = el; this.opts = opts || {};
@@ -137,8 +165,27 @@ class WorldMap {
   px(lon: number, lat: number): number[] {
     if (this.ml) { const p = this.ml.project([lon, lat]); return [p.x, p.y]; }
     const x = lon * D2R, y = millerY(clamp(lat, MAP_LAT_MIN, MAP_LAT_MAX));
-    return [(x - this.cx) * this.R + this.w / 2, (this.cy - y) * this.R + this.h / 2];
+    return [(x - this.cx) * this.R + this.w / 2, (this.cy - y) * this.R * this.yq() + this.h / 2];
   }
+  /** Screen -> lon/lat. */
+  ll(sx: number, sy: number): number[] {
+    if (this.ml) { const p = this.ml.unproject([sx, sy]); return [p.lng, p.lat]; }
+    return [((sx - this.w / 2) / this.R + this.cx) / D2R, millerLat(this.cy - (sy - this.h / 2) / (this.R * this.yq()))];
+  }
+  /** The world map squeezes north-south at high latitudes; zoomed in towards airport level that is
+   *  undone around the centre of the view, so runways and buildings keep their true shape. */
+  _yqR = -1; _yqY = 0; _yqV = 1;
+  yq(): number {
+    if (this.R === this._yqR && this.cy === this._yqY) return this._yqV;
+    this._yqR = this.R; this._yqY = this.cy; return (this._yqV = this.yqCalc());
+  }
+  yqCalc(): number {
+    if (this.R < 3e4) return 1;
+    const t = clamp((Math.log(this.R) - Math.log(3e4)) / (Math.log(6e5) - Math.log(3e4)), 0, 1), lat = millerLat(this.cy) * D2R;
+    return 1 + (Math.cos(0.8 * lat) / Math.cos(lat) - 1) * t;
+  }
+  /** Screen pixels per metre at the centre of the view. */
+  pxPerM(): number { const c = this.ll(this.w / 2, this.h / 2), a = this.px(c[0], c[1]), b = this.px(c[0] + 0.01, c[1]); return Math.abs(b[0] - a[0]) / (0.01 * 111320 * Math.cos(c[1] * D2R)); }
   /** Screen pixels per degree of longitude at the current view. */
   degPx(): number {
     if (this.ml) { const a = this.ml.project([0, 50]), b = this.ml.project([1, 50]); return Math.abs(b.x - a.x); }
@@ -146,8 +193,8 @@ class WorldMap {
   }
   minR() { return Math.max(this.w / (2 * Math.PI), this.h / (MY_MAX - MY_MIN)); }
   clampView() {
-    this.R = clamp(this.R, this.minR(), 4200);
-    const hw = this.w / 2 / this.R, hh = this.h / 2 / this.R;
+    this.R = clamp(this.R, this.minR(), MAP_R_MAX);
+    const hw = this.w / 2 / this.R, hh = this.h / 2 / (this.R * this.yq());
     this.cx = clamp(this.cx, -Math.PI + hw, Math.PI - hw);
     this.cy = clamp(this.cy, MY_MIN + hh, MY_MAX - hh);
   }
@@ -188,9 +235,9 @@ class WorldMap {
   zoomBy(f: number, ax?: number, ay?: number) {
     if (this.ml) { this.userMoved = true; this.ml.easeTo({ zoom: this.ml.getZoom() + Math.log(f) / Math.LN2, duration: 300 }); return; }
     ax = ax == null ? this.w / 2 : ax; ay = ay == null ? this.h / 2 : ay;
-    const wx = this.cx + (ax - this.w / 2) / this.R, wy = this.cy - (ay - this.h / 2) / this.R;
+    const wx = this.cx + (ax - this.w / 2) / this.R, wy = this.cy - (ay - this.h / 2) / (this.R * this.yq());
     this.R *= f; this.clampView();
-    this.cx = wx - (ax - this.w / 2) / this.R; this.cy = wy + (ay - this.h / 2) / this.R;
+    this.cx = wx - (ax - this.w / 2) / this.R; this.cy = wy + (ay - this.h / 2) / (this.R * this.yq());
     this.clampView(); this.baseDirty = true;
   }
 
@@ -209,7 +256,7 @@ class WorldMap {
       if (ids.length === 1) {
         const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
         if (Math.abs(dx) + Math.abs(dy) > 3) { this.moved = true; this.userMoved = true; this.following = null; }
-        this.cx -= dx / this.R; this.cy += dy / this.R; this.clampView(); this.baseDirty = true;
+        this.cx -= dx / this.R; this.cy += dy / (this.R * this.yq()); this.clampView(); this.baseDirty = true;
       }
       p.x = e.offsetX; p.y = e.offsetY;
       if (ids.length === 2) {
@@ -232,7 +279,7 @@ class WorldMap {
   tapAt(x: number, y: number) {
     let best: string = null, bd = 28;
     for (const f of liveOf()) {
-      const p = this.px.apply(this, flightPos(f));
+      const p = this.px.apply(this, this.inScene[f.id] || flightPos(f));
       const d = Math.hypot(p[0] - x, p[1] - y);
       if (d < bd) { bd = d; best = f.id; }
     }
@@ -252,7 +299,10 @@ class WorldMap {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.clearRect(0, 0, this.w, this.h);
     if (!this.ml) { c.fillStyle = col.bg; c.fillRect(0, 0, this.w, this.h); }
-    if (!this.ml) {
+    // the dotted world: always offline; online in the classic look only zoomed out, giving way to real coastlines
+    const dz = this.degPx(), dots = !this.ml ? 1 : State.settings.mapStyle === 'classic' ? clamp((34 - dz) / 18, 0, 1) : 0;
+    if (dots > 0) {
+      c.globalAlpha = dots;
       // graticule every 15°
       c.strokeStyle = col.grid; c.lineWidth = 1;
       c.beginPath();
@@ -265,12 +315,17 @@ class WorldMap {
       const r = clamp(degPx * step * 0.2, 0.55, 2.1);
       c.fillStyle = col.dot;
       c.beginPath();
+      // only the dots in view (zoomed in, that is a tiny part of the world)
+      const ca = this.ll(-8, -8), cb = this.ll(this.w + 8, this.h + 8);
+      const lo0 = Math.min(ca[0], cb[0]), lo1 = Math.max(ca[0], cb[0]), la0 = Math.min(ca[1], cb[1]), la1 = Math.max(ca[1], cb[1]);
       for (const d of landDots(step)) {
+        if (d[0] < lo0 || d[0] > lo1 || d[1] < la0 || d[1] > la1) continue;
         const p = this.px(d[0], d[1]);
         if (p[0] < -4 || p[1] < -4 || p[0] > this.w + 4 || p[1] > this.h + 4) continue;
         c.moveTo(p[0] + r, p[1]); c.arc(p[0], p[1], r, 0, Math.PI * 2);
       }
       c.fill();
+      c.globalAlpha = 1;
     }
     // only the airports that matter: on your routes (yours, your hired pilots' and co-op pilots'), where
     // flights are going right now, and the airport you searched for; the other 49,000 stay hidden
@@ -282,8 +337,10 @@ class WorldMap {
     this.shownAps = Object.keys(used);
     c.font = '600 10px Inter, sans-serif';
     const degPx2 = this.degPx();
+    const inDetail = degPx2 >= AIRPORT_DEG_PX;
     for (const k in used) {
       const a = apt(k); if (!a) continue;
+      if (inDetail && this.scenes[k] && this.scenes[k].L) continue;   // drawn with its real layout instead
       const p = this.px(a.pos[0], a.pos[1]);
       const hub = k === company().hub, marked = k === this.mark;
       if (marked) { c.beginPath(); c.arc(p[0], p[1], 11, 0, Math.PI * 2); c.strokeStyle = col.mag; c.lineWidth = 2; c.stroke(); }
@@ -318,7 +375,7 @@ class WorldMap {
       this.followT = now;
       const ff = State.live.filter(x => x.id === this.following)[0];
       if (ff) {
-        const p = flightPos(ff);
+        const p = this.inScene[ff.id] || flightPos(ff);
         const ins = this.w > 600 ? (this.opts.insetRight || 0) : 0;
         if (this.ml) { if (!this.ml.isMoving()) this.ml.easeTo({ center: p, offset: [-ins / 2, 0], duration: 240, easing: (x: number) => x }); }
         else { this.cx = p[0] * D2R + ins / 2 / this.R; this.cy = millerY(p[1]); this.clampView(); this.baseDirty = true; }
@@ -331,6 +388,23 @@ class WorldMap {
     c.drawImage(this.base, 0, 0);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const degPx = this.degPx();
+    this.inScene = {};
+    if (degPx >= AIRPORT_DEG_PX * 0.5) {
+      if (now - this.scenesT > 700) { this.scenesT = now; this.pickScenes(); }
+      if (degPx >= AIRPORT_DEG_PX) {
+        const ppm = this.pxPerM();
+        c.globalAlpha = clamp((degPx - AIRPORT_DEG_PX) / AIRPORT_DEG_PX, 0, 1) * 0.8 + 0.2;
+        for (const icao of Object.keys(this.scenes)) {
+          const sc = this.scenes[icao]; if (!sc.L) continue;
+          const p0 = this.px(sc.L.lon, sc.L.lat); if (p0[0] < -this.w || p0[0] > this.w * 2 || p0[1] < -this.h || p0[1] > this.h * 2) continue;
+          sc.ctx = c; sc.s = ppm; sc.track = this.following || this.selected;
+          sc.computePlanes(Date.now());
+          sc.draw(now);
+          for (const pl of sc.planes) if (!pl.parked) this.inScene[pl.id] = sc.lonLat(pl.x, pl.y);
+        }
+        c.globalAlpha = 1;
+      }
+    }
     for (const f of liveOf()) {
       if (!f.real && !aiOn(f)) { f.t = f.t + f.rate * dt * (State.settings.reduceMotion ? 0 : 1); if (f.t > 1) f.t = 0.02; }
       const a = apt(f.from).pos, b = apt(f.to).pos;
@@ -338,18 +412,21 @@ class WorldMap {
       const pts: number[][] = [];
       if (!f.noDest) for (let i = 0; i <= N; i++) pts.push(this.px.apply(this, gcInterpolate(a, b, i / N)));
       const sel = this.selected === f.id, mine = !!f.you;
-      const here = this.px.apply(this, flightPos(f));
+      const here = this.px.apply(this, this.inScene[f.id] || flightPos(f));
       if (pts.length) {
         // remaining route: dashed
-        c.setLineDash([4, 5]); c.lineWidth = 1.2; c.strokeStyle = mine ? col.cyan : col.mag; c.globalAlpha = 0.45;
+        // at airport level the long route lines fade, so the airport stays readable
+        const rf = degPx >= AIRPORT_DEG_PX ? 0.22 : 1;
+        c.setLineDash([4, 5]); c.lineWidth = 1.2; c.strokeStyle = mine ? col.cyan : col.mag; c.globalAlpha = 0.45 * rf;
         c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
         // flown part: solid
-        c.setLineDash([]); c.globalAlpha = 1; c.lineWidth = sel || mine ? 2.4 : 1.8;
+        c.setLineDash([]); c.globalAlpha = rf; c.lineWidth = sel || mine ? 2.4 : 1.8;
         const cut = Math.max(1, Math.floor(f.t * N));
         c.beginPath(); for (let i = 0; i <= cut; i++) i ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]);
         c.lineTo(here[0], here[1]); c.stroke();
       }
       c.setLineDash([]); c.globalAlpha = 1;
+      if (this.inScene[f.id]) continue;   // drawn by the airport, on its taxiway or runway
       // heading: the real one for your flight, otherwise from a point just ahead on the route
       let hdg: number;
       if (f.real && f.hdg != null) hdg = f.hdg;
@@ -375,6 +452,40 @@ class WorldMap {
     this.placeBubble();
   }
 
+  /** The airports in view (up to three, nearest the centre first) get their real layout. */
+  pickScenes() {
+    const a = this.ll(-this.w * 0.25, -this.h * 0.25), b = this.ll(this.w * 1.25, this.h * 1.25), c = this.ll(this.w / 2, this.h / 2);
+    const lo0 = Math.min(a[0], b[0]), lo1 = Math.max(a[0], b[0]), la0 = Math.min(a[1], b[1]), la1 = Math.max(a[1], b[1]);
+    const near: [number, string][] = [];
+    const look = (ap: any) => { const p = ap.pos; if (p[0] >= lo0 && p[0] <= lo1 && p[1] >= la0 && p[1] <= la1) near.push([(p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2, ap.icao]); };
+    for (const k of Object.keys(AIRPORTS)) look(AIRPORTS[k]);
+    if (World.ready) for (const ap of World.list) if (!AIRPORTS[ap.icao] && (ap.size || 0) >= 1) look(ap);
+    near.sort((x, y) => x[0] - y[0]);
+    const want = near.slice(0, 3).map(n => n[1]).filter((k, i, l) => l.indexOf(k) === i);
+    for (const k of want) if (!this.scenes[k]) this.scenes[k] = makeAirportScene(k, this);
+    // keep a few recent ones, let the rest go
+    const keys = Object.keys(this.scenes);
+    if (keys.length > 6) for (const k of keys) if (want.indexOf(k) < 0 && Object.keys(this.scenes).length > 6) { this.scenes[k].alive = false; delete this.scenes[k]; }
+    if (want.length) this.baseDirty = true;
+  }
+
+  /** Fly down to an airport at its real place on the map, keeping an eye on an aircraft if one is given. */
+  flyToAirport(icao: string, track?: string) {
+    const a: any = apt(icao); if (!a) return;
+    const lon = a.pos[0], lat = a.pos[1], span = 2600;   // metres across the view
+    this.mark = null; this.selected = track || null; this.following = track || null; this.userMoved = false;
+    if (!this.scenes[icao]) this.scenes[icao] = makeAirportScene(icao, this);
+    if (this.ml) {
+      const z = Math.log(156543 * Math.cos(lat * D2R) / (span / Math.max(320, this.w))) / Math.LN2;
+      this.ml.flyTo({ center: [lon, lat], zoom: Math.min(18, z), duration: reducedMotion() ? 0 : 1800, essential: true });
+      return;
+    }
+    const R = clamp((Math.max(320, this.w) / span) * 6371000 * Math.cos(lat * D2R), this.minR(), MAP_R_MAX);
+    const to = { cx: lon * D2R, cy: millerY(lat), R };
+    if (reducedMotion()) { this.cx = to.cx; this.cy = to.cy; this.R = to.R; this.clampView(); this.baseDirty = true; }
+    else this.anim = { from: { cx: this.cx, cy: this.cy, R: this.R }, to, t0: performance.now(), dur: 1800 };
+  }
+
   /* ---------- the flight's speech bubble: follow, favourite, details ---------- */
   bubbleId: string = null; bubbleEl: HTMLElement = null;
   openBubble(id: string) {
@@ -389,11 +500,12 @@ class WorldMap {
     if (!this.bubbleId || !this.bubbleEl) return;
     const f = State.live.filter(x => x.id === this.bubbleId)[0];
     if (!f) { this.closeBubble(); return; }
-    const p = this.px.apply(this, flightPos(f));
+    const p = this.px.apply(this, this.inScene[f.id] || flightPos(f));
     const off = p[0] < -20 || p[1] < -20 || p[0] > this.w + 20 || p[1] > this.h + 20;
     this.bubbleEl.style.visibility = off ? 'hidden' : '';
     // keep the box inside the map; the pointer line still ends on the aircraft
-    const half = Math.min(110, (this.bubbleEl.firstElementChild as HTMLElement || this.bubbleEl).offsetWidth / 2 || 100);
+    // the box is as wide as its buttons need; it stays centred over the aircraft unless that would push it off the map
+    const half = ((this.bubbleEl.firstElementChild as HTMLElement || this.bubbleEl).offsetWidth / 2) || 100;
     const shift = clamp(p[0], half + 6, Math.max(half + 6, this.w - half - 6)) - p[0];
     this.bubbleEl.style.transform = `translate(${p[0].toFixed(1)}px, ${p[1].toFixed(1)}px)`;
     this.bubbleEl.style.setProperty('--shift', shift.toFixed(1) + 'px');

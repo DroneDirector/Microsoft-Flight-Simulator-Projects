@@ -35,7 +35,7 @@ SCREENS.market = {
 ACTIONS['mk-mode'] = el => { _mkMode = el.getAttribute('data-m') as any; Sound.tick(); refresh(); };
 ACTIONS['mk-maker'] = el => { _mkMaker = el.getAttribute('data-m'); Sound.tick(); refresh(); };
 
-let _buy = { id: '', qty: 1, div: '' };
+let _buy = { id: '', qty: 1, div: '', base: '' };
 
 function nextRegs(c: Company, n: number): string[] {
   const used: { [k: string]: boolean } = {};
@@ -67,12 +67,12 @@ function buySheetHtml(): string {
           <div class="stepper"><button class="icon-btn" data-act="buy-qty" data-d="-1" aria-label="One less"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12h14"/></svg></button><b>${_buy.qty}</b><button class="icon-btn" data-act="buy-qty" data-d="1" aria-label="One more">${icon('plus')}</button></div></div>
         ${c.divisions.length ? `<div class="field"><small>Division</small><div class="seg">${c.divisions.map(d => `<button class="${_buy.div === d.id ? 'on' : ''}" data-act="buy-div" data-div="${d.id}">${esc(d.name)}</button>`).join('')}</div></div>` : ''}
         <div class="field"><small>Registration${_buy.qty > 1 ? 's' : ''}</small><div class="regs">${regs.map(r => `<span>${esc(r)}</span>`).join('')}</div></div>
-        <div class="field"><small>Delivered to</small><b>${esc(apt(c.hub).name)} (${esc(c.hub)})</b></div>
+        ${baseFieldHtml(_buy.base || c.hub, _buy.qty, 'buy')}
         <div class="buy-sum">
           <div><small>Total</small><b>${money(total)}</b></div>
           <div><small>Balance after</small><b class="${after < 0 ? 'red' : ''}">${money(after)}</b></div>
         </div>
-        <button class="btn primary big" data-act="buy-confirm" ${after < 0 ? 'disabled' : ''}>${after < 0 ? 'Not enough money' : `Buy for ${money(total, { compact: true })}`}</button>
+        ${(() => { const nb = noStandsFor(_buy.base || c.hub, _buy.qty); return `<button class="btn primary big" data-act="buy-confirm" ${after < 0 || nb ? 'disabled' : ''}>${nb ? `Not enough stands at ${esc(_buy.base || c.hub)}` : after < 0 ? 'Not enough money' : `Buy for ${money(total, { compact: true })}`}</button>`; })()}
       </div>
     </div>`;
 }
@@ -80,24 +80,36 @@ function buySheetHtml(): string {
 ACTIONS.buy = el => {
   Sound.tick();
   const c = company();
-  _buy = { id: el.getAttribute('data-id'), qty: 1, div: c.divisions.length ? (State.divisionId !== 'all' ? State.divisionId : c.divisions[0].id) : '' };
+  _buy = { id: el.getAttribute('data-id'), qty: 1, base: company().hub, div: c.divisions.length ? (State.divisionId !== 'all' ? State.divisionId : c.divisions[0].id) : '' };
   openLayer('modal', buySheetHtml(), { cls: 'wide buy-pop' });
+};
+/** The base for new aircraft, with its free stands; a full base is pointed out with a way to choose another. */
+function baseFieldHtml(base: string, qty: number, kind: string): string {
+  const f = Bases.free(base), short = f != null && f < qty;
+  return `<div class="field"><small>Delivered to and based at</small><div class="base-pick-row"><b>${esc(apt(base) ? apt(base).name : base)} (${esc(base)})</b><button class="text-btn" data-act="new-base" data-k="${kind}">Change</button></div>
+    <small class="${short ? 'red' : 'muted'}">${short ? `${f <= 0 ? 'No free stands' : 'Only ' + f + ' free stand' + (f === 1 ? '' : 's')} at ${esc(base)}. Choose another base${f > 0 ? ' or fewer aircraft' : ''}.` : esc(Bases.standLabel(base))}</small></div>`;
+}
+ACTIONS['new-base'] = el => {
+  const k = el.getAttribute('data-k');
+  openBasePicker('Base for the new aircraft', 'Where it is delivered and parked', icao => { if (k === 'lease') { _lease.base = icao; rerenderLease(); } else { _buy.base = icao; rerenderBuy(); } });
 };
 function rerenderBuy() { const p = $('.buy-pop .panel'); if (p) p.innerHTML = buySheetHtml(); }
 ACTIONS['buy-qty'] = el => { _buy.qty = clamp(_buy.qty + parseInt(el.getAttribute('data-d'), 10), 1, 12); Sound.tick(); rerenderBuy(); };
 ACTIONS['buy-div'] = el => { _buy.div = el.getAttribute('data-div'); Sound.tick(); rerenderBuy(); };
 
 ACTIONS['buy-confirm'] = () => {
+  if (noStandsFor(_buy.base || company().hub, _buy.qty)) { toast('Not enough free stands there: choose another base', 'warn'); return; }
   if (!coopCanBuy()) { toast('In this co-op only the owner buys aircraft', 'warn'); return; }
   const t = acType(_buy.id), c = company();
   try { coopAfterBuy(`${_buy.qty}× ${t.maker} ${t.model}`, t.price * _buy.qty); } catch (e) { /* ignore */ }
   const regs = nextRegs(c, _buy.qty);
   const from = c.balance;
   c.balance -= t.price * _buy.qty;
-  regs.forEach(r => State.fleet.push({ reg: r, typeId: t.id, companyId: c.id, divisionId: _buy.div || undefined, base: c.hub, location: c.hub, hoursMin: 0, cycles: 0, condition: 100, status: 'parked', delivered: dateStr(new Date()).slice(0, 10) }));
+  regs.forEach(r => State.fleet.push({ reg: r, typeId: t.id, companyId: c.id, divisionId: _buy.div || undefined, base: _buy.base || c.hub, location: _buy.base || c.hub, hoursMin: 0, cycles: 0, condition: 100, status: 'parked', delivered: dateStr(new Date()).slice(0, 10) }));
   State.txns.unshift({ id: uid(), companyId: c.id, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Purchase: ${_buy.qty}× ${t.maker} ${t.model}`, amount: -t.price * _buy.qty, kind: 'purchase',
     reg: regs.join(', '), lines: regs.map(r => [`${t.maker} ${t.model} ${r}, ${t.dev}`, -t.price] as [string, number]), link: { kind: 'aircraft', id: regs[0] } });
   closeAll();
+  Bases.ensure();
   Sound.purchase(); Haptics.success();
   animateBalance(from, c.balance);
   // delivery celebration

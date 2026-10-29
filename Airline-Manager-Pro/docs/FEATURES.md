@@ -136,6 +136,9 @@ Only damage the simulator can actually detect.
 | Repair time: instant, or 5 to 90 minutes depending on the job | Built |
 | Lease aircraft for 1, 3 or 6 years: monthly rent, extend, buy out or return early | Built |
 | Picks up where you left off after being minimised or closed; runs in split screen | Built |
+| World map that zooms from the whole world down to airport level, with real coastlines and borders | Built |
+| Bases and stands: aircraft per base limited to the airport's real stands | Built |
+| Battery indicator with charging and wireless charging | Built |
 | Fly for a real-world airline (names and codes only, no logos) | Built |
 | Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |

@@ -61,7 +61,7 @@ function leaseHandBack(a: Aircraft, fee: number, why: string) {
 }
 
 /* ---------- The lease sheet ---------- */
-let _lease = { id: '', qty: 1, div: '', years: 3 };
+let _lease = { id: '', qty: 1, div: '', years: 3, base: '' };
 
 function leaseSheetHtml(): string {
   const t = acType(_lease.id), c = company();
@@ -78,6 +78,7 @@ function leaseSheetHtml(): string {
         <div class="field"><small>Lease term</small><div class="seg">${LEASE_TERMS.map(x => `<button class="${_lease.years === x.years ? 'on' : ''}" data-act="lease-term" data-y="${x.years}">${x.years} year${x.years > 1 ? 's' : ''}</button>`).join('')}</div></div>
         ${c.divisions.length ? `<div class="field"><small>Division</small><div class="seg">${c.divisions.map(d => `<button class="${_lease.div === d.id ? 'on' : ''}" data-act="lease-div" data-div="${d.id}">${esc(d.name)}</button>`).join('')}</div></div>` : ''}
         <div class="field"><small>Registration${_lease.qty > 1 ? 's' : ''}</small><div class="regs">${regs.map(r => `<span>${esc(r)}</span>`).join('')}</div></div>
+        ${baseFieldHtml(_lease.base || c.hub, _lease.qty, 'lease')}
         <div class="lease-terms">
           <div><small>Rent per month</small><b>${money(monthly * _lease.qty)}</b></div>
           <div><small>Security deposit</small><b>${money(deposit * _lease.qty)}</b><em>paid back at the end</em></div>
@@ -87,7 +88,7 @@ function leaseSheetHtml(): string {
           <div><small>Due today</small><b>${money(today)}</b></div>
           <div><small>Balance after</small><b class="${after < 0 ? 'red' : ''}">${money(after)}</b></div>
         </div>
-        <button class="btn primary big" data-act="lease-confirm" ${after < 0 ? 'disabled' : ''}>${after < 0 ? 'Not enough money' : `Lease for ${money(monthly * _lease.qty, { compact: true })} a month`}</button>
+        ${(() => { const nb = noStandsFor(_lease.base || c.hub, _lease.qty); return `<button class="btn primary big" data-act="lease-confirm" ${after < 0 || nb ? 'disabled' : ''}>${nb ? `Not enough stands at ${esc(_lease.base || c.hub)}` : after < 0 ? 'Not enough money' : `Lease for ${money(monthly * _lease.qty, { compact: true })} a month`}</button>`; })()}
         <p class="fine-print">${icon('info')}The first month's rent and the deposit are paid today, then the rent every 30 days. You can extend, buy it out or return it early from the aircraft's page.</p>
       </div>
     </div>`;
@@ -97,7 +98,7 @@ function rerenderLease() { const p = $('.lease-pop .panel'); if (p) p.innerHTML 
 ACTIONS.lease = el => {
   Sound.tick();
   const c = company();
-  _lease = { id: el.getAttribute('data-id'), qty: 1, years: 3, div: c.divisions.length ? (State.divisionId !== 'all' ? State.divisionId : c.divisions[0].id) : '' };
+  _lease = { id: el.getAttribute('data-id'), qty: 1, years: 3, base: company().hub, div: c.divisions.length ? (State.divisionId !== 'all' ? State.divisionId : c.divisions[0].id) : '' };
   openLayer('modal', leaseSheetHtml(), { cls: 'wide buy-pop lease-pop' });
 };
 ACTIONS['lease-qty'] = el => { _lease.qty = clamp(_lease.qty + parseInt(el.getAttribute('data-d'), 10), 1, 12); Sound.tick(); rerenderLease(); };
@@ -105,18 +106,19 @@ ACTIONS['lease-term'] = el => { _lease.years = +el.getAttribute('data-y'); Sound
 ACTIONS['lease-div'] = el => { _lease.div = el.getAttribute('data-div'); Sound.tick(); rerenderLease(); };
 
 ACTIONS['lease-confirm'] = () => {
+  if (noStandsFor(_lease.base || company().hub, _lease.qty)) { toast('Not enough free stands there: choose another base', 'warn'); return; }
   if (!coopCanBuy()) { toast('In this co-op only the owner takes on aircraft', 'warn'); return; }
   const t = acType(_lease.id), c = company();
   const monthly = leaseMonthly(t.price, _lease.years), deposit = monthly * 2, now = Date.now();
   const regs = nextRegs(c, _lease.qty), from = c.balance;
   const lessor = LESSORS[_hashStr(t.id + c.id) % LESSORS.length];
   c.balance -= (monthly + deposit) * _lease.qty;
-  regs.forEach(r => State.fleet.push({ reg: r, typeId: t.id, companyId: c.id, divisionId: _lease.div || undefined, base: c.hub, location: c.hub, hoursMin: 0, cycles: 0, condition: 100, status: 'parked', delivered: dateStr(new Date()).slice(0, 10),
+  regs.forEach(r => State.fleet.push({ reg: r, typeId: t.id, companyId: c.id, divisionId: _lease.div || undefined, base: _lease.base || c.hub, location: _lease.base || c.hub, hoursMin: 0, cycles: 0, condition: 100, status: 'parked', delivered: dateStr(new Date()).slice(0, 10),
     lease: { since: now, months: _lease.years * 12, monthly, deposit, nextAt: now + LEASE_MONTH, endAt: now + _lease.years * 12 * LEASE_MONTH, lessor } } as any));
   State.txns.unshift({ id: uid(), companyId: c.id, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Lease: ${_lease.qty}× ${t.maker} ${t.model}`, amount: -(monthly + deposit) * _lease.qty, kind: 'lease' as any,
     reg: regs.join(', '), lines: regs.map(r => [`${r}: first month's rent and deposit, ${lessor}`, -(monthly + deposit)] as [string, number]), link: { kind: 'aircraft', id: regs[0] } } as any);
   try { coopAfterBuy(`${_lease.qty}× ${t.maker} ${t.model} (leased)`, (monthly + deposit) * _lease.qty); } catch (e) { /* ignore */ }
-  closeAll(); Store.save();
+  closeAll(); Bases.ensure(); Store.save();
   Sound.purchase(); Haptics.success();
   animateBalance(from, c.balance);
   openLayer('modal', `

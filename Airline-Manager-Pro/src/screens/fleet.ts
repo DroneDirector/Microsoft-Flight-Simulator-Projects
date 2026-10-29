@@ -10,7 +10,7 @@ function fleetCard(a: Aircraft, i: number): string {
     <div class="ac-stage">${aircraftArt(a.typeId, { color: div ? div.color : c.color, color2: c.color2, reg: a.reg })}</div>
     <div class="ac-info">
       ${_blocked[a.reg] ? `<span class="crew-short">${icon('pilots')}${esc(_blocked[a.reg].join(', '))}</span>` : ''}
-      <div class="ac-row1"><b class="ac-reg">${esc(a.reg)}</b>${State.myReg[a.companyId] === a.reg ? '<span class="you-tag">You fly this</span>' : ''}${(a as any).lease ? '<span class="lease-tag">Leased</span>' : ''}${statusChip(a.status)}</div>
+      <div class="ac-row1"><b class="ac-reg">${esc(a.reg)}</b>${State.myReg[a.companyId] === a.reg ? '<span class="you-tag">You fly this</span>' : ''}${(a as any).lease ? '<span class="lease-tag">Leased</span>' : ''}${(a as any).noBase ? '<span class="nostand-tag">No stand</span>' : ''}${statusChip(a.status)}</div>
       <div class="ac-type">${esc(t.maker)} ${esc(t.model)}</div>
       <div class="ac-dev"><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span>${div ? `<span class="div-tag" style="--dc:${div.color}">${esc(div.name)}</span>` : ''}</div>
       <div class="ac-meta">
@@ -36,6 +36,7 @@ SCREENS.fleet = {
       <div><h1>Fleet</h1><p class="sub">${all.length} aircraft, ${all.filter(a => a.status === 'flying').length} in the air, ${all.filter(a => a.status === 'grounded').length} grounded</p></div>
       <div class="btn-row nowrap"><button class="btn primary" data-act="go-market">${icon('plus')}Buy aircraft</button><button class="btn ghost" data-act="go-lease">${icon('key')}Lease aircraft</button></div>
     </div>
+    ${noStandBannerHtml()}
     <div class="filter-row">${classes.map(c => `<button class="fchip ${_fleetFilter === c[0] || (c[0] === 'types' && acType(_fleetFilter)) ? 'on' : ''}" data-act="fleet-filter" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>
     ${_fleetFilter === 'types' ? fleetTypesHtml(all)
       : `${acType(_fleetFilter) ? `<p class="fine-print">${icon('fleet')}${esc(acType(_fleetFilter).maker + ' ' + acType(_fleetFilter).model)}: ${list.length} in the fleet. <button class="text-btn" data-act="fleet-filter" data-f="types">All aircraft types</button></p>` : ''}
@@ -88,6 +89,7 @@ ACTIONS['ac-detail'] = el => {
         <div><small>Range</small><b>${num(t.rangeNm)} nm</b></div>
         <div><small>Base</small><b>${esc(a.base)}</b></div>
       </div>
+      <div class="base-row ${(a as any).noBase ? 'warn' : ''}">${icon((a as any).noBase ? 'alert' : 'pin')}<span><b>${(a as any).noBase ? `No stand at ${esc(a.base)}` : `Based at ${esc(apt(a.base) ? apt(a.base).name : a.base)} (${esc(a.base)})`}</b><small>${(a as any).noBase ? 'All stands there are taken by your aircraft. Refused take-off and no passengers until it has a base with a free stand.' : esc(Bases.standLabel(a.base))}</small></span><button class="btn ${(a as any).noBase ? 'primary' : 'ghost'} sm" data-act="ac-rebase" data-reg="${esc(a.reg)}">${icon('pin')}Change base</button></div>
       ${leasePanelHtml(a)}
       ${f ? `<p class="lede">${icon('fleet')}Flying ${esc(f.callsign)} from ${esc(apt(f.from).city)} to ${esc(apt(f.to).city)}${f.you ? ' with you at the controls' : ', ' + esc(pilot(f.pilotId).name)}.</p>` : ''}
       <div class="two-col">

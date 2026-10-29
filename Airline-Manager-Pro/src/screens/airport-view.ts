@@ -25,6 +25,8 @@ class AirportView {
   active: { tx: number; ty: number; ux: number; uy: number; len: number; name: string; wind: number; windKt: number } = null;
   planes: ApvPlane[] = [];
   lastList = 0;
+  /** Drawn inside the world map (zoomed in to airport level) instead of on its own screen. */
+  embedded = false; map: WorldMap = null; col: any = null;
 
   constructor(host: HTMLElement, icao: string, track: string, fromWorld: WorldMap) {
     this.host = host; this.icao = icao; this.track = track; this.fromWorld = fromWorld;
@@ -66,18 +68,28 @@ class AirportView {
     const L = this.L, k = Math.cos(L.lat * Math.PI / 180);
     return [(lon - L.lon) * 111320 * k, (lat - L.lat) * 110540];
   }
-  scr(x: number, y: number): number[] { return [this.w / 2 + (x - this.cx) * this.s, this.h / 2 - (y - this.cy) * this.s]; }
+  scr(x: number, y: number): number[] {
+    if (this.embedded) { const L = this.L; return this.map.px(L.lon + x / (111320 * Math.cos(L.lat * Math.PI / 180)), L.lat + y / 110540); }
+    return [this.w / 2 + (x - this.cx) * this.s, this.h / 2 - (y - this.cy) * this.s];
+  }
+  /** Local metres -> lon/lat. */
+  lonLat(x: number, y: number): number[] { const L = this.L; return [L.lon + x / (111320 * Math.cos(L.lat * Math.PI / 180)), L.lat + y / 110540]; }
 
   fetching = false;
   setLayout(L: AirportLayout, upgrade?: boolean) {
     this.L = L; this.routes = {};
+    if (this.embedded) { this.buildGraph(); this.pickRunway(); return; }
     if (L.source !== 'runways') this.fetching = false;
     this.labelSource();
     this.buildGraph(); this.pickRunway();
     if (!upgrade || !this.userMoved) { const keepS = upgrade ? this.s : 0; this.fit(); if (keepS && this.track) this.s = keepS; }
     const note = $('#apv-note');
-    if (note) note.innerHTML = L.source !== 'runways' || this.fetching ? '' : `${icon('info')}<span>${navigator.onLine === false ? 'You\'re offline: showing the real runways. The full layout loads when you\'re back online.' : 'No detailed layout is available for this airport, so the real runways are shown.'}</span>`;
-    if (note && note.innerHTML) { note.style.opacity = '1'; setTimeout(() => { note.style.transition = 'opacity .6s'; note.style.opacity = '0'; }, 7000); }
+    const why = AirportLayouts.osmWhy[this.icao];
+    if (note) note.innerHTML = L.source !== 'runways' || this.fetching ? ''
+      : navigator.onLine === false ? `${icon('info')}<span>You're offline: showing the real runways. The full layout loads when you're back online.</span><button class="text-btn" data-act="apv-retry">Try again</button>`
+      : why === 'busy' ? `${icon('info')}<span>The map servers are busy right now, so the real runways are shown.</span><button class="text-btn" data-act="apv-retry">Try again</button>`
+      : `${icon('info')}<span>${this.icao} isn't mapped in detail on OpenStreetMap yet, so the real runways are shown.${Link.status === 'connected' ? '' : ' Link the app to the simulator for its full layout.'}</span>`;
+    if (note && note.innerHTML) { note.style.transition = ''; note.style.opacity = '1'; if (why !== 'busy' && navigator.onLine !== false) setTimeout(() => { note.style.transition = 'opacity .6s'; note.style.opacity = '0'; }, 9000); }
   }
   labelSource() {
     const src = $('#apv-src'), L = this.L; if (!src || !L) return;
@@ -95,7 +107,7 @@ class AirportView {
       for (const p of L.paths) {
         const [type, , st, en] = p;
         if (type === 3) { const a = P[st], k = L.parks[en]; if (a && k) link('n' + st, 'p' + en, Math.hypot(a[0] - k[0], a[1] - k[1])); }
-        else if (type === 1 || type === 2 || type === 4) { const a = P[st], b = P[en]; if (a && b) link('n' + st, 'n' + en, Math.hypot(a[0] - b[0], a[1] - b[1]) * (type === 2 ? 3 : 1)); }
+        else if (type === 1 || type === 2 || type === 4 || type === 9) { const a = P[st], b = P[en]; if (a && b) link('n' + st, 'n' + en, Math.hypot(a[0] - b[0], a[1] - b[1]) * (type === 2 ? 3 : 1)); }
       }
       this.graph = { pts: P, adj, parks: L.parks, schematic: false };
       return;
@@ -279,13 +291,17 @@ class AirportView {
   }
 
   draw(now: number) {
-    const c = this.ctx, L = this.L, s = this.s, col = { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') };
+    const c = this.ctx, L = this.L, s = this.s, col = this.col || { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') };
+    if (!this.embedded) {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = col.bg; c.fillRect(0, 0, this.w, this.h);
     // dot grid every 100 m (or 500 m far out)
     const step = s > 0.12 ? 100 : 500, x0 = this.cx - this.w / 2 / s, x1 = this.cx + this.w / 2 / s, y0 = this.cy - this.h / 2 / s, y1 = this.cy + this.h / 2 / s;
     c.fillStyle = cssVar('--map-dot');
     if ((x1 - x0) / step < 160) for (let x = Math.ceil(x0 / step) * step; x < x1; x += step) for (let y = Math.ceil(y0 / step) * step; y < y1; y += step) { const p = this.scr(x, y); c.fillRect(p[0] - 0.8, p[1] - 0.8, 1.6, 1.6); }
+    }
+    const sat = this.embedded && State.settings.mapStyle === 'satellite';
+    if (sat) c.globalAlpha = 0.62;
     const g = this.graph;
     // aprons and terminal buildings
     for (const ar of L.areas || []) {
@@ -299,21 +315,33 @@ class AirportView {
       const drawSeg = (a: number[], b: number[], wm: number, fill: string) => { const p = this.scr(a[0], a[1]), q = this.scr(b[0], b[1]); c.strokeStyle = fill; c.lineWidth = Math.max(1.5, wm * s); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); };
       c.lineCap = 'round';
       if (paths) {
-        for (const p of paths) { const [type, wid, st, en] = p; if (type === 1 || type === 4) { const a = g.pts[st], b = g.pts[en]; if (a && b) drawSeg(a, b, wid || 20, '#1a3554'); } else if (type === 3) { const a = g.pts[st], k = g.parks[en]; if (a && k) drawSeg(a, k, Math.max(10, wid || 15), '#16304d'); } }
+        for (const p of paths) { const [type, wid, st, en] = p; if (type === 1 || type === 4) { const a = g.pts[st], b = g.pts[en]; if (a && b) drawSeg(a, b, wid || 20, '#1a3554'); } else if (type === 3 && L.source !== 'osm') { const a = g.pts[st], k = g.parks[en]; if (a && k) drawSeg(a, k, Math.max(10, wid || 15), '#16304d'); } }
         if (s > 0.25) { c.setLineDash([]); for (const p of paths) { const [type, , st, en] = p; if (type === 1 || type === 4) { const a = g.pts[st], b = g.pts[en]; if (a && b) drawSeg(a, b, 0.3 / s, 'rgba(242,179,61,.45)'); } } }
       } else {
         const seen: { [k: string]: boolean } = {};
         for (const k in g.adj) for (const [v] of g.adj[k]) { const key = k < v ? k + v : v + k; if (seen[key]) continue; seen[key] = true; drawSeg(this.nodeXY(k), this.nodeXY(v), 22, '#122840'); }
       }
-      // stands
+      // painted stand lead-in lines (OpenStreetMap)
+      if (paths && L.source === 'osm' && s > 0.12) {
+        c.strokeStyle = 'rgba(242,179,61,.55)'; c.lineWidth = Math.max(1, 0.3 * s); c.beginPath();
+        for (const p of paths) if (p[0] === 9) { const a = g.pts[p[2]], b = g.pts[p[3]]; if (a && b) { const q1 = this.scr(a[0], a[1]), q2 = this.scr(b[0], b[1]); c.moveTo(q1[0], q1[1]); c.lineTo(q2[0], q2[1]); } }
+        c.stroke();
+      }
+      // stands: a lead-in line, a stop bar across it, and the stand's name in front
       g.parks.forEach((p, i) => {
-        const q = this.scr(p[0], p[1]), r = Math.max(2.5, (p[3] || 15) * s);
-        c.fillStyle = '#10243c'; c.beginPath(); c.arc(q[0], q[1], r, 0, Math.PI * 2); c.fill();
-        c.strokeStyle = g.schematic ? 'rgba(147,169,193,.25)' : 'rgba(147,169,193,.4)'; c.lineWidth = 1; c.setLineDash(g.schematic ? [3, 3] : []); c.stroke(); c.setLineDash([]);
-        if (s > 0.6 && p[6]) { c.fillStyle = col.dim3; c.font = '600 9px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(L.parkNames && L.parkNames[i] != null ? L.parkNames[i] : standName(p), q[0], q[1] + 3); }
+        const q = this.scr(p[0], p[1]), r = p[3] || 15, h = (p[2] || 0) * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
+        const at = (al: number, ac: number) => this.scr(p[0] + ux * al + uy * ac, p[1] + uy * al - ux * ac);
+        if (g.schematic) { c.fillStyle = '#10243c'; c.beginPath(); c.arc(q[0], q[1], Math.max(2.5, r * s), 0, Math.PI * 2); c.fill(); }
+        c.strokeStyle = 'rgba(242,179,61,.8)'; c.lineWidth = Math.max(1.2, 0.5 * s);
+        if (L.source !== 'osm') { const b0 = at(-r * 2.2, 0); c.beginPath(); c.moveTo(b0[0], b0[1]); c.lineTo(q[0], q[1]); c.stroke(); }
+        const half = Math.max(3 / s, r * 0.35), e1 = at(0, -half), e2 = at(0, half);
+        c.lineWidth = Math.max(1.6, 0.9 * s); c.beginPath(); c.moveTo(e1[0], e1[1]); c.lineTo(e2[0], e2[1]); c.stroke();
+        const name = L.parkNames && L.parkNames[i] ? L.parkNames[i] : p[6] ? standName(p) : '';
+        if (name && s > 0.45) { const t = at(Math.max(6 / s, r * 0.45), 0); c.fillStyle = col.dim; c.font = `600 ${s > 1.5 ? 11 : 9.5}px Inter, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(name, t[0], t[1]); c.textBaseline = 'alphabetic'; }
       });
       c.textAlign = 'left';
     }
+    c.globalAlpha = 1;
     // runways
     for (const r of L.runways) {
       const cc = this.xy(r.lat, r.lon), h = r.hdg * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h), px = Math.cos(h), py = -Math.sin(h);
@@ -356,6 +384,7 @@ class AirportView {
         c.fillStyle = p.you ? col.cyan : tracked ? col.mag : p.parked ? col.dim : col.ink; c.fillText(text, lx, ly + 1);
       }
     }
+    if (this.embedded) return;
     // scale bar
     const m = [50, 100, 200, 500, 1000, 2000, 5000].filter(v => v * s >= 50)[0] || 5000;
     c.fillStyle = col.dim3; c.font = '500 10px Inter, sans-serif';
@@ -405,14 +434,13 @@ function standName(p: number[]): string {
 }
 function cssVar(n: string): string { return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#3FD0E8'; }
 
-/** Open the airport view on top of the map that is showing (Overview or full map). */
+/** Go to an airport: the map flies down to it at its real place and shows its layout, still following the
+ *  aircraft if one is given (it stays followed when it taxis out, takes off and flies on). */
 function openAirportView(icao: string, track?: string) {
   const m = _curMap(); if (!m) return;
   if (_apv) _apv.close(false);
   m.closeBubble();
-  const host = m.el.parentElement || m.el;
-  _apv = new AirportView(host, icao, track || m.following || null, m);
-  m.following = null;
+  m.flyToAirport(icao, track || m.following || null);
   Sound.tick();
 }
 
@@ -420,3 +448,19 @@ ACTIONS['apv-close'] = () => { if (_apv) { const t = _apv.track; _apv.close(!!t)
 ACTIONS['apv-zoom'] = el => { if (_apv) _apv.zoom(parseFloat(el.getAttribute('data-f'))); };
 ACTIONS['apv-fit'] = () => { if (_apv) _apv.fit(); };
 ACTIONS['apv-track'] = el => { if (_apv) { _apv.track = el.getAttribute('data-id'); _apv.userMoved = false; _apv.renderList(); Sound.tick(); } };
+ACTIONS['apv-retry'] = () => {
+  const v = _apv; if (!v) return;
+  Sound.tick(); v.fetching = true; v.labelSource(); const note = $('#apv-note'); if (note) note.innerHTML = '';
+  delete AirportLayouts.osmWhy[v.icao];
+  AirportLayouts.fromOsm(v.icao).then(L => { if (!v.alive) return; v.fetching = false; if (L) { v.setLayout(L, true); toast('Real airport layout loaded', 'ok'); } else v.setLayout(v.L, true); })
+    .catch(() => { if (v.alive) { v.fetching = false; v.setLayout(v.L, true); } });
+};
+
+/** An airport drawn inside the world map: its layout loads in the background (runways first). */
+function makeAirportScene(icao: string, map: WorldMap): AirportView {
+  const v: AirportView = Object.create(AirportView.prototype);
+  Object.assign(v, { embedded: true, map, icao, alive: true, track: null, planes: [], routes: {}, ptrs: {}, s: 1, w: 0, h: 0, cx: 0, cy: 0, fetching: true,
+    col: { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') } });
+  AirportLayouts.get(icao, L => { if (L && v.alive) v.setLayout(L, true); v.fetching = false; }).then(L => { if (v.alive && L && (!v.L || v.L.source === 'runways' || L.source !== 'runways')) v.setLayout(L); });
+  return v;
+}

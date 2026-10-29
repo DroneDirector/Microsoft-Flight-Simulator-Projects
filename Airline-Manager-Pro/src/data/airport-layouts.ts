@@ -44,7 +44,10 @@ const AirportLayouts = {
 
   /** A layout kept on the device from an earlier download. */
   kept(icao: string): AirportLayout {
-    try { const k = JSON.parse(localStorage.getItem('amp-osm:' + icao) || 'null'); if (k && k.l && Date.now() - k.at < this.OSM_KEEP_MS) return (this.cache[icao] = k.l); } catch (e) { /* none */ }
+    // the simulator's layout (saved when the app was linked) first, then OpenStreetMap's
+    for (const key of ['amp-sim:' + icao, 'amp-osm:' + icao]) {
+      try { const k = JSON.parse(localStorage.getItem(key) || 'null'); if (k && k.l && (key.indexOf('amp-sim') === 0 || Date.now() - k.at < this.OSM_KEEP_MS)) return (this.cache[icao] = k.l); } catch (e) { /* none */ }
+    }
     return null;
   },
 
@@ -54,7 +57,7 @@ const AirportLayouts = {
     const ws = this.waiting[icao] || []; delete this.waiting[icao];
     ws.forEach(w => clearTimeout(w.timer));
     let l: AirportLayout = null;
-    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; }
+    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; this.keep('amp-sim:' + icao, l); }
     ws.forEach(w => w.ok(l));
   },
 
@@ -85,7 +88,9 @@ const AirportLayouts = {
   },
 
   /* ---------- OpenStreetMap ---------- */
-  OSM_SERVERS: ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'],
+  OSM_SERVERS: ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'],
+  /** Why the last OpenStreetMap download for an airport gave nothing: 'busy' (no server answered) or 'none' (not mapped). */
+  osmWhy: {} as { [icao: string]: 'busy' | 'none' },
   OSM_KEEP_MS: 90 * 864e5,
 
   fromOsm(icao: string): Promise<AirportLayout> {
@@ -106,6 +111,7 @@ const AirportLayouts = {
     const q = `[out:json][timeout:25][bbox:${bb}];(way["aeroway"~"^(runway|taxiway|taxilane|apron|parking_position|terminal)$"];node["aeroway"~"^(parking_position|gate)$"];);out body geom qt;`;
     return this.overpass(q).then(d => {
       const l = d ? this.parseOsm(icao, a, d.elements || []) : null;
+      if (!d) this.osmWhy[icao] = 'busy'; else if (!l) this.osmWhy[icao] = 'none'; else delete this.osmWhy[icao];
       if (!l) return null;
       this.cache[icao] = l;
       this.keep(key, l);
@@ -113,13 +119,16 @@ const AirportLayouts = {
     });
   },
 
-  overpass(q: string, n = 0): Promise<any> {
-    const url = this.OSM_SERVERS[n]; if (!url) return Promise.resolve(null);
+  overpass(q: string, n = 0, round = 0): Promise<any> {
+    const url = this.OSM_SERVERS[n];
+    // every server busy: one more round after a short pause
+    if (!url) return round ? Promise.resolve(null) : new Promise(ok => setTimeout(ok, 3000)).then(() => this.overpass(q, 0, 1));
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const t = setTimeout(() => ctl && ctl.abort(), 20000);
     return fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl ? ctl.signal : undefined } as any)
       .then(r => { clearTimeout(t); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .catch(() => { clearTimeout(t); return this.overpass(q, n + 1); });
+      .then(d => { if (d && d.remark && /timed out|runtime error|out of memory/i.test(d.remark) && !(d.elements || []).length) throw new Error(d.remark); return d; })
+      .catch(() => { clearTimeout(t); return this.overpass(q, n + 1, round); });
   },
 
   /** Keep up to 30 airports on the device, the oldest go first. */
@@ -176,6 +185,7 @@ const AirportLayouts = {
     const nameIdx = (n: string) => { if (!n) return 0; let i = l.names.indexOf(n); if (i < 0) { l.names.push(n); i = l.names.length - 1; } return i; };
     const closed = (w: any) => w.nodes && w.nodes.length > 3 && w.nodes[0] === w.nodes[w.nodes.length - 1];
     const addPark = (x: number, y: number, hdg: number, ref: string, big: boolean) => { l.parks.push([x, y, Math.round(((hdg % 360) + 360) % 360), big ? 20 : 12, big ? 9 : 2, 0, 0]); l.parkNames.push(ref || ''); return l.parks.length - 1; };
+    const standWays: any[] = [];
     for (const w of ways) {
       const t = w.tags.aeroway, g = w.geometry;
       if (t === 'runway') {
@@ -196,30 +206,65 @@ const AirportLayouts = {
         const wid = widthOf(w, t === 'taxiway' ? 23 : 15), ni = nameIdx(w.tags.ref || '');
         for (let i = 1; i < g.length; i++) l.paths.push([t === 'taxiway' ? 1 : 4, wid, pt(w.nodes[i - 1], g[i - 1], 1), pt(w.nodes[i], g[i], 1), ni, 0, 0]);
       } else if (t === 'parking_position') {
-        if (closed(w)) { const c = g.reduce((s2: number[], q: any) => [s2[0] + q.lat / g.length, s2[1] + q.lon / g.length], [0, 0]); const p = xy({ lat: c[0], lon: c[1] }); addPark(p[0], p[1], 0, w.tags.ref || w.tags.name || '', true); continue; }
-        // the stand is at the end that doesn't join a taxilane
-        const n0 = w.nodes[0], n1 = w.nodes[w.nodes.length - 1], atEnd = (use[n1] || 0) <= (use[n0] || 0);
-        const gs = atEnd ? g[g.length - 1] : g[0], gp = atEnd ? g[g.length - 2] : g[1];
-        const ps = xy(gs), pp = xy(gp), hdg = Math.atan2(ps[0] - pp[0], ps[1] - pp[1]) * 180 / Math.PI;
-        for (let i = 1; i < g.length; i++) l.paths.push([4, 12, pt(w.nodes[i - 1], g[i - 1], 1), pt(w.nodes[i], g[i], 1), 0, 0, 0]);
-        const pk = addPark(ps[0], ps[1], hdg, w.tags.ref || w.tags.name || '', true);
-        l.paths.push([3, 12, pt(atEnd ? n1 : n0, gs, 1), pk, 0, 0, 0]);
+        standWays.push(w);   // read after the taxiways, below
       } else if ((t === 'apron' || t === 'terminal') && closed(w)) {
         l.areas.push({ k: t, pts: g.map(xy) });
       }
     }
-    // stands mapped as single points (and gates without a stand): joined to the nearest taxi point
-    const nodes = els.filter(e => e.type === 'node' && e.tags);
-    const near = (p: number[], max: number) => { let best = -1, bd = max * max; l.points.forEach((q, i) => { const d = (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2; if (d < bd) { bd = d; best = i; } }); return best; };
-    for (const n of nodes) {
-      const p = xy(n), ref = n.tags.ref || n.tags.name || '';
-      if (n.tags.aeroway === 'gate' && l.parks.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 60)) continue;
-      if (n.tags.aeroway === 'gate' && !l.parks.length) continue;
-      if (pIdx[String(n.id)] != null && l.parks.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 3)) continue;
-      const j = near(p, 250);
-      const hdg = j >= 0 ? Math.atan2(p[0] - l.points[j][0], p[1] - l.points[j][1]) * 180 / Math.PI : 0;
-      const pk = addPark(p[0], p[1], hdg, ref, true);
-      if (j >= 0) l.paths.push([3, 12, j, pk, 0, 0, 0]);
+    // ---- stands ----
+    // In OpenStreetMap a stand is usually a numbered point where the aircraft stops, with one or more
+    // painted lead-in lines (also tagged as parking positions) running from the taxilane to it. Lines
+    // without such a point are grouped by stand number; the stop is the end furthest from the taxiways.
+    const taxiPts = l.points.slice();                                           // taxiways and runways only
+    const near = (p: number[], max: number, list = l.points) => { let best = -1, bd = max * max; list.forEach((q, i) => { const d = (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2; if (d < bd) { bd = d; best = i; } }); return best; };
+    const taxiDist = (p: number[]) => { let bd = 1e18; for (const q of taxiPts) { const d = (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2; if (d < bd) bd = d; } return Math.sqrt(bd); };
+    const stopNodes = els.filter(e => e.type === 'node' && e.tags && e.tags.aeroway === 'parking_position');
+    const stopById: { [id: string]: any } = {}; stopNodes.forEach(n => stopById[String(n.id)] = n);
+    const leadIns: { [id: string]: any[] } = {};   // stop node id -> its lead-in lines
+    const loose: { [ref: string]: any[] } = {};
+    for (const w of standWays) {
+      if (closed(w)) { const g = w.geometry, c = g.reduce((s2: number[], q: any) => [s2[0] + q.lat / g.length, s2[1] + q.lon / g.length], [0, 0]); (loose['#area' + w.id] = []).push({ area: xy({ lat: c[0], lon: c[1] }), ref: w.tags.ref || w.tags.name || '' }); continue; }
+      const stop = (w.nodes || []).map(String).filter((id: string) => stopById[id])[0];
+      if (stop) (leadIns[stop] = leadIns[stop] || []).push(w);
+      else { const ref = String(w.tags.ref || w.tags.name || '#' + w.id); (loose[ref] = loose[ref] || []).push(w); }
+    }
+    // lead-in lines are drawn and taxied along (thin, type 9)
+    const addLine = (w: any) => { const g = w.geometry; for (let i = 1; i < g.length; i++) l.paths.push([9, 3, pt(w.nodes[i - 1], g[i - 1], 1), pt(w.nodes[i], g[i], 1), 0, 0, 0]); };
+    // join the open end of a lead-in to the taxi network when the map leaves a small gap
+    const joinEnd = (w: any) => { for (const e of [0, w.nodes.length - 1]) { const id = String(w.nodes[e]); if ((use[id] || 0) > 1 || stopById[id]) continue; const p = xy(w.geometry[e]), j = near(p, 60, taxiPts); if (j >= 0) l.paths.push([9, 3, pIdx[id], j, 0, 0, 0]); } };
+    const standAt = (p: number[], hdg: number, ref: string, from: number) => { const pk = addPark(p[0], p[1], hdg, ref, true); if (from >= 0) l.paths.push([3, 3, from, pk, 0, 0, 0]); return pk; };
+    for (const n of stopNodes) {
+      const p = xy(n), lines = leadIns[String(n.id)] || [];
+      // facing: along the straightest lead-in line, towards the stop
+      let hdg: number = null, bestLen = 0;
+      for (const w of lines) {
+        const g = w.geometry, i = w.nodes.map(String).indexOf(String(n.id)), far = i === 0 ? g[g.length - 1] : g[0], q = xy(far);
+        const len = Math.hypot(q[0] - p[0], q[1] - p[1]); if (len > bestLen) { bestLen = len; hdg = Math.atan2(p[0] - q[0], p[1] - q[1]) * 180 / Math.PI; }
+        addLine(w); joinEnd(w);
+      }
+      const j = lines.length ? pIdx[String(n.id)] : near(p, 250, taxiPts);
+      if (hdg == null) { const q = j >= 0 ? l.points[j] : null; hdg = q ? Math.atan2(p[0] - q[0], p[1] - q[1]) * 180 / Math.PI : 0; }
+      standAt(p, hdg, n.tags.ref || n.tags.name || '', j == null ? -1 : j);
+    }
+    const stopRefs: { [ref: string]: boolean } = {}; stopNodes.forEach(n => { const r = n.tags.ref || n.tags.name; if (r) stopRefs[String(r)] = true; });
+    for (const ref of Object.keys(loose)) {
+      const group = loose[ref];
+      // more lead-in lines for a stand that already has its stop point
+      if (stopRefs[ref] && !group[0].area) { group.forEach(w => { addLine(w); joinEnd(w); }); continue; }
+      if (group[0].area) { const g0 = group[0], j = near(g0.area, 250, taxiPts); standAt(g0.area, 0, g0.ref, j); continue; }
+      // the stop: of all the line ends, the one furthest from the taxiways
+      let best: any = null, bd = -1;
+      for (const w of group) for (const e of [0, w.nodes.length - 1]) { const q = xy(w.geometry[e]), d = taxiDist(q); if (d > bd) { bd = d; best = { w, e, q }; } }
+      group.forEach(w => { addLine(w); joinEnd(w); });
+      const g = best.w.geometry, prev = xy(best.e === 0 ? g[Math.min(1, g.length - 1)] : g[g.length - 2]);
+      const hdg = Math.atan2(best.q[0] - prev[0], best.q[1] - prev[1]) * 180 / Math.PI;
+      standAt(best.q, hdg, ref.charAt(0) === '#' ? '' : ref, pIdx[String(best.w.nodes[best.e])]);
+    }
+    // gates without a stand nearby (some airports only map the gates)
+    for (const n of els.filter(e => e.type === 'node' && e.tags && e.tags.aeroway === 'gate')) {
+      const p = xy(n); if (l.parks.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 120)) continue;
+      const j = near(p, 250, taxiPts), q = j >= 0 ? l.points[j] : null;
+      standAt(p, q ? Math.atan2(p[0] - q[0], p[1] - q[1]) * 180 / Math.PI : 0, n.tags.ref || n.tags.name || '', j);
     }
     l.runways = this.joinRunways(l.runways);
     // the official runway length where the map's differs (stopways and pads are often drawn as runway)

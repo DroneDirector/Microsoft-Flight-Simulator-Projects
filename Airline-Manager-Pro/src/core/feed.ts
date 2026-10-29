@@ -138,6 +138,7 @@ function onSimState(s: SimSnapshot) {
     f.pos = [s.lon, s.lat]; f.hdg = s.hdg; f.alt = Math.round(s.altFt); f.gs = s.gs;
     if (s.wx) (f as any).wx = s.wx;   // the sim's own weather; the demo flight has made-up weather instead
     f.phase = PHASE_NAMES[s.phase] || s.phase;
+    if ((a as any).noBase) S.myLoad.pax = 0;   // no stand at its base: no passengers on board
     f.pax = S.myLoad.pax; f.paxMax = acType(a.typeId).seats;
     if (!f.noDest) {
       const total = gcDistanceNm(AIRPORTS[f.from].pos, AIRPORTS[f.to].pos), left = gcDistanceNm(f.pos, AIRPORTS[f.to].pos);
@@ -228,7 +229,9 @@ function onSimEvent(e: FlightEvent) {
         State.today.push(leg); State.today.sort((x, y) => x.dep < y.dep ? -1 : x.dep > y.dep ? 1 : 0);
       }
       if (leg) { leg.status = 'active'; (leg as any).dep = hhmm; (leg as any).actual = true; }
-      toast(`Blocks off${e.airport ? ' at ' + e.airport : ''}`, 'info');
+      { const me = plane(S.myReg[company().id]) as any;
+        if (me && me.noBase) { toast(`${me.reg} has no stand at its base: not cleared for take-off and no passengers on board`, 'warn'); State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${me.reg}: take-off refused`, body: `${me.reg} has no stand at ${me.base}. Choose another base for it on its page in Fleet. Flights without a base carry no passengers.`, time: 'Now', read: false } as any); }
+        else toast(`Blocks off${e.airport ? ' at ' + e.airport : ''}`, 'info'); }
       break;
     }
     case 'takeoff': toast(`Airborne${e.airport ? ' from ' + e.airport : ''}`, 'info'); break;
@@ -269,6 +272,7 @@ function finishLeg(e: FlightEvent) {
   const to = sm.to || e.airport || nearestKnownAirport(e.lon, e.lat, 6) || '—';
   const from = sm.from || (State.live.filter(f => f.id === 'me')[0] || { from: '—' } as any).from;
   // flight log, hours, landings
+  if ((a as any).noBase) sm.pax = 0;   // flown without a stand at its base: nobody on board
   const hard = sm.landingFpm >= 600 || sm.landingG >= 1.8;
   const grounded = LEG_ISSUES.map(id => State.issues.filter(i => i.id === id)[0]).some(i => i && i.severity === 'grounding');
   State.logbook.unshift({ id: uid(), date: dateStr(new Date()), from, to, reg: a.reg, blockMin: sm.blockMin, landingFpm: -sm.landingFpm, g: sm.landingG, pax: sm.pax,
