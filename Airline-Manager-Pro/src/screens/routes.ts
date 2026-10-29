@@ -24,7 +24,7 @@ SCREENS.routes = {
       const dist = routeDistance(r.legs);
       return `<div class="route-row" style="--i:${i}">
         <span class="rr-code">${esc(r.code)}</span>
-        <span class="rr-chain">${legChain(r.legs)}<small>${r.legs.length - 1} leg${r.legs.length > 2 ? 's' : ''}, ${num(dist)} nm, ${esc(r.days)}</small></span>
+        <span class="rr-chain">${r.test ? `<span class="chain"><b>${esc(r.legs[0])}</b></span><small>Test flight${r.flownAt ? ', flown ' + esc(dateStr(new Date(r.flownAt)).slice(0, 16)) : ', not flown yet'}</small>` : `${legChain(r.legs)}<small>${r.legs.length - 1} leg${r.legs.length > 2 ? 's' : ''}, ${num(dist)} nm, ${esc(r.days)}</small>`}</span>
         <span class="rr-ac">${esc(t.model)}<small>${p ? (p.you ? 'You fly this' : esc(p.name)) : 'No pilot yet'}</small></span>
         <span class="rr-demand"><small>Demand</small><span class="cond cond-${r.demand > 80 ? 'good' : r.demand > 65 ? 'fair' : 'poor'}"><i style="width:${r.demand}%"></i></span></span>
         <span class="rr-yield"><small>Per seat</small><b>${money(r.yieldPerPax)}</b></span>
@@ -33,7 +33,7 @@ SCREENS.routes = {
   },
 };
 
-let _nr = { stops: [] as string[], typeId: '' };
+let _nr = { stops: [] as string[], typeId: '', test: false };
 /** Usable range: published range minus an IFR reserve (about 45 minutes at cruise speed). */
 function usableRange(t: AircraftType): number { return Math.round(t.rangeNm - t.cruiseKt * 0.75); }
 function legBlockMin(t: AircraftType, nm: number): number { return Math.round(nm / t.cruiseKt * 60 + 25); }
@@ -49,35 +49,42 @@ function newRouteHtml(): string {
   const last = _nr.stops[_nr.stops.length - 1];
   const crewMax = t ? Math.max.apply(null, legs.map(l => pilotsNeeded(t, l.block)).concat([multiCrew(t) ? 2 : 1])) : 0;
   return `
-    <div class="modal-head"><div><h2>New route</h2><small>Add as many stops as you like. Every leg must be within the aircraft's real-world range.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-head"><div><h2>${_nr.test ? 'New test flight' : 'New route'}</h2><small>${_nr.test ? 'Take off and land at the same airport, for example after maintenance. Only you can set one up.' : 'Add as many stops as you like. Every leg must be within the aircraft\'s real-world range.'}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body nr">
+      <label class="tg-row nr-test"><span><b>Test flight</b><small>From one airport and back to the same airport, without passengers</small></span><button class="tg ${_nr.test ? 'on' : ''}" role="switch" aria-checked="${_nr.test}" data-act="nr-test"><i></i></button></label>
       <div class="nr-chain">${_nr.stops.map((s, i) => `<span class="nr-stop ${i && !legs[i - 1].ok ? 'bad' : ''}">${i ? `<i></i><em>${num(legs[i - 1].d)} nm</em>` : ''}<b>${esc(s)}</b><small>${esc(apt(s).city)}</small>${i ? `<button class="x" data-act="nr-remove" data-i="${i}" aria-label="Remove ${esc(s)}">${icon('close')}</button>` : ''}</span>`).join('')}
         <span class="nr-hint">${_nr.stops.length < 2 ? 'Pick a destination below' : `${_nr.stops.length - 1} legs, ${num(routeDistance(_nr.stops))} nm`}</span></div>
       ${t ? `<div class="nr-range ${bad.length ? 'bad' : ''}">${icon(bad.length ? 'alert' : 'fuel')}<span>${bad.length
         ? `${bad.map(l => `${l.from} to ${l.to} is ${num(l.d)} nm`).join(', ')}: too far for the ${esc(t.model)} (${num(max)} nm with fuel reserves). Add a fuel stop or pick a longer-range aircraft.`
         : `${esc(t.model)}: up to ${num(max)} nm per leg with fuel reserves (range ${num(t.rangeNm)} nm).${crewMax > 2 ? ` The longest leg needs ${crewMax} pilots.` : ''}`}</span></div>` : ''}
-      <h3>Add a stop</h3>
-      <div class="apt-grid">${opts.filter(k => k !== last).map(k => {
+      <h3>${_nr.test ? 'Airport' : 'Add a stop'}</h3>
+      <div class="apt-grid">${opts.filter(k => _nr.test || k !== last).map(k => {
         const d = gcDistanceNm(apt(last).pos, apt(k).pos), far = !!t && d > max;
         return `<button class="apt-btn ${far ? 'far' : ''}" data-act="nr-add" data-icao="${k}" ${far ? 'disabled' : ''}><b>${k}</b><small>${esc(apt(k).city)}, ${esc(apt(k).country)}</small><small class="d">${num(d)} nm${far ? ', too far' : ''}</small></button>`;
       }).join('')}</div>
       <h3>Aircraft</h3>
       <div class="seg wrap">${fleetTypes.map(id => `<button class="${_nr.typeId === id ? 'on' : ''}" data-act="nr-type" data-t="${id}">${esc(acType(id).model)} <small>${num(usableRange(acType(id)))} nm</small></button>`).join('')}</div>
-      <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="nr-save" ${_nr.stops.length < 2 || bad.length ? 'disabled' : ''}>Create route</button></div>
+      <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="nr-save" ${(_nr.test ? _nr.stops.length < 1 : _nr.stops.length < 2 || bad.length) ? 'disabled' : ''}>${_nr.test ? 'Create test flight' : 'Create route'}</button></div>
     </div>`;
 }
 ACTIONS['new-route'] = () => {
   const c = company();
   const ft = State.fleet.filter(a => a.companyId === c.id)[0];
-  _nr = { stops: [c.hub], typeId: ft ? ft.typeId : '' };
+  _nr = { stops: [c.hub], typeId: ft ? ft.typeId : '', test: false };
   openLayer('modal', newRouteHtml(), { cls: 'wide nr-pop' });
 };
 function rerenderNr() { const p = $('.nr-pop .panel'); if (p) p.innerHTML = newRouteHtml(); }
-ACTIONS['nr-add'] = el => { _nr.stops.push(el.getAttribute('data-icao')); Sound.tick(); rerenderNr(); };
+ACTIONS['nr-add'] = el => { const k = el.getAttribute('data-icao'); if (_nr.test) _nr.stops = [k]; else _nr.stops.push(k); Sound.tick(); rerenderNr(); };
+ACTIONS['nr-test'] = () => { _nr.test = !_nr.test; _nr.stops = [_nr.stops[0] || company().hub]; Sound.tick(); rerenderNr(); };
 ACTIONS['nr-remove'] = el => { _nr.stops.splice(parseInt(el.getAttribute('data-i'), 10), 1); Sound.tick(); rerenderNr(); };
 ACTIONS['nr-type'] = el => { _nr.typeId = el.getAttribute('data-t'); Sound.tick(); rerenderNr(); };
 ACTIONS['nr-save'] = () => {
   const t = acType(_nr.typeId);
+  if (_nr.test) {
+    const c = company(), code = c.icao + 'T' + (State.routes.filter(r => r.test).length + 1);
+    State.routes.push({ id: uid(), companyId: c.id, code, legs: [_nr.stops[0], _nr.stops[0]], days: 'Once', typeId: _nr.typeId, demand: 0, yieldPerPax: 0, test: true });
+    closeAll(); refresh(); toast(`Test flight ${code} created. Assign a pilot under Pilots.`, 'ok'); return;
+  }
   if (t && _nr.stops.slice(1).some((x, i) => gcDistanceNm(apt(_nr.stops[i]).pos, apt(x).pos) > usableRange(t))) { toast('A leg is too far for this aircraft', 'warn'); return; }
   const c = company();
   const code = c.icao + (700 + State.routes.length);

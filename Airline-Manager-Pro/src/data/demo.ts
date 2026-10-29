@@ -18,7 +18,7 @@ interface LiveFlight {
   real?: boolean; pos?: number[]; hdg?: number; noDest?: boolean; gs?: number;
 }
 interface Leg { from: string; to: string; dep: string; reg: string; status: 'done' | 'active' | 'next' | 'planned' }
-interface RouteDef { id: string; companyId: string; code: string; legs: string[]; days: string; typeId: string; pilotId?: string; demand: number; yieldPerPax: number }
+interface RouteDef { id: string; companyId: string; code: string; legs: string[]; days: string; typeId: string; pilotId?: string; demand: number; yieldPerPax: number; test?: boolean; flownAt?: number }
 interface LogEntry {
   id: string; date: string; from: string; to: string; reg: string; blockMin: number; landingFpm: number; g: number;
   pax: number; result: 'ok' | 'hard' | 'crash' | 'incident'; decision?: 'pending' | 'registered' | 'disregarded'; atc: string; notes?: string;

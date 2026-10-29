@@ -14,8 +14,20 @@ function aiOn(f: LiveFlight): boolean { return !f.you && !f.real; }
 function aiSpeed(): number { return Math.max(1, +(State.settings as any).aiSpeed || 1); }
 
 function aiProfile(f: any): FlightProfile {
+  if (f.from === f.to) return aiTestProfile();
   const a = plane(f.reg);
   return flightProfile(a ? a.typeId : 'a320-fenix', f.from, f.to, f.depAt);
+}
+/** A test flight: about 45 minutes from the gate back to the same gate, climbing to 10,000 ft over the area. */
+function aiTestProfile(): FlightProfile {
+  const T = AI_TEST_MIN * 60, seg = (k: number) => Math.round(T * k);
+  // each point carries the phase flown on the way to it
+  const pts: any[] = [
+    { s: 0, d: 0, alt: 0, gs: 0, ph: 'Taxi out' }, { s: seg(.12), d: 0, alt: 0, gs: 0, ph: 'Taxi out' }, { s: seg(.14), d: 0, alt: 0, gs: 150, ph: 'Takeoff' },
+    { s: seg(.32), d: 0, alt: 10000, gs: 250, ph: 'Climb' }, { s: seg(.62), d: 0, alt: 10000, gs: 250, ph: 'Test flight' },
+    { s: seg(.8), d: 0, alt: 2500, gs: 180, ph: 'Descent' }, { s: seg(.86), d: 0, alt: 1200, gs: 140, ph: 'Approach' }, { s: seg(.9), d: 0, alt: 0, gs: 130, ph: 'Final' },
+    { s: seg(.92), d: 0, alt: 0, gs: 15, ph: 'Landing' }, { s: T, d: 0, alt: 0, gs: 0, ph: 'Taxi in' }];
+  return { routeNm: 0, totalS: T, airS: seg(.76), cruiseAlt: 10000, pts } as any;
 }
 /** Real time (ms) at which the flight reaches the gate. */
 function aiEndAt(f: any): number { return f.depAt + f.durMs / (f.spd || 1); }
@@ -25,7 +37,7 @@ function aiUpdate(f: LiveFlight, now: number) {
   const F: any = f;
   if (!F.depAt) return;
   const p = aiProfile(F), el = (now - F.depAt) * (F.spd || 1) / 1000, q = profileAt(p, el);
-  f.t = clamp(q.d / p.routeNm, 0, 1);
+  f.t = p.routeNm > 0 ? clamp(q.d / p.routeNm, 0, 1) : 0;
   f.alt = q.alt; f.gs = q.gs; f.phase = q.ph;
   F.leftNm = q.left; F.toGoS = q.toGoS / (F.spd || 1); F.routeNm = p.routeNm;
   const td = p.pts.filter(x => x.ph === 'Landing')[0];
@@ -63,7 +75,7 @@ function aiAdopt(now: number) {
   for (const f of State.live) {
     const F: any = f;
     if (!aiOn(f) || F.depAt) continue;
-    const p = flightProfile((plane(f.reg) || { typeId: 'a320-fenix' } as any).typeId, f.from, f.to, now);
+    const p = aiProfile({ reg: f.reg, from: f.from, to: f.to, depAt: now });
     F.spd = aiSpeed(); F.durMs = p.totalS * 1000;
     F.depAt = now - profileTimeAtFrac(p, f.t || 0) * 1000 / F.spd;
     F.dutyMin = 0; F.leg = 0;
@@ -84,12 +96,22 @@ function aiSetSpeed(spd: number) {
   }
 }
 
-/** The leg after landing at `at`: the next stop of the pilot's route, or back to where it came from. */
+/** The leg after landing at `at`: the next stop of the route you assigned the pilot. Hired pilots only
+ *  fly routes you created and scheduled: without one they wait on the ground. They never take off and
+ *  land at the same airport, except on a test flight you set up. */
 function aiNextLeg(pilotId: string, from: string, at: string): string {
-  const r = State.routes.filter(x => x.pilotId === pilotId && x.legs.indexOf(at) >= 0)[0];
-  if (r) { const i = r.legs.indexOf(at), nx = r.legs[(i + 1) % r.legs.length]; return nx === at ? from : nx; }
-  return from;
+  const rs = State.routes.filter(x => x.pilotId === pilotId && x.legs.indexOf(at) >= 0);
+  const test = rs.filter(x => x.test && !x.flownAt)[0];
+  if (test) return at;
+  const r = rs.filter(x => !x.test)[0];
+  if (!r) return null;
+  // the stop after this one; a route never sends the aircraft back to where it is
+  const i = r.legs.indexOf(at);
+  for (let k = 1; k < r.legs.length; k++) { const nx = r.legs[(i + k) % r.legs.length]; if (nx !== at) return nx; }
+  return null;
 }
+function aiTestRoute(pilotId: string, at: string): RouteDef { return State.routes.filter(x => x.pilotId === pilotId && x.test && !x.flownAt && x.legs[0] === at)[0] || null; }
+const AI_TEST_MIN = 45;
 
 /** Book a hired pilot's landing: hours, landings, aircraft, revenue, fuel and fees. */
 function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number; names: string[]; tx?: string[] }) {
@@ -101,10 +123,12 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   // real-world fares, on-board sales and costs (economics.ts)
   const burnH = BURN_KG_H[t.cls] || 2000;
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
-  const m = legEconomics(a.typeId, f.from, f.to, f.pax, 0, blockMin, burnKg);
+  const m = f.from === f.to
+    ? (() => { const fuel = Math.round(burnKg * 0.95), crew = Math.round(t.costPerHr * blockMin / 60 * 0.35); return { net: -(fuel + crew), revenue: 0, costs: fuel + crew, lines: [['Test flight fuel', -fuel], ['Aircraft and crew time', -crew]] } as any; })()
+    : legEconomics(a.typeId, f.from, f.to, f.pax, 0, blockMin, burnKg);
   const net = m.net, d = new Date(at), ds = dateStr(d);
   const txId = uid(); (summary.tx = summary.tx || []).push(txId);
-  State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.callsign} ${f.from} to ${f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
+  State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.from === f.to ? 'Test flight ' + f.reg + ' at ' + f.from : f.callsign + ' ' + f.from + ' to ' + f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
     amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: m.lines, byPilot: f.pilotId } as any);
   c.balance += net;
   // keep the day's flown legs for the schedule (the last two days)
@@ -138,8 +162,13 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       // duty: rest once the next leg would take the pilot past the duty limit, otherwise turn around
       const p: any = pilot(f.pilotId), maxDuty = ((p && p.rules && p.rules.maxDutyHrs) || 10) * 60;
       const dutyMin = (F.dutyMin || 0) + Math.round(F.durMs / 60000) + AI_TURN_MIN;
+      // a test flight you set up is done once it is back at the gate
+      if (f.from === f.to) { const tr = aiTestRoute(f.pilotId, f.from); if (tr) tr.flownAt = at;
+        State.notices.unshift({ id: uid(), kind: 'pilot', title: `Test flight completed: ${f.reg}`, body: `${p ? p.name : 'The pilot'} took ${f.reg} up from ${f.from} and back. ${f.reg} is at the gate.`, time: 'Now', read: false } as any); }
       const next = aiNextLeg(f.pilotId, f.from, f.to), a = plane(f.reg);
-      const nextBlock = flightProfile(a ? a.typeId : 'a320-fenix', f.to, next, at).totalS / 60;
+      // no route of yours to fly next: the pilot waits on the ground until you assign one
+      if (!next) { if (p) p.status = 'standby'; continue; }
+      const nextBlock = aiProfile({ reg: f.reg, from: f.to, to: next, depAt: at }).totalS / 60;
       const rest = dutyMin + nextBlock > maxDuty;
       if (p) p.status = rest ? 'resting' : 'flying';
       S.aiNext.push({ reg: f.reg, pilotId: f.pilotId, from: f.to, to: next, spd, depAt: at + (rest ? AI_REST_H * 3600e3 : AI_TURN_MIN * 60e3) / spd,
@@ -151,9 +180,12 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || p.status === 'off') continue;
       // operating certificate suspended by a court: the airline's aircraft stay on the ground
       const gu = (S.groundedUntil || {})[a.companyId]; if (gu && gu > n.depAt) { S.aiNext.push(Object.assign({}, n, { depAt: gu })); continue; }
-      const load = 0.68 + (_hashStr(n.reg + n.leg) % 28) / 100;
-      const depAt = Math.max(n.depAt, earliest), prof = flightProfile(a.typeId, n.from, n.to, depAt);
-      const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: Math.round(n.paxMax * load), paxMax: n.paxMax,
+      // never off and back onto the same airport, except a test flight you set up
+      const test = n.from === n.to;
+      if (!n.to || (test && !aiTestRoute(n.pilotId, n.from))) { p.status = 'standby'; continue; }
+      const load = test ? 0 : 0.68 + (_hashStr(n.reg + n.leg) % 28) / 100;
+      const depAt = Math.max(n.depAt, earliest), prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
+      const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: Math.round(n.paxMax * load), paxMax: n.paxMax, test,
         alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg };
       a.status = 'flying'; p.status = 'flying';
       State.live.push(f);
@@ -256,4 +288,24 @@ function aiDayBlocks(reg: string): { from: string; to: string; start: number; en
     const nx = aiNextLeg(pilotId, from, to); prev = from; from = to; to = nx;
   }
   return out;
+}
+
+/** You assigned a route: a pilot waiting on the ground starts on it with a free aircraft of the route's type. */
+function aiStartRoute(pilotId: string, r: RouteDef): string {
+  const S: any = State, p: any = pilot(pilotId); if (!p || !r) return '';
+  if (State.live.some(f => f.pilotId === pilotId) || (S.aiNext || []).some((n: any) => n.pilotId === pilotId)) return 'flying';
+  const busy = (reg: string) => State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg);
+  const c = company(r.companyId), mine = S.myReg[r.companyId];
+  const free = fleetOf(r.companyId).filter(a => a.typeId === r.typeId && a.reg !== mine && !busy(a.reg) && a.status === 'parked');
+  const a = free.filter(x => r.legs.indexOf(x.location) >= 0)[0] || free[0];
+  if (!a) return 'no-aircraft';
+  const from = r.test ? r.legs[0] : (r.legs.indexOf(a.location) >= 0 ? a.location : r.legs[0]);
+  a.location = from;
+  const to = r.test ? from : aiNextLeg(pilotId, '', from); if (!to) return 'no-leg';
+  const t = acType(a.typeId);
+  S.aiNext = S.aiNext || [];
+  S.aiNext.push({ reg: a.reg, pilotId, from, to, spd: aiSpeed(), depAt: Date.now() + AI_TURN_MIN * 60e3 / aiSpeed(), dutyMin: 0, leg: 0,
+    callsign: r.test ? c.icao + 'T' + (1 + (_hashStr(a.reg) % 9)) : r.code, paxMax: t ? t.seats : 0 });
+  p.status = 'flying';
+  return 'ok';
 }

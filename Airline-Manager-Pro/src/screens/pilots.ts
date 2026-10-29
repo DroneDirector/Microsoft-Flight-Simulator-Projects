@@ -116,7 +116,9 @@ ACTIONS['pilot-rules'] = el => {
     <div class="modal-head"><div><h2>Assign ${esc(p.name)}</h2><small>You can't fly your hired pilots' aircraft, but you decide where they go and the rules they follow.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body">
       <h3>Route</h3>
-      <div class="route-pick">${routes.map(rt => `<button class="rp ${rt.pilotId === p.id ? 'on' : ''}" data-act="rp-pick">${legChain(rt.legs)}<small>${esc(rt.code)}, ${esc(rt.days)}, ${esc(acType(rt.typeId).model)}</small></button>`).join('')}</div>
+      <p class="fine-print">${icon('info')}Hired pilots fly only the routes you create and schedule. Without a route they wait on the ground.</p>
+      <div class="route-pick">${routes.filter(rt => !rt.flownAt).map(rt => `<button class="rp ${rt.pilotId === p.id ? 'on' : ''}" data-act="rp-pick" data-id="${rt.id}">${rt.test ? `<span class="chain"><b>${esc(rt.legs[0])}</b></span>` : legChain(rt.legs)}<small>${esc(rt.code)}, ${rt.test ? 'Test flight' : esc(rt.days)}, ${esc(acType(rt.typeId).model)}${rt.pilotId && rt.pilotId !== p.id && pilot(rt.pilotId) ? `, now ${esc(pilot(rt.pilotId).name)}` : ''}</small></button>`).join('')}
+        <button class="rp ${routes.some(rt => rt.pilotId === p.id && !rt.flownAt) ? '' : 'on'}" data-act="rp-pick" data-id=""><span class="chain"><b>No route</b></span><small>Stays on the ground</small></button></div>
       <h3>Rules</h3>
       <div class="rules">
         <div class="range-row"><span><b>Max duty per day</b><small>Pilot rests once this is reached</small></span><input type="range" min="6" max="14" value="${r.maxDutyHrs}" oninput="this.nextElementSibling.textContent=this.value+' h'"><output>${r.maxDutyHrs} h</output></div>
@@ -126,6 +128,26 @@ ACTIONS['pilot-rules'] = el => {
       </div>
       <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="rules-save">Save assignment</button></div>
     </div>`, { cls: 'wide' });
+  (window as any).__assignPilot = p.id;
 };
 ACTIONS['rp-pick'] = el => { $all('.rp', el.parentElement).forEach(b => b.classList.remove('on')); el.classList.add('on'); Sound.tick(); };
-ACTIONS['rules-save'] = () => { closeAll(); toast('Assignment saved', 'ok'); };
+ACTIONS['rules-save'] = () => {
+  const p: any = pilot((window as any).__assignPilot); if (!p) { closeAll(); return; }
+  const sel = $('.route-pick .rp.on'), rid = sel ? sel.getAttribute('data-id') : '';
+  const ranges = $all('.rules input[type=range]') as HTMLInputElement[];
+  p.rules = { maxDutyHrs: +(ranges[0] ? ranges[0].value : 10), maxLandingFpm: +(ranges[1] ? ranges[1].value : 500),
+    ifrOnly: !!$('.tg[data-key="r-ifr"].on'), homeBaseReturn: !!$('.tg[data-key="r-home"].on') };
+  // one pilot per route, one route (or one test flight) per pilot
+  State.routes.forEach(r => { if (r.pilotId === p.id && r.id !== rid && !r.flownAt) r.pilotId = undefined; });
+  const r = State.routes.filter(x => x.id === rid)[0];
+  let msg = 'Assignment saved';
+  if (r) {
+    const before = r.pilotId && r.pilotId !== p.id ? pilot(r.pilotId) : null;
+    r.pilotId = p.id;
+    if (before) msg = `${p.name} takes over ${r.code} from ${before.name}`;
+    const res = aiStartRoute(p.id, r);
+    if (res === 'ok') msg = `${p.name} starts ${r.test ? 'the test flight' : r.code} in about ${AI_TURN_MIN} minutes`;
+    else if (res === 'no-aircraft') msg = `Assigned. ${p.name} starts when a ${acType(r.typeId).model} is free`;
+  } else msg = `${p.name} stays on the ground`;
+  Store.save(); closeAll(); refresh(); toast(msg, 'ok');
+};
