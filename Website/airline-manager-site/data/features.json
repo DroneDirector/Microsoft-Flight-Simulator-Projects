@@ -281,7 +281,19 @@
     "n": ""
    },
    {
-    "t": "Ranking screen: pilot and airline ranks, pilot rating, airline popularity, 1,197 badges in six tiers",
+    "t": "Ranking screen: your own record and the badges you have earned, newest first",
+    "n": ""
+   },
+   {
+    "t": "Registration: a key tied to the first device, reactivation codes for a new phone or PC",
+    "n": ""
+   },
+   {
+    "t": "About 49,000 world airports, plus every airport in your simulator; search by name, city or code",
+    "n": ""
+   },
+   {
+    "t": "Flight menu on the map: follow, favourite and details",
     "n": ""
    },
    {
@@ -345,6 +357,14 @@
  {
   "title": "Crew",
   "items": [
+   {
+    "t": "Hired pilots and crew gain levels and a better rating from their work",
+    "n": ""
+   },
+   {
+    "t": "Hired pilots fly only the routes you assign; test flights only by you",
+    "n": ""
+   },
    {
     "t": "3D full-body avatars (breathing, sway, blinking, look-around, turn with a finger) for all pilots, co-pilots, flight attendants and mechanics, male and female; drawn avatars where 3D isn't available",
     "n": ""
