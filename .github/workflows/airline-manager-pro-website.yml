@@ -80,7 +80,7 @@ jobs:
       - name: Save the test pictures to the 'website-airline-manager-check' branch
         if: always()
         run: |
-          mkdir -p out && cp /tmp/server.log out/server.log 2>/dev/null; cp ~/site/wp-content/debug.log out/debug.log 2>/dev/null
+          mkdir -p out; cp /tmp/server.log out/server.log 2>/dev/null || true; cp ~/site/wp-content/debug.log out/debug.log 2>/dev/null || true
           cd out && git init -q -b website-airline-manager-check && git add -A
           git -c user.name=DroneDirector -c user.email=simon@dronedirector.fo commit -q --allow-empty -m "Website check (run ${{ github.run_number }})"
           git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" website-airline-manager-check
