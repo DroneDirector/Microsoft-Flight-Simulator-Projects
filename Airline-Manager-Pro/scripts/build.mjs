@@ -40,7 +40,7 @@ mkdirSync(join(root, 'src/generated'), { recursive: true });
 writeFileSync(
   join(root, 'src/generated/config.ts'),
   `// Generated from app.config.json and release-notes/. Do not edit by hand.\nconst APP = ${JSON.stringify({
-    name: cfg.appName, shortName: cfg.shortName, id: cfg.appId, version: cfg.version, updates: cfg.updates || null,
+    name: cfg.appName, shortName: cfg.shortName, id: cfg.appId, version: cfg.version, updates: cfg.updates || null, online: cfg.online || null,
   }, null, 2)};\nconst WHATS_NEW: { v: string; title: string; groups: { h: string; items: string[] }[] }[] = ${JSON.stringify(whatsNew)};\n`
 );
 

@@ -31,6 +31,7 @@
   Link.init();
   Updater.init();
   Backup.init();
+  Licence.init();
   startAiClock();
   startCoopClock();
   Backup.offerRestoreOnFirstStart();

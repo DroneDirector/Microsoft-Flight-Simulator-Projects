@@ -30,6 +30,7 @@ const ICON_PATHS: { [k: string]: string } = {
   swap: '<path d="M7 4 3.5 7.5 7 11M3.5 7.5H17M17 13l3.5 3.5L17 20M20.5 16.5H7"/>',
   radio: '<path d="M4 9h16v11H4z"/><path d="M7 9 17 4"/><circle cx="9" cy="14.5" r="2.2"/><path d="M14 13h3M14 16h3"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.4-4.4"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4"/><path d="M10.4 12.6 20 3M16.5 6.5l2.5 2.5M14 9l2 2"/>',
   coop: '<circle cx="9" cy="8" r="3.2"/><path d="M3 19.5c.6-3.3 3-5.3 6-5.3s5.4 2 6 5.3"/><circle cx="16.8" cy="9.2" r="2.6"/><path d="M16.2 14.3c2.5-.2 4.4 1.5 4.9 4.4"/>',
   user: '<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c1-4 4-6 7.5-6s6.5 2 7.5 6"/>',
   shield: '<path d="M12 3 19.5 6v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z"/>',

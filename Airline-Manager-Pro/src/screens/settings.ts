@@ -14,6 +14,9 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'clock24', label: '24-hour clock' },
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
   ] },
+  { id: 'licence', title: 'Registration', icon: 'key', items: [
+    { type: 'html', html: () => licenceHtml() },
+  ] },
   { id: 'ai', title: 'Virtual pilots', icon: 'fleet', items: [
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Your hired pilots fly their routes even while the app is closed. Each flight takes as long as it would in real life, worked out from the distance along airways, the aircraft's climb, cruise and descent speeds at each altitude, taxi times and the jet stream.</p>` },
     { type: 'choice', key: 'aiSpeed', label: 'Virtual pilot speed', hint: 'Real time is how long the flight takes in the real world. Faster speeds also shorten turnarounds and rest. Only your hired pilots are affected, never your own flights.', options: [['1', 'Real time'], ['2', '2×'], ['4', '4×'], ['10', '10×'], ['30', '30×']] },
@@ -116,6 +119,65 @@ const SETTINGS: SetSection[] = [
 ];
 
 let _setSection = 'general';
+
+/* ---------- Registration ---------- */
+let _lic: { form: '' | 'key' | 'react'; key: string; msg: string; bad: boolean; busy: boolean } = { form: '', key: '', msg: '', bad: false, busy: false };
+
+function licenceHtml(): string {
+  const st = Licence.status(), r = Licence.rec();
+  const msg = _lic.msg ? `<p class="lic-msg ${_lic.bad ? 'bad' : 'ok'}">${icon(_lic.bad ? 'alert' : 'check')}${esc(_lic.msg)}</p>` : '';
+  const keyIn = (v: string) => `<input class="le-in lic-in" id="lic-key" value="${esc(v)}" placeholder="XXXXX-XXXXX-XXXXX" maxlength="23" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Registration key">`;
+  const card = st === 'ok'
+    ? `<div class="set-card ok lic-card"><span class="pc-ic">${icon('key')}</span><span><b>Registered</b><small>Key ${esc(r.masked)} on ${esc(r.deviceName)}, since ${esc(dateStr(new Date(r.at)))}</small></span></div>`
+    : st === 'moved'
+    ? `<div class="set-card warn lic-card"><span class="pc-ic">${icon('alert')}</span><span><b>Registered on another device</b><small>Key ${esc(r.masked)} was registered on ${esc(r.deviceName)}. Enter it here with a reactivation code to move it to this device.</small></span></div>`
+    : st === 'checking'
+    ? `<div class="set-card lic-card"><span class="pc-ic">${icon('key')}</span><span><b>Checking the registration…</b></span></div>`
+    : `<div class="set-card lic-card"><span class="pc-ic">${icon('key')}</span><span><b>Not registered</b><small>Enter the registration key you received with your purchase.</small></span></div>`;
+  const form = st === 'moved' || _lic.form === 'react'
+    ? `<div class="lic-form"><div class="le-group"><b>Registration key</b>${keyIn(_lic.key)}</div>
+        <div class="le-group"><b>Reactivation code</b><input class="le-in lic-in" id="lic-code" placeholder="XXXXX-XXXXX-XXXXX" maxlength="23" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Reactivation code"></div>
+        ${msg}<div class="btn-row"><button class="btn primary sm" data-act="lic-react" ${_lic.busy ? 'disabled' : ''}>${icon('key')}Reactivate on this device</button>${st !== 'moved' ? `<button class="btn ghost sm" data-act="lic-cancel">Cancel</button>` : ''}</div></div>`
+    : st === 'none' || _lic.form === 'key'
+    ? `<div class="lic-form"><div class="le-group"><b>Registration key</b>${keyIn(_lic.key)}</div>${msg}
+        <div class="btn-row"><button class="btn primary sm" data-act="lic-register" ${_lic.busy ? 'disabled' : ''}>${icon('check')}Register</button>${st === 'ok' ? `<button class="btn ghost sm" data-act="lic-cancel">Cancel</button>` : ''}</div></div>`
+    : `${msg}<div class="btn-row"><button class="btn ghost sm" data-act="lic-form" data-f="key">${icon('key')}Enter a key again</button><button class="btn ghost sm" data-act="lic-form" data-f="react">${icon('sync')}Use a reactivation code</button></div>`;
+  return card + form
+    + `<p class="fine-print">${icon('info')}A registration key belongs to the first device it is registered on. That device can register it again as often as needed, also after reinstalling the app. On a new phone or PC, or after Windows or the phone has been set up from scratch, the key needs a reactivation code. Each reactivation code works once.</p>`;
+}
+// keys are typed in capitals, in groups of five
+document.addEventListener('input', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('lic-in')) return;
+  const raw = Licence.normalise(el.value).slice(0, 15), v = Licence.show(raw);
+  if (v !== el.value) { el.value = v; try { el.setSelectionRange(v.length, v.length); } catch (er) { /* not focused */ } }
+});
+function licRerender() { if (_setSection === 'licence') rerenderSettingsBody(); }
+function licVal(id: string): string { const el = $('#' + id) as HTMLInputElement; return el ? el.value : ''; }
+ACTIONS['lic-form'] = el => { _lic = { form: el.getAttribute('data-f') as any, key: '', msg: '', bad: false, busy: false }; Sound.tick(); licRerender(); const k = $('#lic-key') as HTMLInputElement; if (k) k.focus(); };
+ACTIONS['lic-cancel'] = () => { _lic = { form: '', key: '', msg: '', bad: false, busy: false }; Sound.tick(); licRerender(); };
+ACTIONS['lic-register'] = () => {
+  const key = licVal('lic-key'); if (!key.trim()) { _lic.msg = 'Enter your registration key first.'; _lic.bad = true; licRerender(); return; }
+  _lic.key = key; _lic.busy = true; _lic.msg = ''; licRerender();
+  Licence.register(key).then(res => {
+    _lic.busy = false;
+    if (res === 'ok') { _lic = { form: '', key: '', msg: 'Thank you! The app is registered on this device.', bad: false, busy: false }; Haptics.success(); Sound.purchase(); }
+    else if (res === 'other-device') { _lic.form = 'react'; _lic.msg = 'This key is registered on another device. Enter a reactivation code to move it here.'; _lic.bad = true; }
+    else { _lic.msg = 'That isn’t a valid registration key. Check it against the one you received with your purchase.'; _lic.bad = true; Haptics.pulse(30); }
+    licRerender();
+  });
+};
+ACTIONS['lic-react'] = () => {
+  const key = licVal('lic-key'), code = licVal('lic-code');
+  if (!key.trim() || !code.trim()) { _lic.key = key; _lic.msg = 'Enter both your registration key and the reactivation code.'; _lic.bad = true; licRerender(); return; }
+  _lic.key = key; _lic.busy = true; _lic.msg = ''; licRerender();
+  Licence.reactivate(key, code).then(res => {
+    _lic.busy = false;
+    const m: { [k: string]: string } = { 'invalid-key': 'That isn’t a valid registration key.', 'invalid-code': 'That isn’t a valid reactivation code.', 'used-code': 'That reactivation code has already been used. Each code works once.' };
+    if (res === 'ok') { _lic = { form: '', key: '', msg: 'Reactivated. The key now belongs to this device.', bad: false, busy: false }; Haptics.success(); Sound.purchase(); }
+    else { _lic.msg = m[res]; _lic.bad = true; Haptics.pulse(30); }
+    licRerender();
+  });
+};
 
 function settingsBody(): string {
   const sec = SETTINGS.filter(s => s.id === _setSection)[0];

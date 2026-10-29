@@ -47,6 +47,8 @@ export class Desktop {
     if (url === '/api/desktop') return this.api(req, res), true;
     if (url === '/api/backup') return this.backup(req, res), true;
     if (url === '/api/gpus') { listGpus().then(g => json(res, { gpus: g })); return true; }
+    if (url === '/api/device') { machineId().then(id => json(res, { id, name: os.hostname() })); return true; }
+    if (url === '/api/licence') return this.licence(req, res), true;
     const dir = this.appDir(); if (!dir) return false;
     let rel = decodeURIComponent(url === '/' ? '/index.html' : url);
     const file = path.normalize(path.join(dir, rel));
@@ -59,6 +61,13 @@ export class Desktop {
   private api(req: http.IncomingMessage, res: http.ServerResponse) {
     if (req.method === 'PUT') return readBody(req, b => { try { const p = JSON.parse(b); for (const k of Object.keys(DEFAULTS)) if (k in p) (this.prefs as any)[k] = p[k]; this.save(); } catch (e) { /* ignore */ } json(res, this.prefs); });
     json(res, Object.assign({ desktop: true, backupDir: this.backupDir() }, this.prefs));
+  }
+
+  /** The registration, kept by the PC app too, so it survives clearing the app window's data. */
+  private licence(req: http.IncomingMessage, res: http.ServerResponse) {
+    const f = path.join(this.dataDir, 'registration.json');
+    if (req.method === 'PUT') return readBody(req, b => { try { const l = JSON.parse(b); if (l && l.fp) fs.writeFileSync(f, JSON.stringify(l)); json(res, { ok: true }); } catch (e) { res.writeHead(400); res.end(); } });
+    try { json(res, JSON.parse(fs.readFileSync(f, 'utf8'))); } catch (e) { json(res, {}); }
   }
 
   private backup(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -120,4 +129,19 @@ export function listGpus(): Promise<{ name: string; vendor: string; kind: 'integ
       } catch (e) { resolve([]); }
     });
   });
+}
+
+/** Windows' own ID for this installation (new when Windows is installed again), or the network cards' addresses. */
+let _machineId: Promise<string> = null;
+export function machineId(): Promise<string> {
+  if (_machineId) return _machineId;
+  const fallback = () => os.hostname() + '|' + Object.values(os.networkInterfaces()).reduce((a: any[], l) => a.concat(l || []), []).filter((n: any) => !n.internal && n.mac && n.mac !== '00:00:00:00:00:00').map((n: any) => n.mac).sort().join(',');
+  _machineId = new Promise(ok => {
+    if (process.platform !== 'win32') return ok(fallback());
+    execFile('reg', ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid', '/reg:64'], { windowsHide: true, timeout: 5000 }, (err, out) => {
+      const m = /MachineGuid\s+REG_SZ\s+([0-9a-f-]+)/i.exec(String(out || ''));
+      ok(m ? 'win:' + m[1].toLowerCase() : fallback());
+    });
+  });
+  return _machineId;
 }

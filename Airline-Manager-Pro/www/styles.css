@@ -1717,3 +1717,14 @@ button.coop-e:hover { border-color: var(--line-2); }
 @keyframes fbubIn { from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.94); } }
 @keyframes fbubLine { from { transform: scaleY(0); } }
 .calm .fbub-box, .calm .fbub::before { animation: none !important; }
+
+/* Registration */
+.lic-card.ok .pc-ic { color: var(--green); }
+.set-card.warn { border-color: rgba(242,179,61,.45); } .set-card.warn .pc-ic { color: var(--amber); }
+.lic-form { margin: 4px 0 6px; }
+.lic-form .le-group { margin-bottom: 10px; }
+.lic-in { font: 600 16px/1 'Inter', monospace; letter-spacing: .08em; font-variant-numeric: tabular-nums; text-transform: uppercase; }
+.lic-in::placeholder { color: var(--ink-3); letter-spacing: .08em; }
+.lic-msg { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin: 6px 0 10px; }
+.lic-msg .ic { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.lic-msg.ok { color: var(--green); } .lic-msg.bad { color: var(--amber); }

@@ -50,6 +50,20 @@ public class AppToolsPlugin extends Plugin {
     private BroadcastReceiver statusReceiver;
     private volatile boolean busy = false;
 
+    /* ---------- This device (for registration) ---------- */
+
+    /** Android's ID for this app on this phone: the same after updates and reinstalls, new after a factory reset. */
+    @PluginMethod
+    public void deviceId(PluginCall call) {
+        try {
+            String id = Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
+            JSObject r = new JSObject();
+            r.put("id", id == null ? "" : id);
+            r.put("name", Build.MANUFACTURER + " " + Build.MODEL);
+            call.resolve(r);
+        } catch (Exception e) { call.reject(describe(e)); }
+    }
+
     /* ---------- Copy and share ---------- */
 
     @PluginMethod

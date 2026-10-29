@@ -8,5 +8,10 @@
   "updates": {
     "repo": "DroneDirector/Microsoft-Flight-Simulator-Projects",
     "tagPrefix": "airline-manager-pro-v"
+  },
+  "online": {
+    "_comment": "The online register for registration keys and co-op (Supabase). Only the project URL and the public anon key go here, never the secret service_role key.",
+    "supabaseUrl": "",
+    "supabaseKey": ""
   }
 }

@@ -39,6 +39,8 @@
     "src/core/errlog.ts",
     "src/core/update.ts",
     "src/core/backup.ts",
+    "src/data/licence-hashes.ts",
+    "src/core/licence.ts",
     "src/core/desktop.ts",
     "src/ui/exit.ts",
     "src/ui/look-editor.ts",
