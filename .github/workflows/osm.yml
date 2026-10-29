@@ -1,0 +1,18 @@
+name: OSM airport samples
+on: { push: { branches: [osm-fixtures] } }
+permissions: { contents: write }
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p out
+          for A in EKVG EKCH EGLL KJFK ENBR BIKF; do
+            Q="[out:json][timeout:60];area[\"aeroway\"=\"aerodrome\"][\"icao\"=\"$A\"]->.a;(way[\"aeroway\"~\"^(runway|taxiway|taxilane|apron|parking_position|terminal|holding_position)$\"](area.a);node[\"aeroway\"~\"^(parking_position|gate|holding_position)$\"](area.a););out body geom qt;"
+            curl -sS -m 90 --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o out/$A.json || true
+            echo "$A $(wc -c < out/$A.json) bytes, $(gzip -c out/$A.json | wc -c) gzipped"
+            sleep 3
+          done
+          git config user.name DroneDirector; git config user.email simon@dronedirector.fo
+          git add out && git commit -qm "OSM samples" && git push -q origin HEAD:osm-fixtures
