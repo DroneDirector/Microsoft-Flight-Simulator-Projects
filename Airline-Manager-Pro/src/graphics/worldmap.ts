@@ -84,6 +84,7 @@ interface MapOpts { interactive?: boolean; labels?: boolean; onSelect?: (id: str
 /** Where a flight is now: its real position when it comes from the simulator, otherwise along its route. */
 function flightPos(f: LiveFlight): number[] {
   if (f.pos) return f.pos;
+  const fp = flightPathPos(f); if (fp) return fp.pos;   // along its departure, route, arrival and approach
   return gcInterpolate(apt(f.from).pos, apt(f.to).pos, f.t);
 }
 
@@ -408,8 +409,14 @@ class WorldMap {
       if (!f.real && !aiOn(f)) { f.t = f.t + f.rate * dt * (State.settings.reduceMotion ? 0 : 1); if (f.t > 1) f.t = 0.02; }
       const a = apt(f.from).pos, b = apt(f.to).pos;
       const N = 48;
-      const pts: number[][] = [];
-      if (!f.noDest) for (let i = 0; i <= N; i++) pts.push(this.px.apply(this, gcInterpolate(a, b, i / N)));
+      let pts: number[][] = [], cut = -1;
+      const fpp = !f.noDest ? flightPathPos(f) : null;
+      if (fpp) {
+        // the flight's own path: departure, route, arrival and approach
+        pts = fpp.fp.pts.map(q => this.px(q[0], q[1]));
+        let i = 1; while (i < fpp.fp.cum.length && fpp.fp.cum[i] < fpp.d) i++; cut = i - 1;
+        this.procLabels(c, fpp.fp, f, degPx);
+      } else if (!f.noDest) for (let i = 0; i <= N; i++) pts.push(this.px.apply(this, gcInterpolate(a, b, i / N)));
       const sel = this.selected === f.id, mine = !!f.you;
       const here = this.px.apply(this, this.inScene[f.id] || flightPos(f));
       if (pts.length) {
@@ -420,8 +427,8 @@ class WorldMap {
         c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
         // flown part: solid
         c.setLineDash([]); c.globalAlpha = rf; c.lineWidth = sel || mine ? 2.4 : 1.8;
-        const cut = Math.max(1, Math.floor(f.t * N));
-        c.beginPath(); for (let i = 0; i <= cut; i++) i ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]);
+        const upto = cut >= 0 ? cut : Math.max(1, Math.floor(f.t * N));
+        c.beginPath(); for (let i = 0; i <= upto; i++) i ? c.lineTo(pts[i][0], pts[i][1]) : c.moveTo(pts[i][0], pts[i][1]);
         c.lineTo(here[0], here[1]); c.stroke();
       }
       c.setLineDash([]); c.globalAlpha = 1;
@@ -429,6 +436,7 @@ class WorldMap {
       // heading: the real one for your flight, otherwise from a point just ahead on the route
       let hdg: number;
       if (f.real && f.hdg != null) hdg = f.hdg;
+      else if (fpp) { const h2 = this.px.apply(this, geoDest(fpp.pos, fpp.hdg, 0.5)); hdg = Math.atan2(h2[0] - here[0], -(h2[1] - here[1])) / D2R; }
       else { const ah = this.px.apply(this, gcInterpolate(a, b, Math.min(f.t + 0.01, 1))); hdg = Math.atan2(ah[0] - here[0], -(ah[1] - here[1])) / D2R; }
       const t = acType(flightTypeId(f));
       const prop = t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga';
@@ -449,6 +457,22 @@ class WorldMap {
       }
     }
     this.placeBubble();
+  }
+
+  /** Names of the departure, arrival and approach along a flight's path, when zoomed in enough to read them. */
+  procLabels(c: CanvasRenderingContext2D, fp: FlightPath, f: LiveFlight, degPx: number) {
+    const sel = this.selected === f.id || this.following === f.id;
+    if (degPx < (sel ? 60 : 300) || this.opts.labels === false) return;
+    c.save(); c.font = '600 10px Inter, sans-serif'; c.textAlign = 'center';
+    for (const part of fp.parts) {
+      if (part.kind === 'route' || !part.name) continue;
+      const mid = pathAt(fp, (part.from + part.to) / 2), q = this.px(mid.pos[0], mid.pos[1]);
+      if (q[0] < 0 || q[1] < 0 || q[0] > this.w || q[1] > this.h) continue;
+      const text = part.name, w = c.measureText(text).width;
+      c.fillStyle = 'rgba(6,16,30,.78)'; c.fillRect(q[0] - w / 2 - 5, q[1] - 17, w + 10, 15);
+      c.fillStyle = part.kind === 'app' ? (f.you ? this.colors.cyan : this.colors.mag) : this.colors.dim; c.fillText(text, q[0], q[1] - 6);
+    }
+    c.restore();
   }
 
   /** The airports in view (up to three, nearest the centre first) get their real layout. */

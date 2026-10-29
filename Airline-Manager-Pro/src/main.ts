@@ -7,6 +7,7 @@
   if (DESKTOP) { Desk.init(); SETTINGS.unshift({ id: 'display', title: 'Display', icon: 'pc', items: [{ type: 'html', html: desktopSettingsHtml }] } as any); }
   loadKnownAirports();
   World.load();
+  World.loadRunways();   // runways in use, for departures and approaches
   ensurePeople();
   ensurePayroll();
   Store.bind();

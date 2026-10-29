@@ -138,9 +138,10 @@ class AirportView {
     const sw: any = Link.sim && Link.sim.wx && Link.sim.lat && gcDistanceNm([Link.sim.lon, Link.sim.lat], [L.lon, L.lat]) < 60 ? Link.sim.wx : null;
     const wind = sw ? sw.windDir : (_hashStr(this.icao + new Date().toDateString()) % 360), windKt = sw ? Math.round(sw.windKt) : 6 + (_hashStr(this.icao) % 12);
     let best: any = null, bs = -1e9;
+    const ar = typeof activeRunway === 'function' ? activeRunway(this.icao) : null;   // the one the flights use
     for (const r of L.runways) for (const dir of [0, 1]) {
       const hd = (r.hdg + dir * 180) % 360, head = Math.cos((wind - hd) * Math.PI / 180);
-      const score = head * 2 + Math.min(r.len, 4000) / 1500;
+      const score = ar ? -Math.abs(angDiff(ar.hdg, hd)) * 10 + Math.min(r.len, 4000) / 1500 : head * 2 + Math.min(r.len, 4000) / 1500;
       if (score > bs) { bs = score; best = { r, dir, hd }; }
     }
     const r = best.r, c = this.xy(r.lat, r.lon), h = best.hd * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
@@ -239,8 +240,9 @@ class AirportView {
           const fr = (el - to[0]) / Math.max(1, to[1] - to[0]), d = roll * fr * fr;
           pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; phase = 'Take-off roll'; kt = Math.round(150 * fr);
         } else if (cl) {
-          const tt = el - (to ? to[1] : cl[0]), d = roll + tt * 80;
-          if (d < APV_RANGE) { pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(tt * 30); phase = 'Climbing out'; kt = 170; }
+          const tt = el - (to ? to[1] : cl[0]), fpp = flightPathPos(F, now);
+          if (fpp) { const q = this.xy(fpp.pos[1], fpp.pos[0]); if (Math.hypot(q[0], q[1]) < APV_RANGE) { pos = [q[0], q[1], fpp.hdg]; alt = Math.round(tt * 30); phase = fpp.fp.parts[0].name; kt = 170; } }
+          else { const d = roll + tt * 80; if (d < APV_RANGE) { pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(tt * 30); phase = 'Climbing out'; kt = 170; } }
         }
       }
       // arriving here
@@ -248,8 +250,15 @@ class AirportView {
         const ld = this.span(prof, 'Landing'), ti = this.span(prof, 'Taxi in');
         const td = ld ? ld[0] : prof.totalS;
         if (el < td) {
+          const fpp = flightPathPos(F, now);
+          if (fpp) {
+            const q = this.xy(fpp.pos[1], fpp.pos[0]), dist = Math.hypot(q[0], q[1]), left = (fpp.fp.len - fpp.d) * NM;
+            const part = fpp.fp.parts.filter(x => fpp.d >= x.from && fpp.d <= x.to + 0.01)[0];
+            if (dist < APV_RANGE) { pos = [q[0], q[1], fpp.hdg]; alt = Math.round(Math.min(left * 0.0525 * 3.28, 6000)); phase = part && part.kind === 'app' ? (left < 10000 ? 'Final' : '') + (left < 10000 ? ' · ' : '') + part.name : part && part.kind === 'star' ? part.name : 'Approach'; kt = 140; }
+          } else {
           const d = (td - el) * 72;
           if (d < APV_RANGE) { pos = [A.tx - A.ux * d, A.ty - A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(d * 0.0525 * 3.28); phase = d < 6000 ? 'Final' : 'Approach'; kt = 140; }
+          }
         } else if (ld && el < ld[1]) {
           const fr = (el - ld[0]) / Math.max(1, ld[1] - ld[0]), d = A.len * 0.55 * (1 - (1 - fr) * (1 - fr));
           pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; phase = 'Landing roll'; kt = Math.round(130 * (1 - fr) + 20);
