@@ -107,7 +107,6 @@ function coopDepart(m: CoopMember, at: number) {
   const seats = t ? t.seats : 180, pax = Math.round(seats * (0.7 + Math.random() * 0.25));
   const f: any = { id: 'coop-' + uid(), reg: a ? a.reg : '', pilotId: m.id, from, to, t: 0, rate: 0, callsign: (co.icao || 'CO') + (300 + (_hashStr(m.id + at) % 600)),
     pax, paxMax: seats, alt: 0, phase: 'Taxi out', real: true, coop: true, typeId, depAt: at, durMs: prof.totalS * 1000 };
-  assignDelays(f, prof);
   if (a) a.status = 'flying';
   const p = pilot(m.id); if (p) p.status = 'flying';
   State.live.push(f);
