@@ -257,9 +257,15 @@ function flightPathPos(f: any, now?: number): { pos: number[]; hdg: number; d: n
   if (!fp) { fp = flightPathFor(f.from, f.noDest ? null : f.to); if (!fp) return null; _flightPaths[pk] = fp; }
   now = now || Date.now();
   const prof: FlightProfile = f.coop ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
-  const el = Math.max(0, (now - f.depAt) * (f.coop ? 1 : (f.spd || 1)) / 1000), q = profileAt(prof, el);
+  const fe = flightEl(f, now), q = profileAt(prof, fe.el);
   // the profile's distance (along airways) mapped onto this path
   const d = prof.routeNm > 0 ? q.d / prof.routeNm * fp.len : 0;
   const r = pathAt(fp, d);
+  // a holding pattern, or a go-around and a circuit back to the final: circling to the right, a turn about every 4 minutes
+  if (fe.hold && (fe.hold.kind === 'air' || fe.hold.kind === 'goaround')) {
+    const R = fe.hold.kind === 'air' ? 2.6 : 1.8, ang = (fe.inHold / 240) * 360;
+    const ctr = geoDest(r.pos, r.hdg + 90, R), pos = geoDest(ctr, r.hdg - 90 + ang, R);
+    return { pos, hdg: (r.hdg + ang + 360) % 360, d, fp };
+  }
   return { pos: r.pos, hdg: r.hdg, d, fp };
 }

@@ -286,7 +286,7 @@ class AirportView {
       }
       if (!A || !F.depAt || !g) continue;
       const prof: FlightProfile = F.coop ? flightProfile(F.typeId, f.from, f.to, F.depAt) : aiProfile(F);
-      const el = (now - F.depAt) * (F.spd || 1) / 1000;
+      const fe = flightEl(F, now), el = fe.el;
       const roll = Math.min(A.len * 0.65, big ? 2200 : 700), lift = [A.tx + A.ux * roll, A.ty + A.uy * roll];
       let pos: number[] = null, alt = 0, phase = '', kt = 0;
       // the speeds of this flight (docs/reference) and the wind along the runway in use
@@ -353,6 +353,7 @@ class AirportView {
           }
         }
       }
+      if (pos && fe.hold) { phase = holdLabel(fe.hold); if (fe.hold.kind === 'gate' || fe.hold.kind === 'runway') kt = 0; }
       if (pos) out.push(Object.assign(base, { x: pos[0], y: pos[1], hdg: pos[2] || 0, alt, phase, kt }));
     }
     // the fleet's aircraft parked here

@@ -33,6 +33,7 @@
     "src/core/economics.ts",
     "src/core/ai-sim.ts",
     "src/core/procedures.ts",
+    "src/core/delays.ts",
     "src/graphics/land.ts",
     "src/graphics/worldmap.ts",
     "src/ui/battery.ts",
