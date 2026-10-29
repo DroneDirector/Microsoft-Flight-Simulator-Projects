@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.8 (2026-10-29)
+
+- Paying for a repair fixes the aircraft at once and makes it available; one payment covers all its open reports; aircraft stuck in the hangar are released; the hangar shows grounded aircraft
+
 ## 0.5.7 (2026-10-29)
 
 - Airport view: runways, taxiways and stands (from the simulator when linked, real runways otherwise), aircraft taxiing, taking off, landing and taxiing in, runway in use by wind, tracking carried over from the world map and back
