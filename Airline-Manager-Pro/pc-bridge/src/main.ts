@@ -45,7 +45,11 @@ export function run(source: SimSource, server: LinkServer, log: (s: string) => v
   });
   // the airport view asks for an airport's layout; the airport search for every airport in the sim
   server.on('message', (c: any, m: any) => {
-    if (m.type === 'layout' && !source.getLayout) c.send({ type: 'layout', icao: String(m.icao || '').toUpperCase().slice(0, 8), error: 'No simulator layouts' });
+    if (m.type === 'procs') {
+      const icao = String(m.icao || '').toUpperCase().slice(0, 8);
+      if (!source.getProcedures) c.send({ type: 'procs', icao, error: 'No simulator procedures' });
+      else source.getProcedures(icao).then(p => c.send({ type: 'procs', icao, procs: p }), (e: any) => c.send({ type: 'procs', icao, error: String(e && e.message || e) }));
+    } else if (m.type === 'layout' && !source.getLayout) c.send({ type: 'layout', icao: String(m.icao || '').toUpperCase().slice(0, 8), error: 'No simulator layouts' });
     else if (m.type === 'layout' && source.getLayout) {
       const icao = String(m.icao || '').toUpperCase().slice(0, 8);
       source.getLayout(icao).then(l => c.send({ type: 'layout', icao, layout: l }), (e: any) => c.send({ type: 'layout', icao, error: String(e && e.message || e) }));
