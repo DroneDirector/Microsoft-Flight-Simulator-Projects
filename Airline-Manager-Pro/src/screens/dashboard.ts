@@ -163,7 +163,7 @@ SCREENS.ops = {
     function showSel(id: string) {
       const box = $('#ops-sel', root); if (!box) return;
       const f = State.live.filter(x => x.id === id)[0];
-      box.innerHTML = f && !f.you ? `<div class="sel-pop">${flightCard(f)}</div>` : '';
+      box.innerHTML = f ? `<div class="sel-pop"><button class="icon-btn sel-x" data-act="ops-sel-close" aria-label="Close">${icon('close')}</button>${flightCard(f)}</div>` : '';
     }
   },
 };
@@ -223,3 +223,4 @@ ACTIONS['set-my-ac'] = el => {
 ACTIONS['open-crash'] = el => crashPopup(el.getAttribute('data-id'));
 ACTIONS['open-fine'] = el => finePopup(el.getAttribute('data-ref'));
 ACTIONS['open-issue'] = el => mechanicPopup(el.getAttribute('data-id'));
+ACTIONS['ops-sel-close'] = () => { const box = $('#ops-sel'); if (box) box.innerHTML = ''; Sound.tick(); };
