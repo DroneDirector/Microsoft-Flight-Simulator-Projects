@@ -11,7 +11,8 @@ const OFM_ATTRIB = '© <a href="https://www.openstreetmap.org/copyright">OpenStr
  *  overlay); zooming in, the dots give way to coastlines, water, borders and main roads in the same
  *  dark colours, from OpenStreetMap vector tiles (OpenFreeMap, free to use with credit). */
 function classicVectorStyle(): any {
-  const fade = (a: number, b: number) => ['interpolate', ['linear'], ['zoom'], a, 0, b, 1];
+  // zoom-dependent values must be a top-level interpolate, so each fade carries its own end value
+  const fade = (a: number, b: number, to = 1) => ['interpolate', ['linear'], ['zoom'], a, 0, b, to];
   return {
     version: 8,
     sources: { omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: OFM_ATTRIB } },
@@ -21,8 +22,8 @@ function classicVectorStyle(): any {
       { id: 'coast', type: 'line', source: 'omt', 'source-layer': 'water', paint: { 'line-color': '#3FD0E8', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 4.2, 0, 5.6, 0.45, 12, 0.3], 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 12, 1.2] } },
       { id: 'rivers', type: 'line', source: 'omt', 'source-layer': 'waterway', minzoom: 8, paint: { 'line-color': '#1E4A73', 'line-opacity': 0.5, 'line-width': 0.8 } },
       { id: 'roads', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 7, filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary']]], paint: { 'line-color': '#24486F', 'line-opacity': fade(7, 9), 'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.5, 14, 2] } },
-      { id: 'borders-region', type: 'line', source: 'omt', 'source-layer': 'boundary', minzoom: 5, filter: ['all', ['>=', ['get', 'admin_level'], 3], ['<=', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': ['*', 0.18, fade(5, 6.5)], 'line-width': 0.7, 'line-dasharray': [3, 3] } },
-      { id: 'borders', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['all', ['<=', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': ['*', 0.45, fade(3.5, 5.2)], 'line-width': 1, 'line-dasharray': [4, 3] } },
+      { id: 'borders-region', type: 'line', source: 'omt', 'source-layer': 'boundary', minzoom: 5, filter: ['all', ['>=', ['get', 'admin_level'], 3], ['<=', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': fade(5, 6.5, 0.18), 'line-width': 0.7, 'line-dasharray': [3, 3] } },
+      { id: 'borders', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['all', ['<=', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': fade(3.5, 5.2, 0.45), 'line-width': 1, 'line-dasharray': [4, 3] } },
     ],
   };
 }
