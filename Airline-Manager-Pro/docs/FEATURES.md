@@ -36,7 +36,12 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | Airlines, regional/cargo and bush outfits (VFR, IFR, small props) running in parallel | Built |
 | Quick animated company and division switcher | Built |
 | Hire pilots, assign routes and rules (duty time, landing limit, IFR only, return to base) | Built |
-| Watch hired pilots' flights live on the world map | Built (demo movement) |
+| Watch hired pilots' flights live on the world map | Built |
+| Hired pilots fly in the background, even with the app closed: landings, turnarounds, next legs on their route, rest after the duty limit, revenue, fuel and fees booked; "While you were away" summary on opening | Built |
+| Real-world flight times per aircraft and route: airway distance, taxi times (longer at big hubs), climb, cruise and descent speeds at each altitude, cruise level by distance and direction, jet stream | Built |
+| Live countdown on flight cards: phase, altitude, miles to go along the route, time to the gate | Built |
+| Virtual pilot speed: real time (default), 2×, 4×, 10× or 30× | Built (setting) |
+| Phone notification when a hired pilot reaches the gate, also with the app closed | Built (setting) |
 | You can't fly hired pilots' aircraft | Built |
 | You fly one aircraft at a time, chosen from your fleet | Built |
 
@@ -104,6 +109,7 @@ Only damage the simulator can actually detect.
 | Feature | Status |
 |---|---|
 | Balance, revenue, costs and profit per day, week, month and year | Built (demo) |
+| Tap the balance in the top bar to open Finance | Built |
 | Real-world years or simulated years at a chosen speed | Built (setting) |
 | Transactions list | Built |
 
@@ -119,8 +125,9 @@ Only damage the simulator can actually detect.
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
 | Version number in the bottom-left corner | Built |
 | Airline saved on the device and kept through updates; new versions install over the old one | Built |
+| Settings saved the moment they change; a second copy of the airline kept in the app's own files and restored if the web storage is cleared | Built |
 | Delete a company or everything, from Profiles and companies, with a confirmation prompt | Built |
-| Purchase and payment sounds; mute all sounds | Built |
+| Purchase and payment sounds; mute all sounds; the sound button always stays in the top bar | Built |
 | Error log: pop-up with the error, Copy and Share; saved list in Settings; start-up failures and Android crashes reported | Built |
 | Updates from inside the app, with Android's exact reason when an install is refused | Built |
 | World map layers from the layer button on the map: Classic (default, offline), Street (OpenStreetMap, light colours), Satellite (Sentinel-2 cloudless); tap again for Classic | Built |
@@ -133,6 +140,10 @@ Only damage the simulator can actually detect.
 | Feature | Status |
 |---|---|
 | 3D full-body avatars (breathing, sway, blinking, look-around, turn with a finger) for all pilots, co-pilots, flight attendants and mechanics, male and female; drawn avatars where 3D isn't available | Built |
+| Human figures with real body proportions, skin with pores and colour variation, hair grown strand by strand, beards and moustaches, detailed fabrics | Built |
+| Crew figure proportions: Natural, In-between or Stylised | Built (setting) |
+| Beards (stubble, short, full, goatee, Van Dyke) and moustaches (pencil, chevron, walrus, handlebar, horseshoe); pilot sunglasses | Built |
+| Finished crew pictures saved on the device, so they appear at once next time | Built |
 | Pilot's cap for captain (gold braid) and co-pilot | Built |
 | Create your pilot: name, date of birth, nationality with flag, skin tone, face, eyes, nose, lips, facial hair, glasses, hair, uniform | Built |
 | Avatars always fully dressed; clothing only swaps complete garments | Built |

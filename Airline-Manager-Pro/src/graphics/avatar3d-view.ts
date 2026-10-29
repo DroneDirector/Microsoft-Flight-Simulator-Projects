@@ -180,6 +180,72 @@ function av3Draw(model: any, view: string, w: number, h: number, pose?: { t: num
   Av3.stage.remove(model.root);
 }
 
+/* ---------- saved pictures ----------
+   Finished small pictures are kept on the device (IndexedDB), so a figure seen before appears
+   at once next time instead of being built again. A new app version starts a fresh set. */
+const AvDisk = {
+  db: null as IDBDatabase,
+  opening: null as Promise<IDBDatabase>,
+  missed: new Set<string>(),
+  waiting: new Map<string, HTMLCanvasElement[]>(),
+  key(pk: string) { return APP.version + '|' + pk; },
+  open(): Promise<IDBDatabase> {
+    if (this.db) return Promise.resolve(this.db);
+    if (this.opening) return this.opening;
+    this.opening = new Promise((res, rej) => {
+      try {
+        const rq = indexedDB.open('amp-crew-pictures', 1);
+        rq.onupgradeneeded = () => { const os = rq.result.createObjectStore('pics'); os.createIndex('t', 't'); };
+        rq.onsuccess = () => { this.db = rq.result; res(rq.result); this.tidy(); };
+        rq.onerror = () => rej(rq.error);
+      } catch (e) { rej(e); }
+    });
+    return this.opening;
+  },
+  get(pk: string): Promise<Blob> {
+    return this.open().then(db => new Promise<Blob>(res => {
+      const rq = db.transaction('pics').objectStore('pics').get(this.key(pk));
+      rq.onsuccess = () => res(rq.result ? rq.result.b : null); rq.onerror = () => res(null);
+    })).catch(() => null);
+  },
+  put(pk: string, pic: HTMLCanvasElement) {
+    if (!pic.toBlob) return;
+    pic.toBlob(b => { if (!b) return; this.open().then(db => { try { db.transaction('pics', 'readwrite').objectStore('pics').put({ b, t: Date.now() }, this.key(pk)); } catch (e) { /* storage full */ } }).catch(() => { /* no storage */ }); }, 'image/png');
+  },
+  /** Keep the newest 400 pictures, and drop pictures from older app versions. */
+  tidy() {
+    try {
+      const os = this.db.transaction('pics', 'readwrite').objectStore('pics');
+      const keep = 400; let n = 0;
+      os.index('t').openCursor(null, 'prev').onsuccess = (e: any) => {
+        const c = e.target.result; if (!c) return;
+        n++; if (n > keep || String(c.primaryKey).indexOf(APP.version + '|') !== 0) c.delete();
+        c.continue();
+      };
+    } catch (e) { /* ignore */ }
+  },
+};
+
+/** Look for a saved picture before building one. */
+function av3FromDisk(el: HTMLCanvasElement, pk: string) {
+  const W = AvDisk.waiting.get(pk);
+  if (W) { if (W.indexOf(el) < 0) W.push(el); return; }
+  AvDisk.waiting.set(pk, [el]);
+  AvDisk.get(pk).then(blob => {
+    if (!blob || !(window as any).createImageBitmap) return null;
+    return createImageBitmap(blob).catch(() => null);
+  }).then((bmp: ImageBitmap) => {
+    const els = AvDisk.waiting.get(pk) || []; AvDisk.waiting.delete(pk);
+    if (bmp) {
+      const pic = document.createElement('canvas'); pic.width = bmp.width; pic.height = bmp.height;
+      pic.getContext('2d').drawImage(bmp, 0, 0); if (bmp.close) bmp.close();
+      Av3.pics.set(pk, pic);
+    } else AvDisk.missed.add(pk);
+    for (const e of els) if (e.isConnected) av3Attach(e);
+    av3Pump();
+  });
+}
+
 /* ---------- attaching canvases ---------- */
 function av3Attach(el: HTMLCanvasElement, resized?: boolean) {
   const key = el.getAttribute('data-k'); if (!key) return;
@@ -194,6 +260,7 @@ function av3Attach(el: HTMLCanvasElement, resized?: boolean) {
   const pk = key + '|' + el.getAttribute('data-view') + '|' + w + 'x' + h;
   const pic = Av3.pics.get(pk);
   if (pic) { const g = el.getContext('2d'); g.clearRect(0, 0, w, h); g.drawImage(pic, 0, 0); el.classList.add('in'); }
+  else if (!AvDisk.missed.has(pk) && el.clientHeight < 230 && window.indexedDB) av3FromDisk(el, pk);
   else if (Av3.queue.indexOf(el) < 0) Av3.queue.push(el);
   void resized;
 }
@@ -225,6 +292,7 @@ function av3Tick(now: number) {
       pic = document.createElement('canvas'); pic.width = w; pic.height = h;
       pic.getContext('2d').drawImage(Av3.renderer.domElement, 0, 0, w, h, 0, 0, w, h);
       Av3.pics.set(pk, pic);
+      if (el.clientHeight < 230) AvDisk.put(pk, pic);
       if (Av3.pics.size > 160) Av3.pics.delete(Av3.pics.keys().next().value);
     }
     if (el.width !== w || el.height !== h) { el.width = w; el.height = h; }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 (2026-10-29)
+
+- Human crew figures: real body proportions, skin with pores and colour variation, strand-grown hair, shell-rendered beards with a growth map from facial landmarks, moustaches, detailed fabrics; proportions switchable (Natural, In-between, Stylised)
+- New beard, moustache and glasses options, including pilot sunglasses
+- Faster figure building; finished pictures saved on the device
+- Hired pilots fly on the real clock, also with the app closed, with catch-up and a "While you were away" summary on opening
+- Real-world flight profiles per aircraft type and route (airways, taxi, speed schedule by altitude, semicircular cruise levels, jet stream); live countdown of altitude, miles and time to the gate
+- Virtual pilot speed setting (real time to 30×) and landing notifications
+- Link over the phone's hotspot or USB tethering
+- Balance opens Finance; sound button always visible; settings saved immediately with a backup copy in the app's files
+
 ## 0.4.0 (2026-10-28)
 
 - Crew avatars are now 3D figures: captains, co-pilots, hired pilots, flight attendants and mechanics, lit and shaded, with every look option (face, eyes, nose, lips, skin tone, hairstyle, facial hair, glasses, garments, shoes, hats, uniform colour)

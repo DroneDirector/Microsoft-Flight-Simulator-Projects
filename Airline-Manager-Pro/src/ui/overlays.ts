@@ -30,6 +30,8 @@ function closeAll() { while (_layers.length) closeTop(); }
 ACTIONS['close-layer'] = () => { Sound.tick(); closeTop(); };
 
 function toast(msg: string, kind?: 'ok' | 'warn' | 'info', action?: { label: string; act: string; data?: string }) {
+  // one toast at a time: a new one replaces any still showing (they share the same spot)
+  document.querySelectorAll('.toast').forEach(o => { o.classList.remove('show'); setTimeout(() => o.remove(), 300); });
   const t = document.createElement('div');
   t.className = 'toast toast-' + (kind || 'info') + (action ? ' has-act' : '');
   t.innerHTML = `${icon(kind === 'warn' ? 'alert' : kind === 'info' && action ? 'fleet' : 'check')}<span>${esc(msg)}</span>${action
