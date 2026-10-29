@@ -74,6 +74,8 @@ export type ToPhone =
   | { type: 'airports'; list: Airport[] }
   /** an airport's layout from the simulator (runways, taxiways, stands), or why there is none */
   | { type: 'layout'; icao: string; layout?: any; error?: string }
+  /** an airport's published SIDs, STARs and approaches from the simulator, or why there are none */
+  | { type: 'procs'; icao: string; procs?: any; error?: string }
   /** every airport the simulator has, as [ident, latitude, longitude], in parts */
   | { type: 'all-airports'; list: [string, number, number][]; part: number; parts: number; total: number }
   | { type: 'pong'; t: number };
@@ -84,4 +86,5 @@ export type ToPc =
   | { type: 'ping'; t: number }
   | { type: 'plan'; from?: string; to?: string; reg?: string }
   | { type: 'layout'; icao: string }
+  | { type: 'procs'; icao: string }
   | { type: 'all-airports' };

@@ -78,6 +78,106 @@ function smoothPath(p: number[][], passes = 2): number[][] {
   return q;
 }
 
+/* ---------- Published procedures from the simulator (through the PC app, when linked) ---------- */
+interface SimLeg { t: number; fix: string; lat: number; lon: number; alt: number; crs: number; dist: number; turn: number; arcLat?: number; arcLon?: number }
+interface SimProc { name: string; kind: string; type?: number; suffix?: string; rwy?: string; common: SimLeg[]; runways: { name: string; rwy?: string; legs: SimLeg[] }[]; enroute: { name: string; legs: SimLeg[] }[] }
+interface SimProcs { icao: string; sids: SimProc[]; stars: SimProc[]; apps: SimProc[] }
+
+const SimProcedures = {
+  data: {} as { [icao: string]: SimProcs | false },
+  asked: {} as { [icao: string]: boolean },
+  get(icao: string): SimProcs {
+    const d = this.data[icao]; if (d) return d; if (d === false) return null;
+    try { const k = JSON.parse(localStorage.getItem('amp-proc:' + icao) || 'null'); if (k && k.l) return (this.data[icao] = k.l); } catch (e) { /* none */ }
+    this.ask(icao);
+    return null;
+  },
+  ask(icao: string) {
+    if (this.asked[icao] || Link.status !== 'connected') return;
+    this.asked[icao] = true;
+    try { linkSend({ type: 'procs', icao }); } catch (e) { /* not linked */ }
+  },
+  received(icao: string, procs: any, error?: string) {
+    icao = String(icao || '').toUpperCase();
+    if (!procs || error) { this.data[icao] = false; return; }
+    this.data[icao] = procs;
+    try { AirportLayouts.keep('amp-proc:' + icao, procs as any); } catch (e) { /* storage full */ }
+    // only flights that start from now on use them: a flight never changes its path in the air
+    for (const k of Object.keys(_paths)) if (k.indexOf(icao) >= 0) delete _paths[k];
+  },
+};
+
+const APP_TYPES: { [t: number]: string } = { 1: 'GPS', 2: 'VOR', 3: 'NDB', 4: 'ILS', 5: 'LOC', 6: 'SDF', 7: 'LDA', 8: 'VOR/DME', 9: 'NDB/DME', 10: 'RNAV', 11: 'LOC BC' };
+const hasFix = (l: SimLeg) => !!l && (Math.abs(l.lat) > 1e-6 || Math.abs(l.lon) > 1e-6);
+
+/** Legs to points: fixes where they have one, a short climb on course for course-to-altitude legs, arcs drawn round their centre. */
+function legPoints(legs: SimLeg[], start: number[]): number[][] {
+  const out: number[][] = []; let last = start;
+  for (const l of legs || []) {
+    if (hasFix(l)) {
+      const p = [l.lon, l.lat];
+      if (l.t === 17 && l.arcLat != null && last) {   // RF: constant-radius arc to the fix
+        const c = [l.arcLon, l.arcLat], r = gcDistanceNm(c, p), b0 = geoBrg(c, last), b1 = geoBrg(c, p);
+        let sweep = angDiff(b0, b1); if (l.turn === 1 && sweep > 0) sweep -= 360; if (l.turn === 2 && sweep < 0) sweep += 360;
+        const n = Math.max(2, Math.round(Math.abs(sweep) / 10));
+        for (let i = 1; i < n; i++) out.push(geoDest(c, b0 + sweep * i / n, r));
+      }
+      out.push(p); last = p;
+    } else if ([2, 3, 5, 8, 19, 20, 21].indexOf(l.t) >= 0 && last && l.crs) {   // CA, CD, CI, FA, VA, VD, VI
+      last = geoDest(last, l.crs, 3); out.push(last);
+    }
+  }
+  return out;
+}
+function rwyMatch(a: string, b: string) { return !!a && !!b && a.replace(/^0/, '') === b.replace(/^0/, ''); }
+
+/** The published departure for the runway in use that heads best towards the destination. */
+function simDeparture(dep: RunwayEnd, dest: number[]): { pts: number[][]; name: string } {
+  const sp = SimProcedures.get(dep.icao); if (!sp || !sp.sids.length) return null;
+  const want = geoBrg(dep.end, dest);
+  let best: any = null, bs = 1e9;
+  for (const sid of sp.sids) {
+    const rt = sid.runways.filter(r => rwyMatch(r.rwy, dep.name))[0];
+    if (sid.runways.length && !rt) continue;
+    const ens = sid.enroute.length ? sid.enroute : [{ name: '', legs: [] }];
+    for (const en of ens) {
+      const pts = legPoints((rt ? rt.legs : []).concat(sid.common, en.legs), dep.end); if (!pts.length) continue;
+      const exit = pts[pts.length - 1], score = Math.abs(angDiff(want, geoBrg(dep.end, exit))) + gcDistanceNm(exit, dest) * 0.02;
+      if (score < bs) { bs = score; best = { pts, name: sid.name + (en.name ? '.' + en.name : '') }; }
+    }
+  }
+  return best;
+}
+
+/** The published arrival and approach for the landing runway, joined the way the flight comes in. */
+function simArrival(arr: RunwayEnd, from: number[]): { star: number[][]; app: number[][]; starName: string; appName: string } {
+  const sp = SimProcedures.get(arr.icao); if (!sp || !sp.apps.length) return null;
+  const rank = (t: number) => t === 4 ? 0 : t === 10 || t === 1 ? 1 : 2;
+  const apps = sp.apps.filter(a => rwyMatch(a.rwy, arr.name)).sort((a, b) => rank(a.type) - rank(b.type));
+  if (!apps.length) return null;
+  const app = apps[0];
+  // the arrival: the one whose way in suits the direction the flight comes from
+  let star: any = null, ss = 1e9;
+  for (const st of sp.stars) {
+    const rt = st.runways.filter(r => rwyMatch(r.rwy, arr.name))[0];
+    if (st.runways.length && !rt) continue;
+    const ens = st.enroute.length ? st.enroute : [{ name: '', legs: [] }];
+    for (const en of ens) {
+      const pts = legPoints(en.legs.concat(st.common, rt ? rt.legs : []), null); if (!pts.length) continue;
+      const score = gcDistanceNm(from, pts[0]) + pts.reduce((t, q, i) => i ? t + gcDistanceNm(pts[i - 1], q) : 0, 0) * 0.5;
+      if (score < ss) { ss = score; star = { pts, name: (en.name ? en.name + '.' : '') + st.name }; }
+    }
+  }
+  // the approach transition nearest where the arrival ends (or where the flight comes from)
+  const joinAt = star ? star.pts[star.pts.length - 1] : from;
+  let tr: any = null, ts = 1e9;
+  for (const t of app.enroute) { const p = legPoints(t.legs, null); if (!p.length) continue; const d = gcDistanceNm(joinAt, p[0]); if (d < ts) { ts = d; tr = p; } }
+  const final = legPoints(app.common, tr ? tr[tr.length - 1] : joinAt);
+  if (!final.length) return null;
+  const name = `${APP_TYPES[app.type] || 'APP'} ${arr.name}${app.suffix ? ' ' + app.suffix : ''}`;
+  return { star: star ? star.pts : [], app: (tr || []).concat(final), starName: star ? star.name : '', appName: name };
+}
+
 const _paths: { [k: string]: FlightPath } = {};
 /** The whole path of a flight from runway to runway (cached). Null when the runways aren't known. */
 function flightPathFor(from: string, to: string): FlightPath {
@@ -86,45 +186,58 @@ function flightPathFor(from: string, to: string): FlightPath {
   if (!dep || !arr) return null;
   const key = from + '>' + to + '|' + dep.name + '>' + arr.name;
   if (_paths[key]) return _paths[key];
-  // departure: along the runway, straight ahead for 4 nm, then a turn onto the route
-  const toDest = geoBrg(dep.end, arr.thr);
-  const sidA = geoDest(dep.end, dep.hdg, 4);
-  const turn = angDiff(dep.hdg, geoBrg(sidA, arr.thr));
-  const sidPts: number[][] = [sidA];
-  const steps = Math.max(1, Math.round(Math.abs(turn) / 15));
-  for (let i = 1; i <= steps; i++) { const prev = sidPts[sidPts.length - 1], h = dep.hdg + turn * i / steps; sidPts.push(geoDest(prev, h, 1.1)); }
-  sidPts.push(geoDest(sidPts[sidPts.length - 1], geoBrg(sidPts[sidPts.length - 1], arr.thr), 8));
-  // approach: intermediate fix 10 nm out, final approach fix 5.5 nm out, on the extended centre line
-  const back = (arr.hdg + 180) % 360, IF = geoDest(arr.thr, back, 10), FAF = geoDest(arr.thr, back, 5.5);
-  // arrival: straight in when coming from roughly behind the final, otherwise downwind and base
-  const sidEnd = sidPts[sidPts.length - 1];
-  const inbound = geoBrg(sidEnd, IF), off = angDiff(arr.hdg, inbound);
-  let star: number[][];
-  if (Math.abs(off) <= 50) star = [geoDest(IF, (inbound + 180) % 360, 22), geoDest(IF, (inbound + 180) % 360, 8)];
+  // departure: the published one from the simulator, or straight ahead for 4 nm and a turn onto the route
+  let sidPts: number[][], sidName: string;
+  const sd = simDeparture(dep, arr.thr);
+  if (sd) { sidPts = sd.pts; sidName = sd.name; }
   else {
-    const side = off > 0 ? -1 : 1;   // the side of the final the flight comes from
-    const abeam = geoDest(geoDest(arr.thr, (arr.hdg + 90 * side + 360) % 360, 4.5), arr.hdg, 3);   // downwind, abeam the field
-    const base = geoDest(geoDest(IF, (arr.hdg + 90 * side + 360) % 360, 4.5), back, 1.5);           // base turn
-    const entry = geoDest(abeam, geoBrg(sidEnd, abeam) + 180, 14);
-    star = [entry, abeam, base];
+    const sidA = geoDest(dep.end, dep.hdg, 4), turn = angDiff(dep.hdg, geoBrg(sidA, arr.thr));
+    sidPts = [sidA];
+    const steps = Math.max(1, Math.round(Math.abs(turn) / 15));
+    for (let i = 1; i <= steps; i++) { const prev = sidPts[sidPts.length - 1], h = dep.hdg + turn * i / steps; sidPts.push(geoDest(prev, h, 1.1)); }
+    sidPts.push(geoDest(sidPts[sidPts.length - 1], geoBrg(sidPts[sidPts.length - 1], arr.thr), 8));
+    sidName = `${dep.name} departure`;
   }
-  const starSmooth = smoothPath(star.concat([IF]), 2);
+  const sidEnd = sidPts[sidPts.length - 1];
+  // arrival and approach: published ones, or generated (straight in, or downwind and base; IF 10 nm, FAF 5.5 nm)
+  let starPts: number[][], appPts: number[][], starName: string, appName: string;
+  const sa = simArrival(arr, sidEnd);
+  if (sa) {
+    starPts = sa.star; appPts = sa.app; starName = sa.starName || `${arr.name} arrival`; appName = sa.appName;
+    if (!starPts.length) starPts = [geoDest(appPts[0], geoBrg(appPts[0], sidEnd), 15)];
+    const lastApp = appPts[appPts.length - 1];
+    if (gcDistanceNm(lastApp, arr.thr) > 0.05) appPts = appPts.concat([arr.thr]);
+  } else {
+    const back = (arr.hdg + 180) % 360, IF = geoDest(arr.thr, back, 10), FAF = geoDest(arr.thr, back, 5.5);
+    const inbound = geoBrg(sidEnd, IF), off = angDiff(arr.hdg, inbound);
+    let star: number[][];
+    if (Math.abs(off) <= 50) star = [geoDest(IF, (inbound + 180) % 360, 22), geoDest(IF, (inbound + 180) % 360, 8)];
+    else {
+      const side = off > 0 ? -1 : 1;
+      const abeam = geoDest(geoDest(arr.thr, (arr.hdg + 90 * side + 360) % 360, 4.5), arr.hdg, 3);
+      const base = geoDest(geoDest(IF, (arr.hdg + 90 * side + 360) % 360, 4.5), back, 1.5);
+      star = [geoDest(abeam, geoBrg(sidEnd, abeam) + 180, 14), abeam, base];
+    }
+    const sm = smoothPath(star.concat([IF]), 2);
+    starPts = sm.slice(0, -1); appPts = [IF, FAF, arr.thr];
+    starName = `${arr.name} arrival`; appName = `${arr.ils ? 'ILS' : 'RNP'} ${arr.name}`;
+  }
   // the route between, along a great circle
   const enroute: number[][] = [];
-  const a0 = sidEnd, b0 = starSmooth[0], legNm = gcDistanceNm(a0, b0), n = Math.max(2, Math.min(64, Math.round(legNm / 40)));
+  const a0 = sidEnd, b0 = starPts[0], legNm = gcDistanceNm(a0, b0), n = Math.max(2, Math.min(64, Math.round(legNm / 40)));
   for (let i = 1; i < n; i++) enroute.push(gcInterpolate(a0, b0, i / n));
-  const sid = smoothPath([dep.thr, dep.end].concat(sidPts), 1);
-  const pts = sid.concat(enroute, starSmooth, [FAF, arr.thr]);
+  const sid = sd ? [dep.thr, dep.end].concat(sidPts) : smoothPath([dep.thr, dep.end].concat(sidPts), 1);
+  const pts = sid.concat(enroute, starPts, appPts);
   const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + gcDistanceNm(pts[i - 1], pts[i]));
-  const at = (p: number[]) => { let bi = 0, bd = 1e9; pts.forEach((q, i) => { const d = Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]); if (d < bd) { bd = d; bi = i; } }); return cum[bi]; };
-  const appName = `${arr.ils ? 'ILS' : 'RNP'} ${arr.name}`;
+  const idx = (k: number) => cum[Math.min(cum.length - 1, k)];
+  const iSidEnd = sid.length - 1, iStar = iSidEnd + enroute.length + 1, iApp = iStar + starPts.length;
   const parts: ProcPart[] = [
-    { kind: 'sid', name: `${dep.name} departure`, from: 0, to: at(sidEnd) },
-    { kind: 'route', name: '', from: at(sidEnd), to: at(starSmooth[0]) },
-    { kind: 'star', name: `${arr.name} arrival`, from: at(starSmooth[0]), to: at(IF) },
-    { kind: 'app', name: appName, from: at(IF), to: cum[cum.length - 1] },
+    { kind: 'sid', name: sidName, from: 0, to: idx(iSidEnd) },
+    { kind: 'route', name: '', from: idx(iSidEnd), to: idx(iStar) },
+    { kind: 'star', name: starName, from: idx(iStar), to: idx(iApp) },
+    { kind: 'app', name: appName, from: idx(iApp), to: cum[cum.length - 1] },
   ];
-  return (_paths[key] = { pts, cum, len: cum[cum.length - 1], parts, dep, arr });
+  return (_paths[key] = { pts, cum, len: cum[cum.length - 1], parts, dep, arr, sim: !!(sd || sa) } as any);
 }
 
 /** The point `d` nm along a path, and the direction of travel there. */
@@ -135,10 +248,13 @@ function pathAt(fp: FlightPath, d: number): { pos: number[]; hdg: number } {
   return { pos: [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * k, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * k], hdg: geoBrg(p[i - 1], p[i]) };
 }
 
+const _flightPaths: { [k: string]: FlightPath } = {};
 /** Where a hired or co-op pilot's flight is right now along its procedures (null: not on a known path). */
 function flightPathPos(f: any, now?: number): { pos: number[]; hdg: number; d: number; fp: FlightPath } {
   if (!f || !f.depAt || f.real && f.you) return null;
-  const fp = flightPathFor(f.from, f.noDest ? null : f.to); if (!fp) return null;
+  const pk = f.id + '|' + f.from + '>' + f.to + '|' + f.depAt;
+  let fp = _flightPaths[pk];
+  if (!fp) { fp = flightPathFor(f.from, f.noDest ? null : f.to); if (!fp) return null; _flightPaths[pk] = fp; }
   now = now || Date.now();
   const prof: FlightProfile = f.coop ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
   const el = Math.max(0, (now - f.depAt) * (f.coop ? 1 : (f.spd || 1)) / 1000), q = profileAt(prof, el);

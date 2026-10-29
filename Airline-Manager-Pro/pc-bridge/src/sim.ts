@@ -6,6 +6,7 @@ import { EventEmitter } from 'events';
 import { LB_TO_KG } from './geo';
 import type { SimSnapshot, Airport } from './protocol';
 import { LayoutReader, AirportLayout } from './airport-layout';
+import { ProcReader, AirportProcedures } from './procedures';
 
 export type RawSnapshot = Omit<SimSnapshot, 'phase' | 'from'>;
 
@@ -16,6 +17,7 @@ export interface SimSource extends EventEmitter {
   requestAirports(): void;
   /** an airport's layout as the simulator has it (runways, taxiways, stands) */
   getLayout?(icao: string): Promise<AirportLayout>;
+  getProcedures?(icao: string): Promise<AirportProcedures>;
   /** every airport the simulator has */
   allAirports?(): Promise<Airport[]>;
   // events: 'snapshot' (RawSnapshot), 'crash', 'airports' (Airport[]), 'status' (connected: boolean, text: string)
@@ -60,6 +62,7 @@ export class SimConnectSource extends EventEmitter implements SimSource {
   private stationCount = 0;
   private stationNames: string[] = [];
   private layouts: LayoutReader = null;
+  private procs: ProcReader = null;
   private proto = 0;
   private all: Airport[] = null;
   private allParts: Airport[] = [];
@@ -79,6 +82,11 @@ export class SimConnectSource extends EventEmitter implements SimSource {
   getLayout(icao: string): Promise<AirportLayout> {
     if (!this.layouts) return Promise.reject(new Error('Flight Simulator isn\'t running'));
     return this.layouts.get(icao);
+  }
+
+  getProcedures(icao: string): Promise<AirportProcedures> {
+    if (!this.procs) return Promise.reject(new Error('Flight Simulator isn\'t running'));
+    return this.procs.get(icao);
   }
 
   /** Every airport in the simulator (MSFS 2024): read once per session. */
@@ -155,6 +163,8 @@ export class SimConnectSource extends EventEmitter implements SimSource {
     });
     this.layouts = new LayoutReader(h);
     this.layouts.on('note', (t: string) => this.emit('note', t));
+    this.procs = new ProcReader(h);
+    this.procs.on('note', (t: string) => this.emit('note', t));
     this.all = null;
     h.on('airportList', (r: any) => {
       const list: Airport[] = (r.airports || []).map((a: any) => ({ icao: String(a.icao).trim(), lat: a.latitude, lon: a.longitude }))

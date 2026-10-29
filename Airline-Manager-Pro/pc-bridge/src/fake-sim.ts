@@ -26,6 +26,18 @@ export class FakeSim extends EventEmitter implements SimSource {
   stop() { clearInterval(this.timer); }
   requestAirports() { this.emit('airports', FAKE_AIRPORTS); }
   allAirports() { return Promise.resolve(FAKE_AIRPORTS.slice()); }
+  /** Made-up procedures for the demo airport (a departure, an arrival and an RNAV approach to runway 30 at
+   *  Vágar), in the same shape as the simulator's. */
+  getProcedures(icao: string): Promise<any> {
+    if (icao !== 'EKVG') return Promise.reject(new Error('The simulated flight only has procedures for EKVG'));
+    const L = (t: number, fix: string, lat: number, lon: number, alt = 0) => ({ t, fix, lat, lon, alt, crs: 0, dist: 0, turn: 0 });
+    const ca = { t: 2, fix: '', lat: 0, lon: 0, alt: 1500, crs: 298, dist: 0, turn: 0 };
+    return Promise.resolve({ icao, lat: 62.0636, lon: -7.2772,
+      sids: [{ name: 'DEMO1A', kind: 'sid', common: [], runways: [{ name: '', rwy: '30', legs: [ca, L(18, 'VG301', 62.1150, -7.4300, 3000), L(18, 'MYKIN', 62.1800, -7.2000, 6000)] }],
+        enroute: [{ name: 'SOUTH', legs: [L(18, 'SUDUR', 61.8000, -6.6000, 9000)] }] }],
+      stars: [{ name: 'DEMO1V', kind: 'star', common: [L(18, 'NOLSO', 61.9000, -6.5000, 9000), L(18, 'VG305', 61.9900, -6.9500, 5000)], runways: [], enroute: [{ name: 'EAST', legs: [L(18, 'AUSTR', 61.8500, -5.9000, 11000)] }] }],
+      apps: [{ name: '', kind: 'app', type: 10, suffix: '', rwy: '30', common: [L(15, 'VG310', 62.0010, -7.0200, 3500), L(18, 'VG305F', 62.0330, -7.1550, 2000), L(18, 'RW30', 62.0560, -7.2560, 300)], runways: [], enroute: [{ name: 'VG305', legs: [L(18, 'VG305', 61.9900, -6.9500, 5000), L(18, 'VG310', 62.0010, -7.0200, 3500)] }] }] });
+  }
   /** A small made-up layout (one runway, a parallel taxiway, an apron with stands) for the demo. */
   getLayout(icao: string): Promise<any> {
     const a = FAKE_AIRPORTS.filter(x => x.icao === icao)[0];
