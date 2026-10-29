@@ -6,15 +6,27 @@ interface LookEditOpts {
   sexOnly?: boolean; onAccept: (look: Look, identity?: { name: string; dob: string; nat: string }) => void;
 }
 
-let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string } = null;
+let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string } = null;
 
 const LE_TABS = [['person', 'Person'], ['face', 'Face'], ['hair', 'Hair'], ['outfit', 'Outfit']];
 
 function openLookEditor(o: LookEditOpts) {
-  _le = { o, look: JSON.parse(JSON.stringify(dressed(o.look, o.role))), id: o.identity ? Object.assign({}, o.identity) : null, tab: o.identity ? 'person' : 'face' };
+  _le = { o, look: JSON.parse(JSON.stringify(dressed(o.look, o.role))), id: o.identity ? Object.assign({}, o.identity) : null, tab: o.identity ? 'person' : 'face', cam: 'full' };
   if (o.sexOnly) _le.tab = 'person';
+  _le.cam = leCamForTab(_le.tab);
   openLayer('modal', lookEditorHtml(), { cls: 'full look-pop' });
 }
+
+/** Where the editor's camera looks: the face for the face and hair, the whole person for the outfit,
+ *  and while changing one thing, at that thing (hats and glasses: the face; shoes: the feet; neckwear: head and shoulders). */
+function leCamForTab(t: string): string { return t === 'face' || t === 'hair' ? 'face' : 'full'; }
+function leCamForKey(k: string): string {
+  if (/^(face|eyes|nose|lips|facial|glasses|hat|hair|hairColor)$/.test(k)) return 'face';
+  if (k === 'shoes') return 'feet';
+  if (k === 'neck') return 'bust';
+  return 'full';
+}
+function leFigHtml(): string { return avatarSvg(_le.look, _le.o.role, { accent: company().color, cls: 'hero' }).replace('<canvas ', `<canvas data-cam="${_le.cam}" `); }
 
 function leChoice(key: string, opts: string[][], cur: any): string {
   return `<div class="le-opts">${opts.map(op => `<button class="le-opt ${String(cur) === op[0] ? 'on' : ''}" data-act="le-set" data-k="${key}" data-v="${op[0]}">${op[1]}</button>`).join('')}</div>`;
@@ -66,7 +78,7 @@ function lookEditorHtml(): string {
   <div class="le">
     <div class="le-stage">
       <div class="le-spot"></div>
-      <div class="le-fig" data-le-fig>${avatarSvg(_le.look, _le.o.role, { accent: c.color })}</div>
+      <div class="le-fig" data-le-fig>${leFigHtml()}</div>
       <button class="btn ghost sm le-rand" data-act="le-shuffle">${icon('sync')}Surprise me</button>
     </div>
     <div class="le-side">
@@ -80,7 +92,14 @@ function lookEditorHtml(): string {
 }
 
 function leRefresh(body?: boolean) {
-  const fig = $('[data-le-fig]'); if (fig) fig.innerHTML = avatarSvg(_le.look, _le.o.role, { accent: company().color });
+  const fig = $('[data-le-fig]');
+  if (fig) {
+    const cv = fig.querySelector('canvas.hero') as HTMLCanvasElement, html = leFigHtml();
+    // keep the same canvas, so the figure, its motion and the camera carry on smoothly
+    const m = /data-k="([^"]*)"/.exec(html);
+    if (cv && m) { heroSetKey(cv, m[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')); heroSetMode(_le.cam as any); }
+    else fig.innerHTML = html;
+  }
   if (body) { const b = $('[data-le-body]'); if (b) b.innerHTML = lookEditorBody(); }
 }
 function leReadIdentity() {
@@ -92,7 +111,7 @@ function leReadIdentity() {
 }
 
 ACTIONS['le-tab'] = el => {
-  leReadIdentity(); _le.tab = el.getAttribute('data-t'); Sound.tick();
+  leReadIdentity(); _le.tab = el.getAttribute('data-t'); _le.cam = leCamForTab(_le.tab); Sound.tick();
   $all('.look-pop .tab').forEach(t => t.classList.toggle('on', t.getAttribute('data-t') === _le.tab));
   leRefresh(true);
 };
@@ -103,6 +122,8 @@ ACTIONS['le-set'] = el => {
   if (k === 'sex' && _le.o.sexOnly) { const hat = _le.look.hat; _le.look = randomLook('cp' + Math.random(), v as any, _le.o.role); _le.look.hat = hat; }
   if (k === 'top' && v === 'overalls') _le.look.bottom = 'trousers';
   _le.look = dressed(_le.look, _le.o.role);
+  _le.cam = _le.tab === 'outfit' || _le.tab === 'person' ? leCamForKey(k) : leCamForTab(_le.tab);
+  if (k === 'glasses' || k === 'hat') _le.cam = 'face';
   Sound.tick(); leRefresh(true);
 };
 ACTIONS['le-shuffle'] = () => {

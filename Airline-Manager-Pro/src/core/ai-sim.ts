@@ -109,6 +109,9 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
     amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`,
     lines: [[`${f.pax} passengers × ${money(yieldPax)}`, rev], [`Fuel, ${num(burnKg)} kg`, -fuel], ['Landing and handling', -fees]] } as any);
   c.balance += net;
+  // keep the day's flown legs for the schedule (the last two days)
+  const S: any = State; S.aiDay = (S.aiDay || []).filter((x: any) => x.end > Date.now() - 2 * 864e5);
+  S.aiDay.push({ reg: a.reg, from: f.from, to: f.to, start: F.depAt, end: at });
   summary.legs++; summary.net += net; if (p && summary.names.indexOf(p.name) < 0) summary.names.push(p.name);
 }
 
@@ -130,6 +133,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
     if (ev.kind === 'land') {
       const f: LiveFlight = ev.f, F: any = f, at = Math.max(ev.at, earliest), spd = F.spd || 1;
       aiLand(f, at, summary);
+      try { paxOnAiLanding(f); Progress.afterAiLeg(f.pax, (plane(f.reg) || {} as any).typeId, f.to); } catch (e) { /* ignore */ }
       State.live = State.live.filter(x => x !== f);
       // duty: rest once the next leg would take the pilot past the duty limit, otherwise turn around
       const p: any = pilot(f.pilotId), maxDuty = ((p && p.rules && p.rules.maxDutyHrs) || 10) * 60;
@@ -217,4 +221,37 @@ function startAiClock() {
 function aiScheduleNotificationsCancel() {
   const cap = (window as any).Capacitor, LN = cap && cap.Plugins && cap.Plugins.LocalNotifications;
   if (LN) Promise.resolve(LN.cancel({ notifications: Array.from({ length: 100 }, (_, i) => ({ id: AI_NOTIFY_BASE + i })) })).catch(() => { /* none */ });
+}
+
+
+/** A hired pilot's day for the schedule, in minutes after midnight: legs flown, the one in progress, and the
+ *  next ones projected with real-world block times, turnarounds and rest, until the end of the day. */
+function aiDayBlocks(reg: string): { from: string; to: string; start: number; end: number; live?: boolean }[] {
+  const S: any = State, a = plane(reg); if (!a) return [];
+  const mid = new Date(); mid.setHours(0, 0, 0, 0); const m0 = mid.getTime(), m1 = m0 + 864e5;
+  const toMin = (ms: number) => (ms - m0) / 60000;
+  const out: any[] = [];
+  for (const x of (S.aiDay || [])) if (x.reg === reg && x.end > m0) out.push({ from: x.from, to: x.to, start: toMin(x.start), end: toMin(x.end) });
+  const f: any = State.live.filter(x => x.reg === reg && aiOn(x))[0];
+  let at = 0, from = '', prev = '', spd = aiSpeed(), dutyMin = 0, pilotId = '';
+  if (f && f.depAt) { const end = aiEndAt(f); out.push({ from: f.from, to: f.to, start: toMin(f.depAt), end: toMin(end), live: true }); at = end; from = f.to; prev = f.from; spd = f.spd || 1; dutyMin = (f.dutyMin || 0) + f.durMs / 60000; pilotId = f.pilotId; }
+  const n: any = (S.aiNext || []).filter((x: any) => x.reg === reg)[0];
+  if (!f && n) { at = n.depAt - AI_TURN_MIN * 60e3 / (n.spd || 1); from = n.from; prev = n.from === n.to ? n.from : ''; spd = n.spd || 1; dutyMin = n.dutyMin || 0; pilotId = n.pilotId; }
+  if (!at) return out;
+  // project the rest of the day
+  const p: any = pilot(pilotId), maxDuty = ((p && p.rules && p.rules.maxDutyHrs) || 10) * 60;
+  let to = n && !f ? n.to : aiNextLeg(pilotId, prev, from);
+  for (let k = 0; k < 12 && at < m1; k++) {
+    if (!to || to === from) break;
+    const blockMin = flightProfile(a.typeId, from, to, at).totalS / 60;
+    let dep = at + AI_TURN_MIN * 60e3 / spd;
+    if (dutyMin + AI_TURN_MIN + blockMin > maxDuty) { dep = at + AI_REST_H * 3600e3 / spd; dutyMin = 0; }
+    if (k === 0 && n && !f) dep = n.depAt;
+    const end = dep + blockMin * 60e3 / spd;
+    if (dep >= m1) break;
+    out.push({ from, to, start: toMin(dep), end: toMin(end) });
+    dutyMin += AI_TURN_MIN + blockMin; at = end;
+    const nx = aiNextLeg(pilotId, from, to); prev = from; from = to; to = nx;
+  }
+  return out;
 }

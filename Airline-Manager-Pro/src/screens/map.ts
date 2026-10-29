@@ -65,6 +65,17 @@ function showFlightOnMap(id: string) {
   if (State.screen === 'map') focus();
   else { go('map'); setTimeout(focus, 320); }
 }
+/** Show an aircraft on the map: follow it if it's flying, otherwise centre on the airport where it stands. */
+function showAircraftOnMap(reg: string) {
+  const f = State.live.filter(x => x.reg === reg)[0];
+  if (f) { showFlightOnMap(f.id); return; }
+  const a = plane(reg); if (!a) return;
+  const ap = apt(a.location); closeAll(); Sound.tick();
+  const focus = () => { if (!_bigMap || !ap) return; _bigMap.selected = null; _bigMap.fit([ap.pos, [ap.pos[0] + 1.5, ap.pos[1] + 0.8], [ap.pos[0] - 1.5, ap.pos[1] - 0.8]], 60, true);
+    toast(`${reg} is ${a.status === 'grounded' || a.status === 'maintenance' ? 'in the hangar' : 'on the ground'} at ${ap.city} (${a.location})`, 'info'); };
+  if (State.screen === 'map') focus(); else { go('map'); setTimeout(focus, 320); }
+}
+ACTIONS['show-aircraft'] = el => showAircraftOnMap(el.getAttribute('data-reg'));
 ACTIONS['show-flight'] = el => { const t = el.closest('.toast'); if (t) t.remove(); showFlightOnMap(el.getAttribute('data-id')); };
 
 /* ---------- Map layers: Classic (default) / Street / Satellite ---------- */

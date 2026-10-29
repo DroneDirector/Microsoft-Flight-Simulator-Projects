@@ -35,18 +35,9 @@ function av3Supported(): boolean {
   return Av3.ok;
 }
 
-function av3Init() {
-  if (Av3.renderer) return;
-  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false, powerPreference: 'low-power' });
-  r.setPixelRatio(1);
-  r.setClearColor(0x000000, 0);
-  r.outputColorSpace = THREE.SRGBColorSpace;
-  r.toneMapping = THREE.ACESFilmicToneMapping;
-  r.toneMappingExposure = 1.12;
-  r.shadowMap.enabled = true;
-  r.shadowMap.type = THREE.PCFSoftShadowMap;
-  r.domElement.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); });
-  Av3.renderer = r;
+/** The studio every figure stands in: sky and floor bounce, a warm key light with soft shadows, a fill,
+ *  two rims, reflections for gold, visors and eyes, and a soft contact shadow. One per renderer. */
+function av3Studio(r: any): { scene: any; stage: any } {
   const scene = new THREE.Scene();
   // studio light: sky and floor bounce, a warm key light with soft shadows, a soft fill and two rims
   scene.add(new THREE.HemisphereLight(0xdfeaff, 0x3a3128, 1.3));
@@ -75,7 +66,24 @@ function av3Init() {
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.42), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sh), transparent: true, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.002; shadow.renderOrder = -1;
   scene.add(shadow);
-  Av3.stage = new THREE.Group(); scene.add(Av3.stage);
+  const stage = new THREE.Group(); scene.add(stage);
+  return { scene, stage };
+}
+
+function av3Init() {
+  if (Av3.renderer) return;
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false, powerPreference: 'low-power' });
+  r.setPixelRatio(1);
+  r.setClearColor(0x000000, 0);
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  r.toneMappingExposure = 1.12;
+  r.shadowMap.enabled = true;
+  r.shadowMap.type = THREE.PCFSoftShadowMap;
+  r.domElement.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); });
+  Av3.renderer = r;
+  const st = av3Studio(r); const scene = st.scene;
+  Av3.stage = st.stage;
   Av3.scene = scene;
   Av3.camera = new THREE.PerspectiveCamera(20, 1, 0.1, 30);
   // find avatars as they appear in the page, and keep sizes in step
@@ -131,7 +139,7 @@ function av3Model(key: string, q?: number): any {
   // keep a few built figures; free the rest
   while (Av3.models.size > 6) {
     const k0 = Av3.models.keys().next().value, old = Av3.models.get(k0);
-    if (Av3.live.some(l => l.model === old)) break;
+    if (Av3.live.some(l => l.model === old) || (typeof Hero !== 'undefined' && Hero.model === old)) break;
     Av3.models.delete(k0); av3Dispose(old.root);
   }
   return m;
@@ -249,6 +257,7 @@ function av3FromDisk(el: HTMLCanvasElement, pk: string) {
 /* ---------- attaching canvases ---------- */
 function av3Attach(el: HTMLCanvasElement, resized?: boolean) {
   const key = el.getAttribute('data-k'); if (!key) return;
+  if (el.classList.contains('hero')) { heroAttach(el); return; }
   if (!(el as any)._bound) {
     (el as any)._bound = true;
     if (Av3.sizes) Av3.sizes.observe(el);
@@ -328,7 +337,7 @@ function av3PickLive() {
   _av3PickAt = now;
   if (!Human.ready || (State && State.settings && State.settings.reduceMotion)) { Av3.live = []; return; }
   const cands: { el: HTMLCanvasElement; area: number }[] = [];
-  document.querySelectorAll('canvas.av3:not(.still)').forEach(c => {
+  document.querySelectorAll('canvas.av3:not(.still):not(.hero)').forEach(c => {
     const el = c as HTMLCanvasElement, r = el.getBoundingClientRect();
     if (!r.width || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return;
     if (r.width * r.height < 9000) return;
@@ -368,4 +377,108 @@ function av3Refresh() {
   if (!Av3.renderer) return;
   document.querySelectorAll('canvas.av3').forEach(c => av3Attach(c as HTMLCanvasElement));
   av3Pump();
+}
+
+
+/* ---------- the hero figure ----------
+   The large figure in the look editor gets a renderer of its own that draws straight into its canvas
+   at the screen's full frame rate (no copying), so it moves completely smoothly. Its camera glides
+   to what you are editing: the whole figure, head and shoulders, a close-up of the face, or the shoes. */
+type HeroCam = 'full' | 'bust' | 'face' | 'feet';
+const Hero = {
+  el: null as HTMLCanvasElement, r: null as any, scene: null as any, stage: null as any, cam: null as any,
+  key: '', model: null as any, mode: 'full' as HeroCam, cur: null as number[], raf: 0, last: 0,
+  t0: 0, yaw: 0, drag: false, lastTouch: 0, blinkAt: 0, blinkT: -9, gaze: [0, 0], gazeAt: 0, fade: 1,
+};
+
+function heroAttach(el: HTMLCanvasElement) {
+  if (Hero.el !== el) {
+    heroRelease();
+    Hero.el = el;
+    try {
+      const r = new THREE.WebGLRenderer({ canvas: el, antialias: true, alpha: true, powerPreference: 'high-performance' });
+      r.setClearColor(0x000000, 0); r.outputColorSpace = THREE.SRGBColorSpace;
+      r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.12;
+      r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+      el.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); });
+      const st = av3Studio(r);
+      Hero.r = r; Hero.scene = st.scene; Hero.stage = st.stage; Hero.cam = new THREE.PerspectiveCamera(20, 1, 0.05, 30);
+    } catch (e) { el.classList.remove('hero'); Hero.el = null; av3Attach(el); return; }
+    el.addEventListener('pointerdown', ev => heroGrab(ev));
+    const sec = performance.now() / 1000;
+    Object.assign(Hero, { key: '', model: null, cur: null, t0: sec - Math.random() * 6, yaw: 0, drag: false, lastTouch: 0, blinkAt: sec + 1.2, blinkT: -9, gaze: [0, 0], gazeAt: sec + 1 });
+  }
+  heroSetMode((el.getAttribute('data-cam') as HeroCam) || Hero.mode);
+  if (!Hero.raf) Hero.raf = requestAnimationFrame(heroTick);
+}
+
+function heroRelease() {
+  if (Hero.raf) cancelAnimationFrame(Hero.raf); Hero.raf = 0;
+  if (Hero.model && Hero.stage) Hero.stage.remove(Hero.model.root);
+  if (Hero.r) { try { Hero.r.dispose(); Hero.r.forceContextLoss(); } catch (e) { /* already gone */ } }
+  Object.assign(Hero, { el: null, r: null, scene: null, stage: null, cam: null, model: null, key: '' });
+}
+
+/** Change what the camera looks at; it glides there. */
+function heroSetMode(m: HeroCam) { Hero.mode = m; if (Hero.el) Hero.el.setAttribute('data-cam', m); }
+
+/** Switch the hero canvas to another look without replacing it (the camera and motion carry on). */
+function heroSetKey(el: HTMLCanvasElement, key: string) { el.setAttribute('data-k', key); if (Hero.el === el) Hero.key = ''; }
+
+/** Camera target [height looked at, distance] for a framing. */
+function heroTarget(model: any, mode: HeroCam, aspect: number): number[] {
+  const half = Math.tan(20 * Math.PI / 360);
+  let y0: number, y1: number, width: number;
+  if (mode === 'face') { y0 = model.headY - 0.16; y1 = Math.min(model.top + 0.015, model.headY + 0.17); width = 0.34; }
+  else if (mode === 'bust') { y0 = model.bustBottom; y1 = model.top + 0.02; width = 0.56; }
+  else if (mode === 'feet') { y0 = -0.03; y1 = 0.4; width = 0.5; }
+  else { y0 = -0.01; y1 = model.top + 0.03; width = model.width + 0.06; }
+  const dist = Math.max((y1 - y0) / 2 / half, width / 2 / (half * aspect));
+  const viewH = dist * half * 2, cy = mode === 'full' ? y0 + viewH / 2 : (y0 + y1) / 2;
+  return [cy, dist];
+}
+
+function heroTick(now: number) {
+  Hero.raf = 0;
+  const el = Hero.el;
+  if (!el || !el.isConnected || !Hero.r) { heroRelease(); return; }
+  Hero.raf = requestAnimationFrame(heroTick);
+  if (document.hidden || !Human.ready) return;
+  const sec = now / 1000, dt = Math.min(0.1, Hero.last ? sec - Hero.last : 0.016); Hero.last = sec;
+  // the look changed: build the new figure (the old one stays on screen until it's ready)
+  const key = el.getAttribute('data-k');
+  if (key !== Hero.key) {
+    const m = av3Model(key, 1);
+    if (m) { if (Hero.model) Hero.stage.remove(Hero.model.root); Hero.model = m; Hero.key = key; Hero.stage.add(m.root); el.classList.add('in'); }
+  }
+  const model = Hero.model; if (!model) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = Math.round(el.clientWidth * dpr), h = Math.round(el.clientHeight * dpr);
+  if (!w || !h) return;
+  if (el.width !== w || el.height !== h) Hero.r.setSize(w, h, false);
+  // idle motion
+  if (sec > Hero.blinkAt) { Hero.blinkT = sec; Hero.blinkAt = sec + 2.4 + Math.random() * 3.6; }
+  const bt = (sec - Hero.blinkT) / 0.16, blink = bt >= 0 && bt <= 1 ? Math.sin(bt * Math.PI) : 0;
+  if (sec > Hero.gazeAt) { Hero.gaze = [(Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.15]; Hero.gazeAt = sec + 1.2 + Math.random() * 2.5; }
+  if (!Hero.drag && sec - Hero.lastTouch > 3) Hero.yaw *= Math.exp(-dt * 3.5);
+  const calm = State && State.settings && State.settings.reduceMotion;
+  model.pose({ t: calm ? 0 : sec - Hero.t0, yaw: Hero.yaw, blink: calm ? 0 : blink, gaze: calm ? [0, 0] : Hero.gaze });
+  // camera glides to its framing (critically damped, frame-rate independent)
+  const tgt = heroTarget(model, Hero.mode, w / h);
+  if (!Hero.cur) Hero.cur = tgt.slice();
+  const k = 1 - Math.exp(-dt * 5.5);
+  Hero.cur[0] += (tgt[0] - Hero.cur[0]) * k; Hero.cur[1] += (tgt[1] - Hero.cur[1]) * k;
+  const cam = Hero.cam, close = Hero.cur[1] < 2.2;
+  cam.aspect = w / h; cam.position.set(0, Hero.cur[0] + (close ? 0.01 : 0.1), Hero.cur[1]); cam.lookAt(0, Hero.cur[0], 0); cam.updateProjectionMatrix();
+  Hero.r.render(Hero.scene, cam);
+}
+
+function heroGrab(ev: PointerEvent) {
+  const el = Hero.el; if (!el) return;
+  ev.stopPropagation();
+  const x0 = ev.clientX, yaw0 = Hero.yaw;
+  Hero.drag = true; Hero.lastTouch = performance.now() / 1000;
+  try { el.setPointerCapture(ev.pointerId); } catch (e) { /* older WebView */ }
+  const move = (e: PointerEvent) => { Hero.yaw = yaw0 + (e.clientX - x0) / 90; Hero.lastTouch = performance.now() / 1000; };
+  const up = () => { Hero.drag = false; Hero.lastTouch = performance.now() / 1000; el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); };
+  el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 }

@@ -8,7 +8,7 @@ const SAVE_VERSION = 1;
 const SAVED_KEYS = ['companyId', 'divisionId', 'myReg', 'settings', 'profiles', 'companies', 'pilots', 'candidates',
   'fleet', 'live', 'today', 'routes', 'logbook', 'issues', 'notices', 'txns', 'fines',
   'staff', 'staffCandidates', 'incidents', 'coPilot', 'birthdayGreeted', 'simDate', 'myLoad', 'salaryV2',
-  'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown', 'aiNext'];
+  'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown', 'aiNext', 'aiDay', 'cases', 'screen', 'badges', 'progress', 'popLog', 'ratingDay'];
 
 // Changes between save versions go here, e.g. MIGRATIONS[2] = data => { ...; return data; }
 const MIGRATIONS: { [v: number]: (d: any) => any } = {};
@@ -16,12 +16,13 @@ const MIGRATIONS: { [v: number]: (d: any) => any } = {};
 const Store = {
   _timer: 0 as any,
   _defaults: null as any,
+  wasEmpty: false,   // nothing was saved on this phone when the app started
 
   load() {
     this._defaults = JSON.parse(JSON.stringify(State.settings));
     let raw: string = null;
     try { raw = localStorage.getItem(STORE_KEY); } catch (e) { return; }
-    if (!raw) return;
+    if (!raw) { this.wasEmpty = true; return; }
     let data: any;
     try { data = JSON.parse(raw); } catch (e) { this.backupBroken(raw); return; }
     if (!data || typeof data !== 'object' || !data.state) return;
@@ -44,6 +45,7 @@ const Store = {
     // and a second copy in the app's own files on the phone
     // (at most every few seconds, and straight away when the app goes to the background)
     this._native = json;
+    if (typeof Backup !== 'undefined') Backup.afterSave(json, document.hidden);
     if (document.hidden) this.flushNative();
     else if (!this._nativeTimer) this._nativeTimer = setTimeout(() => this.flushNative(), 5000);
   },

@@ -10,6 +10,11 @@ import android.content.IntentFilter;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
+import android.content.ContentResolver;
+import android.content.SharedPreferences;
+import android.content.UriPermission;
+import android.database.Cursor;
+import android.provider.DocumentsContract;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -21,6 +26,8 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.ActivityCallback;
+import androidx.activity.result.ActivityResult;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -140,6 +147,145 @@ public class AppToolsPlugin extends Plugin {
             } catch (Exception e) { r.put("data", ""); }
         }
         call.resolve(r);
+    }
+
+    /* ---------- Backup folder and backup files ----------
+       The airline is copied to a folder the user picks (for example Documents, or a Google Drive folder),
+       outside the app's own storage, so it survives clearing the app's data, uninstalling and moving to
+       a new phone. After a reinstall the user picks the same folder again and everything comes back. */
+
+    static final String BACKUP_NAME = "AirlineManagerPro-backup.json";
+    private SharedPreferences prefs() { return getContext().getSharedPreferences("amp-backup", Context.MODE_PRIVATE); }
+
+    private Uri backupTree() {
+        String u = prefs().getString("tree", null);
+        if (u == null) return null;
+        Uri tree = Uri.parse(u);
+        for (UriPermission p : getContext().getContentResolver().getPersistedUriPermissions())
+            if (p.getUri().equals(tree) && p.isWritePermission()) return tree;
+        return null;
+    }
+
+    private String displayName(Uri doc) {
+        try (Cursor c = getContext().getContentResolver().query(doc, new String[] { DocumentsContract.Document.COLUMN_DISPLAY_NAME }, null, null, null)) {
+            if (c != null && c.moveToFirst()) return c.getString(0);
+        } catch (Exception e) { /* unknown */ }
+        return "";
+    }
+
+    /** The backup file inside the picked folder, created if asked. Returns null when it isn't there. */
+    private Uri backupFile(Uri tree, boolean create) throws Exception {
+        ContentResolver cr = getContext().getContentResolver();
+        String parentId = DocumentsContract.getTreeDocumentId(tree);
+        Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId);
+        try (Cursor c = cr.query(children, new String[] { DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME }, null, null, null)) {
+            while (c != null && c.moveToNext()) if (BACKUP_NAME.equals(c.getString(1))) return DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0));
+        }
+        if (!create) return null;
+        return DocumentsContract.createDocument(cr, DocumentsContract.buildDocumentUriUsingTree(tree, parentId), "application/json", BACKUP_NAME);
+    }
+
+    private void writeText(Uri doc, String text) throws Exception {
+        try (OutputStream out = getContext().getContentResolver().openOutputStream(doc, "wt")) {
+            if (out == null) throw new Exception("The file couldn't be opened for writing");
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+    private String readText(Uri doc) throws Exception {
+        try (InputStream in = getContext().getContentResolver().openInputStream(doc)) {
+            if (in == null) throw new Exception("The file couldn't be opened");
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[64 * 1024]; int n;
+            while ((n = in.read(b)) > 0) buf.write(b, 0, n);
+            return new String(buf.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+
+    @PluginMethod
+    public void backupFolderInfo(PluginCall call) {
+        JSObject r = new JSObject(); Uri tree = backupTree();
+        r.put("set", tree != null);
+        if (tree != null) r.put("name", displayName(DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))));
+        r.put("lastWrite", prefs().getLong("lastWrite", 0));
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void backupFolderPick(PluginCall call) {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        startActivityForResult(call, i, "folderPicked");
+    }
+
+    @ActivityCallback
+    private void folderPicked(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        Intent d = result.getData();
+        if (d == null || d.getData() == null) { JSObject r = new JSObject(); r.put("set", false); call.resolve(r); return; }
+        Uri tree = d.getData();
+        try {
+            getContext().getContentResolver().takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            prefs().edit().putString("tree", tree.toString()).apply();
+            JSObject r = new JSObject();
+            r.put("set", true);
+            r.put("name", displayName(DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))));
+            Uri f = backupFile(tree, false);
+            r.put("hasBackup", f != null);
+            call.resolve(r);
+        } catch (Exception e) { call.reject("The folder couldn't be used: " + describe(e)); }
+    }
+
+    @PluginMethod
+    public void backupFolderWrite(PluginCall call) {
+        Uri tree = backupTree();
+        if (tree == null) { call.reject("No backup folder chosen"); return; }
+        try {
+            writeText(backupFile(tree, true), call.getString("data", ""));
+            prefs().edit().putLong("lastWrite", System.currentTimeMillis()).apply();
+            call.resolve();
+        } catch (Exception e) { call.reject("The backup couldn't be written: " + describe(e)); }
+    }
+
+    @PluginMethod
+    public void backupFolderRead(PluginCall call) {
+        Uri tree = backupTree(); JSObject r = new JSObject();
+        if (tree == null) { r.put("data", ""); call.resolve(r); return; }
+        try { Uri f = backupFile(tree, false); r.put("data", f == null ? "" : readText(f)); call.resolve(r); }
+        catch (Exception e) { call.reject("The backup couldn't be read: " + describe(e)); }
+    }
+
+    @PluginMethod
+    public void backupExport(PluginCall call) {
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("application/json");
+        i.putExtra(Intent.EXTRA_TITLE, call.getString("name", BACKUP_NAME));
+        startActivityForResult(call, i, "exportPicked");
+    }
+
+    @ActivityCallback
+    private void exportPicked(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        Intent d = result.getData();
+        if (d == null || d.getData() == null) { JSObject r = new JSObject(); r.put("saved", false); call.resolve(r); return; }
+        try { writeText(d.getData(), call.getString("data", "")); JSObject r = new JSObject(); r.put("saved", true); call.resolve(r); }
+        catch (Exception e) { call.reject("The backup file couldn't be saved: " + describe(e)); }
+    }
+
+    @PluginMethod
+    public void backupImport(PluginCall call) {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[] { "application/json", "text/plain", "application/octet-stream" });
+        startActivityForResult(call, i, "importPicked");
+    }
+
+    @ActivityCallback
+    private void importPicked(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        Intent d = result.getData(); JSObject r = new JSObject();
+        if (d == null || d.getData() == null) { r.put("data", ""); call.resolve(r); return; }
+        try { r.put("data", readText(d.getData())); call.resolve(r); }
+        catch (Exception e) { call.reject("The backup file couldn't be read: " + describe(e)); }
     }
 
     /* ---------- Updates ---------- */

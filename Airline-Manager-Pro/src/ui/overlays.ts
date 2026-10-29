@@ -155,6 +155,8 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref) crashPopup(n.ref);
   else if (n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref)) showFlightOnMap(n.ref);
+  else if (n.kind === 'staff' && n.ref === 'badges') { closeAll(); go('ranking'); }
+  else if (n.kind === 'staff' && n.ref && /^case-/.test(n.ref)) courtPopup(n.ref);
   else if (n.kind === 'staff' && n.ref) incidentPopup(n.ref);
   else if (n.kind === 'birthday') ACTIONS['bday-preview'](null, null);
   else openLayer('modal', `<div class="modal-head"><h2>${esc(n.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div><div class="modal-body"><p class="lede">${esc(n.body)}</p></div>`, { cls: 'narrow' });

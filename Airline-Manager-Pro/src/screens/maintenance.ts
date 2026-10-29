@@ -1,4 +1,34 @@
 // Maintenance: aircraft condition and every open damage report from the mechanic.
+
+/** The hangar: a drawn building with each aircraft that's in for work standing inside, or empty. */
+function hangarSvg(): string {
+  return `<svg class="hg-bg" viewBox="0 0 420 170" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    <defs>
+      <linearGradient id="hgIn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0E2036"/><stop offset="1" stop-color="#162C46"/></linearGradient>
+      <linearGradient id="hgFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B3150"/><stop offset="1" stop-color="#0C1A2C"/></linearGradient>
+      <radialGradient id="hgLamp" cx="0.5" cy="0" r="1"><stop offset="0" stop-color="#FFF4D6" stop-opacity=".5"/><stop offset="1" stop-color="#FFF4D6" stop-opacity="0"/></radialGradient>
+    </defs>
+    <path d="M14 162 V58 Q210 -6 406 58 V162 Z" fill="#0A1626" stroke="#2A4466" stroke-width="2"/>
+    <path d="M40 162 V66 Q210 14 380 66 V162 Z" fill="url(#hgIn)"/>
+    ${[90, 150, 210, 270, 330].map(x => `<path d="M${x} ${x === 210 ? 30 : x === 150 || x === 270 ? 36 : 50} v10" stroke="#3A5878" stroke-width="2"/><ellipse cx="${x}" cy="${x === 210 ? 42 : x === 150 || x === 270 ? 48 : 62}" rx="9" ry="2.6" fill="#FFF1C9"/><path d="M${x - 9} ${x === 210 ? 43 : x === 150 || x === 270 ? 49 : 63} L${x - 46} 162 H${x + 46} L${x + 9} ${x === 210 ? 43 : x === 150 || x === 270 ? 49 : 63} Z" fill="url(#hgLamp)" opacity=".55"/>`).join('')}
+    ${[0, 1, 2, 3, 4, 5].map(k => `<path d="M${52 + k * 56} 66 L${210 + (k - 2.5) * 30} 22" stroke="#22405F" stroke-width="1.2" opacity=".7"/>`).join('')}
+    <path d="M40 140 H380 V162 H40 Z" fill="url(#hgFloor)"/>
+    <path d="M110 152 H310" stroke="#F2C14E" stroke-width="2" stroke-dasharray="10 8" opacity=".7"/>
+    <rect x="14" y="66" width="26" height="96" fill="#132741" stroke="#2A4466"/><rect x="380" y="66" width="26" height="96" fill="#132741" stroke="#2A4466"/>
+    ${[0, 1, 2, 3].map(k => `<path d="M14 ${80 + k * 22} H40 M380 ${80 + k * 22} H406" stroke="#22405F"/>`).join('')}
+    <path d="M6 162 H414" stroke="#2A4466" stroke-width="3"/>
+  </svg>`;
+}
+function hangarHtml(jobs: Issue[]): string {
+  if (!jobs.length) return `<div class="hangar empty">${hangarSvg()}<span class="hg-msg">${icon('check')}The hangar is empty. Scheduled repairs show up here.</span></div>`;
+  return jobs.map(i => {
+    const a = plane(i.reg), c = company(a.companyId);
+    return `<button class="hangar" data-act="ac-detail" data-reg="${esc(i.reg)}">${hangarSvg()}
+      <span class="hg-plane">${aircraftArt(a.typeId, { color: c.color, color2: c.color2, reg: a.reg, ground: true })}</span>
+      <span class="hg-tag">${statusChip('scheduled')}<b>${esc(i.reg)}</b><span>${esc(i.title)}</span><small>${i.days} day${i.days === 1 ? '' : 's'}</small></span>
+    </button>`;
+  }).join('');
+}
 SCREENS.maint = {
   title: 'Maintenance', icon: 'wrench',
   render() {
@@ -23,10 +53,11 @@ SCREENS.maint = {
             <div class="ic-foot"><span><b>${money(i.cost)}</b><small>${i.days ? i.days + ' day' + (i.days > 1 ? 's' : '') + ' in the hangar' : 'Overnight job'}</small></span>
               <button class="btn ghost sm" data-act="open-issue" data-id="${i.id}">${icon('volume')}Mechanic</button>
               <button class="btn ghost sm" data-act="fix-later" data-id="${i.id}">Later</button>
-              <button class="btn danger sm" data-act="fix-now" data-id="${i.id}">Pay and fix now</button></div>
+              <button class="btn primary sm" data-act="fix-now" data-id="${i.id}">Pay and fix now</button></div>
           </div>`;
         }).join('') || emptyState('No open reports', 'Damage the simulator detects after a flight shows up here.')}
-        ${sched.length ? `<h3>In the hangar</h3>${sched.map(i => `<div class="mini-row">${statusChip('scheduled')}<b>${esc(i.reg)}</b><span>${esc(i.title)}</span><small>${i.days} d</small></div>`).join('')}` : ''}
+        <h3>In the hangar</h3>
+        ${hangarHtml(sched)}
       </div>
       <div class="maint-cond card">
         <div class="card-h"><b>Fleet condition</b></div>

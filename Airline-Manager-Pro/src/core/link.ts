@@ -5,6 +5,13 @@
 
 const LINK_PORT = 47610;
 
+/** Weather at your aircraft, as Flight Simulator has it. */
+interface SimWeather {
+  windDir: number; windKt: number; visM: number; tempC: number; qnhHpa: number;
+  precip: 'none' | 'rain' | 'snow'; precipMm: number; inCloud: boolean;
+  turb: 'none' | 'light' | 'moderate' | 'severe';
+}
+
 interface SimSnapshot {
   t: number; connected: boolean; sim: string; inFlight: boolean; paused: boolean; title: string; atcId: string; atcModel: string; atcType: string;
   lat: number; lon: number; altFt: number; aglFt: number; hdg: number; ias: number; gs: number; vsFpm: number; g: number; pitch: number;
@@ -12,6 +19,7 @@ interface SimSnapshot {
   fuelKg: number; emptyKg: number; totalKg: number; mtowKg: number; stations: { name: string; kg: number }[];
   gsx: { running: boolean; boardingState: number; paxBoarded: number; paxTotal: number; cargoPct: number };
   approachAirport: string; phase: string; from: string;
+  wx?: SimWeather;              // weather at the aircraft from the simulator (PC app 0.5.1 and later)
 }
 interface FlightEvent {
   type: string; t: number; lat: number; lon: number; airport?: string; fpm?: number; g?: number; pitch?: number; bounces?: number;

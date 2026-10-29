@@ -4,7 +4,7 @@ interface AppScreen { title: string; icon: string; render: () => string; mount?:
 const SCREENS: { [k: string]: AppScreen } = {};
 const ACTIONS: { [k: string]: (el: HTMLElement, ev: Event) => void } = {};
 
-const NAV_ORDER = ['ops', 'fleet', 'routes', 'schedule', 'maint', 'finance', 'logbook', 'pilots'];
+const NAV_ORDER = ['ops', 'fleet', 'routes', 'schedule', 'maint', 'finance', 'logbook', 'pilots', 'ranking'];
 // Pages opened from inside other pages, shown under their parent in the rail
 const SUB_PAGES: { [k: string]: string } = { map: 'ops', market: 'fleet' };
 

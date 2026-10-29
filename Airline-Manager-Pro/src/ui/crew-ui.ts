@@ -101,15 +101,23 @@ const MISCONDUCT_P: { [k: string]: number } = { never: 0, rare: 0.02, normal: 0.
 function maybeIncident() {
   const S: any = State;
   const cid = State.companyId;
-  const roles: CrewRole[] = ['fa', 'mech', 'fo'];
+  // the AI crew only: hired pilots, co-pilots, flight attendants and mechanics (never you)
+  const roles: string[] = ['fa', 'mech', 'fo', 'pilot'];
+  const me = myPilot();
   for (const r of roles) {
-    const p = MISCONDUCT_P[S.settings.misconduct[r]] || 0;
+    const p = MISCONDUCT_P[S.settings.misconduct[r === 'pilot' ? 'fo' : r]] || 0;
     if (Math.random() >= p) continue;
-    const pool = r === 'fo' ? State.pilots.filter((x: any) => x.coPilotFor === cid) : staffOf(cid, r);
+    const pool = (r === 'fo' ? State.pilots.filter((x: any) => x.coPilotFor === cid)
+      : r === 'pilot' ? State.pilots.filter((x: any) => x.companyId === cid && !x.coPilotFor && x !== me && x.id !== 'you' && x.status !== 'off')
+      : staffOf(cid, r as CrewRole)).filter((x: any) => !x.suspended);
     if (!pool.length) continue;
     const who: any = pool[Math.floor(Math.random() * pool.length)];
-    const t = INCIDENTS[r][Math.floor(Math.random() * INCIDENTS[r].length)];
-    const inc: Incident = { id: uid(), staffId: who.id, title: t[0], text: t[1].replace('{n}', who.name).replace('{b}', who.base), date: '2026-10-28', status: 'open' };
+    // well-rated staff behave: the chance falls as their rating rises
+    if (Math.random() > conductFactor(who.rating)) continue;
+    // very rarely it's a crime: police, the aviation authority and a court case
+    if (maybeCriminal(who, r)) return;
+    const t = INCIDENTS[r === 'pilot' ? 'fo' : r][Math.floor(Math.random() * INCIDENTS[r === 'pilot' ? 'fo' : r].length)];
+    const inc: Incident = { id: uid(), staffId: who.id, title: t[0], text: t[1].replace('{n}', who.name).replace('{b}', who.base), date: dateStr(new Date()).slice(0, 10), status: 'open' };
     S.incidents.unshift(inc);
     State.notices.unshift({ id: 'n-' + inc.id, kind: 'staff' as any, title: `Conduct report: ${who.name}`, body: `${t[0]}. Discipline or dismiss.`, time: 'Now', read: false, ref: inc.id });
     renderTopbar(); Sound.chime(); Store.soon();
@@ -142,7 +150,7 @@ function incidentPopup(id: string) {
 }
 ACTIONS.discipline = el => {
   const inc = (State as any).incidents.filter((x: Incident) => x.id === el.getAttribute('data-id'))[0]; if (!inc) return;
-  const p = staffById(inc.staffId); if (p) p.warnings = (p.warnings || 0) + 1;
+  const p = staffById(inc.staffId); if (p) { p.warnings = (p.warnings || 0) + 1; p.rating = clamp(Math.round(((p.rating || 3.5) - 0.3) * 100) / 100, 1, 5); }
   inc.status = 'disciplined';
   State.notices = State.notices.filter(n => n.ref !== inc.id);
   closeAll(); Sound.tick(); Store.save(); refresh();

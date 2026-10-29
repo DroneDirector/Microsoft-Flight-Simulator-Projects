@@ -71,6 +71,7 @@ const BURN_KG_H: { [cls: string]: number } = { ga: 30, bush: 120, turboprop: 650
 
 function onSimState(s: SimSnapshot) {
   Link.sim = s;
+  try { paxOnState(s); } catch (e) { /* never stop the feed */ }
   const b: any = State.bridge, S: any = State;
   if (!s || !s.connected) {
     b.sim = s ? 'Flight Simulator not running' : b.sim;
@@ -121,6 +122,7 @@ function onSimState(s: SimSnapshot) {
     const to = plannedTo(f.from, s.approachAirport);
     f.to = to || f.from; f.noDest = !to;
     f.pos = [s.lon, s.lat]; f.hdg = s.hdg; f.alt = Math.round(s.altFt); f.gs = s.gs;
+    if (s.wx) (f as any).wx = s.wx;   // the sim's own weather; the demo flight has made-up weather instead
     f.phase = PHASE_NAMES[s.phase] || s.phase;
     f.pax = S.myLoad.pax; f.paxMax = acType(a.typeId).seats;
     if (!f.noDest) {
@@ -202,8 +204,16 @@ function onSimEvent(e: FlightEvent) {
   switch (e.type) {
     case 'blocks-off': {
       _legNotes = []; LEG_ISSUES.length = 0;
-      const leg = State.today.filter(l => l.from === e.airport && (l.status === 'next' || l.status === 'planned'))[0];
-      if (leg) { State.today.forEach(l => { if (l.status === 'active') l.status = 'done'; }); leg.status = 'active'; }
+      // the schedule follows what you actually fly: the planned leg from here becomes active with the real
+      // off-blocks time, and a leg that wasn't planned is added to today's schedule
+      const hhmm = dateStr(new Date()).slice(11);
+      State.today.forEach(l => { if (l.status === 'active') l.status = 'done'; });
+      let leg = State.today.filter(l => l.from === e.airport && (l.status === 'next' || l.status === 'planned'))[0];
+      if (!leg && e.airport) {
+        leg = { from: e.airport, to: plannedTo(e.airport, '') || '', dep: hhmm, reg: a ? a.reg : '', status: 'active' } as any;
+        State.today.push(leg); State.today.sort((x, y) => x.dep < y.dep ? -1 : x.dep > y.dep ? 1 : 0);
+      }
+      if (leg) { leg.status = 'active'; (leg as any).dep = hhmm; (leg as any).actual = true; }
       toast(`Blocks off${e.airport ? ' at ' + e.airport : ''}`, 'info');
       break;
     }
@@ -233,7 +243,7 @@ function onSimEvent(e: FlightEvent) {
       else ACTIONS['crash-decide']({ getAttribute: (k: string) => k === 'data-id' ? l.id : 'registered' } as any, null);
       break;
     }
-    case 'blocks-on': finishLeg(e); break;
+    case 'blocks-on': finishLeg(e); try { paxOnBlocksOn(e.airport || (e.summary && e.summary.to) || ''); } catch (er) { /* ignore */ } break;
   }
   Store.soon();
 }
@@ -248,7 +258,7 @@ function finishLeg(e: FlightEvent) {
   const hard = sm.landingFpm >= 600 || sm.landingG >= 1.8;
   const grounded = LEG_ISSUES.map(id => State.issues.filter(i => i.id === id)[0]).some(i => i && i.severity === 'grounding');
   State.logbook.unshift({ id: uid(), date: dateStr(new Date()), from, to, reg: a.reg, blockMin: sm.blockMin, landingFpm: -sm.landingFpm, g: sm.landingG, pax: sm.pax,
-    result: grounded ? 'incident' : hard ? 'hard' : 'ok', atc: State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'Built-in', notes: _legNotes.join(', ') || undefined } as any);
+    typeId: a.typeId, result: grounded ? 'incident' : hard ? 'hard' : 'ok', atc: State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'Built-in', notes: _legNotes.join(', ') || undefined } as any);
   me.hoursMin += sm.blockMin; me.landings += 1;
   a.hoursMin += sm.blockMin; a.cycles += 1; a.location = to; a.status = grounded ? 'grounded' : 'parked';
   // money
@@ -266,10 +276,11 @@ function finishLeg(e: FlightEvent) {
   const before = c.balance;
   c.balance += rev - fuel - fees;
   // today's legs
-  State.today.forEach(l => { if (l.status === 'active' && l.to === to) l.status = 'done'; });
+  State.today.forEach(l => { if (l.status === 'active') { if (l.to !== to) (l as any).planned = l.to; l.to = to; l.status = 'done'; (l as any).arr = time; (l as any).blockMin = sm.blockMin; } });
   const nxt = State.today.filter(l => l.status === 'planned')[0]; if (nxt && !State.today.some(l => l.status === 'next')) nxt.status = 'next';
   State.notices.unshift({ id: uid(), kind: 'flight', title: `Landed at ${to}: ${sm.landingFpm} fpm`, body: `${from} to ${to}, ${hours(sm.blockMin)} block, ${num(sm.distanceNm)} nm, ${sm.pax} passengers. ${money(rev - fuel - fees, { sign: true })}.`, time: time, read: false });
   removeMyLiveFlight();
+  try { Progress.afterMyLeg(sm.landingFpm, grounded ? 'incident' : hard ? 'hard' : 'ok'); } catch (er) { /* ignore */ }
   Store.save(); refresh(); animateBalance(before, c.balance);
   toast(`Flight logged: ${from} to ${to}, ${money(rev - fuel - fees, { sign: true })}`, 'ok');
   // the mechanic gets back to you about anything found on this leg

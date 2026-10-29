@@ -9,6 +9,18 @@ function coPilotChip(): string {
   return `<button class="sync-item cp" data-act="staff-detail" data-id="${co.id}"><span class="cp-av">${avatarSvg(co.look, 'fo', { view: 'bust', accent: company().color })}</span><span><small>Co-pilot</small><b>${esc(co.name)}</b></span></button>`;
 }
 
+/** Weather where you are flying: from Flight Simulator when linked, made-up demo weather otherwise. */
+function weatherChip(f: LiveFlight): string {
+  const w: SimWeather = (f as any).wx || (f.real ? null : { windDir: 260, windKt: 64, visM: 10000, tempC: -52, qnhHpa: 1009, precip: 'none', precipMm: 0, inCloud: false, turb: 'light' });
+  if (!w) return '';
+  const vis = w.visM >= 9999 ? '10 km+' : w.visM >= 1000 ? (w.visM / 1000).toFixed(w.visM < 5000 ? 1 : 0) + ' km' : Math.round(w.visM / 50) * 50 + ' m';
+  const sky = w.precip === 'snow' ? 'Snow' : w.precip === 'rain' ? (w.precipMm > 4 ? 'Heavy rain' : 'Rain') : w.inCloud ? 'In cloud' : w.visM < 5000 ? 'Mist' : 'Clear';
+  const turb = { none: 'Smooth', light: 'Light turbulence', moderate: 'Moderate turbulence', severe: 'Severe turbulence' }[w.turb] || 'Smooth';
+  const bad = w.turb === 'severe' || w.turb === 'moderate';
+  return `<div class="sync-item wx ${bad ? 'warn' : ''}">${icon('wind')}<span><small>${f.real ? 'Weather in the sim' : 'Weather (demo)'}</small>
+    <b>${String(Math.round(w.windDir)).padStart(3, '0')}° ${w.windKt} kt, ${vis}, ${w.tempC}°C</b><small>${sky}, ${turb}, QNH ${w.qnhHpa}</small></span></div>`;
+}
+
 function flightCard(f: LiveFlight): string {
   const a = plane(f.reg), t = acType(a.typeId), A = apt(f.from), B = apt(f.to);
   const dist = gcDistanceNm(A.pos, B.pos);
@@ -39,6 +51,7 @@ function flightCard(f: LiveFlight): string {
       <button class="sync-item" data-act="weights">${icon('fuel')}<span><small>Fuel on board</small><b>${num((State as any).myLoad.fuelKg)} kg</b></span><i class="si-ok ${fuelOk ? '' : 'bad'}">${icon(fuelOk ? 'check' : 'alert')}</i></button>
       <div class="sync-item">${icon('radio')}<span><small>ATC, ${State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'built-in'}</small>
         <span class="clr">${f.real ? '<i>Taxi</i><i>Takeoff</i><i>Landing</i>' : '<i class="ok">Taxi</i><i class="ok">Takeoff</i><i>Landing</i>'}</span></span></div>
+      ${weatherChip(f)}
       ${coPilotChip()}
     </div>` : `<div class="fc-sync"><div class="sync-item">${icon('user')}<span><small>Flown by</small><b>${esc(pilot(f.pilotId).name)}</b></span></div>
       <div class="sync-item">${icon('pax')}<span><small>On board</small><b>${f.pax} passengers</b></span></div></div>`}

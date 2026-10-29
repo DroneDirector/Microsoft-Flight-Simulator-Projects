@@ -78,6 +78,20 @@ const SETTINGS: SetSection[] = [
     }).join('') + `<div class="btn-row"><button class="btn ghost" data-act="new-company">${icon('plus')}New company</button><button class="btn ghost" data-act="new-division">${icon('plus')}New division</button></div>
       <div class="danger-zone"><span><b>Saved on this device</b><small>Your companies are saved automatically and kept when the app updates.</small></span><button class="btn ghost sm danger-txt" data-act="reset-ask">${icon('trash')}Delete everything</button></div>` },
   ] },
+  { id: 'backup', title: 'Backup and restore', icon: 'shield', items: [
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}Everything is saved on this phone the moment it changes: settings, looks, staff, fleet, money, flight logs and the link to your PC. When you open the app again it is exactly as you left it, also after updates.</p>` },
+    { type: 'html', html: () => {
+      const f = Backup.folder, native = !!Backup.tools();
+      if (!native) return `<div class="set-card"><span class="pc-ic">${icon('shield')}</span><span><b>Backups</b><small>Save a backup file and open it again on any device.</small></span></div>`;
+      const last = f && f.lastWrite ? 'last saved ' + dateStr(new Date(f.lastWrite)) : 'no backup written yet';
+      return `<div class="set-card ${f && f.set ? 'ok' : ''}"><span class="pc-ic">${icon('shield')}</span><span><b>${f && f.set ? 'Automatic backups are on' : 'Choose a backup folder'}</b>
+        <small>${f && f.set ? `To ${esc(f.name || 'your folder')}, ${esc(last)}. Clearing the app's data or reinstalling doesn't touch it.` : 'Pick a folder outside the app (Documents, an SD card or a Google Drive folder). The airline is copied there automatically, and after a reinstall or on a new phone you pick it again to get everything back.'}</small></span>
+        <button class="btn ${f && f.set ? 'ghost' : 'primary'} sm" data-act="backup-folder">${f && f.set ? 'Change' : 'Choose folder'}</button></div>`
+        + (f && f.set ? `<div class="btn-row"><button class="btn ghost sm" data-act="backup-now">${icon('check')}Back up now</button></div>` : '');
+    } },
+    { type: 'html', html: () => `<div class="btn-row"><button class="btn ghost sm" data-act="backup-export">${icon('download')}Save a backup file</button><button class="btn ghost sm" data-act="backup-import">${icon('sync')}Restore from a backup</button></div>` },
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}Android's own backup (Settings → Google → Backup on the phone) also carries the app's data to a new phone.</p>` },
+  ] },
   { id: 'support', title: 'Updates and errors', icon: 'download', items: [
     { type: 'html', html: () => {
       const u = Updater, busy = u.state === 'checking' || u.state === 'downloading' || u.state === 'installing';

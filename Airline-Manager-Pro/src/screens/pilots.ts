@@ -69,6 +69,8 @@ SCREENS.pilots = {
         <h1>${esc(me.name)}</h1>
         <p class="sub">${esc(me.rank)}, ${natLabel(me.nat)}, ${ageOf(me.dob)}, based at ${esc(apt(me.base).name)}</p>
         <div class="ph-types">${me.types.map((t: string) => `<span class="dev-tag">${esc(acType(t).model)}</span>`).join('')}</div>
+        ${(() => { const st = Progress.compute(), r = Progress.rankOf(Progress.pilotXp(st), PILOT_RANKS), n = Object.keys((State as any).badges || {}).length;
+          return `<button class="ph-rank" data-act="go-ranking">${icon('trophy')}<span><b>${esc(r.name)}</b><small>Rating ${(me.rating || 4).toFixed(1)} · ${n} badges · popularity ${Math.round(c.reputation || 0)}</small></span>${icon('chevron')}</button>`; })()}
       </div>
       <div class="ph-stats">
         <div><small>Flight hours</small><b>${hours(me.hoursMin)}</b></div>
