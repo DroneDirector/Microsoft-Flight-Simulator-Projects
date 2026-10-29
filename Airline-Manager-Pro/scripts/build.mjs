@@ -3,7 +3,7 @@
 //  2. Compiles all TypeScript into one plain script (www/app.js) so the same
 //     output runs in Android, a Windows wrapper and the MSFS toolbar panel.
 //  3. With --preview, also writes dist/preview.html: one self-contained file.
-import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,12 +11,37 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cfg = JSON.parse(readFileSync(join(root, 'app.config.json'), 'utf8'));
 
+// "What's new" in the app: the three newest release notes (release-notes/<version>.md) up to this version.
+// The lines about the download files are left out; headings and points are kept.
+const verNum = v => v.split('.').map(Number);
+const cmpVer = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+const notesDir = join(root, 'release-notes');
+const inline = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+const whatsNew = (existsSync(notesDir) ? readdirSync(notesDir) : [])
+  .filter(f => /^\d+\.\d+\.\d+\.md$/.test(f)).map(f => f.slice(0, -3))
+  .filter(v => cmpVer(v, cfg.version) <= 0).sort((a, b) => cmpVer(b, a)).slice(0, 3)
+  .map(v => {
+    const lines = readFileSync(join(notesDir, v + '.md'), 'utf8').split(/\r?\n/);
+    let title = '', groups = [], cur = null;
+    for (const raw of lines) {
+      const l = raw.trim(); if (!l) continue;
+      const head = /^\*\*([^*]+)\*\*$/.exec(l);
+      if (head && !title && /\d+\.\d+\.\d+/.test(head[1])) { title = head[1].replace(/^.*?\d+\.\d+\.\d+\s*[:–-]?\s*/, ''); continue; }
+      if (head) { cur = { h: head[1], items: [] }; groups.push(cur); continue; }
+      if (/\.(apk|zip)\b/i.test(l) && !cur) continue; // the download files
+      const item = l.replace(/^[-*]\s+/, '');
+      if (!cur) { cur = { h: '', items: [] }; groups.push(cur); }
+      cur.items.push(inline(item));
+    }
+    return { v, title, groups: groups.filter(g => g.items.length) };
+  });
+
 mkdirSync(join(root, 'src/generated'), { recursive: true });
 writeFileSync(
   join(root, 'src/generated/config.ts'),
-  `// Generated from app.config.json. Do not edit by hand.\nconst APP = ${JSON.stringify({
+  `// Generated from app.config.json and release-notes/. Do not edit by hand.\nconst APP = ${JSON.stringify({
     name: cfg.appName, shortName: cfg.shortName, id: cfg.appId, version: cfg.version, updates: cfg.updates || null,
-  }, null, 2)};\n`
+  }, null, 2)};\nconst WHATS_NEW: { v: string; title: string; groups: { h: string; items: string[] }[] }[] = ${JSON.stringify(whatsNew)};\n`
 );
 
 // Capacitor (Android wrapper) settings come from the same config

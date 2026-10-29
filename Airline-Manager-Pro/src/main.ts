@@ -31,6 +31,7 @@
   Backup.init();
   startAiClock();
   Backup.offerRestoreOnFirstStart();
+  whatsNewOnStart();
   if ((State as any).linkedOnce) State.live = State.live.filter(f => !(f.you && !f.real));
   // Splash fades out once the first screen is painted
   const sp = document.createElement('div');

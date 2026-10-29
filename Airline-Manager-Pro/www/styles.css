@@ -1513,3 +1513,30 @@ canvas.av3:not(.still):not(.live):not(.bust) { transform-origin: 50% 100%; anima
 
 .txd-sec { margin-top: 10px; }
 .txd-sh { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+
+/* ---------- What's new ---------- */
+.layer-modal.wn .panel { width: min(640px, calc(100vw - 24px)); }
+.wn-list { display: flex; flex-direction: column; gap: 10px; max-height: min(62vh, 560px); overflow-y: auto; padding-right: 2px; }
+.wn-rel { border-radius: 14px; border: 1px solid var(--line); background: var(--bg-2); transition: border-color .25s, background .25s; }
+.wn-rel[open] { border-color: var(--line-2); background: var(--panel-2); }
+.wn-latest { border-color: rgba(63, 208, 232, .35); }
+.wn-rel summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+.wn-rel summary::-webkit-details-marker { display: none; }
+.wn-ver { flex: none; padding: 4px 9px; border-radius: 8px; font: 600 12px/1 var(--display); letter-spacing: .02em; color: var(--ink-2); background: var(--panel-3); }
+.wn-latest .wn-ver { color: #03131f; background: var(--cyan); }
+.wn-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wn-t b { font-size: 14px; }
+.wn-t small { font-size: 11.5px; color: var(--ink-3); }
+.wn-new { font-style: normal; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 99px; color: var(--green); background: rgba(61, 220, 151, .14); }
+.wn-chev { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: var(--ink-2); transition: transform .3s var(--ease), background .25s; }
+.wn-chev svg { width: 16px; height: 16px; }
+.wn-rel[open] .wn-chev { transform: rotate(90deg); background: var(--panel-3); color: var(--cyan); }
+.wn-body { padding: 0 16px 14px; animation: wn-in .35s var(--ease); }
+.wn-body h4 { font-size: 12.5px; font-weight: 600; color: var(--cyan); margin: 10px 0 6px; }
+.wn-body ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.wn-body li { position: relative; padding-left: 16px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.wn-body li::before { content: ""; position: absolute; left: 2px; top: .6em; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--magenta); }
+.wn-body li b { color: var(--ink); font-weight: 600; }
+.set-card .btn.sm { flex: none; }
+@keyframes wn-in { from { opacity: 0; transform: translateY(-4px); } }
+.calm .wn-body { animation: none; }

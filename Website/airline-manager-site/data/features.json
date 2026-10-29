@@ -1,0 +1,460 @@
+[
+ {
+  "title": "Platform",
+  "items": [
+   {
+    "t": "Android app, landscape only (phones and tablets)",
+    "n": ""
+   },
+   {
+    "t": "Windows version: the whole app in its own window from the PC app, connected straight to the sim; window, borderless, full screen; any screen size including ultrawide; graphics card and sound output choice",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Linking with the simulator",
+  "items": [
+   {
+    "t": "PC app (Windows) that reads the simulator through SimConnect, no SDK needed",
+    "n": ""
+   },
+   {
+    "t": "Link over the same Wi-Fi, discovery, 6-digit pairing, auto-reconnect",
+    "n": ""
+   },
+   {
+    "t": "Link over mobile data: the PC joins the phone's hotspot (or USB tethering)",
+    "n": ""
+   },
+   {
+    "t": "Pairing a PC with a code",
+    "n": ""
+   },
+   {
+    "t": "PC app log file; errors keep the window open with the details",
+    "n": ""
+   },
+   {
+    "t": "Detect which aircraft is loaded in the sim and match it to the aircraft you're flying",
+    "n": ""
+   },
+   {
+    "t": "Passenger numbers from GSX Pro (and the sim's payload stations without GSX)",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Companies and pilots",
+  "items": [
+   {
+    "t": "Your own pilot profile, synced with your simulator flights",
+    "n": ""
+   },
+   {
+    "t": "Several companies under one pilot profile, or a separate pilot profile per company (your choice)",
+    "n": ""
+   },
+   {
+    "t": "Divisions inside a company with their own fleets, sharing money and reputation",
+    "n": ""
+   },
+   {
+    "t": "Airlines, regional/cargo and bush outfits (VFR, IFR, small props) running in parallel",
+    "n": ""
+   },
+   {
+    "t": "Quick animated company and division switcher",
+    "n": ""
+   },
+   {
+    "t": "Hire pilots, assign routes and rules (duty time, landing limit, IFR only, return to base)",
+    "n": ""
+   },
+   {
+    "t": "Watch hired pilots' flights live on the world map",
+    "n": ""
+   },
+   {
+    "t": "Hired pilots fly in the background, even with the app closed: landings, turnarounds, next legs on their route, rest after the duty limit, revenue, fuel and fees booked; \"While you were away\" summary on opening",
+    "n": ""
+   },
+   {
+    "t": "Real-world flight times per aircraft and route: airway distance, taxi times (longer at big hubs), climb, cruise and descent speeds at each altitude, cruise level by distance and direction, jet stream",
+    "n": ""
+   },
+   {
+    "t": "Live countdown on flight cards: phase, altitude, miles to go along the route, time to the gate",
+    "n": ""
+   },
+   {
+    "t": "Virtual pilot speed: real time (default), 2×, 4×, 10× or 30×",
+    "n": "Setting"
+   },
+   {
+    "t": "Phone notification when a hired pilot reaches the gate, also with the app closed",
+    "n": "Setting"
+   },
+   {
+    "t": "You can't fly hired pilots' aircraft",
+    "n": ""
+   },
+   {
+    "t": "You fly one aircraft at a time, chosen from your fleet",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Overview widgets",
+  "items": [
+   {
+    "t": "Fleet size (aircraft owned)",
+    "n": ""
+   },
+   {
+    "t": "Active flights",
+    "n": ""
+   },
+   {
+    "t": "Fleet availability in percent",
+    "n": ""
+   },
+   {
+    "t": "Profit: daily, weekly, monthly, yearly (all years flown)",
+    "n": ""
+   },
+   {
+    "t": "Fleet status per aircraft: in flight (green), available (blue), maintenance (red)",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Fleet and market",
+  "items": [
+   {
+    "t": "Detailed fleet cards with an original illustration per aircraft type in company colours",
+    "n": ""
+   },
+   {
+    "t": "Buy aircraft from brands installed in the sim (Airbus, Boeing, Bombardier CRJ, ATR, de Havilland Canada, Cessna, Daher, Pilatus …)",
+    "n": ""
+   },
+   {
+    "t": "Add-on aircraft (PMDG, Fenix, iniBuilds, Aerosoft, SimWorks Studios …)",
+    "n": ""
+   },
+   {
+    "t": "Buy several aircraft, including several identical ones",
+    "n": ""
+   },
+   {
+    "t": "Purchase sound, vibration and delivery animation",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Routes and schedule",
+  "items": [
+   {
+    "t": "Routes to any country, departure and destination",
+    "n": ""
+   },
+   {
+    "t": "Multi-stop routes (3, 4, 5 or more stops a day)",
+    "n": ""
+   },
+   {
+    "t": "Your day's legs and a timeline of every aircraft",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Flight logs",
+  "items": [
+   {
+    "t": "Flight hours, landings, landing rate and G per flight",
+    "n": ""
+   },
+   {
+    "t": "Crashes: choose to register or disregard",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Maintenance and damage",
+  "items": [
+   {
+    "t": "Tail strike, hard landing, flap/gear overspeed, engine failures, overstress",
+    "n": ""
+   },
+   {
+    "t": "Severe turbulence damage (extreme only, realistic results: inspection, overstress, cabin damage)",
+    "n": ""
+   },
+   {
+    "t": "Mechanic reports in the inbox and an animated mechanic pop-up",
+    "n": ""
+   },
+   {
+    "t": "Fix now or fix later; serious damage grounds the aircraft",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "ATC",
+  "items": [
+   {
+    "t": "Built-in ATC (default) or BeyondATC, chosen in Settings",
+    "n": "Setting"
+   },
+   {
+    "t": "Fines for taking off, landing or taxiing without clearance, with transcript and contest option",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Finance",
+  "items": [
+   {
+    "t": "Balance, revenue, costs and profit per day, week, month and year",
+    "n": ""
+   },
+   {
+    "t": "Tap the balance in the top bar to open Finance",
+    "n": ""
+   },
+   {
+    "t": "Real-world fares (distance, domestic or international, aircraft type, cabin mix), on-board sales, bags, cargo",
+    "n": ""
+   },
+   {
+    "t": "Real-world costs per leg: fuel, landing, handling, navigation, maintenance by part, sales fees, catering, crew hotels, overheads",
+    "n": ""
+   },
+   {
+    "t": "Landing messages open the flight's income and expenses",
+    "n": ""
+   },
+   {
+    "t": "GSX Pro ground services charged at real-world rates as GSX completes them (setting); standard charges without GSX",
+    "n": ""
+   },
+   {
+    "t": "Real-world years or simulated years at a chosen speed",
+    "n": "Setting"
+   },
+   {
+    "t": "Transactions list",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Interface",
+  "items": [
+   {
+    "t": "Main navigation: Overview, Fleet, Routes, Schedule, Maintenance, Finance, Flight logs, Pilots, Settings",
+    "n": ""
+   },
+   {
+    "t": "Notification bell with unread count and grouped inbox",
+    "n": ""
+   },
+   {
+    "t": "Modular settings with toggles, easy to extend",
+    "n": ""
+   },
+   {
+    "t": "Animated screens, pop-ups and transitions; reduce-motion option",
+    "n": ""
+   },
+   {
+    "t": "Hold-to-exit power button with farewell animation",
+    "n": ""
+   },
+   {
+    "t": "Ranking screen: pilot and airline ranks, pilot rating, airline popularity, 1,197 badges in six tiers",
+    "n": ""
+   },
+   {
+    "t": "Fly for a real-world airline (names and codes only, no logos)",
+    "n": ""
+   },
+   {
+    "t": "Backup folder outside the app, backup files, restore on a fresh install",
+    "n": "Android"
+   },
+   {
+    "t": "Full-screen mode, edge-swipe protection, back gesture never quits by accident",
+    "n": "Android"
+   },
+   {
+    "t": "Version number in the bottom-left corner",
+    "n": ""
+   },
+   {
+    "t": "What's new after every update: the newest version's changes open, the two before it folded; again from Settings → General",
+    "n": ""
+   },
+   {
+    "t": "Airline saved on the device and kept through updates; new versions install over the old one",
+    "n": ""
+   },
+   {
+    "t": "Settings saved the moment they change; a second copy of the airline kept in the app's own files and restored if the web storage is cleared",
+    "n": ""
+   },
+   {
+    "t": "Delete a company or everything, from Profiles and companies, with a confirmation prompt",
+    "n": ""
+   },
+   {
+    "t": "Purchase and payment sounds; mute all sounds; the sound button always stays in the top bar",
+    "n": ""
+   },
+   {
+    "t": "Error log: pop-up with the error, Copy and Share; saved list in Settings; start-up failures and Android crashes reported",
+    "n": ""
+   },
+   {
+    "t": "Updates from inside the app, with Android's exact reason when an install is refused",
+    "n": ""
+   },
+   {
+    "t": "World map layers from the layer button on the map: Classic (default, offline), Street (OpenStreetMap, light colours), Satellite (Sentinel-2 cloudless); tap again for Classic",
+    "n": ""
+   },
+   {
+    "t": "Pilot messages open the map on that aircraft and follow it",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Crew",
+  "items": [
+   {
+    "t": "3D full-body avatars (breathing, sway, blinking, look-around, turn with a finger) for all pilots, co-pilots, flight attendants and mechanics, male and female; drawn avatars where 3D isn't available",
+    "n": ""
+   },
+   {
+    "t": "Human figures with real body proportions, skin with pores and colour variation, hair grown strand by strand, beards and moustaches, detailed fabrics",
+    "n": ""
+   },
+   {
+    "t": "Crew figure proportions: Natural, In-between or Stylised",
+    "n": "Setting"
+   },
+   {
+    "t": "Beards (stubble, short, full, goatee, Van Dyke) and moustaches (pencil, chevron, walrus, handlebar, horseshoe); pilot sunglasses",
+    "n": ""
+   },
+   {
+    "t": "Finished crew pictures saved on the device, so they appear at once next time",
+    "n": ""
+   },
+   {
+    "t": "Pilot's cap for captain (gold braid) and co-pilot",
+    "n": ""
+   },
+   {
+    "t": "Create your pilot: name, date of birth, nationality with flag, skin tone, face, eyes, nose, lips, facial hair, glasses, hair, uniform",
+    "n": ""
+   },
+   {
+    "t": "Avatars always fully dressed; clothing only swaps complete garments",
+    "n": ""
+   },
+   {
+    "t": "Hire flight attendants and mechanics, change flight attendants' looks",
+    "n": ""
+   },
+   {
+    "t": "Co-pilot on two-pilot aircraft: choose male or female, look generated",
+    "n": ""
+   },
+   {
+    "t": "Weekly salaries for all staff, paid from the company balance, shown in Finance",
+    "n": ""
+   },
+   {
+    "t": "Conduct reports: discipline or dismiss; adjustable frequency",
+    "n": ""
+   },
+   {
+    "t": "Warnings recorded as light, moderate or severe; most staff improve after a warning; ratings lower the chance of misconduct",
+    "n": ""
+   },
+   {
+    "t": "Rare criminal cases for hired crew and passengers: police, aviation authority, court over 2-3 real days, verdict and sentence",
+    "n": ""
+   },
+   {
+    "t": "Drunk passengers at the gate on your flights: deny or allow boarding, with consequences",
+    "n": ""
+   },
+   {
+    "t": "Real-world crew rules (attendants per seats, co-pilot, mechanics per base and fleet) block flights",
+    "n": ""
+   },
+   {
+    "t": "Birthday greeting in the app and as a phone notification",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Flight data",
+  "items": [
+   {
+    "t": "Route legs limited by the aircraft's published range with fuel reserves",
+    "n": ""
+   },
+   {
+    "t": "Fuel on board and weights (empty, passengers, bags, cargo, mail, fuel, total vs. MTOW) from Flight Simulator",
+    "n": ""
+   },
+   {
+    "t": "GSX detection; fallback to the sim's own payload data",
+    "n": ""
+   },
+   {
+    "t": "Connection panel: Wi-Fi network, phone hotspot, PC app scan, manual address",
+    "n": ""
+   },
+   {
+    "t": "Finance transaction details and salary list",
+    "n": ""
+   }
+  ]
+ },
+ {
+  "title": "Your flights from the simulator",
+  "items": [
+   {
+    "t": "Live position, heading, phase, altitude, remaining distance and arrival time on the map and flight card",
+    "n": ""
+   },
+   {
+    "t": "Leg logged at blocks on: landing rate, G, block time, passengers, hours, landings, aircraft hours and cycles",
+    "n": ""
+   },
+   {
+    "t": "Ticket revenue, fuel and fees booked per leg",
+    "n": ""
+   },
+   {
+    "t": "Mechanic reports damage found on the leg after landing",
+    "n": ""
+   }
+  ]
+ }
+]

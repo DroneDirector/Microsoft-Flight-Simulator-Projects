@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4 (2026-10-29)
+
+- What's new pop-up after every update: the three newest versions from the release notes, the newest open (can be folded away until the next update), the two before it folded; also in Settings → General
+
 ## 0.5.3 (2026-10-29)
 
 - "I use GSX Pro": GSX ground services (boarding, deboarding, catering, fuelling, pushback, de-icing) read by the PC app and charged at real-world rates when GSX completes them; standard charges without GSX
@@ -21,7 +25,7 @@
 - Weather and graded turbulence from the sim (PC app)
 - Aircraft condition from age, use and mechanics; four bands; emergencies and accidents; court case against the airline when maintenance is to blame
 - Timed repairs (5-120 minutes) that continue while the app is closed; hangar drawing; Maintenance without red backgrounds; Aircraft types view
-- Warnings with severity and learning; ratings affect conduct; rare criminal cases with police, authority and court over 2-3 days (AI crew only)
+- Warnings with severity and learning; ratings affect conduct; rare criminal cases with police, authority and court over 2-3 days (hired crew only)
 - Drunk and unruly passengers
 - Natural skin colours; outfits by sex; skirt fix; look editor camera and smooth animation
 - Settings saved immediately, last screen restored; backup folder, backup files and restore on a fresh install

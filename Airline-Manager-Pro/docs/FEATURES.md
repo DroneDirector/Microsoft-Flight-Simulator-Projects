@@ -131,6 +131,7 @@ Only damage the simulator can actually detect.
 | Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
 | Version number in the bottom-left corner | Built |
+| What's new after every update: the newest version's changes open, the two before it folded; again from Settings → General | Built |
 | Airline saved on the device and kept through updates; new versions install over the old one | Built |
 | Settings saved the moment they change; a second copy of the airline kept in the app's own files and restored if the web storage is cleared | Built |
 | Delete a company or everything, from Profiles and companies, with a confirmation prompt | Built |
@@ -159,7 +160,7 @@ Only damage the simulator can actually detect.
 | Weekly salaries for all staff, paid from the company balance, shown in Finance | Built (demo payroll) |
 | Conduct reports: discipline or dismiss; adjustable frequency | Built |
 | Warnings recorded as light, moderate or severe; most staff improve after a warning; ratings lower the chance of misconduct | Built |
-| Rare criminal cases for AI crew and passengers: police, aviation authority, court over 2-3 real days, verdict and sentence | Built |
+| Rare criminal cases for hired crew and passengers: police, aviation authority, court over 2-3 real days, verdict and sentence | Built |
 | Drunk passengers at the gate on your flights: deny or allow boarding, with consequences | Built |
 | Real-world crew rules (attendants per seats, co-pilot, mechanics per base and fleet) block flights | Built |
 | Birthday greeting in the app and as a phone notification | Built |

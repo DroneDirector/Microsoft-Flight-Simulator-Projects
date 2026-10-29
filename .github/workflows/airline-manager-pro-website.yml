@@ -1,0 +1,125 @@
+name: Airline Manager Pro – website
+# Keeps the website up to date with the app, by itself:
+#  - the feature page from the app's docs/FEATURES.md (only what is in the app now),
+#  - the carousel and section screenshots from the app itself when the app's screens change,
+#  - the WordPress plugin (Elementor) as a download on its own release,
+#  - a test on a fresh WordPress + Elementor at every screen size, and
+#  - the preview on GitHub Pages: https://dronedirector.github.io/Microsoft-Flight-Simulator-Projects/
+# The download buttons on the site follow the newest app release by themselves.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Website/**'
+      - 'Airline-Manager-Pro/docs/FEATURES.md'
+      - 'Airline-Manager-Pro/src/**'
+      - 'Airline-Manager-Pro/www/styles.css'
+      - '.github/workflows/airline-manager-pro-website.yml'
+      - '.github/scripts/website-amp/**'
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency: { group: airline-manager-pro-website, cancel-in-progress: true }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - name: Feature list from the app's FEATURES.md
+        run: python3 .github/scripts/website-amp/features.py Airline-Manager-Pro/docs/FEATURES.md Website/airline-manager-site/data
+
+      - name: Did the app's screens change?
+        id: screens
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || git diff --name-only HEAD~1 HEAD | grep -qE '^Airline-Manager-Pro/(src/|www/styles.css)'; then echo "go=1" >> "$GITHUB_OUTPUT"; else echo "go=0" >> "$GITHUB_OUTPUT"; fi
+
+      - name: New screenshots from the app
+        if: steps.screens.outputs.go == '1'
+        run: |
+          cd Airline-Manager-Pro && npm install --no-audit --no-fund && npm run build && cd ..
+          npm install --no-save --prefix /tmp/pw playwright@1.48.2 && (cd /tmp/pw && npx playwright install --with-deps chromium >/dev/null)
+          mkdir -p /tmp/appshots
+          NODE_PATH=/tmp/pw/node_modules node .github/scripts/website-amp/app-shots.js "$PWD/Airline-Manager-Pro/www/index.html" /tmp/appshots
+          pip install -q pillow
+          python3 .github/scripts/website-amp/encode-shots.py /tmp/appshots Website/airline-manager-site/assets/img
+
+      - name: Save the updated feature list and screenshots
+        run: |
+          if [ -n "$(git status --porcelain -- Website/airline-manager-site/data Website/airline-manager-site/assets/img)" ]; then
+            git config user.name "DroneDirector"; git config user.email "simon@dronedirector.fo"
+            git add Website/airline-manager-site/data Website/airline-manager-site/assets/img
+            git commit -qm "Website: feature list and screenshots updated from the app"
+            for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
+          else echo "Nothing changed"; fi
+
+      - name: The plugin for WordPress, as a download
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          (cd Website && zip -qr "$RUNNER_TEMP/airline-manager-site.zip" airline-manager-site)
+          gh release view airline-manager-website -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create airline-manager-website -R "$GITHUB_REPOSITORY" --title "Airline Manager Pro website (WordPress + Elementor)" \
+              --notes "The website plugin, updated automatically whenever the website or the app's features change. Install: WordPress → Plugins → Add New → Upload Plugin → airline-manager-site.zip (the free Elementor plugin must be active)." --prerelease --latest=false
+          gh release upload airline-manager-website "$RUNNER_TEMP/airline-manager-site.zip" --clobber -R "$GITHUB_REPOSITORY"
+
+      - name: WordPress + Elementor + the website plugin
+        run: bash .github/scripts/website-amp/setup-wp.sh
+
+      - name: Check every page at every screen size
+        run: |
+          pip install -q playwright && python -m playwright install --with-deps chromium >/dev/null
+          python3 .github/scripts/website-amp/check.py http://127.0.0.1:8080 out
+
+      - name: Save the test pictures to the 'website-airline-manager-check' branch
+        if: always()
+        run: |
+          [ -d out ] || exit 0
+          cd out && git init -q -b website-airline-manager-check && git add -A
+          git -c user.name=DroneDirector -c user.email=simon@dronedirector.fo commit -qm "Website check (run ${{ github.run_number }})"
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" website-airline-manager-check
+
+      - name: Save the pages as plain files for the preview
+        run: |
+          LIVE="https://dronedirector.github.io/Microsoft-Flight-Simulator-Projects"
+          mkdir -p /tmp/mirror && cd /tmp/mirror
+          for p in "" airline-manager-pro-features/; do
+            wget -q -e robots=off --page-requisites --adjust-extension --no-host-directories -P . "http://127.0.0.1:8080/$p" || true
+          done
+          find . -name '*\?*' | while read f; do mv -f "$f" "${f%%\?*}"; done
+          # fonts and pictures named in CSS, and every screenshot of the carousel
+          find . -name "*.css" | while read f; do d=$(dirname "$f"); grep -oE "url\(['\"]?[^)'\"]+" "$f" | sed -E "s/url\(['\"]?//" | grep -vE '^(data:|#|http)' | while read u; do
+              u=${u%%[?#]*}; dst=$(realpath -m "$d/$u"); rel=${dst#$PWD/}
+              [ -f "$dst" ] || { mkdir -p "$(dirname "$dst")"; cp "$HOME/site/$rel" "$dst" 2>/dev/null || rm -f "$dst"; }
+            done; done
+          mkdir -p wp-content/plugins/airline-manager-site/assets/img
+          cp -n ~/site/wp-content/plugins/airline-manager-site/assets/img/* wp-content/plugins/airline-manager-site/assets/img/
+          mkdir -p wp-content/plugins/elementor/assets/js wp-includes/js
+          cp -r ~/site/wp-content/plugins/elementor/assets/js/. wp-content/plugins/elementor/assets/js/
+          cp ~/site/wp-includes/js/wp-emoji-release.min.js wp-includes/js/ 2>/dev/null || true
+          grep -rlE '127\.0\.0\.1:8080' --include='*.html' --include='*.css' --include='*.js' --include='*.json' . | while read f; do
+            sed -i -e "s#http://127.0.0.1:8080#$LIVE#g" -e "s#http:\\\\/\\\\/127.0.0.1:8080#${LIVE//\//\\\\/}#g" "$f"
+          done
+          find . -name "*.html" -exec sed -i 's#<head>#<head><meta name="robots" content="noindex">#' {} +
+          touch .nojekyll
+          echo "left: $(grep -rl '127.0.0.1' . | wc -l) files still naming the test server"; du -sh .
+
+      - uses: actions/configure-pages@v5
+        with: { enablement: true }
+        continue-on-error: true
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: /tmp/mirror }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.d.outputs.page_url }}" }
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4
