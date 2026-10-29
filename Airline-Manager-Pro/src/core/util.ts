@@ -22,6 +22,13 @@ function hours(mins: number): string {
   return h + ':' + (m < 10 ? '0' : '') + m;
 }
 
+/** Time left as h:mm:ss (or m:ss under an hour), for countdowns. */
+function countdown(sec: number): string {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60, p = (n: number) => (n < 10 ? '0' : '') + n;
+  return h ? h + ':' + p(m) + ':' + p(s) : m + ':' + p(s);
+}
+
 function num(n: number): string { return Math.round(n).toLocaleString('en-US'); }
 
 function clamp(v: number, a: number, b: number): number { return v < a ? a : v > b ? b : v; }

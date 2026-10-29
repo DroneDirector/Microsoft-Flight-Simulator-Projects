@@ -1,4 +1,5 @@
-// Link to the Airline Manager Pro PC app over the local Wi-Fi network.
+// Link to the Airline Manager Pro PC app over the local network: the same Wi-Fi, or the PC joined
+// to this phone's hotspot (the PC then uses the phone's mobile data).
 // Finds the PC (UDP discovery through the native LanLink plugin), pairs with the 6-digit code
 // shown on the PC, remembers it, and reconnects automatically.
 
@@ -29,6 +30,8 @@ const Link = {
   pending: null as { resolve: (r: any) => void } ,
   lastMsg: 0,
   latency: 0,
+  via: 'wifi' as 'wifi' | 'hotspot' | 'usb',
+  net: null as any,
 
   get pc(): { ip: string; name: string; token: string } { return (State as any).linkPc || null; },
 
@@ -38,11 +41,18 @@ const Link = {
     document.addEventListener('visibilitychange', () => { if (!document.hidden && this.pc && this.status !== 'connected') this.connect(this.pc.ip); });
   },
 
-  /** Wi-Fi details from the phone (name needs the location permission on Android). */
-  async wifiInfo(ask?: boolean): Promise<{ ssid: string; ip: string; level: number; wifi: boolean; cellular: boolean }> {
+  /** Network details from the phone: Wi-Fi (its name needs the location permission on Android) and the phone's hotspot. */
+  async wifiInfo(ask?: boolean): Promise<{ ssid: string; ip: string; level: number; wifi: boolean; cellular: boolean; hotspot?: boolean; hotspotIp?: string; hotspotKind?: string }> {
     const p = lanPlugin();
-    if (p) { try { return await p.wifiInfo({ askLocation: !!ask }); } catch (e) { /* fall through */ } }
-    return { ssid: '', ip: '', level: 0, wifi: navigator.onLine, cellular: false };
+    if (p) { try { const r = await p.wifiInfo({ askLocation: !!ask }); this.net = r; return r; } catch (e) { /* fall through */ } }
+    return { ssid: '', ip: '', level: 0, wifi: navigator.onLine, cellular: false, hotspot: false };
+  },
+
+  /** Whether a PC address is on the phone's hotspot (or USB tethering) rather than Wi-Fi. */
+  viaFor(ip: string): 'wifi' | 'hotspot' | 'usb' {
+    const n = this.net;
+    if (n && n.hotspot && n.hotspotIp && ip && n.hotspotIp.split('.').slice(0, 3).join('.') === ip.split('.').slice(0, 3).join('.')) return n.hotspotKind === 'usb' ? 'usb' : 'hotspot';
+    return 'wifi';
   },
 
   /** Look for PC apps on the local network. */
@@ -67,6 +77,8 @@ const Link = {
     clearTimeout(this.retry);
     if (this.ws) { try { this.ws.onclose = null; this.ws.close(); } catch (e) { /* closed */ } }
     this.status = code ? 'pairing' : 'connecting';
+    this.via = this.viaFor(ip);
+    if (!this.net) this.wifiInfo(false).then(() => { this.via = this.viaFor(ip); linkChanged(); });
     linkChanged();
     return new Promise(resolve => {
       let done = false;
@@ -74,7 +86,7 @@ const Link = {
       let ws: WebSocket;
       try { ws = new WebSocket(`ws://${ip}:${LINK_PORT}`); } catch (e) { this.status = 'offline'; linkChanged(); finish({ ok: false, reason: 'Can\'t reach that address.' }); return; }
       this.ws = ws;
-      const timer = setTimeout(() => { if (ws.readyState !== 1) { try { ws.close(); } catch (e) { /* closed */ } finish({ ok: false, reason: 'The PC didn\'t answer. Check that the PC app is running and both are on the same Wi-Fi.' }); } }, 5000);
+      const timer = setTimeout(() => { if (ws.readyState !== 1) { try { ws.close(); } catch (e) { /* closed */ } finish({ ok: false, reason: 'The PC didn\'t answer. Check that the PC app is running and that the PC is on the same Wi-Fi or your phone\'s hotspot.' }); } }, 5000);
       ws.onopen = () => {
         clearTimeout(timer);
         const device = 'Android phone';
@@ -106,7 +118,7 @@ const Link = {
         this.status = this.pc ? 'offline' : 'unpaired';
         this.sim = null; onSimState(null);
         linkChanged();
-        finish({ ok: false, reason: 'The PC didn\'t answer. Check that the PC app is running and both are on the same Wi-Fi.' });
+        finish({ ok: false, reason: 'The PC didn\'t answer. Check that the PC app is running and that the PC is on the same Wi-Fi or your phone\'s hotspot.' });
         if (this.pc) this.retry = setTimeout(() => this.reconnect(), was === 'connected' ? 2000 : 6000);
       };
       ws.onerror = () => { /* onclose follows */ };
@@ -137,7 +149,7 @@ const Link = {
 function linkChanged() {
   const b: any = State.bridge;
   b.pc = Link.status === 'connected' ? 'connected' : Link.status === 'unpaired' ? 'offline' : 'searching';
-  b.link = Link.status === 'connected' ? 'wifi' : 'none';
+  b.link = Link.status === 'connected' ? Link.via : 'none';
   if (Link.pc) { b.pcName = Link.pc.name; b.pcIp = Link.pc.ip; }
   b.latencyMs = Link.latency || b.latencyMs;
   renderTopbar();

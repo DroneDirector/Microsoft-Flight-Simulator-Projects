@@ -260,21 +260,24 @@ function scheduleBirthdayNotification() {
   }).catch(() => { /* notifications not allowed */ });
 }
 
-/* ---------- Connection panel (Wi-Fi only) ---------- */
+/* ---------- Connection panel: same Wi-Fi, or the PC on the phone's hotspot ---------- */
 ACTIONS['link-panel'] = async () => {
   Sound.tick(); closeAll();
   const wi = await Link.wifiInfo(true);
   const bars = Math.max(0, Math.min(4, wi.level || 0));
+  const hs = !!wi.hotspot, hsName = wi.hotspotKind === 'usb' ? 'USB tethering' : 'hotspot';
+  const where = hs && !wi.wifi ? 'your ' + hsName : esc(wi.ssid || 'your Wi-Fi') + (hs ? ' and your ' + hsName : '');
   const wrap = openLayer('modal', `
-    <div class="modal-head"><div><h2>Connection</h2><small>The app links to the PC that runs Flight Simulator over your Wi-Fi.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-head"><div><h2>Connection</h2><small>The app links to the PC that runs Flight Simulator over your Wi-Fi, or over your phone's hotspot.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body link">
-      <div class="ln-card ${wi.wifi ? 'ok' : ''}"><span class="ln-ic">${icon('wifi')}</span><span><b>${wi.wifi ? esc(wi.ssid || 'Wi-Fi') : 'Not on Wi-Fi'}</b><small>${wi.wifi ? `Wi-Fi${wi.ip ? ', this phone ' + esc(wi.ip) : ''}${wi.ssid ? '' : (lanPlugin() ? '. Allow location access to show the network name' : '')}` : 'Connect this phone to the same Wi-Fi as your PC'}</small></span>
-        <span class="bars">${[1, 2, 3, 4].map(i => `<i class="${i <= bars ? 'on' : ''}" style="height:${i * 4 + 2}px"></i>`).join('')}</span></div>
+      ${hs ? `<div class="ln-card ok"><span class="ln-ic">${icon('cell')}</span><span><b>Phone ${hsName} on</b><small>This phone ${esc(wi.hotspotIp || '')}. A PC connected to it uses your mobile data.</small></span></div>` : ''}
+      ${!hs || wi.wifi ? `<div class="ln-card ${wi.wifi ? 'ok' : ''}"><span class="ln-ic">${icon('wifi')}</span><span><b>${wi.wifi ? esc(wi.ssid || 'Wi-Fi') : 'Not on Wi-Fi'}</b><small>${wi.wifi ? `Wi-Fi${wi.ip ? ', this phone ' + esc(wi.ip) : ''}${wi.ssid ? '' : (lanPlugin() ? '. Allow location access to show the network name' : '')}` : 'Connect this phone to the same Wi-Fi as your PC, or turn on your hotspot'}</small></span>
+        <span class="bars">${[1, 2, 3, 4].map(i => `<i class="${i <= bars ? 'on' : ''}" style="height:${i * 4 + 2}px"></i>`).join('')}</span></div>` : ''}
       <div class="ln-radar"><div class="rd"><i></i><i></i><i></i><span class="sweep"></span><b class="pc-dot"></b></div>
-        <div class="ln-scan" data-scan><b>Scanning ${esc(wi.ssid || 'your Wi-Fi')} for the PC app…</b><small>Make sure the ${esc(APP.shortName)} PC app is running next to Flight Simulator.</small></div></div>
+        <div class="ln-scan" data-scan><b>Scanning ${where} for the PC app…</b><small>Make sure the ${esc(APP.shortName)} PC app is running next to Flight Simulator.</small></div></div>
       <div data-pcs></div>
-      <div class="ln-card"><span class="ln-ic">${icon('cell')}</span><span><b>Mobile data</b><small>${wi.cellular ? 'On, ' : ''}not used for linking</small></span></div>
-      <p class="fine-print">${icon('info')}Your phone and the PC must be on the same Wi-Fi network.</p>
+      ${hs ? '' : `<div class="ln-card"><span class="ln-ic">${icon('cell')}</span><span><b>Mobile data</b><small>${wi.cellular ? 'On. ' : ''}To link over mobile data, turn on this phone's hotspot and connect the PC to it.</small></span></div>`}
+      <p class="fine-print">${icon('info')}The phone and the PC must be on the same Wi-Fi, or the PC connected to your phone's hotspot.${hs ? ' The link itself uses about 5 MB an hour; Flight Simulator streams scenery and can use far more, which you can limit in its Data settings.' : ''}</p>
     </div>`, { cls: 'narrow link-pop' });
   linkScan(wrap);
 };
@@ -326,7 +329,7 @@ ACTIONS['link-manual-go'] = async () => {
     const ctl = new AbortController(); setTimeout(() => ctl.abort(), 2500);
     const j = await (await fetch(`http://${ip}:${LINK_PORT}/info`, { signal: ctl.signal })).json();
     closeAll(); pairPopup(ip, j.pcName || ip);
-  } catch (e) { err.innerHTML = `${icon('alert')}No PC app answered at ${esc(ip)}. Check that it's running and on the same Wi-Fi.`; }
+  } catch (e) { err.innerHTML = `${icon('alert')}No PC app answered at ${esc(ip)}. Check that it's running and on the same Wi-Fi or your phone's hotspot.`; }
 };
 
 function pairPopup(ip: string, name: string) {

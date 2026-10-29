@@ -12,6 +12,12 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => `<div class="set-card"><span class="brand-lg">${brandMark()}</span><span><b>${esc(APP.name)}</b><small>Version ${esc(APP.version)}</small></span></div>` },
     { type: 'choice', key: 'units', label: 'Units', options: [['imperial', 'Feet, knots, nm'], ['metric', 'Metres, km/h, km']] },
     { type: 'toggle', key: 'clock24', label: '24-hour clock' },
+    { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
+  ] },
+  { id: 'ai', title: 'Virtual pilots', icon: 'fleet', items: [
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}Your hired pilots fly their routes even while the app is closed. Each flight takes as long as it would in real life, worked out from the distance along airways, the aircraft's climb, cruise and descent speeds at each altitude, taxi times and the jet stream.</p>` },
+    { type: 'choice', key: 'aiSpeed', label: 'Virtual pilot speed', hint: 'Real time is how long the flight takes in the real world. Faster speeds also shorten turnarounds and rest. Only your hired pilots are affected, never your own flights.', options: [['1', 'Real time'], ['2', '2×'], ['4', '4×'], ['10', '10×'], ['30', '30×']] },
+    { type: 'toggle', key: 'aiNotify', label: 'Notify me when my pilots land', hint: 'A phone notification when a hired pilot reaches the gate, even when the app is closed.' },
   ] },
   { id: 'time', title: 'Time and years', icon: 'clock', items: [
     { type: 'choice', key: 'timeMode', label: 'Company calendar', hint: 'Real-world years follow today’s date. Simulated years run faster, so your airline can build up several years of history.', options: [['real', 'Real-world years'], ['sim', 'Simulated years']] },
@@ -20,12 +26,12 @@ const SETTINGS: SetSection[] = [
   { id: 'sync', title: 'Simulator link', icon: 'sync', items: [
     { type: 'html', html: () => {
       const on = Link.status === 'connected', pc = Link.pc;
-      const sub = on ? `${Link.sim && Link.sim.connected ? esc(Link.sim.sim) : 'Flight Simulator not running'} on ${esc(pc.name)}, ${esc(pc.ip)}${Link.latency ? ', ' + Link.latency + ' ms' : ''}`
-        : pc ? `Paired with ${esc(pc.name)}. Looking for it on this Wi-Fi…` : 'Not paired yet. The screens show demo data until you link your PC.';
+      const sub = on ? `${Link.sim && Link.sim.connected ? esc(Link.sim.sim) : 'Flight Simulator not running'} on ${esc(pc.name)}, ${esc(pc.ip)}${Link.via !== 'wifi' ? ', through your phone\'s ' + (Link.via === 'usb' ? 'USB tethering' : 'hotspot') : ''}${Link.latency ? ', ' + Link.latency + ' ms' : ''}`
+        : pc ? `Paired with ${esc(pc.name)}. Looking for it on this network…` : 'Not paired yet. The screens show demo data until you link your PC.';
       return `<div class="set-card link ${on ? 'ok' : ''}"><span class="pc-ic">${icon('pc')}</span><span><b>${on ? 'Connected to your PC' : pc ? 'Not connected' : 'No PC linked'}</b><small>${sub}</small></span><button class="btn ${pc ? 'ghost' : 'primary'} sm" data-act="link-panel">${pc ? 'Details' : 'Link a PC'}</button></div>`
         + (pc ? `<div class="btn-row"><button class="btn ghost sm" data-act="link-forget">${icon('close')}Unpair ${esc(pc.name)}</button></div>` : '');
     } },
-    { type: 'html', html: () => `<p class="fine-print">${icon('info')}The app links to the ${esc(APP.shortName)} PC app over Wi-Fi. Your phone and the PC with Flight Simulator must be on the same Wi-Fi network.</p>` },
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}The app links to the ${esc(APP.shortName)} PC app over your local network: put the phone and the PC with Flight Simulator on the same Wi-Fi, or connect the PC to your phone's hotspot to use mobile data.</p>` },
     { type: 'toggle', key: 'gsx', label: 'Passenger numbers from GSX', hint: 'Reads boarded passengers from GSX Pro. Falls back to the app’s own numbers.' },
   ] },
   { id: 'atc', title: 'ATC', icon: 'radio', items: [
@@ -135,7 +141,9 @@ ACTIONS['set-section'] = el => {
   rerenderSettingsBody(true);
 };
 ACTIONS['set-choice'] = el => {
+  if (el.getAttribute('data-key') === 'aiSpeed') aiSetSpeed(+el.getAttribute('data-v') || 1);
   (State.settings as any)[el.getAttribute('data-key')] = el.getAttribute('data-v');
+  Store.save();
   Sound.tick(); rerenderSettingsBody();
   refresh();
 };
@@ -149,7 +157,7 @@ ACTIONS.toggle = el => {
   if (key === 'mk-installed') { _mkInstalled = on; refresh(); return; }
   if (key === 'reduceMotion') document.documentElement.classList.toggle('calm', on);
   if (key === 'muteAll') { if (on) Voice.stop(); renderTopbar(); }
-  if (key in State.settings) setTimeout(() => rerenderSettingsBody(), 180);
+  if (key in State.settings) { Store.save(); setTimeout(() => rerenderSettingsBody(), 180); }
 };
 
 ACTIONS['sound-test'] = () => { const was = State.settings.purchaseSound; State.settings.purchaseSound = true; Sound.purchase(); Haptics.success(); State.settings.purchaseSound = was; };

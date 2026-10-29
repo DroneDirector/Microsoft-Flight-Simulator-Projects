@@ -11,8 +11,8 @@ interface Look {
   lips: 'thin' | 'medium' | 'full';
   hair: string;            // key of HAIR_STYLES
   hairColor: number;       // index into HAIR_COLORS
-  facial: 'none' | 'stubble' | 'beard' | 'moustache';
-  glasses: 'none' | 'aviator' | 'round' | 'rect';
+  facial: string;          // none, stubble, short, full, goatee, vandyke, or a moustache: pencil, chevron, walrus, handlebar, horseshoe
+  glasses: 'none' | 'aviator' | 'sunglasses' | 'round' | 'rect';
   top: 'jacket' | 'shirt' | 'pullover' | 'vest' | 'blouse' | 'overalls';
   bottom: 'trousers' | 'skirt' | 'shorts';
   shoes: 'oxford' | 'boots' | 'pumps' | 'sneakers';
@@ -78,8 +78,8 @@ function randomLook(seed: string, sex: 'm' | 'f', role: CrewRole): Look {
   l.lips = pick(['thin', 'medium', 'full'] as any);
   l.hair = sex === 'f' ? pick(['bob', 'long', 'bun', 'ponytail', 'braids', 'wavy', 'curly', 'afro']) : pick(['crop', 'side', 'buzz', 'curly', 'afro', 'bald', 'wavy', 'crop']);
   l.hairColor = l.skin > 5 ? pick([0, 0, 1, 8]) : pick([0, 1, 2, 3, 4, 5, 6, 7, 8]);
-  l.facial = sex === 'm' ? pick(['none', 'none', 'stubble', 'beard', 'moustache'] as any) : 'none';
-  l.glasses = pick(['none', 'none', 'none', 'aviator', 'round', 'rect'] as any);
+  l.facial = sex === 'm' ? pick(['none', 'none', 'none', 'stubble', 'stubble', 'short', 'full', 'goatee', 'vandyke', 'chevron', 'pencil', 'walrus', 'horseshoe']) : 'none';
+  l.glasses = pick(['none', 'none', 'none', 'none', 'aviator', 'round', 'rect', (role === 'captain' || role === 'fo') ? 'sunglasses' : 'none'] as any);
   if (role === 'captain' || role === 'fo') l.top = pick(['jacket', 'jacket', 'shirt', 'pullover'] as any);
   return l;
 }
@@ -100,6 +100,9 @@ function avatarSvg(look: Look, role: CrewRole, o?: { view?: 'full' | 'bust'; acc
 function avatarSvg2d(look: Look, role: CrewRole, o?: { view?: 'full' | 'bust'; accent?: string; still?: boolean; cls?: string }): string {
   o = o || {};
   const L = dressed(look, role);
+  const facialPick = L.facial;
+  L.facial = ['short', 'full', 'goatee', 'vandyke'].indexOf(facialPick) >= 0 ? 'beard' : ['pencil', 'chevron', 'walrus', 'handlebar', 'horseshoe'].indexOf(facialPick) >= 0 ? 'moustache' : facialPick;
+  const sun = L.glasses === 'sunglasses'; if (sun) L.glasses = 'aviator';
   const id = 'av' + (++_avSeq);
   const cx = 100;
   const skin = SKIN_TONES[L.skin] || SKIN_TONES[2], skinD = shade(skin, -0.16), skinL = shade(skin, 0.12);
@@ -262,7 +265,7 @@ function avatarSvg2d(look: Look, role: CrewRole, o?: { view?: 'full' | 'bust'; a
   // glasses
   if (L.glasses !== 'none') {
     const gs = L.glasses === 'aviator'
-      ? [-1, 1].map(s => `<path d="M${cx + s * 3},${ey - 4} L${cx + s * 15},${ey - 4} Q${cx + s * 16},${ey + 6} ${cx + s * 10},${ey + 7} Q${cx + s * 3},${ey + 6} ${cx + s * 3},${ey - 4} Z" fill="#3B4656" fill-opacity=".35" stroke="#B8A06A" stroke-width="1.2"/>`).join('')
+      ? [-1, 1].map(s => `<path d="M${cx + s * 3},${ey - 4} L${cx + s * 15},${ey - 4} Q${cx + s * 16},${ey + 6} ${cx + s * 10},${ey + 7} Q${cx + s * 3},${ey + 6} ${cx + s * 3},${ey - 4} Z" fill="${sun ? '#22302a' : '#3B4656'}" fill-opacity="${sun ? '.88' : '.35'}" stroke="#B8A06A" stroke-width="1.2"/>`).join('')
       : L.glasses === 'round' ? [-1, 1].map(s => `<circle cx="${cx + s * ex}" cy="${ey}" r="6" fill="none" stroke="#2A2D33" stroke-width="1.5"/>`).join('')
         : [-1, 1].map(s => `<rect x="${cx + s * ex - 6.5}" y="${ey - 4.5}" width="13" height="9" rx="2" fill="none" stroke="#2A2D33" stroke-width="1.6"/>`).join('');
     front.push(gs + `<path d="M${cx - 3.5},${ey - 1} Q${cx},${ey - 3} ${cx + 3.5},${ey - 1}" stroke="#2A2D33" stroke-width="1.2" fill="none"/>`);

@@ -37,7 +37,7 @@ function renderTopbar() {
   const div = c.divisions.filter(d => d.id === State.divisionId)[0];
   const b = State.bridge;
   const st = Link.status;
-  const linkTxt = st === 'connected' ? (Link.sim && !Link.sim.connected ? 'Linked, sim not running' : 'Linked over Wi-Fi')
+  const linkTxt = st === 'connected' ? (Link.sim && !Link.sim.connected ? 'Linked, sim not running' : Link.via === 'wifi' ? 'Linked over Wi-Fi' : Link.via === 'usb' ? 'Linked over USB' : 'Linked via hotspot')
     : st === 'unpaired' ? ((State as any).linkedOnce ? 'Link your PC' : 'Demo, link your PC') : 'Looking for your PC';
   const n = unreadCount();
   $('.topbar').innerHTML = `
@@ -47,11 +47,11 @@ function renderTopbar() {
       ${icon('down', 'co-chev')}
     </button>
     <button class="link-pill ${b.pc === 'connected' ? 'ok' : 'warn'}" data-act="link-panel" aria-label="${linkTxt}. Open connection details">
-      <i class="link-led"></i>${icon('wifi')}<span>${linkTxt}</span><em>${b.pc === 'connected' && Link.latency ? Link.latency + ' ms' : ''}</em>
+      <i class="link-led"></i>${icon(st === 'connected' && Link.via !== 'wifi' ? 'cell' : 'wifi')}<span>${linkTxt}</span><em>${b.pc === 'connected' && Link.latency ? Link.latency + ' ms' : ''}</em>
     </button>
     <div class="top-spacer"></div>
-    <div class="balance" data-balance><small>Balance</small><b data-balance-val>${money(c.balance, { compact: true })}</b></div>
-    ${State.settings.muteAll ? `<button class="icon-btn muted-btn" data-act="unmute" aria-label="Sounds are muted. Tap to turn sounds back on">${icon('mute')}</button>` : ''}
+    <button class="balance" data-balance data-act="go" data-screen="finance" aria-label="Balance ${money(c.balance)}. Open Finance"><small>Balance</small><b data-balance-val>${money(c.balance, { compact: true })}</b></button>
+    <button class="icon-btn sound-btn ${State.settings.muteAll ? 'muted-btn' : ''}" data-act="sound-toggle" aria-label="${State.settings.muteAll ? 'Sounds are muted. Tap to turn sounds on' : 'Sounds are on. Tap to mute all sounds'}">${icon(State.settings.muteAll ? 'mute' : 'volume')}</button>
     <button class="icon-btn bell ${n ? 'has' : ''}" data-act="inbox" aria-label="Notifications, ${n} unread">${icon('bell')}${n ? `<span class="badge">${n}</span>` : ''}</button>
     <button class="icon-btn" data-act="settings" aria-label="Settings">${icon('gear')}</button>
     <button class="icon-btn power-btn" data-act="exit" aria-label="Exit ${esc(APP.name)}">${icon('power')}</button>`;
@@ -152,3 +152,10 @@ function subHead(parent: string, title: string, sub: string, right?: string): st
 }
 
 ACTIONS.unmute = () => { State.settings.muteAll = false; renderTopbar(); Sound.tick(); toast('Sounds on', 'ok'); };
+ACTIONS['sound-toggle'] = () => {
+  const mute = !State.settings.muteAll;
+  if (mute) { Voice.stop(); State.settings.muteAll = true; } else { State.settings.muteAll = false; Sound.tick(); }
+  renderTopbar(); Haptics.pulse(8);
+  try { if ($('#set-body')) rerenderSettingsBody(); } catch (e) { /* settings closed */ }
+  toast(mute ? 'All sounds muted' : 'Sounds on', 'ok');
+};

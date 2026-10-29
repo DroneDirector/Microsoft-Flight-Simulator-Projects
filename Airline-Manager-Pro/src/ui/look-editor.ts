@@ -43,8 +43,9 @@ function lookEditorBody(): string {
     <div class="le-group"><b>Eyes</b>${leChoice('eyes', [['almond', 'Almond'], ['round', 'Round'], ['mono', 'Monolid']], L.eyes)}</div>
     <div class="le-group"><b>Nose</b>${leChoice('nose', [['narrow', 'Narrow'], ['medium', 'Medium'], ['wide', 'Wide']], L.nose)}</div>
     <div class="le-group"><b>Lips</b>${leChoice('lips', [['thin', 'Thin'], ['medium', 'Medium'], ['full', 'Full']], L.lips)}</div>
-    <div class="le-group"><b>Facial hair</b>${leChoice('facial', [['none', 'None'], ['stubble', 'Stubble'], ['moustache', 'Moustache'], ['beard', 'Beard']], L.facial)}</div>
-    <div class="le-group"><b>Glasses</b>${leChoice('glasses', [['none', 'No glasses'], ['rect', 'Rectangular'], ['round', 'Round'], ['aviator', 'Aviator']], L.glasses)}</div>`;
+    <div class="le-group"><b>Beard</b>${leChoice('facial', [['none', 'None'], ['stubble', 'Stubble'], ['short', 'Short beard'], ['full', 'Full beard'], ['goatee', 'Goatee'], ['vandyke', 'Van Dyke']], L.facial === 'beard' ? 'short' : L.facial)}</div>
+    <div class="le-group"><b>Moustache</b>${leChoice('facial', [['pencil', 'Pencil'], ['chevron', 'Chevron'], ['walrus', 'Walrus'], ['handlebar', 'Handlebar'], ['horseshoe', 'Horseshoe']], L.facial === 'moustache' ? 'chevron' : L.facial)}</div>
+    <div class="le-group"><b>Glasses</b>${leChoice('glasses', [['none', 'No glasses'], ['rect', 'Rectangular'], ['round', 'Round'], ['aviator', 'Aviator'], ['sunglasses', 'Pilot sunglasses']], L.glasses)}</div>`;
   if (t === 'hair') return `
     <div class="le-group"><b>Hairstyle</b>${leChoice('hair', Object.keys(HAIR_STYLES).map(k => [k, HAIR_STYLES[k]]), L.hair)}</div>
     <div class="le-group"><b>Hair colour</b>${leSwatches('hairColor', HAIR_COLORS, L.hairColor)}</div>`;

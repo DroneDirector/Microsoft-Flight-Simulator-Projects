@@ -43,6 +43,10 @@ if (existsSync(three)) {
   copyFileSync(three, join(root, 'www/vendor/three.min.js'));
 }
 
+// Crew body data (made from the CC0 MakeHuman model, see tools/human-data)
+const humans = join(root, 'assets/humans.bin');
+copyFileSync(humans, join(root, 'www/humans.bin'));
+
 const tpl = readFileSync(join(root, 'www/index.template.html'), 'utf8');
 writeFileSync(join(root, 'www/index.html'), tpl.replace(/%APP_NAME%/g, cfg.appName).replace(/%APP_VERSION%/g, cfg.version));
 
@@ -65,7 +69,7 @@ if (process.argv.includes('--preview')) {
     .replace(/<script src="vendor\/three.min.js"><\/script>/, () => existsSync(three) ? `<script>${readFileSync(three, 'utf8').replace(/<\/script/g, '<\\/script')}</script>` : '')
     .replace(/\s*<script src="vendor\/maplibre[^"]+"><\/script>/g, '')
     .replace(/<link rel="stylesheet" href="styles.css">/, () => `<style>${css}</style>`)
-    .replace(/<script src="app.js"><\/script>/, () => `<script>${js.replace(/<\/script/g, '<\\/script')}</script>`);
+    .replace(/<script src="app.js"><\/script>/, () => `<script>window.__HUMANS_B64="${readFileSync(humans).toString('base64')}";</script><script>${js.replace(/<\/script/g, '<\\/script')}</script>`);
   mkdirSync(join(root, 'dist'), { recursive: true });
   writeFileSync(join(root, 'dist/preview.html'), html);
   console.log('Preview written to dist/preview.html');

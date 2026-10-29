@@ -23,15 +23,20 @@ import org.json.JSONObject;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
 import java.net.SocketTimeoutException;
+import java.util.Collections;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Local Wi-Fi helpers for linking to the Airline Manager Pro PC app:
- * the Wi-Fi network name, signal and this phone's address, and UDP discovery of PCs on the network.
+ * Local network helpers for linking to the Airline Manager Pro PC app: the Wi-Fi network name,
+ * signal and this phone's address, whether the phone shares its mobile data (hotspot or USB),
+ * and UDP discovery of PCs on every local network the phone is on, including its own hotspot.
  */
 @CapacitorPlugin(
     name = "LanLink",
@@ -85,6 +90,23 @@ public class LanLinkPlugin extends Plugin {
         r.put("ssid", ssid);
         r.put("ip", "0.0.0.0".equals(ip) ? "" : ip);
         r.put("level", level);
+        // the phone's own hotspot (or USB tethering): an interface other than the Wi-Fi client with a local address
+        String hsIp = "", hsKind = "";
+        try {
+            for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                String name = ni.getName();
+                boolean ap = name.matches("^(ap|swlan|softap|wlan[1-9]|wifi_ap|wl0\\.).*"), usb = name.matches("^(rndis|usb|ncm).*");
+                if (!ap && !usb) continue;
+                for (InterfaceAddress ia : ni.getInterfaceAddresses()) {
+                    InetAddress a = ia.getAddress();
+                    if (a instanceof Inet4Address && a.isSiteLocalAddress() && !a.getHostAddress().equals(ip)) { hsIp = a.getHostAddress(); hsKind = usb ? "usb" : "hotspot"; }
+                }
+            }
+        } catch (Exception ignored) { }
+        r.put("hotspot", !hsIp.isEmpty());
+        r.put("hotspotIp", hsIp);
+        r.put("hotspotKind", hsKind);
         return r;
     }
 
@@ -109,6 +131,15 @@ public class LanLinkPlugin extends Plugin {
                 targets.add("255.255.255.255");
                 DhcpInfo d = wm.getDhcpInfo();
                 if (d != null && d.netmask != 0) targets.add(intToIp((d.ipAddress & d.netmask) | ~d.netmask));
+                // every local network: Wi-Fi, the phone's own hotspot, USB tethering
+                try {
+                    for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                        if (!ni.isUp() || ni.isLoopback()) continue;
+                        for (InterfaceAddress ia : ni.getInterfaceAddresses()) {
+                            if (ia.getAddress() instanceof Inet4Address && ia.getAddress().isSiteLocalAddress() && ia.getBroadcast() != null) targets.add(ia.getBroadcast().getHostAddress());
+                        }
+                    }
+                } catch (Exception ignored) { }
                 long end = System.currentTimeMillis() + timeout;
                 long nextSend = 0;
                 byte[] buf = new byte[2048];

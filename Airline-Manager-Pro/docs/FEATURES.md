@@ -17,7 +17,9 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | Feature | Status |
 |---|---|
 | PC app (Windows) that reads the simulator through SimConnect, no SDK needed | Built |
-| Link over Wi-Fi only (phone and PC on the same network), discovery, 6-digit pairing, auto-reconnect | Built |
+| Link over the same Wi-Fi, discovery, 6-digit pairing, auto-reconnect | Built |
+| Link over mobile data: the PC joins the phone's hotspot (or USB tethering) | Built |
+| Link over the internet (phone on mobile data, PC on its own connection anywhere) | Planned |
 | Pairing a PC with a code | Built |
 | PC app log file; errors keep the window open with the details | Built |
 | Detect which aircraft is loaded in the sim and match it to the aircraft you're flying | Built |
@@ -149,7 +151,7 @@ Only damage the simulator can actually detect.
 | Fuel on board and weights (empty, passengers, bags, cargo, mail, fuel, total vs. MTOW) from Flight Simulator | Built |
 | GSX detection; fallback to the sim's own payload data | Built |
 | Load data from PMDG / Fenix / iniBuilds own interfaces where needed | Planned |
-| Connection panel: Wi-Fi network, PC app scan, manual address; Wi-Fi only, same network | Built |
+| Connection panel: Wi-Fi network, phone hotspot, PC app scan, manual address | Built |
 | Finance transaction details and salary list | Built |
 
 ## Your flights from the simulator

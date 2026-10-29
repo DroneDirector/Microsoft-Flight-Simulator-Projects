@@ -8,3 +8,4 @@ capacitor.config.json
 /android/
 src/**/*.js
 www/vendor/
+www/humans.bin

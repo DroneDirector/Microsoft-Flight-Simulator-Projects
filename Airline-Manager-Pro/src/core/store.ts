@@ -8,7 +8,7 @@ const SAVE_VERSION = 1;
 const SAVED_KEYS = ['companyId', 'divisionId', 'myReg', 'settings', 'profiles', 'companies', 'pilots', 'candidates',
   'fleet', 'live', 'today', 'routes', 'logbook', 'issues', 'notices', 'txns', 'fines',
   'staff', 'staffCandidates', 'incidents', 'coPilot', 'birthdayGreeted', 'simDate', 'myLoad', 'salaryV2',
-  'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown'];
+  'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown', 'aiNext'];
 
 // Changes between save versions go here, e.g. MIGRATIONS[2] = data => { ...; return data; }
 const MIGRATIONS: { [v: number]: (d: any) => any } = {};
@@ -38,8 +38,35 @@ const Store = {
   save() {
     const out: any = {};
     for (const k of SAVED_KEYS) out[k] = (State as any)[k];
-    try { localStorage.setItem(STORE_KEY, JSON.stringify({ v: SAVE_VERSION, app: APP.version, savedAt: Date.now(), state: out })); }
+    const json = JSON.stringify({ v: SAVE_VERSION, app: APP.version, savedAt: Date.now(), state: out });
+    try { localStorage.setItem(STORE_KEY, json); }
     catch (e) { /* storage full or unavailable: keep running from memory */ }
+    // and a second copy in the app's own files on the phone
+    // (at most every few seconds, and straight away when the app goes to the background)
+    this._native = json;
+    if (document.hidden) this.flushNative();
+    else if (!this._nativeTimer) this._nativeTimer = setTimeout(() => this.flushNative(), 5000);
+  },
+  _native: '' as string,
+  _nativeTimer: 0 as any,
+  flushNative() {
+    clearTimeout(this._nativeTimer); this._nativeTimer = 0;
+    const T = this.native(), json = this._native; this._native = '';
+    if (json && T && T.backupWrite) T.backupWrite({ data: json }).catch(() => { /* the web copy is still there */ });
+  },
+
+  native(): any { const cap = (window as any).Capacitor; return cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.AppTools; },
+
+  /** If the web storage was emptied (the system can clear it), bring the airline back from the phone's copy. */
+  restoreIfEmpty() {
+    let has = false;
+    try { has = !!localStorage.getItem(STORE_KEY); } catch (e) { /* storage unavailable */ }
+    const T = this.native();
+    if (has || !T || !T.backupRead) return;
+    T.backupRead().then((r: any) => {
+      if (!r || !r.data) return;
+      try { JSON.parse(r.data); localStorage.setItem(STORE_KEY, r.data); location.reload(); } catch (e) { /* broken copy: start fresh */ }
+    }).catch(() => { /* no copy */ });
   },
 
   /** Save shortly after a change, so many quick changes become one write. */

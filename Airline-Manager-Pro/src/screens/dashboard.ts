@@ -12,13 +12,16 @@ function coPilotChip(): string {
 function flightCard(f: LiveFlight): string {
   const a = plane(f.reg), t = acType(a.typeId), A = apt(f.from), B = apt(f.to);
   const dist = gcDistanceNm(A.pos, B.pos);
-  const left = f.real ? (f.noDest ? 0 : gcDistanceNm(f.pos, B.pos)) : dist * (1 - f.t);
+  const F: any = f, ai = aiOn(f) && F.depAt;
+  // hired pilots: miles along the planned route and time to the gate from the real-world flight profile
+  const left = ai ? F.leftNm : f.real ? (f.noDest ? 0 : gcDistanceNm(f.pos, B.pos)) : dist * (1 - f.t);
   const spd = f.real && f.gs > 60 ? f.gs : t.cruiseKt;
   const eta = Math.round(left / spd * 60);
-  const altTxt = f.alt < 18000 ? num(Math.round(f.alt / 100) * 100) + ' ft' : 'FL' + Math.round(f.alt / 100);
+  const etaTxt = ai ? countdown(F.toGoS) : hours(eta);
+  const altTxt = f.alt < 50 ? 'Ground' : f.alt < 18000 ? num(Math.round(f.alt / 100) * 100) + ' ft' : 'FL' + Math.round(f.alt / 100);
   const fuelOk = (State as any).myLoad.fuelKg >= (State as any).myLoad.tripFuelKg + (State as any).myLoad.reserveKg;
   return `
-  <div class="card flight-card">
+  <div class="card flight-card" data-fc="${esc(f.id)}">
     <div class="fc-top"><span class="fc-cs">${esc(f.callsign)}</span>${statusChip('flying')}<span class="fc-ac">${esc(f.reg)}, ${esc(t.model)}</span></div>
     <div class="fc-route">
       <div><b>${esc(f.from)}</b><small>${esc(A.city)}</small></div>
@@ -29,7 +32,7 @@ function flightCard(f: LiveFlight): string {
       <div><small>Phase</small><b>${esc(f.phase)}</b></div>
       <div><small>Altitude</small><b>${altTxt}</b></div>
       <div><small>Remaining</small><b>${f.noDest ? '—' : num(left) + ' nm'}</b></div>
-      <div><small>Arrives in</small><b>${f.noDest ? '—' : hours(eta)}</b></div>
+      <div><small>Arrives in</small><b>${f.noDest ? '—' : etaTxt}</b></div>
     </div>
     ${f.you ? `<div class="fc-sync">
       <div class="sync-item">${icon('pax')}<span><small>Passengers from ${(State as any).myLoad.source === 'gsx' ? 'GSX' : 'the sim'}</small><b>${f.pax} / ${f.paxMax}</b></span></div>

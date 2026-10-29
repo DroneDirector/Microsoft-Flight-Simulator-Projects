@@ -158,7 +158,9 @@ small { font-size: 12px; color: var(--ink-2); }
 .link-pill.ok .link-led { background: var(--green); box-shadow: 0 0 0 0 rgba(61, 220, 151, .6); animation: led 2.4s infinite; }
 @keyframes led { 0% { box-shadow: 0 0 0 0 rgba(61, 220, 151, .55); } 70% { box-shadow: 0 0 0 7px rgba(61, 220, 151, 0); } 100% { box-shadow: 0 0 0 0 rgba(61, 220, 151, 0); } }
 .top-spacer { flex: 1; }
-.balance { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; padding: 0 6px; border-radius: 8px; }
+.balance { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; padding: 0 6px; border-radius: 8px; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+.balance:active { background: rgba(255,255,255,.06); }
+.balance:focus-visible { outline: 2px solid var(--cyan); }
 .balance small { font-size: 10.5px; }
 .balance b { font: 700 17px/1.1 var(--display); }
 .balance.flash b { animation: flashUp .9s var(--ease); }

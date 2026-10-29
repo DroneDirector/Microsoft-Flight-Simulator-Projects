@@ -1,8 +1,10 @@
-// Shows the 3D crew figures in the interface. One shared WebGL renderer draws every avatar
-// (into the top-left corner of its canvas, then copied into the avatar's own canvas):
-// small ones become cached pictures, the few largest on screen are animated live
-// (breathing, a gentle sway, blinking, looking around) and can be turned with a finger.
-// Without WebGL (or the 3D library) the drawn 2D avatars are used instead.
+// Shows the crew figures (see human.ts) in the interface. One shared WebGL renderer draws every
+// avatar into the corner of its canvas, then copies it into the avatar's own canvas:
+// small ones become cached pictures (built with less hair detail), the few largest on screen are
+// animated live (breathing, a gentle sway, blinking, looking around) and can be turned with a finger.
+// Without WebGL, the 3D library or the body data, the drawn 2D avatars are used instead.
+
+declare const THREE: any;
 
 interface AvReq { look: Look; role: CrewRole; accent: string; view: 'full' | 'bust'; still: boolean }
 
@@ -16,12 +18,14 @@ const Av3 = {
   models: new Map<string, any>(),
   pics: new Map<string, HTMLCanvasElement>(),
   queue: [] as HTMLCanvasElement[],
-  live: [] as { el: HTMLCanvasElement; model: any; t0: number; yaw: number; drag: any; blinkAt: number; blinkT: number; gaze: number[]; gazeAt: number; lastTouch: number }[],
+  live: [] as { el: HTMLCanvasElement; model: any; t0: number; yaw: number; drag: any; blinkAt: number; blinkT: number; gaze: number[]; gazeAt: number; lastTouch: number; drawn: number }[],
+  failed: false,
   raf: 0,
   sizes: null as any,
 };
 
 function av3Supported(): boolean {
+  if (Av3.failed) return false;
   if (Av3.ok !== null) return Av3.ok;
   try {
     const T = (window as any).THREE;
@@ -38,22 +42,22 @@ function av3Init() {
   r.setClearColor(0x000000, 0);
   r.outputColorSpace = THREE.SRGBColorSpace;
   r.toneMapping = THREE.ACESFilmicToneMapping;
-  r.toneMappingExposure = 1.35;
+  r.toneMappingExposure = 1.12;
   r.shadowMap.enabled = true;
   r.shadowMap.type = THREE.PCFSoftShadowMap;
   r.domElement.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); });
   Av3.renderer = r;
   const scene = new THREE.Scene();
-  // soft studio light: sky and floor bounce, a warm key light with soft shadows, a cool rim
-  scene.add(new THREE.HemisphereLight(0xdfeaff, 0x3a3128, 1.1));
-  const key = new THREE.DirectionalLight(0xfff0e2, 2.6);
-  key.position.set(-1.4, 3.2, 3.0); key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.012; key.shadow.radius = 4;
-  const sc = key.shadow.camera; sc.left = -0.6; sc.right = 0.6; sc.top = 2.0; sc.bottom = -0.1; sc.near = 0.5; sc.far = 8;
+  // studio light: sky and floor bounce, a warm key light with soft shadows, a soft fill and two rims
+  scene.add(new THREE.HemisphereLight(0xdfeaff, 0x3a3128, 1.3));
+  const key = new THREE.DirectionalLight(0xfff0e2, 2.8);
+  key.position.set(-1.6, 3.2, 3.2); key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0003; key.shadow.normalBias = 0.01; key.shadow.radius = 5;
+  const sc = key.shadow.camera; sc.left = -0.7; sc.right = 0.7; sc.top = 2.1; sc.bottom = -0.1; sc.near = 0.5; sc.far = 8;
   key.target.position.set(0, 0.9, 0); scene.add(key, key.target);
-  const fill = new THREE.DirectionalLight(0xbcd6ff, 0.8); fill.position.set(2.2, 1.6, 2.0); scene.add(fill);
-  const rim = new THREE.DirectionalLight(0x8fe4ff, 2.2); rim.position.set(1.2, 2.6, -2.6); scene.add(rim);
-  const rim2 = new THREE.DirectionalLight(0xffd9b0, 1.0); rim2.position.set(-1.6, 1.8, -2.0); scene.add(rim2);
+  const fill = new THREE.DirectionalLight(0xdbe6ff, 1.2); fill.position.set(2.2, 1.8, 2.6); scene.add(fill);
+  const rim = new THREE.DirectionalLight(0x8fe4ff, 2.2); rim.position.set(1.4, 2.6, -2.8); scene.add(rim);
+  const rim2 = new THREE.DirectionalLight(0xffd9b0, 1.2); rim2.position.set(-1.8, 1.8, -2.2); scene.add(rim2);
   // environment for reflections on gold, visors and eyes
   const pm = new THREE.PMREMGenerator(r);
   const env = new THREE.Scene();
@@ -65,7 +69,10 @@ function av3Init() {
   for (const [x, y, z, w] of [[-4, 5, 5, 4], [5, 3, 3, 2], [0, 4, -6, 3]]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, w), new THREE.MeshBasicMaterial({ color: 0xffffff })); p.position.set(x, y, z); p.lookAt(0, 1, 0); env.add(p); }
   scene.environment = pm.fromScene(env, 0.02).texture;
   // contact shadow under the feet
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.42), new THREE.MeshBasicMaterial({ map: shadowTex(), transparent: true, depthWrite: false }));
+  const sh = document.createElement('canvas'); sh.width = sh.height = 128;
+  { const g = sh.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(0.55, 'rgba(0,0,0,0.22)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); }
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.42), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sh), transparent: true, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.002; shadow.renderOrder = -1;
   scene.add(shadow);
   Av3.stage = new THREE.Group(); scene.add(Av3.stage);
@@ -87,11 +94,20 @@ function av3Init() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) av3Loop(); });
   // look now and then for figures that should be animated (pop-ups opening, screens changing)
   setInterval(() => { if (!Av3.raf && !document.hidden && document.querySelector('canvas.av3:not(.still)')) av3Loop(); }, 1000);
+  // the body data loads once; until then avatars wait
+  Human.load().then(() => av3Refresh()).catch((e: any) => {
+    Av3.failed = true;
+    ErrorLog.add('avatars', 'Crew figures couldn\'t load', (e && e.message) || String(e), 'The drawn avatars are shown instead.', false);
+    refresh();
+  });
 }
+
+/** Proportions chosen in Settings → Crew figures. */
+function av3Style(): string { return (State && State.settings && (State.settings as any).crewStyle) || 'balanced'; }
 
 function av3Key(look: Look, role: CrewRole, accent: string): string {
   const L = dressed(look, role);
-  return role + '|' + accent + '|' + ['sex', 'skin', 'face', 'eyes', 'nose', 'lips', 'hair', 'hairColor', 'facial', 'glasses', 'top', 'bottom', 'shoes', 'neck', 'hat', 'uniform'].map(k => (L as any)[k]).join(',');
+  return av3Style() + '|' + role + '|' + accent + '|' + ['sex', 'skin', 'face', 'eyes', 'nose', 'lips', 'hair', 'hairColor', 'facial', 'glasses', 'top', 'bottom', 'shoes', 'neck', 'hat', 'uniform'].map(k => (L as any)[k]).join(',');
 }
 
 /** The avatar markup: a canvas the renderer paints into (see avatarSvg). */
@@ -102,16 +118,18 @@ function avatar3dHtml(look: Look, role: CrewRole, o: { view?: 'full' | 'bust'; a
   return `<canvas class="av av3 ${view === 'bust' ? 'bust' : ''} ${o.still ? 'still' : ''} ${o.cls || ''}" data-k="${esc(key)}" data-view="${view}" role="img" aria-label="Crew avatar"></canvas>`;
 }
 
-function av3Model(key: string): any {
-  let m = Av3.models.get(key);
-  if (m) { Av3.models.delete(key); Av3.models.set(key, m); return m; }
-  const rq = Av3.reqs[key]; if (!rq) return null;
-  m = buildFigure(rq.look, rq.role, rq.accent);
-  const box = new THREE.Box3().setFromObject(m.root);
-  m.top = box.max.y; m.width = Math.max(box.max.x - box.min.x, 0.5);
-  Av3.models.set(key, m);
-  // keep a handful of built figures; free the rest
-  while (Av3.models.size > 10) {
+/** A built figure for a request; q is the detail (1 for large or animated figures, less for small pictures). */
+function av3Model(key: string, q?: number): any {
+  q = q || 1;
+  const mk = key + '|' + q;
+  let m = Av3.models.get(mk);
+  if (m) { Av3.models.delete(mk); Av3.models.set(mk, m); return m; }
+  const rq = Av3.reqs[key]; if (!rq || !Human.ready) return null;
+  try { m = Human.build(rq.look, rq.role, rq.accent, key.split('|')[0], q); }
+  catch (e) { ErrorLog.add('avatars', 'A crew figure couldn\'t be drawn', (e && e.message) || String(e), e && e.stack, false); return null; }
+  Av3.models.set(mk, m);
+  // keep a few built figures; free the rest
+  while (Av3.models.size > 6) {
     const k0 = Av3.models.keys().next().value, old = Av3.models.get(k0);
     if (Av3.live.some(l => l.model === old)) break;
     Av3.models.delete(k0); av3Dispose(old.root);
@@ -121,7 +139,7 @@ function av3Model(key: string): any {
 function av3Dispose(o: any) {
   o.traverse((m: any) => {
     if (m.geometry) m.geometry.dispose();
-    if (m.material) (Array.isArray(m.material) ? m.material : [m.material]).forEach((x: any) => x.dispose());
+    if (m.material) (Array.isArray(m.material) ? m.material : [m.material]).forEach((x: any) => { if (x.map && !(x.map.userData && x.map.userData.shared)) x.map.dispose(); x.dispose(); });
   });
 }
 
@@ -155,26 +173,11 @@ function av3Draw(model: any, view: string, w: number, h: number, pose?: { t: num
   const H = r.domElement.height;
   r.setViewport(0, H - h, w, h); r.setScissor(0, H - h, w, h); r.setScissorTest(true);
   Av3.stage.add(model.root);
-  av3Pose(model, pose || { t: 0, yaw: 0, blink: 0, gaze: [0, 0] });
+  model.pose(pose || { t: 0, yaw: 0, blink: 0, gaze: [0, 0] });
   av3Frame(model, view, w, h);
   r.clear();
   r.render(Av3.scene, Av3.camera);
   Av3.stage.remove(model.root);
-}
-
-function av3Pose(m: any, p: { t: number; yaw: number; blink: number; gaze: number[] }) {
-  const t = p.t, P = m.parts;
-  m.root.rotation.y = p.yaw;
-  m.root.rotation.z = Math.sin(t * 2 * Math.PI / 6.2) * 0.012;
-  const br = Math.sin(t * 2 * Math.PI / 4.2);
-  P.torso.scale.set(1 + br * 0.006, 1 + br * 0.004, 1 + br * 0.01);
-  P.head.position.y = 1.47 + br * 0.002;
-  P.head.rotation.y = Math.sin(t * 0.43) * 0.16 + Math.sin(t * 0.17) * 0.08 + p.gaze[0] * 0.3;
-  P.head.rotation.x = Math.sin(t * 0.31 + 1) * 0.04 - 0.02;
-  P.head.rotation.z = Math.sin(t * 0.23 + 2) * 0.025;
-  P.armL.rotation.x = Math.sin(t * 2 * Math.PI / 6.2 + 0.4) * 0.02; P.armR.rotation.x = Math.sin(t * 2 * Math.PI / 6.2 + 1.2) * 0.02;
-  for (const e of P.eyes) { e.rotation.x = -p.gaze[1] * 0.25; e.rotation.y = (e.position.x > 0 ? 0.06 : -0.06) + p.gaze[0] * 0.3; }
-  for (const l of P.lids) l.rotation.x = lerp(l.userData.open, l.userData.closed, p.blink);
 }
 
 /* ---------- attaching canvases ---------- */
@@ -208,7 +211,7 @@ function av3Tick(now: number) {
   Av3.raf = 0;
   const t0 = performance.now();
   // pending pictures
-  while (Av3.queue.length && performance.now() - t0 < 24) {
+  while (Human.ready && Av3.queue.length && performance.now() - t0 < 24) {
     const el = Av3.queue.shift();
     if (!el.isConnected) continue;
     const key = el.getAttribute('data-k'), view = el.getAttribute('data-view');
@@ -216,7 +219,8 @@ function av3Tick(now: number) {
     const pk = key + '|' + view + '|' + w + 'x' + h;
     let pic = Av3.pics.get(pk);
     if (!pic) {
-      const model = av3Model(key); if (!model) continue;
+      // small pictures are built with less hair, which looks the same at that size and is much quicker
+      const model = av3Model(key, el.clientHeight < 230 ? 0.3 : 1); if (!model) continue;
       av3Draw(model, view, w, h);
       pic = document.createElement('canvas'); pic.width = w; pic.height = h;
       pic.getContext('2d').drawImage(Av3.renderer.domElement, 0, 0, w, h, 0, 0, w, h);
@@ -238,6 +242,8 @@ function av3Tick(now: number) {
     const bt = (sec - L.blinkT) / 0.16, blink = bt >= 0 && bt <= 1 ? Math.sin(bt * Math.PI) : 0;
     if (sec > L.gazeAt) { L.gaze = [(Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.15]; L.gazeAt = sec + 1.2 + Math.random() * 2.5; }
     if (!L.drag && sec - L.lastTouch > 3) L.yaw *= 0.94;
+    if (sec - L.drawn < 1 / 30) continue;   // 30 frames a second is plenty for idle motion
+    L.drawn = sec;
     av3Draw(L.model, el.getAttribute('data-view'), w, h, { t: sec - L.t0, yaw: L.yaw, blink, gaze: L.gaze });
     const g = el.getContext('2d');
     g.clearRect(0, 0, w, h); g.drawImage(Av3.renderer.domElement, 0, 0, w, h, 0, 0, w, h);
@@ -252,7 +258,7 @@ function av3PickLive() {
   const now = performance.now();
   if (now - _av3PickAt < 500 && Av3.live.every(l => l.el.isConnected)) return;
   _av3PickAt = now;
-  if (State && State.settings && State.settings.reduceMotion) { Av3.live = []; return; }
+  if (!Human.ready || (State && State.settings && State.settings.reduceMotion)) { Av3.live = []; return; }
   const cands: { el: HTMLCanvasElement; area: number }[] = [];
   document.querySelectorAll('canvas.av3:not(.still)').forEach(c => {
     const el = c as HTMLCanvasElement, r = el.getBoundingClientRect();
@@ -272,7 +278,7 @@ function av3PickLive() {
     if (Av3.live.some(l => l.el === el)) continue;
     const model = av3Model(el.getAttribute('data-k')); if (!model) continue;
     const sec = performance.now() / 1000;
-    Av3.live.push({ el, model, t0: sec - Math.random() * 6, yaw: 0, drag: null, blinkAt: sec + 1 + Math.random() * 2, blinkT: -9, gaze: [0, 0], gazeAt: sec + 1, lastTouch: 0 });
+    Av3.live.push({ el, model, t0: sec - Math.random() * 6, yaw: 0, drag: null, blinkAt: sec + 1 + Math.random() * 2, blinkT: -9, gaze: [0, 0], gazeAt: sec + 1, lastTouch: 0, drawn: 0 });
   }
 }
 

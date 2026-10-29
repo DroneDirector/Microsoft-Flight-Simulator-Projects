@@ -1,6 +1,6 @@
 # Airline Manager Pro PC app
 
-Runs on the Windows PC with Microsoft Flight Simulator 2024 (or 2020) and links it to the Airline Manager Pro Android app over your Wi-Fi.
+Runs on the Windows PC with Microsoft Flight Simulator 2024 (or 2020) and links it to the Airline Manager Pro Android app over your Wi-Fi, or over your phone's hotspot (mobile data).
 
 - Reads your aircraft through SimConnect with [node-simconnect](https://github.com/EvenAR/node-simconnect). No SDK or SimConnect.dll is needed on the PC.
 - Tracks each leg: blocks off, take-off, touchdown (landing rate, G, pitch), blocks on, with distance, block time and fuel used.

@@ -111,6 +111,37 @@ public class AppToolsPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /* ---------- Save backup ---------- */
+    // A second copy of the saved airline in the app's own files, used if the web storage is ever emptied.
+
+    static final String BACKUP_FILE = "save-backup.json";
+
+    @PluginMethod
+    public void backupWrite(PluginCall call) {
+        String data = call.getString("data", "");
+        File dir = getContext().getFilesDir(), tmp = new File(dir, BACKUP_FILE + ".tmp"), dst = new File(dir, BACKUP_FILE);
+        try (OutputStream out = new FileOutputStream(tmp)) {
+            out.write(data.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) { call.reject("Backup could not be written: " + describe(e)); return; }
+        if (!tmp.renameTo(dst)) { call.reject("Backup could not be stored"); return; }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void backupRead(PluginCall call) {
+        JSObject r = new JSObject();
+        File f = new File(getContext().getFilesDir(), BACKUP_FILE);
+        if (f.exists()) {
+            try (InputStream in = new FileInputStream(f)) {
+                java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+                byte[] b = new byte[64 * 1024]; int n;
+                while ((n = in.read(b)) > 0) buf.write(b, 0, n);
+                r.put("data", new String(buf.toByteArray(), StandardCharsets.UTF_8));
+            } catch (Exception e) { r.put("data", ""); }
+        }
+        call.resolve(r);
+    }
+
     /* ---------- Updates ---------- */
 
     private boolean canInstall() {
