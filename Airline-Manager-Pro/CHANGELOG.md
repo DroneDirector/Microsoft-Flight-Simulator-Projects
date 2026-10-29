@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2 (2026-10-29)
+
+- Published SIDs, STARs and approaches read from the simulator by the PC app, kept on the phone, chosen by runway in use and direction; generated ones where there are none
+
 ## 0.7.1 (2026-10-29)
 
 - Departures, arrivals and ILS/RNP approaches: one path per flight from runway to runway, runway in use by wind, shown and named on the map
