@@ -1,0 +1,258 @@
+COMMERCIAL AIRCRAFT LANDING SPEEDS, WEIGHTS AND PASSENGER LOADS
+Reference guide | Prepared 29 October 2026
+
+IMPORTANT SCOPE AND SAFETY NOTE This guide follows the same broad
+aircraft families as the companion takeoff-speed guide. It covers major
+commercial passenger jets and selected regional turboprops. It is a
+broad reference, not literally every aircraft ever built or every
+sub-variant.
+
+Landing speeds below are approximate educational ranges for final
+approach / threshold airspeed in landing configuration. They are not
+guaranteed landing speeds for a specific flight. The actual target
+approach speed is calculated for the aircraft’s actual landing weight,
+flap/configuration, wind, and operating procedures. Never use this guide
+to operate an aircraft or determine whether a particular runway is long
+enough.
+
+KEY TERMS • Approach speed (often called VAPP): the target speed used on
+final approach. It is usually higher than the aircraft’s reference speed
+to account for wind and other factors. • Threshold speed: airspeed as
+the aircraft crosses the runway threshold; published
+aircraft-characteristics tables may state a final approach speed under
+specified conditions. • Touchdown speed: speed over the runway at wheel
+contact. It is lower than threshold speed because the aircraft
+decelerates during the flare, but it varies. • Maximum landing weight
+(MLW): the maximum permitted aircraft weight for landing. It is not the
+weight every flight must have, nor the minimum weight needed to land. •
+Maximum takeoff weight (MTOW): a separate limit; it is usually higher
+than MLW. A flight may depart heavy and burn fuel before landing.
+
+UNITS 1 knot (kt) = 1.852 km/h. Landing speed is airspeed, not
+groundspeed. A headwind means lower groundspeed for the same airspeed; a
+tailwind means higher groundspeed and generally increases landing
+distance.
+
+HOW TO READ THE LIST • Typical seats are common airline layouts, not a
+certified limit for every operator. • Approx. landing approach speed is
+a broad illustrative range in knots and km/h, not an operational speed
+for a specific flight. • Approx. MLW is a representative family-level
+figure in metric tonnes. Weight options vary by exact model, engine,
+certification and operator. • Passenger count does not set a landing
+speed by itself. Actual landing weight includes the aircraft, crew,
+passengers, baggage/cargo and remaining fuel.
+
+======================================================================== 1.
+AIRBUS PASSENGER JETS
+========================================================================
+
+Model Typical seats Approx. approach speed Approx. MLW (kt; km/h)
+(tonnes) A220-100 100-120 120-135; 222-250 about 55 A220-300 120-160
+125-140; 231-259 about 60 A318 107-132 120-135; 222-250 about 57 A319ceo
+124-156 125-140; 231-259 about 62 A319neo 120-160 125-140; 231-259 about
+67 A320ceo 150-180 125-140; 231-259 about 66 A320neo 150-194 125-140;
+231-259 about 67-68 A321ceo 185-220 130-145; 241-269 about 75-77 A321neo
+185-244 130-145; 241-269 about 79-82 A321XLR 180-220 130-145; 241-269
+variant-dependent A300-600 250-300 130-150; 241-278 about 140 A310-300
+200-280 125-145; 231-269 about 123 A330-200 220-290 135-155; 250-287
+about 182 A330-300 250-330 135-155; 250-287 about 187 A330-800 220-260
+135-155; 250-287 about 191 A330-900 260-300 135-155; 250-287 about 191
+A340-300 250-300 135-150; 250-278 about 192 A340-600 320-380 145-160;
+269-296 about 265 A350-900 300-350 135-150; 250-278 about 205 A350-1000
+350-410 140-155; 259-287 about 236 A380-800 450-600 145-160; 269-296
+about 394
+
+Specific published Airbus airport-planning examples under standard
+conditions: • A320-200: 136 kt at 66,000 kg MLW. • A320neo: 131.5 kt at
+67,400 kg MLW. • A321-100/-200: 140 kt at 75,500 kg MLW; A321neo: 136 kt
+at 79,200 kg MLW. • A340-500: 146 kt at 246,000 kg MLW; A340-600: 153 kt
+at 265,000 kg MLW. • A350-900: 140 kt at 205,000 kg MLW; A350-1000: 147
+kt at 236,000 kg MLW. These are manufacturer airport-planning reference
+values for stated configurations/conditions and are not a target speed
+for every landing.
+
+========================================================================
+2. BOEING PASSENGER JETS
+========================================================================
+
+Model Typical seats Approx. approach speed Approx. MLW (kt; km/h)
+(tonnes) 717-200 100-125 120-140; 222-259 about 50 737-700 125-145
+120-140; 222-259 about 58 737-800 160-180 125-145; 231-269 about 66
+737-900ER 175-195 130-145; 241-269 about 71 737 MAX 7 135-160 120-140;
+222-259 variant-dependent 737 MAX 8 160-180 125-145; 231-269 about 69
+737 MAX 9 175-195 130-145; 241-269 about 74 737 MAX 10 185-210 130-145;
+241-269 variant-dependent 747-400 350-420 140-160; 259-296 about 285
+747-8 Intercontinental 400-470 145-165; 269-306 about 342 757-200
+180-220 125-145; 231-269 about 91 757-300 220-280 130-150; 241-278 about
+99 767-300ER 210-270 130-150; 241-278 about 145 767-400ER 240-300
+135-150; 250-278 about 159 777-200ER 300-375 135-155; 250-287 about 213
+777-200LR 300-375 140-160; 259-296 about 223 777-300ER 350-425 140-160;
+259-296 about 251 777-8 (development) 350-425 140-165; 259-306
+variant-dependent 777-9 (development) 375-450 140-165; 259-306
+variant-dependent 787-8 200-275 130-150; 241-278 about 172 787-9 250-325
+135-155; 250-287 about 193 787-10 300-375 135-155; 250-287 about 201
+
+Boeing family-level figures vary by weight option, sub-variant and
+configuration. For exact model data, use the relevant Boeing airplane
+characteristics document and approved operator performance system.
+
+========================================================================
+3. EMBRAER REGIONAL AND SMALLER COMMERCIAL JETS
+========================================================================
+
+Model Typical seats Approx. approach speed Approx. MLW (kt; km/h)
+(tonnes) ERJ-135 37-38 110-130; 204-241 about 18 ERJ-140 44-50 110-130;
+204-241 about 19 ERJ-145 50 110-130; 204-241 about 19 E170 66-78
+115-135; 213-250 about 32 E175 70-88 115-135; 213-250 about 33 E190
+96-114 120-140; 222-259 about 44 E195 108-124 120-140; 222-259 about 45
+E190-E2 97-114 120-140; 222-259 about 50 E195-E2 120-146 125-145;
+231-269 about 54
+
+========================================================================
+4. BOMBARDIER / MITSUBISHI CRJ REGIONAL JETS
+========================================================================
+
+Model Typical seats Approx. approach speed Approx. MLW (kt; km/h)
+(tonnes) CRJ-100/200 40-50 110-130; 204-241 about 21 CRJ-700 66-78
+115-135; 213-250 about 29 CRJ-900 76-90 120-140; 222-259 about 32
+CRJ-1000 97-104 120-140; 222-259 about 34
+
+========================================================================
+5. COMAC, SUKHOI AND OTHER REGIONAL/NARROW-BODY JETS
+========================================================================
+
+Model Typical seats Approx. approach speed Approx. MLW (kt; km/h)
+(tonnes) COMAC ARJ21/C909 78-90 115-135; 213-250 about 36 COMAC C919
+158-192 125-145; 231-269 about 67 Sukhoi Superjet 100 87-108 115-140;
+213-259 about 41 Fokker 100 97-109 120-140; 222-259 about 38 BAe 146 /
+Avro RJ100 90-112 115-135; 213-250 about 38 McDonnell Douglas MD-80
+130-172 125-145; 231-269 about 59-63 MD-90 150-172 125-145; 231-269
+about 62 DC-9-30 90-115 120-140; 222-259 about 41 DC-10-30 250-380
+135-160; 250-296 about 187 MD-11 285-410 140-165; 259-306 about 213
+Lockheed L-1011 250-400 135-160; 250-296 about 166
+
+For older aircraft, individual operator modifications and published
+variant data may differ significantly. Some models are now rare in
+passenger service.
+
+========================================================================
+6. COMMERCIAL TURBOPROPS (NOT JETS; INCLUDED FOR COMPARISON)
+========================================================================
+
+Model Typical seats Approx. approach speed Approx. MLW (kt; km/h)
+(tonnes) ATR 42-600 40-50 95-115; 176-213 about 18 ATR 72-600 68-78
+100-120; 185-222 about 21 Dash 8 Q400 70-90 105-125; 194-231 about 28
+Saab 340 30-36 90-110; 167-204 about 12 Saab 2000 50-58 100-120; 185-222
+about 21 Fokker 50 46-58 95-115; 176-213 about 19 Embraer EMB 120 30
+95-115; 176-213 about 11 Dornier 328 turboprop 30-33 95-115; 176-213
+about 13
+
+========================================================================
+7. HOW PASSENGER LOAD AFFECTS LANDING WEIGHT AND SPEED
+========================================================================
+
+Passenger count alone does not determine landing speed. The aircraft’s
+total landing weight includes: operating aircraft weight + crew +
+passengers + baggage/cargo + remaining fuel
+
+For illustration only, if passenger plus baggage is assumed to average
+100 kg per person: Passengers onboard Illustrative passenger payload 20
+2,000 kg (2.0 tonnes) 40 4,000 kg (4.0 tonnes) 50 5,000 kg (5.0 tonnes)
+70 7,000 kg (7.0 tonnes) 100 10,000 kg (10.0 tonnes) 150 15,000 kg (15.0
+tonnes) 180 18,000 kg (18.0 tonnes) 200 20,000 kg (20.0 tonnes) 250
+25,000 kg (25.0 tonnes) 300 30,000 kg (30.0 tonnes) 350 35,000 kg (35.0
+tonnes) 400 40,000 kg (40.0 tonnes) 500 50,000 kg (50.0 tonnes) 600
+60,000 kg (60.0 tonnes)
+
+This is only a simple arithmetic illustration, not an approved
+passenger-mass assumption or a calculation of aircraft landing weight.
+Actual operator assumptions, baggage, cargo and fuel vary.
+
+For otherwise similar configuration and conditions, higher landing
+weight generally requires a higher reference/approach speed and
+increases landing energy and stopping distance. The exact change must be
+calculated from approved aircraft performance data; do not estimate an
+actual landing speed from passenger count.
+
+========================================================================
+8. MAXIMUM LANDING WEIGHT VS. MAXIMUM TAKEOFF WEIGHT
+========================================================================
+
+MLW is not MTOW. Many airliners have a maximum landing weight
+substantially lower than their maximum takeoff weight because landing
+imposes different structural and performance limits.
+
+An aircraft may take off at a high weight, burn fuel in flight, then
+land below MLW. If it must land above MLW, the crew follows the
+aircraft’s approved procedures and company guidance; this document is
+not a guide for such a decision.
+
+A legal, safe landing also depends on: • Actual landing weight and
+centre of gravity • Runway length, slope, surface and braking action •
+Wind, gusts, crosswind and weather • Temperature, pressure altitude and
+runway contamination • Flap/gear configuration and aircraft system
+status • Approach stability and required regulatory safety margins •
+Available stopping distance and approved landing-performance
+calculations
+
+Being below MLW does not by itself prove that a landing is safe on a
+given runway.
+
+========================================================================
+9. HOW WIND, SPEED AND RUNWAY CONDITIONS AFFECT LANDING
+========================================================================
+
+Headwind: Usually reduces groundspeed for a given airspeed and can
+reduce landing distance, although gusts and wind changes require careful
+speed management. Tailwind: Usually increases groundspeed and landing
+distance; tailwind limits and performance calculations apply. Wet or
+contaminated runway: Can reduce braking effectiveness and increase
+stopping distance. Higher landing weight: Generally increases approach
+speed and kinetic energy, making stopping performance more demanding.
+Excessive approach speed: Can increase float and touchdown distance,
+potentially increasing runway-overrun risk. Too little airspeed: Can
+reduce stall margin and increase the risk of an unstable approach or
+hard landing. Temperature and altitude: Affect aircraft performance and
+runway margins; they are included in approved landing calculations.
+
+Approach speed is managed by pilots throughout descent, approach, flare
+and touchdown. Touchdown speed is not one fixed number because it
+depends on approach speed, wind, flare technique and conditions.
+
+========================================================================
+10. SOURCES AND FURTHER REFERENCE
+========================================================================
+
+Airbus Aircraft Characteristics (airport and maintenance planning):
+https://www.aircraft.airbus.com/en/customer-care/fleet-wide-care/airport-operations-and-aircraft-characteristics/aircraft-characteristics
+
+Airbus A320 aircraft characteristics (example showing
+manufacturer-published final approach speed at a specified MLW and
+standard conditions):
+https://aircraft.airbus.com/sites/g/files/jlcbta126/files/2025-07/AC_A320_20250715.pdf
+
+Airbus A321 aircraft characteristics:
+https://www.airbus.com/sites/g/files/jlcbta136/files/2021-11/Airbus-Commercial-Aircraft-AC-A321.pdf
+
+Airbus A350 aircraft characteristics:
+https://www.airbus.com/sites/g/files/jlcbta136/files/2021-11/Airbus-Commercial-Aircraft-AC-A350-900-1000.pdf
+
+Airbus Safety First: control of speed during descent, approach and
+landing:
+https://safetyfirst.airbus.com/control-your-speed-during-descent-approach-and-landing/
+
+Boeing Airplane Characteristics for Airport Planning:
+https://www.boeing.com/commercial/airports/plan-manuals
+
+Boeing Onboard Performance Tool overview (landing performance
+calculations use current runway, weather, weight and configuration):
+https://services.boeing.com/operations/flight-performance/onboard-performance-tool
+
+These references provide manufacturer context and, for selected models,
+specific approach-speed definitions. Family-level values in this guide
+are approximate and should be verified against the exact aircraft’s
+current documentation. For real flight operations, use the approved
+aircraft flight manual, airline procedures and authorized performance
+calculation system.
+
+END OF DOCUMENT
