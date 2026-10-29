@@ -110,6 +110,20 @@ jobs:
           touch .nojekyll
           echo "left: $(grep -rl '127.0.0.1' . | wc -l) files still naming the test server"; du -sh .
 
+      - name: Preview copy for dronedirector.github.io/Android-Projects/airline-manager-pro
+        # The same pages, published by the Android-Projects preview site in its airline-manager-pro folder.
+        run: |
+          OUR="https://dronedirector.github.io/Microsoft-Flight-Simulator-Projects"
+          AP="https://dronedirector.github.io/Android-Projects/airline-manager-pro"
+          rm -rf /tmp/mirror-ap && cp -r /tmp/mirror /tmp/mirror-ap && cd /tmp/mirror-ap
+          grep -rlE 'Microsoft-Flight-Simulator-Projects' --include='*.html' --include='*.css' --include='*.js' --include='*.json' . | while read f; do
+            sed -i -e "s#$OUR#$AP#g" -e "s#${OUR//\//\\\\/}#${AP//\//\\\\/}#g" "$f"
+          done
+          echo "pages pointing at the new address: $(grep -rl 'github.io/Android-Projects/airline-manager-pro' --include='*.html' . | wc -l)"
+          git init -q -b website-airline-manager-preview && git add -A
+          git -c user.name=DroneDirector -c user.email=simon@dronedirector.fo commit -qm "Website preview (run ${{ github.run_number }})"
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" website-airline-manager-preview
+
       - uses: actions/configure-pages@v5
         with: { enablement: true }
         continue-on-error: true
@@ -117,8 +131,10 @@ jobs:
         with: { path: /tmp/mirror }
 
   deploy:
+    # Only works once GitHub Pages is switched on for this repository (Settings → Pages → Source: GitHub Actions).
     needs: build
     runs-on: ubuntu-latest
+    continue-on-error: true
     environment: { name: github-pages, url: "${{ steps.d.outputs.page_url }}" }
     steps:
       - id: d
