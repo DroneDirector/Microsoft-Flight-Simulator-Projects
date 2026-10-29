@@ -36,12 +36,14 @@ function aiEndAt(f: any): number { return f.depAt + f.durMs / (f.spd || 1); }
 function aiUpdate(f: LiveFlight, now: number) {
   const F: any = f;
   if (!F.depAt) return;
-  const p = aiProfile(F), el = (now - F.depAt) * (F.spd || 1) / 1000, q = profileAt(p, el);
+  const p = aiProfile(F), fe = flightEl(F, now), el = fe.el, q = profileAt(p, el);
   f.t = p.routeNm > 0 ? clamp(q.d / p.routeNm, 0, 1) : 0;
   f.alt = q.alt; f.gs = q.gs; f.phase = q.ph;
-  F.leftNm = q.left; F.toGoS = q.toGoS / (F.spd || 1); F.routeNm = p.routeNm;
+  if (fe.hold) { if (fe.hold.kind !== 'gate') noteHold(F, fe.hold); f.phase = holdLabel(fe.hold); if (fe.hold.kind === 'gate' || fe.hold.kind === 'runway') f.gs = 0; }
+  const extra = holdsLeft(F, fe);
+  F.leftNm = q.left; F.toGoS = (q.toGoS + extra) / (F.spd || 1); F.routeNm = p.routeNm;
   const td = p.pts.filter(x => x.ph === 'Landing')[0];
-  F.toTdS = td ? Math.max(0, td.s - el) / (F.spd || 1) : F.toGoS;
+  F.toTdS = td ? (Math.max(0, td.s - el) + extra) / (F.spd || 1) : F.toGoS;
 }
 
 // Messages at the real points of each flight: top of descent and established on final. Only phase
@@ -189,6 +191,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       const depAt = Math.max(n.depAt, earliest), prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
       const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: Math.round(n.paxMax * load), paxMax: n.paxMax, test,
         alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg };
+      if (!test) assignDelays(f, prof);
       a.status = 'flying'; p.status = 'flying';
       State.live.push(f);
     }

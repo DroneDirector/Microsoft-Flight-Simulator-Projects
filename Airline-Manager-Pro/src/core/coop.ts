@@ -107,6 +107,7 @@ function coopDepart(m: CoopMember, at: number) {
   const seats = t ? t.seats : 180, pax = Math.round(seats * (0.7 + Math.random() * 0.25));
   const f: any = { id: 'coop-' + uid(), reg: a ? a.reg : '', pilotId: m.id, from, to, t: 0, rate: 0, callsign: (co.icao || 'CO') + (300 + (_hashStr(m.id + at) % 600)),
     pax, paxMax: seats, alt: 0, phase: 'Taxi out', real: true, coop: true, typeId, depAt: at, durMs: prof.totalS * 1000 };
+  assignDelays(f, prof);
   if (a) a.status = 'flying';
   const p = pilot(m.id); if (p) p.status = 'flying';
   State.live.push(f);
@@ -117,8 +118,9 @@ function coopDepart(m: CoopMember, at: number) {
 
 /** Position, phase and altitude of a co-op pilot's flight right now. */
 function coopUpdate(f: LiveFlight, now: number) {
-  const F: any = f, p = flightProfile(F.typeId, f.from, f.to, F.depAt), el = Math.max(0, now - F.depAt) / 1000, q = profileAt(p, el);
+  const F: any = f, p = flightProfile(F.typeId, f.from, f.to, F.depAt), fe = flightEl(F, now), el = fe.el, q = profileAt(p, el);
   f.t = clamp(q.d / p.routeNm, 0, 1); f.alt = q.alt; f.gs = q.gs; f.phase = q.ph;
+  if (fe.hold) { if (fe.hold.kind !== 'gate') noteHold(F, fe.hold); f.phase = holdLabel(fe.hold); }
   F.leftNm = q.left; F.toGoS = q.toGoS; F.routeNm = p.routeNm;
 }
 

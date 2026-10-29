@@ -141,6 +141,7 @@ Only damage the simulator can actually detect.
 | Battery indicator with charging and wireless charging | Built |
 | Departures, arrivals and ILS/RNP approaches for hired and co-op pilots, shown on the map | Built |
 | Real take-off, landing and taxi speeds per aircraft type, by weight and wind | Built |
+| Rare delays for real reasons: de-icing, slots, queues, holding patterns, go-arounds | Built |
 | Fly for a real-world airline (names and codes only, no logos) | Built |
 | Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.4 (2026-10-29)
+
+- Rare delays (about 2-3 in 100 flights) at the gate, the holding point, in a holding pattern or as a go-around, with real reasons, more likely in wind and winter; shown on the map, at the airport, in arrival times and notifications
+
 ## 0.7.3 (2026-10-29)
 
 - Take-off and landing speeds and weights per aircraft type (docs/reference), by weight and wind; take-off and landing rolls from them
