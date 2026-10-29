@@ -33,12 +33,14 @@ function maintQuality(cid: string): { coverage: number; skill: number; q: number
   return { coverage, skill, q: coverage * (0.4 + 0.6 * skill) };
 }
 
+/** The repair times the app chooses from (real minutes). */
+const REPAIR_STEPS = [5, 10, 15, 20, 25, 30, 40, 50, 60, 90];
+function repairStep(m: number): number { return REPAIR_STEPS.reduce((best, s) => Math.abs(s - m) < Math.abs(best - m) ? s : best, REPAIR_STEPS[0]); }
+
 /** Repair time in real minutes, from the job and the mechanics doing it (better mechanics are quicker). */
 function repairMinutes(i: Issue, skill: number): number {
-  const base = i.severity === 'grounding' ? 90 : i.severity === 'major' ? 50 : 15;
-  const steps = [5, 10, 20, 30, 40, 50, 60, 90, 120];
-  const m = base * (1.35 - 0.6 * skill) * (0.85 + 0.3 * Math.random());
-  return steps.reduce((best, s) => Math.abs(s - m) < Math.abs(best - m) ? s : best, steps[0]);
+  const base = i.severity === 'grounding' ? 65 : i.severity === 'major' ? 32 : 10;
+  return repairStep(base * (1.35 - 0.6 * skill) * (0.85 + 0.3 * Math.random()));
 }
 
 /** Repair everything reported on an aircraft in one go: it goes into the hangar for the real repair
@@ -49,11 +51,13 @@ function repairAll(reg: string): Issue[] {
   const jobs = State.issues.filter(i => i.reg === reg && i.status !== 'fixed') as any[];
   if (!jobs.length) return [];
   const mins = jobs.map(i => i.durMin || repairMinutes(i, skill)).sort((x, y) => y - x);
-  const dur = Math.min(150, mins[0] + mins.slice(1).reduce((t, m) => t + Math.round(m * 0.3), 0));
+  const dur = repairStep(Math.min(90, mins[0] + mins.slice(1).reduce((t, m) => t + Math.round(m * 0.3), 0)));
   const gain = jobs.reduce((t, i) => t + (i.severity === 'grounding' ? 40 : i.severity === 'major' ? 22 : 8), 0) * (0.6 + 0.4 * skill);
   const now = Date.now(), from = a.condition, to = Math.min(condCap(a), a.condition + gain);
-  for (const i of jobs) { i.startedAt = now; i.durMin = dur; i.fromCond = from; i.toCond = to; i.status = 'scheduled'; }
+  const instant = (State.settings as any).repairTime === 'instant';
+  for (const i of jobs) { i.startedAt = instant ? now - dur * 60000 : now; i.durMin = dur; i.fromCond = from; i.toCond = to; i.status = 'scheduled'; i.instant = instant; }
   if (a.status !== 'flying') a.status = 'maintenance';
+  if (instant && a.status !== 'flying') conditionAdvance();
   return jobs;
 }
 function startRepair(i: Issue) { repairAll(i.reg); }
@@ -84,7 +88,7 @@ function conditionAdvance() {
     if (State.issues.some((x: any) => x.reg === reg && x.status === 'scheduled')) continue;
     a.status = State.issues.some((x: any) => x.reg === reg && x.status === 'open' && x.severity === 'grounding') ? 'grounded' : 'parked';
     try { crewAfterRepair(a.companyId, a.location || a.base, jobs[0].durMin); } catch (e) { /* ignore */ }
-    State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${reg} is out of the hangar`, body: `${jobs.map(j => j.title).join(', ')} done in ${jobs[0].durMin} minutes. Condition ${Math.round(a.condition)}%. Ready for its next flight.`, time: 'Now', read: false } as any);
+    State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${reg} is ${jobs[0].instant ? 'repaired' : 'out of the hangar'}`, body: `${jobs.map(j => j.title).join(', ')} done${jobs[0].instant ? '' : ' in ' + jobs[0].durMin + ' minutes'}. Condition ${Math.round(a.condition)}%. Ready for its next flight.`, time: 'Now', read: false } as any);
   }
   if (hrs <= 0) return;
   // daily care: aircraft on the ground at their base slowly recover, more with good mechanics;
