@@ -10,7 +10,9 @@ jobs:
           mkdir -p out
           for A in EKVG EKCH EGLL KJFK ENBR BIKF; do
             Q="[out:json][timeout:60];area[\"aeroway\"=\"aerodrome\"][\"icao\"=\"$A\"]->.a;(way[\"aeroway\"~\"^(runway|taxiway|taxilane|apron|parking_position|terminal|holding_position)$\"](area.a);node[\"aeroway\"~\"^(parking_position|gate|holding_position)$\"](area.a););out body geom qt;"
-            curl -sS -m 90 --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o out/$A.json || true
+            curl -sS -m 90 -A "AirlineManagerPro/0.5.8 (+https://dronedirector.fo)" --data-urlencode "data=$Q" https://overpass-api.de/api/interpreter -o out/$A.json || true
+            head -c 120 out/$A.json; echo
+            curl -sS -m 90 -A "Mozilla/5.0 AirlineManagerPro" --data-urlencode "data=$Q" https://overpass.private.coffee/api/interpreter -o out/$A-b.json || true; head -c 120 out/$A-b.json; echo
             echo "$A $(wc -c < out/$A.json) bytes, $(gzip -c out/$A.json | wc -c) gzipped"
             sleep 3
           done
