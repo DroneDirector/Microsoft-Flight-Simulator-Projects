@@ -1,25 +1,50 @@
-name: OSM airport samples
+name: Map zoom check
 on: { push: { branches: [osm-fixtures] } }
 permissions: { contents: write }
 jobs:
-  fetch:
+  shots:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { ref: amp-0.5.1-work, path: app }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
       - shell: bash
         run: |
           set +e
-          mkdir -p out
-          for A in EKVG EKCH EGLL KJFK ENBR BIKF; do
-            Q="[out:json][timeout:60];area[\"aeroway\"=\"aerodrome\"][\"icao\"=\"$A\"]->.a;(way[\"aeroway\"~\"^(runway|taxiway|taxilane|apron|parking_position|terminal)$\"](area.a);node[\"aeroway\"~\"^(parking_position|gate)$\"](area.a););out body geom qt;"
-            for S in https://overpass-api.de/api/interpreter https://overpass.private.coffee/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter; do
-              code=$(curl -sS -m 90 -A "AirlineManagerPro/0.5.8 (+https://dronedirector.fo)" -H "Accept: application/json" --data-urlencode "data=$Q" "$S" -o out/$A.json -w "%{http_code}")
-              echo "$A $S -> $code $(wc -c < out/$A.json) bytes, $(gzip -c out/$A.json | wc -c) gzipped" >> out/summary.txt
-              [ "$code" = "200" ] && break
-              sleep 5
-            done
-            sleep 2
-          done
-          cat out/summary.txt
+          cd app/Airline-Manager-Pro && npm install --no-audit --no-fund >/dev/null 2>&1 && npm run build && cd ../..
+          npm install --no-save --prefix /tmp/pw playwright@1.48.2 >/dev/null 2>&1 && (cd /tmp/pw && npx playwright install --with-deps chromium >/dev/null 2>&1)
+          (cd app/Airline-Manager-Pro/www && python3 -m http.server 8124 >/dev/null 2>&1 &)
+          sleep 2
+          mkdir -p out && rm -f out/*.png
+          cat > /tmp/pw/shots.js <<'JS'
+          const { chromium } = require('playwright');
+          (async () => {
+            const b = await chromium.launch(); const log = [];
+            for (const style of ['classic', 'satellite']) {
+              const p = await b.newPage({ viewport: { width: 1280, height: 760 } });
+              p.on('pageerror', e => log.push(style + ' pageerror ' + e));
+              await p.addInitScript(s => { try { const k = 'airline-manager-pro.save'; const d = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) {} window.__style = s; }, style);
+              await p.goto('http://127.0.0.1:8124/index.html'); await p.waitForTimeout(9000);
+              await p.evaluate(s => { closeAll(); State.settings.mapStyle = s; go('map', true); }, style); await p.waitForTimeout(4000);
+              const ml = await p.evaluate(() => !!(_bigMap && _bigMap.ml)); log.push(style + ' maplibre=' + ml);
+              for (const z of [2, 4, 5, 6, 8, 11]) {
+                await p.evaluate(z => { _bigMap.following = null; _bigMap.ml.jumpTo({ center: [-7.0, 62.0], zoom: z }); }, z);
+                await p.waitForTimeout(z >= 8 ? 6000 : 4000);
+                await p.screenshot({ path: `out/${style}-z${z}.png` });
+              }
+              await p.evaluate(() => _bigMap.flyToAirport('EKVG')); await p.waitForTimeout(12000);
+              log.push(style + ' after fly: zoom ' + (await p.evaluate(() => _bigMap.ml.getZoom().toFixed(2))) + ' scenes ' + (await p.evaluate(() => Object.keys(_bigMap.scenes).map(k => k + ':' + (_bigMap.scenes[k].L ? _bigMap.scenes[k].L.source : 'none')).join(','))));
+              await p.screenshot({ path: `out/${style}-ekvg.png` });
+              await p.evaluate(() => _bigMap.flyToAirport('EKCH')); await p.waitForTimeout(14000);
+              await p.screenshot({ path: `out/${style}-ekch.png` });
+              await p.close();
+            }
+            require('fs').writeFileSync('out/log.txt', log.join('\n')); await b.close();
+          })();
+          JS
+          node /tmp/pw/shots.js || echo "shots failed" >> out/log.txt
+          cat out/log.txt
           git config user.name DroneDirector; git config user.email simon@dronedirector.fo
-          git add out && git commit -qm "OSM samples" && git push -q origin HEAD:osm-fixtures
+          git add out && git commit -qm "Map zoom shots" && git push -q origin HEAD:osm-fixtures
