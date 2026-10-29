@@ -144,10 +144,10 @@ document.addEventListener('input', e => {
 });
 
 /** Centre the map on an airport, mark it and show what it is. */
-function focusAirport(icao: string) {
+function focusAirport(icao: string, stay?: boolean) {
   const a: any = apt(icao), m = _curMap(); if (!a || !m) return;
   m.following = null; m.selected = null; m.mark = icao;
-  m.fit([[a.pos[0] - 1.6, a.pos[1] - 0.9], [a.pos[0] + 1.6, a.pos[1] + 0.9]], 40, true);
+  if (!stay) m.fit([[a.pos[0] - 1.6, a.pos[1] - 0.9], [a.pos[0] + 1.6, a.pos[1] + 0.9]], 40, true);
   m.baseDirty = true;
   const box = $(State.screen === 'map' ? '#map-detail' : '#ops-sel'); if (!box) return;
   const onRoutes = State.routes.filter(r => r.companyId === State.companyId && r.legs.indexOf(icao) >= 0).map(r => r.code);
@@ -156,6 +156,7 @@ function focusAirport(icao: string) {
     <div class="apt-name">${esc(a.name)}</div><small class="muted">${esc([a.city !== a.name ? a.city : '', a.country].filter(Boolean).join(', '))}${a.elev != null ? ` · ${num(a.elev)} ft` : ''}</small>
     <div class="apt-rwy" id="apt-rwy"></div>
     <small class="muted">${onRoutes.length ? 'On your routes: ' + onRoutes.join(', ') : 'Not on any of your routes yet'}</small>
+    ${AIRPORT_VIEW ? `<button class="btn primary sm apt-view-btn" data-act="apt-view" data-icao="${esc(icao)}">${icon('land')}Airport view</button>` : ''}
   </div></div>`;
   World.loadRunways().then(rw => {
     const el = $('#apt-rwy'); if (!el) return;
@@ -165,6 +166,9 @@ function focusAirport(icao: string) {
 }
 ACTIONS['map-find'] = el => { closeAll(); Sound.tick(); focusAirport(el.getAttribute('data-icao')); };
 ACTIONS['map-unmark'] = () => { const m = _curMap(); if (m) { m.mark = null; m.baseDirty = true; } const box = $(State.screen === 'map' ? '#map-detail' : '#ops-sel'); if (box) box.innerHTML = ''; };
+
+/** The airport view is switched on once it is finished. */
+const AIRPORT_VIEW = false;
 
 /* ---------- The flight's speech bubble ---------- */
 function flightBubbleHtml(id: string, following: boolean): string {
@@ -176,9 +180,20 @@ function flightBubbleHtml(id: string, following: boolean): string {
     <div class="fbub-acts">
       <button class="${following ? 'on' : ''}" data-act="fb-follow" data-id="${esc(id)}">${icon('focus')}${following ? 'Following' : 'Follow'}</button>
       ${f.you ? '' : `<button class="${fav ? 'on fav' : ''}" data-act="fb-fav" data-id="${esc(id)}">${icon('star')}${fav ? 'Favourite' : 'Favourite'}</button>`}
+      ${AIRPORT_VIEW ? `<button data-act="fb-airport" data-id="${esc(id)}">${icon('land')}${esc(bubbleAirport(f))}</button>` : ''}
       <button data-act="fb-details" data-id="${esc(id)}">${icon('info')}Details</button>
     </div></div>`;
 }
+/** The airport a flight is nearest in its trip: where it left from until the climb is over, then where it's going. */
+function bubbleAirport(f: any): string {
+  if (f.noDest) return f.from;
+  return /taxi out|pushback|takeoff|take-off|climb|boarding/i.test(f.phase || '') || (f.t != null && f.t < 0.5 && !/descent|approach|final|landing|taxi in/i.test(f.phase || '')) ? f.from : f.to;
+}
+ACTIONS['fb-airport'] = el => {
+  const f: any = State.live.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!f) return;
+  openAirportView(bubbleAirport(f), f.id);
+};
+ACTIONS['apt-view'] = el => { const icao = el.getAttribute('data-icao'); ACTIONS['map-unmark'](el, null); openAirportView(icao); };
 ACTIONS['fb-follow'] = el => {
   const id = el.getAttribute('data-id'), m = _curMap(); if (!m) return; Sound.tick();
   if (m.following === id) m.following = null; else { m.mark = null; m.follow(id); }

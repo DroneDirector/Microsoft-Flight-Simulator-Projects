@@ -126,7 +126,12 @@ Only damage the simulator can actually detect.
 | Modular settings with toggles, easy to extend | Built |
 | Animated screens, pop-ups and transitions; reduce-motion option | Built |
 | Hold-to-exit power button with farewell animation | Built |
-| Ranking screen: pilot and airline ranks, pilot rating, airline popularity, 1,197 badges in six tiers | Built |
+| Ranking screen: your own record and the badges you have earned, newest first | Built |
+| Registration: a key tied to the first device, reactivation codes for a new phone or PC | Built |
+| About 49,000 world airports, plus every airport in your simulator; search by name, city or code | Built |
+| Flight menu on the map: follow, favourite and details | Built |
+| Co-op: run an airline together with other pilots, online through Supabase | Coming soon |
+| Airport view: runways, taxiways and stands with aircraft taxiing, taking off and landing | Coming soon |
 | Fly for a real-world airline (names and codes only, no logos) | Built |
 | Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
@@ -148,6 +153,8 @@ Only damage the simulator can actually detect.
 
 | Feature | Status |
 |---|---|
+| Hired pilots and crew gain levels and a better rating from their work | Built |
+| Hired pilots fly only the routes you assign; test flights only by you | Built |
 | 3D full-body avatars (breathing, sway, blinking, look-around, turn with a finger) for all pilots, co-pilots, flight attendants and mechanics, male and female; drawn avatars where 3D isn't available | Built |
 | Human figures with real body proportions, skin with pores and colour variation, hair grown strand by strand, beards and moustaches, detailed fabrics | Built |
 | Crew figure proportions: Natural, In-between or Stylised | Built (setting) |

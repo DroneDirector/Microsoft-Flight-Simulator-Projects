@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.6 (2026-10-29)
+
+- Registration in Settings: keys tied to the first device, re-registering on the same device as often as needed, reactivation codes (one use each) for a new device; online register ready for Supabase
+- About 49,000 world airports plus the simulator's full airport list; airport search by name, city, ICAO and IATA on the maps; only route airports shown; tap an airport for its card
+- Flight menu on the maps: Follow, Favourite, Details; favourites listed first
+- Co-op screen (first part), with sample pilots until online play is ready
+- Levels for hired pilots and crew; badges only for your own flights; personal Ranking with earned badges only
+- Hired pilots fly only assigned routes; same-airport legs only as test flights, which only you can create
+
 ## 0.5.5 (2026-10-29)
 
 - Animated start-up screen (five seconds): detailed compass-star mark, loading steps and a route-line progress bar with sparks and a take-off at 100%; the app then opens on the Overview

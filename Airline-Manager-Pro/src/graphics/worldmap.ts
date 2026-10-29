@@ -66,6 +66,7 @@ class WorldMap {
   base: HTMLCanvasElement; baseDirty = true;
   w = 0; h = 0; dpr = 1;
   cx = 0; cy = 0; R = 200; // view centre in radians-space, pixels per radian
+  shownAps: string[] = [];
   opts: MapOpts; selected: string = null; mark: string = null; raf = 0; alive = true; last = 0;
   ptrs: { [id: number]: { x: number; y: number } } = {}; pinch0 = 0; R0 = 0; moved = false;
   anim: any = null; colors: any; lastFit: any = null; userMoved = false;
@@ -235,6 +236,12 @@ class WorldMap {
       const d = Math.hypot(p[0] - x, p[1] - y);
       if (d < bd) { bd = d; best = f.id; }
     }
+    // an airport on the map opens its card, when it is closer to the tap than any flight
+    {
+      let ap: string = null, ad = 18;
+      for (const k of this.shownAps) { const a = apt(k); if (!a) continue; const p = this.px(a.pos[0], a.pos[1]), d = Math.hypot(p[0] - x, p[1] - y); if (d < ad) { ad = d; ap = k; } }
+      if (ap && (!best || ad + 3 < bd) && typeof focusAirport === 'function') { this.selected = null; this.closeBubble(); Sound.tick(); focusAirport(ap, true); return; }
+    }
     this.selected = best;
     if (best) this.openBubble(best); else this.closeBubble();
     if (this.opts.onSelect) this.opts.onSelect(best);
@@ -272,6 +279,7 @@ class WorldMap {
     for (const f of State.live) { used[f.from] = true; if (!f.noDest) used[f.to] = true; }
     used[company().hub] = true;
     if (this.mark) used[this.mark] = true;
+    this.shownAps = Object.keys(used);
     c.font = '600 10px Inter, sans-serif';
     const degPx2 = this.degPx();
     for (const k in used) {
