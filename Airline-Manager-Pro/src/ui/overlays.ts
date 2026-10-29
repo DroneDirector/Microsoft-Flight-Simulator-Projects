@@ -209,7 +209,7 @@ function mechanicPopup(issueId: string) {
           </div>`).join('')}</div>
         <div class="modal-actions">
           <button class="btn ghost" data-act="fix-later" data-id="${issue.id}">Fix later</button>
-          <button class="btn danger" data-act="fix-now" data-id="${issue.id}">${icon('wrench')}Pay ${money(issue.cost)} and fix now</button>
+          <button class="btn danger" data-act="fix-now" data-id="${issue.id}">${icon('wrench')}${repairTotal(issue.reg).n > 1 ? `Pay ${money(repairTotal(issue.reg).cost)} and fix all ${repairTotal(issue.reg).n}` : `Pay ${money(issue.cost)} and fix now`}</button>
         </div>
         ${issue.severity === 'grounding' ? `<p class="fine-print">${icon('alert')}Grounding damage: ${esc(issue.reg)} can't be flown until this is repaired.</p>` : ''}
       </div>
@@ -229,14 +229,20 @@ ACTIONS['mech-voice'] = el => {
 ACTIONS['fix-now'] = el => {
   const i = State.issues.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!i) return;
   const a = plane(i.reg), c = company(a.companyId);
-  const from = c.balance; c.balance -= i.cost;
-  // the mechanics start work; the aircraft is in the hangar for the real repair time (see condition.ts)
-  startRepair(i);
-  State.txns.unshift({ id: uid(), companyId: a.companyId, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Repair: ${i.title} (${i.reg})`, amount: -i.cost, kind: 'maint', reg: i.reg,
-    lines: [['Labour', -Math.round(i.cost * 0.45)], ['Parts', -Math.round(i.cost * 0.55)]], note: i.detail, link: { kind: 'aircraft', id: i.reg } });
-  Voice.stop(); closeAll(); Sound.payOut(); Haptics.pulse(30); refresh(); animateBalance(from, c.balance);
-  toast(`${i.reg} is in the hangar: about ${(i as any).durMin} minutes of work`, 'ok');
+  // one payment repairs everything reported on this aircraft, and it is ready to fly straight away
+  const open = State.issues.filter(x => x.reg === i.reg && x.status === 'open'), cost = open.reduce((t, x) => t + x.cost, 0);
+  const from = c.balance; c.balance -= cost;
+  repairAll(i.reg);
+  if (cost) State.txns.unshift({ id: uid(), companyId: a.companyId, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Repair: ${open.map(x => x.title).join(', ')} (${i.reg})`, amount: -cost, kind: 'maint', reg: i.reg,
+    lines: [['Labour', -Math.round(cost * 0.45)], ['Parts', -Math.round(cost * 0.55)]], note: open.map(x => x.detail).join(' '), link: { kind: 'aircraft', id: i.reg } } as any);
+  Voice.stop(); closeAll(); Sound.payOut(); Haptics.pulse(30); Store.save(); refresh(); animateBalance(from, c.balance);
+  toast(`${i.reg} is repaired and ready for its next flight. Condition ${Math.round(a.condition)}%`, 'ok');
 };
+/** What fixing an aircraft costs: all its open reports together. */
+function repairTotal(reg: string): { n: number; cost: number } {
+  const open = State.issues.filter(x => x.reg === reg && x.status === 'open');
+  return { n: open.length, cost: open.reduce((t, x) => t + x.cost, 0) };
+}
 ACTIONS['fix-later'] = el => {
   const i = State.issues.filter(x => x.id === el.getAttribute('data-id'))[0];
   Voice.stop(); closeAll(); refresh();

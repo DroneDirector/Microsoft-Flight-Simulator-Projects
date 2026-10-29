@@ -41,14 +41,22 @@ function repairMinutes(i: Issue, skill: number): number {
   return steps.reduce((best, s) => Math.abs(s - m) < Math.abs(best - m) ? s : best, steps[0]);
 }
 
-/** Start a repair: the aircraft goes into the hangar and the condition climbs over the repair time. */
-function startRepair(i: Issue) {
-  const a: any = plane(i.reg); if (!a) return;
-  const mq = maintQuality(a.companyId), I: any = i;
-  I.startedAt = Date.now(); I.durMin = repairMinutes(i, mq.skill || 0.3);
-  I.fromCond = a.condition; I.toCond = Math.min(condCap(a), a.condition + (i.severity === 'grounding' ? 40 : i.severity === 'major' ? 22 : 8) * (0.6 + 0.4 * (mq.skill || 0.3)));
-  i.status = 'scheduled'; a.status = 'maintenance';
+/** Repair an aircraft's reports: paid for, done, and the aircraft ready for its next flight. */
+function repairAll(reg: string): Issue[] {
+  const a: any = plane(reg); if (!a) return [];
+  const mq = maintQuality(a.companyId), jobs = State.issues.filter(i => i.reg === reg && i.status !== 'fixed');
+  for (const i of jobs as any[]) {
+    const gain = (i.severity === 'grounding' ? 40 : i.severity === 'major' ? 22 : 8) * (0.6 + 0.4 * (mq.skill || 0.3));
+    a.condition = Math.round(Math.min(condCap(a), Math.max(a.condition, (i.fromCond != null ? i.fromCond : a.condition) + gain)));
+    i.durMin = i.durMin || repairMinutes(i, mq.skill || 0.3);
+    i.status = 'fixed'; i.fixedAt = Date.now();
+  }
+  if (a.status === 'maintenance' || a.status === 'grounded') a.status = 'parked';
+  if (jobs.length) try { crewAfterRepair(a.companyId, a.location || a.base, jobs.reduce((t: number, i: any) => t + (i.durMin || 15), 0)); } catch (e) { /* ignore */ }
+  return jobs;
 }
+/** Older saves: a repair that was paid for and still in the hangar is finished. */
+function startRepair(i: Issue) { repairAll(i.reg); }
 
 /** The best an aircraft can be at its age: a 25-year-old airframe never looks new again. */
 function condCap(a: any): number { return Math.max(60, 100 - acAge(a) * 1.2); }
@@ -59,18 +67,11 @@ function conditionAdvance() {
   const S: any = State, now = Date.now();
   const last = S.condTick || now; S.condTick = now;
   const hrs = Math.min(24 * 14, (now - last) / 3600e3);
-  // repairs in progress
-  for (const i of State.issues as any[]) {
-    if (i.status !== 'scheduled' || !i.startedAt) continue;
-    const a: any = plane(i.reg); if (!a) continue;
-    const k = clamp((now - i.startedAt) / (i.durMin * 60000), 0, 1);
-    a.condition = Math.round(i.fromCond + (i.toCond - i.fromCond) * k);
-    if (k >= 1) {
-      i.status = 'fixed';
-      if (!State.issues.some((x: any) => x.reg === a.reg && x.status === 'scheduled')) a.status = State.issues.some((x: any) => x.reg === a.reg && x.status === 'open' && x.severity === 'grounding') ? 'grounded' : 'parked';
-      try { crewAfterRepair(a.companyId, a.location || a.base, i.durMin); } catch (e) { /* ignore */ }
-      State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${a.reg} is out of the hangar`, body: `${i.title} done in ${i.durMin} minutes. Condition ${Math.round(a.condition)}%.`, time: 'Now', read: false } as any);
-    }
+  // repairs paid for in an older version and still in the hangar are done now
+  const waiting = (State.issues as any[]).filter(i => i.status === 'scheduled');
+  for (const reg of waiting.map(i => i.reg).filter((r, k, l) => l.indexOf(r) === k)) {
+    if (State.issues.some(i => i.reg === reg && i.status === 'open')) { waiting.filter(i => i.reg === reg).forEach(i => { i.status = 'fixed'; }); const a: any = plane(reg); if (a && a.status === 'maintenance') a.status = State.issues.some(i => i.reg === reg && i.status === 'open' && i.severity === 'grounding') ? 'grounded' : 'parked'; }
+    else repairAll(reg);
   }
   if (hrs <= 0) return;
   // daily care: aircraft on the ground at their base slowly recover, more with good mechanics;
