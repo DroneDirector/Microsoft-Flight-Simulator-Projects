@@ -1,0 +1,278 @@
+COMMERCIAL AIRCRAFT TAKEOFF SPEEDS, WEIGHTS AND PASSENGER LOADS
+Reference guide | Prepared 29 October 2026
+
+IMPORTANT SCOPE AND SAFETY NOTE This is a broad reference guide to major
+commercial passenger-jet families and selected regional aircraft. It is
+not literally every aircraft ever built or every sub-variant.
+Manufacturer weight options, engine options, certification changes,
+airline cabin layouts and aircraft modifications create many variants.
+
+Takeoff speeds below are broad, approximate educational ranges in
+indicated airspeed, not guaranteed values for a particular flight. For
+many commercial aircraft, manufacturers do not publish one universal
+takeoff speed because crews calculate V1, VR and V2 for each departure
+using the approved performance system/manual. Actual speeds can be
+outside these ranges. Do not use this document to operate an aircraft or
+calculate takeoff performance.
+
+MAXIMUM TAKEOFF WEIGHT (MTOW) MTOW is the maximum permitted aircraft
+weight at the start of the takeoff run for a particular approved weight
+variant. It is not the weight every flight must reach, nor the minimum
+weight needed to take off. Exact MTOW differs by sub-variant, engine,
+certification and airline configuration. Figures below are approximate
+representative published values or family-level ranges; check current
+manufacturer documentation for the exact aircraft.
+
+PASSENGER WEIGHT EXAMPLES There is no single required passenger count or
+passenger weight for takeoff. An aircraft can depart with few passengers
+if the total aircraft weight, balance, fuel, runway and performance
+requirements are satisfied. Conversely, a full passenger cabin does not
+guarantee the aircraft can depart with maximum fuel and cargo.
+
+For rough comparison only, this guide uses 100 kg per passenger as an
+illustrative combined passenger-plus-baggage allowance. This is NOT a
+universal regulatory standard: actual operator mass assumptions and
+actual baggage/cargo weights vary. The passenger-load figure is simply:
+illustrative passenger payload = passenger count x 100 kg It does not
+include the aircraft itself, fuel, crew, catering, cargo or other
+operational items, and must not be mistaken for a takeoff-weight
+calculation.
+
+SPEED UNITS 1 knot (kt) = 1.852 km/h. Takeoff speed means airspeed, not
+speed over the runway. Headwind can reduce groundspeed at a given
+airspeed; tailwind can increase groundspeed and runway requirements.
+
+HOW TO READ THE LIST • Typical seats = broad common airline layout, not
+a certified limit for every operator. • Approx. takeoff speed = broad
+illustrative range for the family/model, not a specific V1/VR/V2. • MTOW
+= approximate maximum takeoff weight, metric tonnes unless stated
+otherwise. • Passenger payload examples show the 100 kg/person
+illustration at the low and high ends of the typical seat range. • “Jet”
+sections cover passenger jets; a final section includes commonly used
+commercial turboprops for comparison.
+
+======================================================================== 1.
+AIRBUS PASSENGER JETS
+========================================================================
+
+Model Typical seats Approx. takeoff speed Approx. MTOW (kt; km/h)
+(tonnes) A220-100 100-120 120-140; 222-259 63-70 A220-300 120-160
+125-145; 231-269 67-70 A318 107-132 125-145; 231-269 59-68 A319ceo
+124-156 125-145; 231-269 64-75 A319neo 120-160 125-145; 231-269 75-79
+A320ceo 150-180 130-150; 241-278 66-78 A320neo 150-194 130-150; 241-278
+73-79 A321ceo 185-220 135-155; 250-287 83-93 A321neo 185-244 135-160;
+250-296 89-97 A321XLR 180-220 135-160; 250-296 about 101 A300-600
+250-300 140-165; 259-306 about 171 A310-300 200-280 135-160; 250-296
+about 164 A330-200 220-290 140-165; 259-306 about 242 A330-300 250-330
+140-165; 259-306 about 242 A330-800 220-260 140-165; 259-306 about 251
+A330-900 260-300 140-170; 259-315 about 251 A340-300 250-300 140-165;
+259-306 about 275 A340-600 320-380 145-170; 269-315 about 380 A350-900
+300-350 145-170; 269-315 about 280 A350-1000 350-410 145-175; 269-324
+about 319 A380-800 450-600 145-175; 269-324 about 575-575.5
+
+Note: Airbus weight figures vary by approved weight variant. The A380’s
+853-passenger figure is a maximum certified seating capacity, not a
+typical airline layout.
+
+========================================================================
+2. BOEING PASSENGER JETS
+========================================================================
+
+Model Typical seats Approx. takeoff speed Approx. MTOW (kt; km/h)
+(tonnes) 717-200 100-125 120-140; 222-259 about 55 737-700 125-145
+125-145; 231-269 about 70 737-800 160-180 130-155; 241-287 about 79
+737-900ER 175-195 135-155; 250-287 about 85 737 MAX 7 135-160 125-145;
+231-269 about 80 737 MAX 8 160-180 130-155; 241-287 about 83 737 MAX 9
+175-195 135-155; 250-287 about 88 737 MAX 10 185-210 135-160; 250-296
+about 90 747-400 350-420 145-175; 269-324 about 397 747-8
+Intercontinental 400-470 150-175; 278-324 about 448 757-200 180-220
+135-160; 250-296 about 116 757-300 220-280 140-165; 259-306 about 123
+767-300ER 210-270 140-165; 259-306 about 187 767-400ER 240-300 140-165;
+259-306 about 204 777-200ER 300-375 145-175; 269-324 about 298 777-200LR
+300-375 145-175; 269-324 about 348 777-300ER 350-425 145-175; 269-324
+about 352 777-8 (development) 350-425 145-180; 269-333 about 365 777-9
+(development) 375-450 145-180; 269-333 about 352 787-8 200-275 140-170;
+259-315 about 228 787-9 250-325 140-170; 259-315 about 259 787-10
+300-375 145-175; 269-324 about 260
+
+Some models have multiple weight options. The 777X figures are
+manufacturer-published family specifications, but entry into commercial
+service/certification status may change; verify current status before
+relying on them.
+
+========================================================================
+3. EMBRAER REGIONAL AND SMALLER COMMERCIAL JETS
+========================================================================
+
+Model Typical seats Approx. takeoff speed Approx. MTOW (kt; km/h)
+(tonnes) ERJ-135 37-38 105-125; 194-231 about 20 ERJ-140 44-50 110-130;
+204-241 about 22 ERJ-145 50 110-130; 204-241 about 22 E170 66-78
+115-135; 213-250 about 38 E175 70-88 120-140; 222-259 about 38 E190
+96-114 125-145; 231-269 about 51 E195 108-124 125-145; 231-269 about 52
+E190-E2 97-114 125-145; 231-269 about 57 E195-E2 120-146 130-150;
+241-278 about 62
+
+Seat counts and MTOW differ by variant and operator. ERJ-145 family
+weights depend on the specific ERJ variant.
+
+========================================================================
+4. MITSUBISHI/ BOMBARDIER CRJ REGIONAL JETS
+========================================================================
+
+Model Typical seats Approx. takeoff speed Approx. MTOW (kt; km/h)
+(tonnes) CRJ-100/200 40-50 110-130; 204-241 about 24 CRJ-700 66-78
+115-135; 213-250 about 34 CRJ-900 76-90 120-140; 222-259 about 38
+CRJ-1000 97-104 125-145; 231-269 about 41
+
+The CRJ programme was developed by Bombardier and acquired by Mitsubishi
+Heavy Industries. Figures are representative family-level values.
+
+========================================================================
+5. COMAC, SUKHOI AND OTHER REGIONAL/NARROW-BODY JETS
+========================================================================
+
+Model Typical seats Approx. takeoff speed Approx. MTOW (kt; km/h)
+(tonnes) COMAC ARJ21/C909 78-90 115-140; 213-259 about 41 COMAC C919
+158-192 130-155; 241-287 about 79 Sukhoi Superjet 100 87-108 120-145;
+222-269 about 46 Fokker 100 97-109 120-145; 222-269 about 45 BAe 146 /
+Avro RJ100 90-112 115-140; 213-259 about 44 McDonnell Douglas MD-80
+130-172 130-155; 241-287 about 68-72 MD-90 150-172 130-155; 241-287
+about 71 DC-9-30 90-115 120-145; 222-269 about 50 DC-10-30 250-380
+140-170; 259-315 about 263 MD-11 285-410 145-175; 269-324 about 286
+Lockheed L-1011 250-400 140-170; 259-315 about 231
+
+These include older and/or regionally operated aircraft; availability
+and passenger configurations vary widely. Manufacturer specifications
+should be checked for the exact variant.
+
+========================================================================
+6. COMMERCIAL TURBOPROPS (NOT JETS, INCLUDED FOR COMPARISON)
+========================================================================
+
+Model Typical seats Approx. takeoff speed Approx. MTOW (kt; km/h)
+(tonnes) ATR 42-600 40-50 95-115; 176-213 about 19 ATR 72-600 68-78
+100-120; 185-222 about 23 Dash 8 Q400 70-90 105-125; 194-231 about 30
+Saab 340 30-36 90-110; 167-204 about 13 Saab 2000 50-58 100-120; 185-222
+about 23 Fokker 50 46-58 95-115; 176-213 about 20 Embraer EMB 120 30
+95-115; 176-213 about 12 Dornier 328 turboprop 30-33 95-115; 176-213
+about 14
+
+========================================================================
+7. ILLUSTRATIVE PASSENGER PAYLOAD WEIGHT
+========================================================================
+
+At the illustrative allowance of 100 kg per passenger (passenger plus
+baggage), passenger payload alone would be:
+
+Passengers onboard Illustrative passenger payload 20 2,000 kg (2.0
+tonnes) 40 4,000 kg (4.0 tonnes) 50 5,000 kg (5.0 tonnes) 70 7,000 kg
+(7.0 tonnes) 100 10,000 kg (10.0 tonnes) 150 15,000 kg (15.0 tonnes) 180
+18,000 kg (18.0 tonnes) 200 20,000 kg (20.0 tonnes) 250 25,000 kg (25.0
+tonnes) 300 30,000 kg (30.0 tonnes) 350 35,000 kg (35.0 tonnes) 400
+40,000 kg (40.0 tonnes) 500 50,000 kg (50.0 tonnes) 600 60,000 kg (60.0
+tonnes) 800 80,000 kg (80.0 tonnes)
+
+These are arithmetic examples, not estimates of the actual passenger
+load on a particular flight. Actual passenger mass policies differ, and
+baggage may be counted separately.
+
+========================================================================
+8. WHAT WEIGHT DOES AN AIRCRAFT “NEED” TO TAKE OFF?
+========================================================================
+
+There is no single minimum takeoff weight that applies to a model. A
+flight’s takeoff weight is broadly made up of: operating empty weight +
+crew + passengers + baggage/cargo + usable fuel The precise definitions
+and accounting categories depend on the operator’s weight-and-balance
+system.
+
+A flight must be within the applicable limits, including: • Maximum
+takeoff weight (MTOW) • Maximum landing weight (MLW), considering
+expected landing weight • Maximum zero-fuel weight (MZFW), where
+applicable • Centre-of-gravity and trim limits • Runway length and
+runway condition • Temperature, pressure altitude, wind and obstacles •
+Engine/thrust and flap configuration • Required takeoff performance and
+regulatory safety margins
+
+A jet may be too heavy to depart from a short runway even if it is below
+MTOW. Conversely, it may depart well below MTOW when lightly loaded. A
+maximum passenger count does not determine whether it can take off; the
+full aircraft weight and performance calculation do.
+
+========================================================================
+9. WHY TAKEOFF SPEED CHANGES
+========================================================================
+
+Weight: For otherwise similar conditions and configuration, the speed
+needed to generate a given lift increases approximately with the square
+root of weight. A 20% weight increase corresponds to about a 9.5%
+increase in the idealized speed for the same lift, all else equal. This
+is a simplified aerodynamic relationship, not a method for calculating
+real takeoff speeds.
+
+Wind: A headwind usually reduces groundspeed at the required airspeed. A
+tailwind usually raises groundspeed and increases takeoff distance.
+Crosswind limits also apply.
+
+Air density: Hot weather and high-altitude airports reduce air density
+and can reduce engine performance. This often increases runway distance
+and may affect performance-limited weight. Indicated airspeed does not
+simply increase in proportion to temperature or altitude.
+
+Flaps and aircraft design: Takeoff flap settings and wing design change
+lift characteristics. Different variants can have different certified
+speeds even at similar weights.
+
+Runway and obstacles: Wet/contaminated pavement, slope, runway length
+and obstacles affect the permitted takeoff weight and performance
+calculations.
+
+========================================================================
+10. TAKEOFF SPEED TERMS
+========================================================================
+
+V1: The takeoff decision speed used in the planned stop/continue
+decision. It is not simply “the speed where the plane must always take
+off.” VR: Rotation speed, at which the pilot initiates the pitch-up for
+takeoff. V2: Takeoff safety speed used for the initial climb performance
+target. Liftoff speed: The speed at which the aircraft actually leaves
+the runway; it is related to but not necessarily identical to VR.
+
+The crew calculates these speeds for the specific aircraft, weight,
+runway, weather and configuration. Do not infer a flight’s actual
+V1/VR/V2 from the broad ranges in this guide.
+
+========================================================================
+11. SOURCES AND FURTHER REFERENCE
+========================================================================
+
+Manufacturer sources are the best starting point for exact model and
+weight-variant information:
+
+Airbus Aircraft Characteristics (airport and maintenance planning):
+https://www.aircraft.airbus.com/en/customer-care/fleet-wide-care/airport-operations-and-aircraft-characteristics/aircraft-characteristics
+
+Airbus passenger aircraft families:
+https://www.airbus.com/en/products-services/commercial-aircraft/passenger-aircraft
+
+Boeing Airplane Characteristics for Airport Planning:
+https://www.boeing.com/commercial/airports/plan-manuals
+
+Boeing 737 MAX technical specifications:
+https://www.boeing.com/commercial/737max/
+
+Boeing 737 Next Generation specifications:
+https://www.boeing.com/commercial/737ng
+
+Boeing 777 specifications: https://www.boeing.com/commercial/777
+
+Boeing 777X specifications: https://www.boeing.com/commercial/777x
+
+Boeing 787 specifications: https://www.boeing.com/commercial/787
+
+Airbus and Boeing airport-planning manuals generally contain
+dimensional, weight and performance-planning information, but they are
+not substitutes for the aircraft flight manual, approved performance
+tool, or airline operational documentation.
+
+END OF DOCUMENT

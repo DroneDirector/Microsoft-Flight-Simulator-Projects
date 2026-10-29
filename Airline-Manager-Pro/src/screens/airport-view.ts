@@ -210,6 +210,67 @@ class AirportView {
     return a < 0 ? null : [a, b];
   }
 
+  /** The landing roll: speed over the ground at touchdown (m/s), braking (m/s²) to 15 kt, its length (m from the threshold) and time. */
+  landingRoll(SP: any, hw: number, big: boolean): { v0: number; dec: number; t: number; end: number } {
+    const A = this.active, v0 = Math.max(25, SP.vtd - hw) * KT, v1 = 15 * KT;
+    // brake harder on a short runway, so the aircraft is down to taxi speed before 80% of it
+    const room = Math.max(250, A.len * 0.8 - 400), dec = Math.max(big ? 1.7 : 1.4, (v0 * v0 - v1 * v1) / (2 * room));
+    const t = (v0 - v1) / dec;
+    return { v0, dec, t, end: 400 + v0 * t - 0.5 * dec * t * t };
+  }
+  /** A taxi route with speeds (knots) that follow it: 5-10 in tight turns and the last 100 m before the
+   *  runway or stand, 15-25 on straight taxiways, up to about 30 on long straight ones; gentle speeding
+   *  up and slowing down in between. Returns points every 10 m with the time (s) to reach each. */
+  taxiTimed(path: number[][], v0kt: number, endKt: number): { p: number[][]; t: number[]; v: number[]; total: number } {
+    const key = path.length ? path[0].join() + '>' + path[path.length - 1].join() + '|' + path.length + '|' + v0kt : '';
+    const C: any = this.timedCache || (this.timedCache = {});
+    if (C[key]) return C[key];
+    const pts: number[][] = [], vmax: number[] = [];
+    // resample every 10 m, remembering how sharp the turn is at each original corner
+    const turnAt: number[] = path.map((q, i) => {
+      if (i === 0 || i === path.length - 1) return 0;
+      const a = Math.atan2(q[0] - path[i - 1][0], q[1] - path[i - 1][1]), b = Math.atan2(path[i + 1][0] - q[0], path[i + 1][1] - q[1]);
+      return Math.abs(((b - a) * 180 / Math.PI + 540) % 360 - 180);
+    });
+    const segLen = (i: number) => Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1]);
+    // length of the straight stretch each segment belongs to (bends under 20° count as straight)
+    const straight: number[] = []; let run = 0, from = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      run += segLen(i);
+      if (i === path.length - 2 || turnAt[i + 1] > 20) { for (let k = from; k <= i; k++) straight[k] = run; run = 0; from = i + 1; }
+    }
+    const cornerKt: { [i: number]: number } = {};
+    path.forEach((q, i) => { const a = turnAt[i]; if (a > 60) cornerKt[i] = 8; else if (a > 30) cornerKt[i] = 12; else if (a > 15) cornerKt[i] = 18; });
+    for (let i = 0; i < path.length - 1; i++) {
+      const L = segLen(i), n = Math.max(1, Math.round(L / 10));
+      const top = straight[i] > 700 ? 30 : straight[i] > 300 ? 25 : 18;
+      for (let k = 0; k < n; k++) {
+        const f = k / n; pts.push([path[i][0] + (path[i + 1][0] - path[i][0]) * f, path[i][1] + (path[i + 1][1] - path[i][1]) * f]);
+        vmax.push(k === 0 && cornerKt[i] ? cornerKt[i] : top);
+      }
+    }
+    if (path.length) { pts.push(path[path.length - 1].slice(0, 2)); vmax.push(endKt); }
+    // the last 100 m before the runway or the stand: 5-10 kt
+    let back = 0; for (let i = pts.length - 1; i > 0 && back < 100; i--) { vmax[i] = Math.min(vmax[i], back < 40 ? 6 : 9); back += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); }
+    // speeding up and slowing down at about 0.6 m/s² and 1 m/s²
+    const v = vmax.map(x => x * KT); v[0] = Math.min(v[0], v0kt * KT);
+    for (let i = 1; i < v.length; i++) { const ds = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); v[i] = Math.min(v[i], Math.sqrt(v[i - 1] * v[i - 1] + 2 * 0.6 * ds)); }
+    v[v.length - 1] = Math.min(v[v.length - 1], endKt * KT);
+    for (let i = v.length - 2; i >= 0; i--) { const ds = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); v[i] = Math.min(v[i], Math.sqrt(v[i + 1] * v[i + 1] + 2 * 1.0 * ds)); }
+    const t = [0];
+    for (let i = 1; i < pts.length; i++) { const ds = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); t.push(t[i - 1] + ds / Math.max(0.8, (v[i] + v[i - 1]) / 2)); }
+    return (C[key] = { p: pts, t, v: v.map(x => x / KT), total: t[t.length - 1] });
+  }
+  timedCache: any = null;
+  /** Where along a timed route the aircraft is after `s` seconds: [x, y, heading], and its speed. */
+  timedAt(r: { p: number[][]; t: number[]; v: number[]; total: number }, s: number): { pos: number[]; kt: number } {
+    const p = r.p; if (!p.length) return null;
+    if (s <= 0) { const h = p.length > 1 ? Math.atan2(p[1][0] - p[0][0], p[1][1] - p[0][1]) * 180 / Math.PI : 0; return { pos: [p[0][0], p[0][1], h], kt: 0 }; }
+    let i = 1; while (i < r.t.length - 1 && r.t[i] < s) i++;
+    const k = clamp((s - r.t[i - 1]) / ((r.t[i] - r.t[i - 1]) || 1), 0, 1), a = p[i - 1], b = p[i];
+    return { pos: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI], kt: s >= r.total ? 0 : Math.round(r.v[i - 1] + (r.v[i] - r.v[i - 1]) * k) };
+  }
+
   computePlanes(now: number) {
     const out: ApvPlane[] = [], L = this.L, A = this.active, g = this.graph;
     const icao = this.icao, typeOf = (f: any) => acType(flightTypeId(f));
@@ -228,21 +289,39 @@ class AirportView {
       const el = (now - F.depAt) * (F.spd || 1) / 1000;
       const roll = Math.min(A.len * 0.65, big ? 2200 : 700), lift = [A.tx + A.ux * roll, A.ty + A.uy * roll];
       let pos: number[] = null, alt = 0, phase = '', kt = 0;
+      // the speeds of this flight (docs/reference) and the wind along the runway in use
+      const SP = flightSpeeds(flightTypeId(f), f.pax || Math.round(t.seats * 0.8), gcDistanceNm(apt(f.from).pos, apt(f.noDest ? f.from : f.to).pos));
+      const hw = headwind(A.wind, A.windKt, Math.atan2(A.ux, A.uy) * 180 / Math.PI);
+      const rwyHdg = Math.atan2(A.ux, A.uy) * 180 / Math.PI;
       // departing from here
       if (f.from === icao) {
         const tx = this.span(prof, 'Taxi out'), to = this.span(prof, 'Takeoff'), cl = this.span(prof, 'Climb');
         if (tx && el < tx[1]) {
           const stand = this.standFor(f.reg + 'd' + f.from, big), hold = this.nearestNode(A.tx + A.ux * 60, A.ty + A.uy * 60);
           const path = stand && hold ? this.route(stand, hold).concat([[A.tx, A.ty]]) : [];
-          const fr = (el - tx[0]) / Math.max(1, tx[1] - tx[0]);
-          pos = this.along(path, fr < 0.12 ? 0 : (fr - 0.12) / 0.88); phase = fr < 0.12 ? 'Pushback' : 'Taxi out'; kt = fr < 0.12 ? 3 : 15;
+          const PUSH = 75;   // pushback: about 75 s at 3-5 kt, nose pointing the other way
+          // it waits at the gate and pushes back in time to reach the runway about a minute before its slot
+          const need = path.length > 1 ? PUSH + this.taxiTimed(path, 0, 0).total + 60 : 0, wait = Math.max(0, (tx[1] - tx[0]) - need);
+          const sIn = el - tx[0] - wait;
+          if (path.length > 1 && sIn < 0) { const k = this.nodeXY(stand), pk = g.parks[+stand.slice(1)]; pos = [k[0], k[1], pk ? pk[2] : 0]; phase = 'At the gate, boarding'; kt = 0; }
+          else if (path.length > 1 && sIn < PUSH) {
+            const r = this.taxiTimed(path, 0, 0), q = this.timedAt(r, 0), back = Math.min(1, sIn / PUSH) * 35;
+            const sp = this.along(path, Math.min(0.999, back / Math.max(1, r.p.length * 10)));
+            pos = sp ? [sp[0], sp[1], ((sp[2] || q.pos[2]) + 180) % 360] : q.pos; phase = 'Pushback'; kt = sIn < PUSH - 10 ? 4 : 0;
+          } else if (path.length > 1) {
+            const r = this.taxiTimed(path, 0, 0), sTaxi = sIn - PUSH;
+            const q = this.timedAt(r, sTaxi + 35 / 4.5);   // continues where the pushback left off
+            pos = q.pos; kt = q.kt; phase = sTaxi + 35 / 4.5 >= r.total ? 'Holding short ' + (A.name || '') : 'Taxi out';
+          } else { pos = [A.tx, A.ty, rwyHdg]; phase = 'Taxi out'; }
         } else if (to && el < to[1]) {
-          const fr = (el - to[0]) / Math.max(1, to[1] - to[0]), d = roll * fr * fr;
-          pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; phase = 'Take-off roll'; kt = Math.round(150 * fr);
+          // take-off roll: accelerate to rotation speed (over the ground: minus the headwind), lift off, climb at V2
+          const vrGs = Math.max(20, SP.vr - hw) * KT, acc = big ? 2.0 : 2.4, tRoll = vrGs / acc, sIn = el - to[0];
+          if (sIn < tRoll) { const d = 0.5 * acc * sIn * sIn; pos = [A.tx + A.ux * d, A.ty + A.uy * d, rwyHdg]; phase = 'Take-off roll'; kt = Math.round(acc * sIn / KT + hw); }
+          else { const dRoll = 0.5 * acc * tRoll * tRoll, v2 = Math.max(20, SP.v2 - hw) * KT, d = dRoll + v2 * (sIn - tRoll); pos = [A.tx + A.ux * d, A.ty + A.uy * d, rwyHdg]; alt = Math.round((sIn - tRoll) * 30); phase = 'Lift-off'; kt = SP.v2; }
         } else if (cl) {
           const tt = el - (to ? to[1] : cl[0]), fpp = flightPathPos(F, now);
-          if (fpp) { const q = this.xy(fpp.pos[1], fpp.pos[0]); if (Math.hypot(q[0], q[1]) < APV_RANGE) { pos = [q[0], q[1], fpp.hdg]; alt = Math.round(tt * 30); phase = fpp.fp.parts[0].name; kt = 170; } }
-          else { const d = roll + tt * 80; if (d < APV_RANGE) { pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(tt * 30); phase = 'Climbing out'; kt = 170; } }
+          if (fpp) { const q = this.xy(fpp.pos[1], fpp.pos[0]); if (Math.hypot(q[0], q[1]) < APV_RANGE) { pos = [q[0], q[1], fpp.hdg]; alt = Math.round(tt * 30); phase = fpp.fp.parts[0].name; kt = Math.min(250, SP.v2 + 10 + Math.round(tt * 0.6)); } }
+          else { const d = tt * SP.v2 * KT; if (d < APV_RANGE) { pos = [A.tx + A.ux * d, A.ty + A.uy * d, rwyHdg]; alt = Math.round(tt * 30); phase = 'Climbing out'; kt = SP.v2 + 10; } }
         }
       }
       // arriving here
@@ -254,18 +333,24 @@ class AirportView {
           if (fpp) {
             const q = this.xy(fpp.pos[1], fpp.pos[0]), dist = Math.hypot(q[0], q[1]), left = (fpp.fp.len - fpp.d) * NM;
             const part = fpp.fp.parts.filter(x => fpp.d >= x.from && fpp.d <= x.to + 0.01)[0];
-            if (dist < APV_RANGE) { pos = [q[0], q[1], fpp.hdg]; alt = Math.round(Math.min(left * 0.0525 * 3.28, 6000)); phase = part && part.kind === 'app' ? (left < 10000 ? 'Final' : '') + (left < 10000 ? ' · ' : '') + part.name : part && part.kind === 'star' ? part.name : 'Approach'; kt = 140; }
+            if (dist < APV_RANGE) { pos = [q[0], q[1], fpp.hdg]; alt = Math.round(Math.min(left * 0.0525 * 3.28, 6000)); phase = part && part.kind === 'app' ? (left < 10000 ? 'Final' : '') + (left < 10000 ? ' · ' : '') + part.name : part && part.kind === 'star' ? part.name : 'Approach'; kt = left < 600 ? SP.vthr : left < 12000 ? SP.vapp : Math.min(210, SP.vapp + Math.round((left - 12000) / 400)); }
           } else {
           const d = (td - el) * 72;
-          if (d < APV_RANGE) { pos = [A.tx - A.ux * d, A.ty - A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(d * 0.0525 * 3.28); phase = d < 6000 ? 'Final' : 'Approach'; kt = 140; }
+          if (d < APV_RANGE) { pos = [A.tx - A.ux * d, A.ty - A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(d * 0.0525 * 3.28); phase = d < 6000 ? 'Final' : 'Approach'; kt = SP.vapp; }
           }
-        } else if (ld && el < ld[1]) {
-          const fr = (el - ld[0]) / Math.max(1, ld[1] - ld[0]), d = A.len * 0.55 * (1 - (1 - fr) * (1 - fr));
-          pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; phase = 'Landing roll'; kt = Math.round(130 * (1 - fr) + 20);
-        } else if (ti && el < ti[1] + 30) {
-          const exit = this.nearestNode(A.tx + A.ux * A.len * 0.6, A.ty + A.uy * A.len * 0.6), stand = this.standFor(f.reg + 'a' + f.to, big);
-          const path = [[A.tx + A.ux * A.len * 0.55, A.ty + A.uy * A.len * 0.55]].concat(exit && stand ? this.route(exit, stand) : []);
-          pos = this.along(path, (el - ti[0]) / Math.max(1, ti[1] - ti[0])); phase = el > ti[1] ? 'At the gate' : 'Taxi in'; kt = el > ti[1] ? 0 : 15;
+        } else if (ld && el >= ld[0]) {
+          // landing: touch down about 400 m past the threshold, brake to taxi speed, then taxi to the stand
+          const land = this.landingRoll(SP, hw, big), sIn = el - ld[0];
+          if (sIn < land.t) {
+            const v0 = land.v0, d = 400 + v0 * sIn - 0.5 * land.dec * sIn * sIn;
+            pos = [A.tx + A.ux * d, A.ty + A.uy * d, rwyHdg]; phase = sIn < 2 ? 'Touchdown' : 'Landing roll'; kt = Math.round((v0 - land.dec * sIn) / KT + hw);
+          } else {
+            const exitPt = [A.tx + A.ux * land.end, A.ty + A.uy * land.end], exit = this.nearestNode(A.tx + A.ux * (land.end + 80), A.ty + A.uy * (land.end + 80)), stand = this.standFor(f.reg + 'a' + f.to, big);
+            const path = [exitPt].concat(exit && stand ? this.route(exit, stand) : []);
+            const r = this.taxiTimed(path, 15, 0), q = this.timedAt(r, sIn - land.t);
+            // at the gate for half a minute, then it is one of the parked aircraft
+            if (q && sIn - land.t < r.total + 30) { pos = q.pos; kt = q.kt; phase = sIn - land.t >= r.total ? 'At the gate' : 'Taxi in'; }
+          }
         }
       }
       if (pos) out.push(Object.assign(base, { x: pos[0], y: pos[1], hdg: pos[2] || 0, alt, phase, kt }));
@@ -388,7 +473,7 @@ class AirportView {
       drawPlaneGlyph(c, q[0], q[1], p.hdg, size, p.prop, p.you ? col.cyan : p.parked ? col.dim : col.ink, col.bg);
       if (!p.parked || s > 0.5 || tracked) {
         c.font = '600 10.5px Inter, sans-serif';
-        const text = p.label + (p.parked ? '' : ' · ' + p.phase), w = c.measureText(text).width, lx = q[0] + size * 0.55 + 6, ly = q[1] - size * 0.4;
+        const text = p.label + (p.parked ? '' : ' · ' + p.phase + (p.kt ? ' · ' + p.kt + ' kt' : '')), w = c.measureText(text).width, lx = q[0] + size * 0.55 + 6, ly = q[1] - size * 0.4;
         c.fillStyle = 'rgba(6,16,30,.82)'; c.fillRect(lx - 4, ly - 10, w + 8, 15);
         c.fillStyle = p.you ? col.cyan : tracked ? col.mag : p.parked ? col.dim : col.ink; c.fillText(text, lx, ly + 1);
       }
@@ -524,7 +609,7 @@ class AirportView {
       drawPlaneGlyph(c, q[0], q[1], p.hdg, size, p.prop, p.you ? col.cyan : p.parked ? col.dim : col.ink, col.bg);
       if (!p.parked || s > 0.5 || tracked) {
         c.font = '600 10.5px Inter, sans-serif';
-        const text = p.label + (p.parked ? '' : ' · ' + p.phase), w = c.measureText(text).width, lx = q[0] + size * 0.55 + 6, ly = q[1] - size * 0.4;
+        const text = p.label + (p.parked ? '' : ' · ' + p.phase + (p.kt ? ' · ' + p.kt + ' kt' : '')), w = c.measureText(text).width, lx = q[0] + size * 0.55 + 6, ly = q[1] - size * 0.4;
         c.fillStyle = 'rgba(6,16,30,.82)'; c.fillRect(lx - 4, ly - 10, w + 8, 15);
         c.fillStyle = p.you ? col.cyan : tracked ? col.mag : p.parked ? col.dim : col.ink; c.fillText(text, lx, ly + 1);
       }

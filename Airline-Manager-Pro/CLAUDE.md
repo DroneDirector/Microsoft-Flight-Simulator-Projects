@@ -1,0 +1,23 @@
+# Airline Manager Pro: project rules
+
+## Aircraft performance data (take-off and landing)
+- Take-off and landing speeds, MTOW, MLW and typical seats for every aircraft type come from the reference
+  documents in `docs/reference/`:
+  - `takeoff-speeds-and-weights.txt` and `landing-speeds-and-weights.txt` (the owner's documents),
+  - `additional-aircraft-speeds-and-weights.txt` (the types those two don't list).
+- **Every aircraft type added to the app from now on gets the same data.** If it isn't in any of the
+  documents, look it up (manufacturer data, the aircraft's POH/AFM, airport-planning documents, pilot
+  organisations' reviews), add a row to `additional-aircraft-speeds-and-weights.txt` in the same format,
+  with sources, and mark values that are worked out rather than published (D: rotation ≈ 1.2 × Vso,
+  approach ≈ 1.3 × Vso). Do this in the same change that adds the aircraft.
+- Taxi speeds (all types): tight turns or near obstacles 5–10 kt; normal straight taxiways 15–25 kt;
+  long straight taxiways up to about 30 kt; approaching the runway or the stand 5–10 kt; pushback 3–5 kt.
+
+## Working rules
+- Sign every commit as `DroneDirector <simon@dronedirector.fo>`, with no co-author or session lines.
+- Never mention in code, comments, text or commits that anything is made with AI.
+- Licences of anything used must allow commercial sale.
+- Updates install over the old version and keep the user's data.
+- Always build and release the phone app and the PC app together.
+- Work goes to branch `amp-0.5.1-work`; merging to `main` releases (the build runs on `Airline-Manager-Pro/**` changes on main).
+- Never put registration keys or reactivation codes in this (public) repository: only their fingerprints.

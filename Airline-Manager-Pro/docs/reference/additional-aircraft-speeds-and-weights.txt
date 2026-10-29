@@ -1,0 +1,102 @@
+ADDITIONAL AIRCRAFT: TAKEOFF AND LANDING SPEEDS, WEIGHTS AND PASSENGER LOADS
+Reference guide | Prepared 29 October 2026
+Companion to takeoff-speeds-and-weights.txt and landing-speeds-and-weights.txt
+
+SCOPE AND SAFETY NOTE
+This guide covers the aircraft in Airline Manager Pro that the two companion guides do not list:
+the Boeing 737-600 and six light / utility aircraft. Same rules as the companion guides: these are
+broad, approximate educational figures for the app's simulation, not operational speeds. Never use
+this guide to operate an aircraft.
+
+HOW TO READ THE LIST
+- Takeoff speed = rotation / lift-off speed in knots (indicated airspeed).
+- Approach speed = final approach speed in landing configuration, in knots.
+- MTOW / MLW = maximum takeoff / landing weight.
+- Source column: P = published by the manufacturer or in the aircraft's handbook (POH/AFM),
+  R = published in a review or report by a pilot organisation,
+  D = derived (worked out) because nothing usable was published: rotation about 1.2 x and approach
+      about 1.3 x the published landing-configuration stall speed (Vso), the usual rule of thumb.
+- 1 knot = 1.852 km/h; 1 mph = 0.869 kt; 1 lb = 0.4536 kg.
+
+========================================================================
+1. BOEING 737-600
+========================================================================
+
+Model     Typical seats  Takeoff speed (kt)  Approach speed (kt)  MTOW (t)  MLW (t)   Source
+737-600   108-130        120-140             120-135              about 66  about 55  approach and
+                                                                                       weights: P (Boeing
+                                                                                       planning data: 126 kt
+                                                                                       at 55.1 t MLW);
+                                                                                       takeoff: D, scaled
+                                                                                       from the 737-700 range
+                                                                                       by weight
+
+========================================================================
+2. LIGHT AND UTILITY AIRCRAFT
+========================================================================
+
+Model                         Seats  Takeoff (kt)  Approach (kt)  MTOW (kg)  MLW (kg)  Stall Vso  Source
+DHC-6 Twin Otter (Series 300) 19     70-85         75-85          5,670      5,579     about 58   weights P (De Havilland);
+                                                                                       kt         speeds D/R (published
+                                                                                                  figures vary by operator
+                                                                                                  and flap setting)
+DHC-2 Beaver                  6-7    55-65         60-70          2,313      2,313     about 39   weights P (U-6A data,
+                                     (60-75 mph)   (approx. 75    (5,100 lb) (5,100 lb) kt        land version); approach R
+                                                   mph on final)                       (45 mph)   (AOPA, 75 mph final);
+                                                                                                  takeoff D
+Cessna 208B Grand Caravan     9-14   70-75         75-85          3,969      3,856     about 61   P/R (AOPA: rotate 70
+                                                   (78 over the   (8,750 lb) (8,500 lb) kt        KIAS short field;
+                                                   threshold,                                     75-85 KIAS full-flap
+                                                   short field)                                   landing; 120 KIAS
+                                                                                                  flaps 10 approach
+                                                                                                  segment)
+Kodiak 100 (Series III)       9-10   65-75         75-85          3,291      3,035     60 kcas    weights P (Daher / spec
+                                                                  (7,255 lb) (6,690 lb)           data); speeds D from
+                                                                                                  Vso 60 kcas
+Pilatus PC-12 NG / NGX        6-9    65-75         80-90          4,740      4,500     67 kt      weights P; speeds R
+                                                   (84 over the   (10,450 lb) (9,921 lb)           (operator review: rotate
+                                                   threshold,                                     65-70 kt, about 80 kt
+                                                   short field)                                   full-flap approach)
+Cessna 172S Skyhawk           4      55            60-75          1,157      1,157     48 kcas    P (Cessna 172S POH:
+                                                                  (2,550 lb) (2,550 lb)            rotate 55 KIAS; approach
+                                                                                                  65-75 KIAS flaps up,
+                                                                                                  60-70 KIAS flaps 30,
+                                                                                                  61 KIAS short field)
+
+Notes
+- Takeoff and approach speeds rise with weight in roughly the square root of the weight ratio
+  (same rule as the companion guides, section 9).
+- The light aircraft land on short or grass strips and on water (Beaver, Twin Otter, Caravan and
+  Kodiak on floats): the same speeds apply; ground rolls are much shorter than airliners'.
+- Passenger payload illustration: 100 kg per passenger including baggage, as in the companion guides.
+
+========================================================================
+3. SOURCES
+========================================================================
+
+Boeing, Airplane approach speeds and weights (airport planning):
+https://www.boeing.com/content/dam/boeing/v2/airports/faq/arcandapproachspeeds.pdf
+De Havilland, Twin Otter Classic 300-G specification sheet:
+https://dehavilland.com/wp-content/uploads/2025/09/DHC_Twin_Otter_300-G_WHEELS_Spec_Sheet_v2_DIGITAL.pdf
+FlightGear wiki, DHC-6 Twin Otter (rotation and touchdown speeds, simulator reference):
+https://wiki.flightgear.org/Dhc6
+GlobalSecurity, U-6A / L-20 Beaver specifications:
+https://www.globalsecurity.org/military/systems/aircraft/u-6-specs.htm
+AOPA Pilot, Beaver checkout (2013):
+https://www.aopa.org/news-and-media/all-news/2013/june/pilot/beaver-checkout
+GlobalAir, Cessna Grand Caravan 208B specifications:
+https://www.globalair.com/aircraft-specifications/cessna/grand-caravan-208b-specifications/1273
+AOPA Pilot, Turbine Pilot: Cessna Caravan (2009):
+https://www.aopa.org/news-and-media/all-news/2009/march/pilot/turbine-pilot-cessna-caravan-sky-truck
+Kodiak 100 / 900 comparison (Daher data):
+https://ras.de/wp-content/uploads/2025/04/k100-and-k900-comparison.pdf
+Aeropedia, Quest Kodiak 100:
+https://aeropedia.com.au/content/quest-kodiak-100/
+Wikipedia, Pilatus PC-12:
+https://en.wikipedia.org/wiki/Pilatus_PC-12
+Philip Greenspun, Pilatus PC-12 operator's review:
+https://philip.greenspun.com/flying/pc-12/review
+Cessna 172S Pilot's Operating Handbook:
+https://www.befa.org/wp-content/uploads/2019/12/POH-Cessna-172S.pdf
+
+END OF DOCUMENT
