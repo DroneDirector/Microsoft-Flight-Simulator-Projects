@@ -246,7 +246,8 @@ small { font-size: 12px; color: var(--ink-2); }
 .cond { position: relative; display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; flex: 1; min-width: 50px; }
 .cond i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; transform-origin: left; animation: grow .9s var(--ease) both; }
 .cond-good i { background: var(--green); }
-.cond-fair i { background: var(--amber); }
+.cond-fair i { background: #F2D04E; }
+.cond-attn i { background: #FF8A3D; }
 .cond-poor i { background: var(--red); }
 @keyframes grow { from { transform: scaleX(0); } }
 
@@ -1475,3 +1476,15 @@ canvas.av3:not(.still):not(.live):not(.bust) { transform-origin: 50% 100%; anima
 .ph-rank > svg:first-child { width: 22px; height: 22px; color: var(--amber); }
 .ph-rank > svg:last-child { width: 16px; height: 16px; color: var(--ink-2); }
 .ph-rank b { display: block; font-size: 14px; } .ph-rank small { font-size: 11.5px; color: var(--ink-2); }
+
+.type-card { text-align: left; color: inherit; font: inherit; cursor: pointer; padding: 12px 16px 14px; display: flex; flex-direction: column; }
+.tc-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.tc-head b { font: 700 16px var(--display); }
+.tc-n { font: 700 26px var(--display); color: var(--cyan); display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+.tc-n small { font: 500 10.5px 'Inter'; color: var(--ink-2); margin-top: 2px; }
+.tc-sub { color: var(--ink-2); font-size: 12px; }
+.tc-st { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin: 8px 0 4px; color: var(--ink-2); }
+.tc-st .led { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+.led.fl { background: var(--flight); } .led.av { background: var(--avail); } .led.mx { background: var(--maint); }
+.tc-spec { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.tc-spec small { display: block; font-size: 10.5px; color: var(--ink-2); } .tc-spec b { font-size: 13px; }

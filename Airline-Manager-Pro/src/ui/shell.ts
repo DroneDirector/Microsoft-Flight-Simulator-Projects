@@ -137,8 +137,9 @@ function statusChip(s: string): string {
 }
 
 function conditionBar(v: number): string {
-  const cls = v >= 85 ? 'good' : v >= 65 ? 'fair' : 'poor';
-  return `<span class="cond cond-${cls}"><i style="width:${v}%"></i></span>`;
+  // one line: green good, yellow some wear, orange needs attention, red severe problems
+  const b = condBand(v);
+  return `<span class="cond cond-${b[1]}" title="${b[2]}"><i style="width:${Math.round(v)}%"></i></span>`;
 }
 
 function emptyState(title: string, body: string, actionLabel?: string, act?: string): string {

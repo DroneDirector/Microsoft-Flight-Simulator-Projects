@@ -119,6 +119,8 @@ function maybeIncident() {
     const t = INCIDENTS[r === 'pilot' ? 'fo' : r][Math.floor(Math.random() * INCIDENTS[r === 'pilot' ? 'fo' : r].length)];
     const inc: Incident = { id: uid(), staffId: who.id, title: t[0], text: t[1].replace('{n}', who.name).replace('{b}', who.base), date: dateStr(new Date()).slice(0, 10), status: 'open' };
     S.incidents.unshift(inc);
+    // being late, skipping work and the like costs rating (and for mechanics, the quality of their work)
+    who.rating = clamp(Math.round(((who.rating || 3.5) - 0.15) * 100) / 100, 1, 5);
     State.notices.unshift({ id: 'n-' + inc.id, kind: 'staff' as any, title: `Conduct report: ${who.name}`, body: `${t[0]}. Discipline or dismiss.`, time: 'Now', read: false, ref: inc.id });
     renderTopbar(); Sound.chime(); Store.soon();
     toast(`Conduct report: ${who.name}`, 'warn', { label: 'Open', act: 'open-incident', data: inc.id });

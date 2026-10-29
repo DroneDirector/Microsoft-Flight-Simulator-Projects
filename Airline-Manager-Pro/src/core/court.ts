@@ -37,6 +37,11 @@ const OFFENCES: { [role: string]: { w: number; title: string; charge: string; te
   ],
 };
 OFFENCES.fo = OFFENCES.pilot;
+// the airline itself, after an accident that investigators blame on poor maintenance (you are the accountable manager)
+OFFENCES.airline = [
+  { w: 1, title: 'Accident caused by poor maintenance, with fatalities', charge: 'Corporate manslaughter and breaching aviation safety law', text: 'The investigation found that the accident was caused by poor maintenance: {why}.', months: [-2, -2], fine: [20000000, 80000000], fatal: true },
+  { w: 1, title: 'Accident caused by poor maintenance', charge: 'Breaching aviation safety law and endangering the safety of aircraft', text: 'The investigation found that the accident was caused by poor maintenance: {why}.', months: [-3, -3], fine: [2000000, 15000000] },
+];
 // passengers (prosecuted after the police meet the aircraft)
 OFFENCES.pax = [
   { w: 50, title: 'Drunk and disruptive on board', charge: 'Being drunk on an aircraft and disruptive behaviour towards the crew', text: '{n} was severely drunk, refused crew instructions and had to be restrained by the cabin crew. Police met the aircraft at {b}.', months: [0, 6], fine: [1500, 9000] },
@@ -65,21 +70,21 @@ function maybeCriminal(who: any, role: string): boolean {
   return true;
 }
 
-function openCourtCase(who: any, role: string, offenceIdx?: number) {
+function openCourtCase(who: any, role: string, offenceIdx?: number, why?: string) {
   const S: any = State, list = OFFENCES[role] || OFFENCES.fa;
   const o = offenceIdx != null ? list[offenceIdx] : _pickW(list);
   const base = apt(who.base) || apt(company().hub), country = base ? base.country : '';
   const fleet = fleetOf(who.companyId || State.companyId), ac = fleet[Math.floor(Math.random() * fleet.length)];
-  const fill = (t: string) => t.replace(/\{n\}/g, who.name).replace(/\{b\}/g, base ? base.city : who.base).replace(/\{r\}/g, ac ? ac.reg : 'one of your aircraft');
+  const fill = (t: string) => t.replace(/\{why\}/g, why || 'repairs left undone').replace(/\{n\}/g, who.name).replace(/\{b\}/g, base ? base.city : who.base).replace(/\{r\}/g, ac ? ac.reg : 'one of your aircraft');
   const now = Date.now(), d = (h: number) => now + h * H * (0.85 + 0.3 * Math.random());
   const authority = AUTHORITIES[country] || 'the national civil aviation authority';
   const court = base ? `the District Court in ${base.city}` : 'the district court';
   const c: CourtCase = {
     id: 'case-' + uid(), staffId: who.id, name: who.name, role, look: who.look, companyId: who.companyId || State.companyId,
     offence: o.title, charge: fill(o.charge), summary: fill(o.text), country, court, authority, opened: now, status: 'open',
-    guiltyP: o.fatal ? 0.97 : 0.8, fatal: !!o.fatal, reg: ac ? ac.reg : '',
+    guiltyP: role === 'airline' ? 0.85 : o.fatal ? 0.97 : 0.8, fatal: !!o.fatal, reg: ac ? ac.reg : '',
     stages: [
-      { at: now, key: 'arrest', title: o.fatal ? 'Arrested' : 'Police and authority investigation', text: `${fill(o.text)} The police and ${authority} have opened an investigation. ${who.name} is suspended from all duties.` },
+      { at: now, key: 'arrest', title: o.fatal ? 'Arrested' : 'Police and authority investigation', text: `${fill(o.text)} The police and ${authority} have opened an investigation.${role === 'airline' || role === 'pax' ? '' : ' ' + who.name + ' is suspended from all duties.'}` },
       { at: d(6), key: 'charge', title: 'Charged', text: `The prosecutor has charged ${who.name} with ${fill(o.charge).toLowerCase()}. ${o.licence ? 'The authority has suspended the licence until the case is decided.' : ''}` },
       { at: d(20), key: 'hearing', title: 'Preliminary hearing', text: `At a preliminary hearing at ${court}, ${who.name} ${Math.random() < 0.5 ? 'pleaded not guilty' : 'did not enter a plea'}. ${o.fatal ? 'The judge ordered that the defendant stay in custody until the trial.' : 'The trial was set for the next day.'}` },
       { at: d(32), key: 'trial1', title: 'Trial, day one', text: `The prosecution presented its case: ${o.fatal ? 'flight data, recordings and expert witnesses from the accident investigation' : 'witness statements, records and evidence from ' + authority.replace(/^the /, 'the ')}.` },
@@ -89,8 +94,8 @@ function openCourtCase(who: any, role: string, offenceIdx?: number) {
   };
   S.cases = S.cases || []; S.cases.unshift(c);
   // staff are suspended: off duty, their flights stop
-  if (role !== 'pax') { who.status = 'off'; who.suspended = c.id; }
-  if (o.fatal && ac) courtWriteOff(ac, c);
+  if (role !== 'pax' && role !== 'airline') { who.status = 'off'; who.suspended = c.id; }
+  if (o.fatal && ac && role !== 'airline') courtWriteOff(ac, c);
   courtNotice(c, c.stages[0]);
   c.stages[0].done = true;
   Store.save();
@@ -112,7 +117,9 @@ function courtNotice(c: CourtCase, st: CourtStage) {
 
 function sentenceText(o: { months: number[]; fine: number[]; licence?: boolean; fatal?: boolean }, role: string): string {
   const parts: string[] = [];
-  if (o.months[0] < 0) parts.push(Math.random() < 0.5 ? 'life imprisonment' : `${Math.round(_rand(18, 25))} years in prison`);
+  if (o.months[0] === -2) parts.push(`${Math.round(_rand(2, 4))} years in prison for the accountable manager, suspended, and the operating certificate suspended for ${Math.round(_rand(7, 21))} days`);
+  else if (o.months[0] === -3) parts.push(`the operating certificate suspended for ${Math.round(_rand(2, 7))} days`);
+  else if (o.months[0] < 0) parts.push(Math.random() < 0.5 ? 'life imprisonment' : `${Math.round(_rand(18, 25))} years in prison`);
   else {
     const m = Math.round(_rand(o.months[0], o.months[1]));
     if (m >= 12) parts.push(`${Math.round(m / 6) / 2} years in prison`);
@@ -121,6 +128,17 @@ function sentenceText(o: { months: number[]; fine: number[]; licence?: boolean; 
   if (o.fine[1] > 0) parts.push(`a fine of ${money(Math.round(_rand(o.fine[0], o.fine[1]) / 500) * 500)}`);
   if (o.licence) parts.push(role === 'mech' ? 'loss of the maintenance licence' : 'loss of the pilot\'s licence');
   return parts.length ? parts.join(', ') : 'community service';
+}
+
+/** The airline's punishment: the fine is paid, popularity falls, and a suspended operating certificate grounds the fleet for a while. */
+function courtPunishAirline(c: CourtCase, guilty: boolean) {
+  const co = company(c.companyId); if (!co) return;
+  if (!guilty) { const before = co.reputation; co.reputation = Math.min(100, co.reputation + 5); void before; return; }
+  const m = /fine of \$([\d,]+)/.exec(c.sentence || ''), fine = m ? +m[1].replace(/,/g, '') : 0;
+  if (fine) { co.balance -= fine; State.txns.unshift({ id: uid(), companyId: co.id, date: dateStr(new Date()).slice(0, 10), time: dateStr(new Date()).slice(11), label: `Court fine: ${c.offence}`, amount: -fine, kind: 'fees', lines: [[c.court, -fine]] } as any); }
+  const d = /suspended for (\d+) days/.exec(c.sentence || '');
+  if (d) (State as any).groundedUntil = Object.assign((State as any).groundedUntil || {}, { [co.id]: Date.now() + (+d[1]) * 864e5 });
+  co.reputation = Math.max(0, co.reputation - 10);
 }
 
 /** Move every open case on to now (also catches up after the app was closed). */
@@ -140,8 +158,9 @@ function courtAdvance() {
         st.title = guilty ? 'Guilty' : 'Not guilty';
         st.text = guilty ? `${c.court.replace(/^the /, 'The ')} found ${c.name} guilty of ${c.charge.toLowerCase()}. Sentence: ${c.sentence}.` + (c.fatal ? '' : ' Their employment ends.')
           : `${c.court.replace(/^the /, 'The ')} found ${c.name} not guilty. They can return to work, or you can let them go.`;
-        const p = staffById(c.staffId);
+        const p = c.role === 'airline' || c.role === 'pax' ? null : staffById(c.staffId);
         if (guilty && p) courtRemove(p);
+        if (c.role === 'airline') courtPunishAirline(c, guilty);
         if (!guilty && p) { p.suspended = ''; p.status = p.role ? 'standby' : 'standby'; }
       }
       courtNotice(c, st);
@@ -169,10 +188,10 @@ function courtPopup(id: string) {
   const next = c.stages.filter(s => !s.done)[0];
   openLayer('modal', `
     <div class="inc">
-      <div class="inc-av">${c.role === 'pax' ? `<span class="pax-av">${icon('user')}</span>` : avatarSvg(c.look, c.role === 'pilot' ? 'captain' : c.role as any, { accent: company().color, still: true })}</div>
+      <div class="inc-av">${c.role === 'pax' || c.role === 'airline' ? `<span class="pax-av">${icon(c.role === 'airline' ? 'fleet' : 'user')}</span>` : avatarSvg(c.look, c.role === 'pilot' ? 'captain' : c.role as any, { accent: company().color, still: true })}</div>
       <div class="inc-main">
         <div class="modal-head"><div><small>Criminal case, ${esc(c.court)}</small><h2>${esc(c.offence)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-        <div class="inc-who"><b>${esc(c.name)}</b><small>${esc(c.role === 'pax' ? 'Passenger' : ROLE_NAMES[c.role === 'pilot' ? 'captain' : c.role] || 'Crew')}. Charge: ${esc(c.charge)}</small>
+        <div class="inc-who"><b>${esc(c.name)}</b><small>${esc(c.role === 'pax' ? 'Passenger' : c.role === 'airline' ? 'The airline, with you as the accountable manager' : ROLE_NAMES[c.role === 'pilot' ? 'captain' : c.role] || 'Crew')}. Charge: ${esc(c.charge)}</small>
           <small class="${c.status === 'guilty' ? 'amber' : c.status === 'acquitted' ? 'green' : ''}">${c.status === 'open' ? (next ? `Next: ${esc(next.title.toLowerCase())}, around ${esc(when(next.at))}` : 'Awaiting the verdict') : c.status === 'guilty' ? `Guilty: ${esc(c.sentence || '')}` : 'Not guilty'}</small></div>
         <ol class="court-tl">${c.stages.map(s => `<li class="${s.done ? 'done' : ''}"><time>${s.done || s === next ? esc(when(s.at)) : ''}</time><b>${esc(s.title)}</b>${s.done ? `<p>${esc(s.text)}</p>` : ''}</li>`).join('')}</ol>
       </div>

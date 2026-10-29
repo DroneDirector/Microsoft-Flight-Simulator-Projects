@@ -17,7 +17,7 @@ function fleetCard(a: Aircraft, i: number): string {
         <span>${icon('pin')}${esc(where)}</span>
         <span>${icon('clock')}${num(a.hoursMin / 60)} h</span>
       </div>
-      <div class="ac-cond"><small>Condition</small>${conditionBar(a.condition)}<b>${a.condition}%</b></div>
+      <div class="ac-cond"><small>Condition</small>${conditionBar(a.condition)}<b>${Math.round(a.condition)}%</b></div>
     </div>
   </button>`;
 }
@@ -28,21 +28,40 @@ SCREENS.fleet = {
   render() {
     _blocked = crewCheck().blocked;
     const all = fleetOf();
-    const classes = [['all', 'All'], ['airliner', 'Narrowbody'], ['widebody', 'Widebody'], ['regional', 'Regional jets'], ['turboprop', 'Turboprops'], ['bush', 'Bush'], ['ga', 'Light aircraft']]
-      .filter(c => c[0] === 'all' || all.some(a => acType(a.typeId).cls === c[0]));
-    const list = all.filter(a => _fleetFilter === 'all' || acType(a.typeId).cls === _fleetFilter);
-    const byType: { [k: string]: number } = {};
-    all.forEach(a => { const t = acType(a.typeId); const k = t.maker + ' ' + t.model; byType[k] = (byType[k] || 0) + 1; });
+    const classes = [['types', 'Aircraft types'], ['all', 'All'], ['airliner', 'Narrowbody'], ['widebody', 'Widebody'], ['regional', 'Regional jets'], ['turboprop', 'Turboprops'], ['bush', 'Bush'], ['ga', 'Light aircraft']]
+      .filter(c => c[0] === 'all' || c[0] === 'types' || all.some(a => acType(a.typeId).cls === c[0]));
+    const list = all.filter(a => _fleetFilter === 'all' || acType(a.typeId).cls === _fleetFilter || a.typeId === _fleetFilter);
     return `
     <div class="screen-head">
       <div><h1>Fleet</h1><p class="sub">${all.length} aircraft, ${all.filter(a => a.status === 'flying').length} in the air, ${all.filter(a => a.status === 'grounded').length} grounded</p></div>
       <button class="btn primary" data-act="go" data-screen="market">${icon('plus')}Buy aircraft</button>
     </div>
-    <div class="filter-row">${classes.map(c => `<button class="fchip ${_fleetFilter === c[0] ? 'on' : ''}" data-act="fleet-filter" data-f="${c[0]}">${c[1]}</button>`).join('')}
-      <span class="type-sum">${Object.keys(byType).map(k => `<i>${byType[k]}× ${esc(k)}</i>`).join('')}</span></div>
-    <div class="ac-grid">${list.map(fleetCard).join('') || emptyState('No aircraft yet', 'Buy your first aircraft to start flying routes.', 'Buy aircraft', 'go-market')}</div>`;
+    <div class="filter-row">${classes.map(c => `<button class="fchip ${_fleetFilter === c[0] || (c[0] === 'types' && acType(_fleetFilter)) ? 'on' : ''}" data-act="fleet-filter" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>
+    ${_fleetFilter === 'types' ? fleetTypesHtml(all)
+      : `${acType(_fleetFilter) ? `<p class="fine-print">${icon('fleet')}${esc(acType(_fleetFilter).maker + ' ' + acType(_fleetFilter).model)}: ${list.length} in the fleet. <button class="text-btn" data-act="fleet-filter" data-f="types">All aircraft types</button></p>` : ''}
+    <div class="ac-grid">${list.map(fleetCard).join('') || emptyState('No aircraft yet', 'Buy your first aircraft to start flying routes.', 'Buy aircraft', 'go-market')}</div>`}`;
   },
 };
+
+/** Aircraft types: one card per type in the fleet, with how many you have and how they're doing. */
+function fleetTypesHtml(all: Aircraft[]): string {
+  const c = company(), ids: string[] = [];
+  all.forEach(a => { if (ids.indexOf(a.typeId) < 0) ids.push(a.typeId); });
+  if (!ids.length) return emptyState('No aircraft yet', 'Buy your first aircraft to start flying routes.', 'Buy aircraft', 'go-market');
+  return `<div class="ac-grid">${ids.map((id, i) => {
+    const t = acType(id), mine = all.filter(a => a.typeId === id);
+    const fly = mine.filter(a => a.status === 'flying').length, mx = mine.filter(a => a.status === 'grounded' || a.status === 'maintenance').length, avail = mine.length - fly - mx;
+    const cond = mine.reduce((s, a) => s + a.condition, 0) / mine.length, hrs = mine.reduce((s, a) => s + a.hoursMin, 0) / 60;
+    return `<button class="ac-card type-card" data-act="fleet-filter" data-f="${id}" style="--i:${i}">
+      <div class="ac-art">${aircraftArt(id, { color: c.color, color2: c.color2 })}</div>
+      <div class="tc-head"><b>${esc(t.maker)} ${esc(t.model)}</b><span class="tc-n">${mine.length}<small>in the fleet</small></span></div>
+      <small class="tc-sub">${esc(t.variant)}, ${esc(t.dev)}</small>
+      <div class="tc-st"><span><i class="led fl"></i>${fly} flying</span><span><i class="led av"></i>${avail} available</span><span><i class="led mx"></i>${mx} maintenance</span></div>
+      <div class="ac-cond"><small>Average condition</small>${conditionBar(cond)}<b>${Math.round(cond)}%</b></div>
+      <div class="tc-spec"><span><small>Seats</small><b>${t.seats}</b></span><span><small>Range</small><b>${num(t.rangeNm)} nm</b></span><span><small>Cruise</small><b>${t.cruiseKt} kt</b></span><span><small>Fleet hours</small><b>${num(hrs)}</b></span></div>
+    </button>`;
+  }).join('')}</div>`;
+}
 
 ACTIONS['fleet-filter'] = el => { _fleetFilter = el.getAttribute('data-f'); Sound.tick(); refresh(); };
 ACTIONS['go-market'] = () => go('market');
@@ -63,7 +82,7 @@ ACTIONS['ac-detail'] = el => {
       <div class="kv-row">
         <div><small>Airframe hours</small><b>${num(a.hoursMin / 60)}</b></div>
         <div><small>Cycles</small><b>${num(a.cycles)}</b></div>
-        <div><small>Condition</small><b>${a.condition}%</b></div>
+        <div><small>Condition</small><b>${Math.round(a.condition)}%</b></div>
         <div><small>Seats</small><b>${t.seats}</b></div>
         <div><small>Range</small><b>${num(t.rangeNm)} nm</b></div>
         <div><small>Base</small><b>${esc(a.base)}</b></div>

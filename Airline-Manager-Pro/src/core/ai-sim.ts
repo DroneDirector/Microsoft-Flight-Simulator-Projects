@@ -133,6 +133,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
     if (ev.kind === 'land') {
       const f: LiveFlight = ev.f, F: any = f, at = Math.max(ev.at, earliest), spd = F.spd || 1;
       aiLand(f, at, summary);
+      try { const pa: any = plane(f.reg); if (pa) { conditionAfterFlight(pa, F.durMs / 60000); conditionRisk(pa, f); } } catch (e) { /* ignore */ }
       try { paxOnAiLanding(f); Progress.afterAiLeg(f.pax, (plane(f.reg) || {} as any).typeId, f.to); } catch (e) { /* ignore */ }
       State.live = State.live.filter(x => x !== f);
       // duty: rest once the next leg would take the pilot past the duty limit, otherwise turn around
@@ -149,6 +150,8 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       S.aiNext = S.aiNext.filter((x: any) => x !== n);
       // an aircraft that went to maintenance, was sold or lost its pilot stays on the ground
       if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || p.status === 'off') continue;
+      // operating certificate suspended by a court: the airline's aircraft stay on the ground
+      const gu = (S.groundedUntil || {})[a.companyId]; if (gu && gu > n.depAt) { S.aiNext.push(Object.assign({}, n, { depAt: gu })); continue; }
       const load = 0.68 + (_hashStr(n.reg + n.leg) % 28) / 100;
       const depAt = Math.max(n.depAt, earliest), prof = flightProfile(a.typeId, n.from, n.to, depAt);
       const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: Math.round(n.paxMax * load), paxMax: n.paxMax,

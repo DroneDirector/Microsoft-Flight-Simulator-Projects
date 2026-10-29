@@ -170,7 +170,7 @@ function mechanicLines(issue: Issue): string {
     : `Quick word about ${spellReg(issue.reg)}, the ${t.model}.`;
   const mid = `${issue.title}. ${issue.detail}`;
   const end = issue.severity === 'grounding'
-    ? `It's about ${issue.days} days in the hangar and roughly ${money(issue.cost)}. Your call, but she stays grounded until it's done.`
+    ? `It's ${issue.severity === 'grounding' ? 'one to two hours' : issue.severity === 'major' ? 'about an hour' : 'a quick job'} in the hangar and roughly ${money(issue.cost)}. Your call, but she stays grounded until it's done.`
     : issue.days ? `I'd want her for about ${issue.days} day${issue.days > 1 ? 's' : ''}, roughly ${money(issue.cost)}. We can do it now, or I'll pencil it in for later.`
       : `It's a quick job overnight, about ${money(issue.cost)}. Fix it now or leave it for later, up to you.`;
   return start + ' ' + mid + ' ' + end;
@@ -225,13 +225,12 @@ ACTIONS['fix-now'] = el => {
   const i = State.issues.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!i) return;
   const a = plane(i.reg), c = company(a.companyId);
   const from = c.balance; c.balance -= i.cost;
-  i.status = i.days ? 'scheduled' : 'fixed';
-  if (i.severity === 'grounding' || i.days) a.status = 'maintenance';
-  if (!State.issues.some(x => x.reg === i.reg && x.status === 'open' && x.severity === 'grounding') && a.status === 'grounded') a.status = 'maintenance';
-  State.txns.unshift({ id: uid(), companyId: a.companyId, date: '2026-10-28', time: new Date().toTimeString().slice(0, 5), label: `Repair: ${i.title} (${i.reg})`, amount: -i.cost, kind: 'maint', reg: i.reg,
+  // the mechanics start work; the aircraft is in the hangar for the real repair time (see condition.ts)
+  startRepair(i);
+  State.txns.unshift({ id: uid(), companyId: a.companyId, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Repair: ${i.title} (${i.reg})`, amount: -i.cost, kind: 'maint', reg: i.reg,
     lines: [['Labour', -Math.round(i.cost * 0.45)], ['Parts', -Math.round(i.cost * 0.55)]], note: i.detail, link: { kind: 'aircraft', id: i.reg } });
   Voice.stop(); closeAll(); Sound.payOut(); Haptics.pulse(30); refresh(); animateBalance(from, c.balance);
-  toast(i.days ? `${i.reg} is in the hangar, back in ${i.days} d` : `${i.title} fixed on ${i.reg}`, 'ok');
+  toast(`${i.reg} is in the hangar: about ${(i as any).durMin} minutes of work`, 'ok');
 };
 ACTIONS['fix-later'] = el => {
   const i = State.issues.filter(x => x.id === el.getAttribute('data-id'))[0];

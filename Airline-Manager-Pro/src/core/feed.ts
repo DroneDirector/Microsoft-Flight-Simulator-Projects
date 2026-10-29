@@ -261,6 +261,7 @@ function finishLeg(e: FlightEvent) {
     typeId: a.typeId, result: grounded ? 'incident' : hard ? 'hard' : 'ok', atc: State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'Built-in', notes: _legNotes.join(', ') || undefined } as any);
   me.hoursMin += sm.blockMin; me.landings += 1;
   a.hoursMin += sm.blockMin; a.cycles += 1; a.location = to; a.status = grounded ? 'grounded' : 'parked';
+  try { conditionAfterFlight(a, sm.blockMin); } catch (er) { /* ignore */ }
   // money
   const route = State.routes.filter(r => r.companyId === c.id && r.legs.indexOf(from) >= 0 && r.legs.indexOf(to) >= 0)[0];
   const yieldPax = route ? route.yieldPerPax : Math.round(40 + 0.22 * sm.distanceNm);

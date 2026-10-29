@@ -25,7 +25,7 @@ function hangarHtml(jobs: Issue[]): string {
     const a = plane(i.reg), c = company(a.companyId);
     return `<button class="hangar" data-act="ac-detail" data-reg="${esc(i.reg)}">${hangarSvg()}
       <span class="hg-plane">${aircraftArt(a.typeId, { color: c.color, color2: c.color2, reg: a.reg, ground: true })}</span>
-      <span class="hg-tag">${statusChip('scheduled')}<b>${esc(i.reg)}</b><span>${esc(i.title)}</span><small>${i.days} day${i.days === 1 ? '' : 's'}</small></span>
+      <span class="hg-tag">${statusChip('scheduled')}<b>${esc(i.reg)}</b><span>${esc(i.title)}</span><small>${(i as any).startedAt ? Math.max(0, Math.ceil(((i as any).startedAt + (i as any).durMin * 60000 - Date.now()) / 60000)) + ' min left' : 'Waiting'}</small></span>
     </button>`;
   }).join('');
 }
@@ -50,7 +50,7 @@ SCREENS.maint = {
             <div class="ic-top">${statusChip(i.severity)}<b>${esc(i.reg)}</b><small>${esc(t.model)}, ${esc(i.date)}</small></div>
             <h4>${esc(i.title)}</h4><p>${esc(i.detail)}</p>
             <small class="src">${icon('sliders')}${esc(i.source)}</small>
-            <div class="ic-foot"><span><b>${money(i.cost)}</b><small>${i.days ? i.days + ' day' + (i.days > 1 ? 's' : '') + ' in the hangar' : 'Overnight job'}</small></span>
+            <div class="ic-foot"><span><b>${money(i.cost)}</b><small>About ${i.severity === 'grounding' ? '60-120' : i.severity === 'major' ? '30-60' : '5-20'} min in the hangar</small></span>
               <button class="btn ghost sm" data-act="open-issue" data-id="${i.id}">${icon('volume')}Mechanic</button>
               <button class="btn ghost sm" data-act="fix-later" data-id="${i.id}">Later</button>
               <button class="btn primary sm" data-act="fix-now" data-id="${i.id}">Pay and fix now</button></div>
@@ -61,7 +61,7 @@ SCREENS.maint = {
       </div>
       <div class="maint-cond card">
         <div class="card-h"><b>Fleet condition</b></div>
-        ${sorted.map(a => `<button class="cond-row" data-act="ac-detail" data-reg="${a.reg}"><b>${esc(a.reg)}</b><small>${esc(acType(a.typeId).model)}</small>${conditionBar(a.condition)}<span>${a.condition}%</span>${a.status === 'grounded' ? '<i class="gr">Grounded</i>' : ''}</button>`).join('')}
+        ${sorted.map(a => `<button class="cond-row" data-act="ac-detail" data-reg="${a.reg}"><b>${esc(a.reg)}</b><small>${esc(acType(a.typeId).model)}</small>${conditionBar(a.condition)}<span>${Math.round(a.condition)}%</span>${a.status === 'grounded' ? '<i class="gr">Grounded</i>' : ''}</button>`).join('')}
         <p class="fine-print">${icon('info')}Damage is only reported when the simulator can detect it: tail strikes, hard landings, overspeed, engine failures, overstress and severe turbulence.</p>
       </div>
     </div>`;

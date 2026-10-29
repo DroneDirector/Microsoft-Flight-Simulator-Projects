@@ -23,6 +23,7 @@
   startConductClock();
   startCourtClock();
   startProgress();
+  startConditionClock();
   Link.init();
   Updater.init();
   Backup.init();

@@ -1,0 +1,134 @@
+// Aircraft condition. Every aircraft wears with flying hours, take-offs and landings and with age; your
+// mechanics keep it up. How well they do depends on how many you have for the fleet and how good they are
+// (their rating falls when they are late, skip work or are disciplined). Repairs take real time, from
+// 5 minutes for a small job to 2 hours for a big one, and the condition rises while the work goes on.
+// It all runs on the real clock, so it carries on while the app is closed.
+//
+//   green  75-100   good
+//   yellow 55-75    some wear, keep an eye on it
+//   orange 35-55    needs attention: emergency landings become more likely
+//   red    under 35 severe problems: emergencies are likely, and a serious accident becomes possible
+//
+// A serious accident is investigated. If poor maintenance caused it (too few or poor mechanics, repairs
+// left undone, a worn-out aircraft kept flying) the airline is prosecuted and the court decides the
+// punishment; when it wasn't the airline's fault, there is no case against you.
+
+const COND_BANDS = [[75, 'good', 'Good'], [55, 'fair', 'Some wear'], [35, 'attn', 'Needs attention'], [0, 'poor', 'Severe problems']] as [number, string, string][];
+function condBand(v: number) { for (const b of COND_BANDS) if (v >= b[0]) return b; return COND_BANDS[3]; }
+
+/** Age in years (from the build year, set once per aircraft from its hours if not known). */
+function acAge(a: any): number {
+  if (!a.built) a.built = new Date().getFullYear() - Math.min(30, Math.round(a.hoursMin / 60 / 2800));
+  return Math.max(0, new Date().getFullYear() - a.built);
+}
+
+/** How well a base is maintained: share of the mechanics needed (0-1) times their average skill (0-1). */
+function maintQuality(cid: string): { coverage: number; skill: number; q: number } {
+  const mechs = staffOf(cid, 'mech');
+  const fl = State.fleet.filter(a => a.companyId === cid);
+  let need = 0; fl.forEach(a => need += MECH_RATIO[acType(a.typeId).cls] || 1);
+  need = Math.max(1, Math.ceil(need));
+  const coverage = clamp(mechs.length / need, 0, 1);
+  const skill = mechs.length ? clamp(mechs.reduce((s, m) => s + (m.rating || 3), 0) / mechs.length / 5, 0.2, 1) : 0;
+  return { coverage, skill, q: coverage * (0.4 + 0.6 * skill) };
+}
+
+/** Repair time in real minutes, from the job and the mechanics doing it (better mechanics are quicker). */
+function repairMinutes(i: Issue, skill: number): number {
+  const base = i.severity === 'grounding' ? 90 : i.severity === 'major' ? 50 : 15;
+  const steps = [5, 10, 20, 30, 40, 50, 60, 90, 120];
+  const m = base * (1.35 - 0.6 * skill) * (0.85 + 0.3 * Math.random());
+  return steps.reduce((best, s) => Math.abs(s - m) < Math.abs(best - m) ? s : best, steps[0]);
+}
+
+/** Start a repair: the aircraft goes into the hangar and the condition climbs over the repair time. */
+function startRepair(i: Issue) {
+  const a: any = plane(i.reg); if (!a) return;
+  const mq = maintQuality(a.companyId), I: any = i;
+  I.startedAt = Date.now(); I.durMin = repairMinutes(i, mq.skill || 0.3);
+  I.fromCond = a.condition; I.toCond = Math.min(condCap(a), a.condition + (i.severity === 'grounding' ? 40 : i.severity === 'major' ? 22 : 8) * (0.6 + 0.4 * (mq.skill || 0.3)));
+  i.status = 'scheduled'; a.status = 'maintenance';
+}
+
+/** The best an aircraft can be at its age: a 25-year-old airframe never looks new again. */
+function condCap(a: any): number { return Math.max(60, 100 - acAge(a) * 1.2); }
+
+let _condLast = 0;
+/** Move wear and repairs on to now (also after the app was closed). */
+function conditionAdvance() {
+  const S: any = State, now = Date.now();
+  const last = S.condTick || now; S.condTick = now;
+  const hrs = Math.min(24 * 14, (now - last) / 3600e3);
+  // repairs in progress
+  for (const i of State.issues as any[]) {
+    if (i.status !== 'scheduled' || !i.startedAt) continue;
+    const a: any = plane(i.reg); if (!a) continue;
+    const k = clamp((now - i.startedAt) / (i.durMin * 60000), 0, 1);
+    a.condition = Math.round(i.fromCond + (i.toCond - i.fromCond) * k);
+    if (k >= 1) {
+      i.status = 'fixed';
+      if (!State.issues.some((x: any) => x.reg === a.reg && x.status === 'scheduled')) a.status = State.issues.some((x: any) => x.reg === a.reg && x.status === 'open' && x.severity === 'grounding') ? 'grounded' : 'parked';
+      State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${a.reg} is out of the hangar`, body: `${i.title} done in ${i.durMin} minutes. Condition ${Math.round(a.condition)}%.`, time: 'Now', read: false } as any);
+    }
+  }
+  if (hrs <= 0) return;
+  // daily care: aircraft on the ground at their base slowly recover, more with good mechanics;
+  // everything ages a little; poorly kept aircraft lose condition even standing still
+  const qBy: { [cid: string]: any } = {};
+  for (const a of State.fleet as any[]) {
+    if (a.status === 'maintenance') continue;
+    const mq = qBy[a.companyId] || (qBy[a.companyId] = maintQuality(a.companyId));
+    const age = acAge(a), cap = condCap(a);
+    const care = (mq.q - 0.55) * 0.35 * hrs;              // good maintenance gains, poor maintenance loses
+    const ageing = (0.004 + age * 0.0006) * hrs;
+    a.condition = clamp(Math.round((a.condition + care - ageing) * 10) / 10, 1, cap);
+    if (a.condition > cap) a.condition = cap;
+  }
+}
+
+/** Wear from one flight: hours, a take-off and a landing; worse for old aircraft and poor upkeep. */
+function conditionAfterFlight(a: any, blockMin: number) {
+  const mq = maintQuality(a.companyId), age = acAge(a);
+  const wear = (blockMin / 60 * 0.12 + 0.35) * (1 + age / 25) * (1.6 - mq.q);
+  a.condition = clamp(Math.round((a.condition - wear) * 10) / 10, 1, 100);
+}
+
+/** After a hired pilot's landing: worn aircraft may divert with a problem, and in the worst state crash. */
+function conditionRisk(a: any, f: any): boolean {
+  const c = a.condition;
+  if (c < 55 && Math.random() < Math.pow((55 - c) / 55, 2) * 0.08) {
+    const sev = c < 35 ? 'grounding' : 'major';
+    const what = ['an engine running rough', 'a hydraulic leak', 'smoke from an electrical fault', 'a pressurisation fault', 'a landing gear that wouldn\'t lock down'][Math.floor(Math.random() * 5)];
+    State.issues.unshift({ id: uid(), reg: a.reg, title: 'Emergency landing', detail: `${f.callsign} declared an emergency with ${what} and landed safely at ${f.to}. Inspection and repair needed.`, source: `Condition ${Math.round(c)}% at the time`, severity: sev as any, cost: Math.round(acType(a.typeId).price * (sev === 'grounding' ? 0.004 : 0.0015) / 100) * 100, days: 0, status: 'open', date: dateStr(new Date()).slice(0, 10) } as any);
+    a.status = sev === 'grounding' ? 'grounded' : a.status;
+    State.notices.unshift({ id: uid(), kind: 'pilot', title: `Emergency landing: ${f.callsign}`, body: `${f.callsign} (${a.reg}) declared an emergency with ${what} and landed safely at ${f.to}. ${a.reg} needs repair.`, time: 'Now', read: false } as any);
+    try { Progress.popularity(-2, 'An emergency landing'); } catch (e) { /* ignore */ }
+    return false;
+  }
+  if (c < 35 && Math.random() < Math.pow((35 - c) / 35, 2) * 0.006) { conditionAccident(a, f); return true; }
+  return false;
+}
+
+/** A serious accident. Investigators decide whether poor maintenance caused it; if so, the airline is prosecuted. */
+function conditionAccident(a: any, f: any) {
+  const S: any = State, co = company(a.companyId), mq = maintQuality(a.companyId);
+  const overdue = State.issues.filter((i: any) => i.reg === a.reg && i.status === 'open').length;
+  const fault = clamp((0.6 - mq.q) * 1.5 + overdue * 0.15 + (35 - a.condition) / 60, 0, 0.95);
+  const airlineFault = Math.random() < fault;
+  const dead = Math.random() < 0.35;
+  courtWriteOff(a, { reg: a.reg } as any);
+  State.notices.unshift({ id: uid(), kind: 'pilot', title: `Serious accident: ${f.callsign}`, body: `${a.reg} crashed on arrival at ${f.to}. ${dead ? 'There were fatalities.' : 'Everyone on board survived, some with injuries.'} The accident investigation board has opened an investigation.`, time: 'Now', read: false } as any);
+  try { Progress.popularity(dead ? -30 : -15, 'A serious accident'); } catch (e) { /* ignore */ }
+  if (airlineFault) {
+    const why = [mq.coverage < 0.8 ? 'too few mechanics for the fleet' : '', mq.skill && mq.skill < 0.65 ? 'poorly qualified, unreliable mechanics' : '', overdue ? `${overdue} known ${overdue === 1 ? 'defect' : 'defects'} left unrepaired` : '', a.condition < 35 ? `the aircraft flown in a condition of ${Math.round(a.condition)}%` : ''].filter(Boolean).join(', ');
+    openCourtCase({ id: 'airline-' + co.id, name: co.name, look: null, base: co.hub, companyId: co.id }, 'airline', dead ? 0 : 1, why);
+  } else {
+    State.notices.unshift({ id: uid(), kind: 'pilot', title: 'Accident report: not the airline\'s fault', body: `The investigation found that the ${a.reg} accident was not caused by its maintenance. No charges against ${co.name}.`, time: 'Now', read: false } as any);
+  }
+}
+
+function startConditionClock() {
+  conditionAdvance();
+  setInterval(() => { conditionAdvance(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { conditionAdvance(); try { refresh(); } catch (e) { /* ignore */ } } });
+}

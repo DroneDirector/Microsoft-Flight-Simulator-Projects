@@ -40,6 +40,7 @@
     "src/ui/crew-ui.ts",
     "src/core/court.ts",
     "src/core/progress.ts",
+    "src/core/condition.ts",
     "src/core/passengers.ts",
     "src/screens/dashboard.ts",
     "src/screens/map.ts",
