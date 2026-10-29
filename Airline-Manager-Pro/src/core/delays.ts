@@ -1,5 +1,5 @@
-// Delays, rare as in real life. When a hired or co-op pilot's flight sets off it may get one, for a
-// real reason:
+// Delays, rare as in real life, for hired (AI) pilots only: never for co-op players or for you. When a
+// hired pilot's flight sets off it may get one, for a real reason:
 //   at the gate: de-icing, a late inbound crew, a departure slot (ATC flow control), a technical check,
 //     a baggage offload, fog at the destination, thunderstorms on the route, strong crosswind;
 //   at the holding point: a departure queue, a runway inspection, bird activity, a runway change;
@@ -18,9 +18,11 @@ const DELAY_REASONS = {
   goaround: [['Go-around: wind shear', 6, 10], ['Go-around: runway not clear', 6, 9], ['Go-around: unstable approach', 6, 9]],
 } as { [k: string]: [string, number, number][] };
 
-/** Pick the delays of a flight that is setting off now (most flights get none). */
+/** Pick the delays of a flight that is setting off now (most flights get none). Only for hired (AI)
+ *  pilots: co-op flights are flown by real people, and your own flights by you. */
 function assignDelays(F: any, prof: FlightProfile) {
   if (F.holds) return;
+  if (F.coop || F.you || F.real) { F.holds = []; return; }
   const A: any = apt(F.from), B: any = apt(F.to); if (!A || !B) { F.holds = []; return; }
   const wa = airportWind(F.from, A.pos), wb = airportWind(F.to, B.pos), month = new Date().getMonth();
   const winter = (month >= 10 || month <= 2) && Math.abs(A.pos[1]) > 45, windy = (w: any) => w.kt >= 25 ? 2.5 : w.kt >= 18 ? 1.5 : 1;
