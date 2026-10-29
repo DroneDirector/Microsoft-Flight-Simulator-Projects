@@ -126,7 +126,7 @@ SCREENS.ops = {
           <div class="map-host" id="ops-map"></div>
           <div class="map-legend"><b>Live operations</b><span>${live.length} airborne</span></div>
           <div class="map-sel" id="ops-sel"></div>
-          <div class="map-tools">${layerBtn()}</div>
+          <div class="map-tools">${mapSearchBtn()}${layerBtn()}</div>
           <button class="map-expand" data-act="go" data-screen="map" aria-label="Open the full map">${icon('map')}Full map</button>
         </div>
         <aside class="ops-side">
@@ -151,12 +151,15 @@ SCREENS.ops = {
   },
   mount(root) {
     const host = $('#ops-map', root);
-    _opsMap = new WorldMap(host, { interactive: true, onSelect: id => showSel(id) });
+    // tapping a flight (yours, a hired pilot's or a co-op pilot's) follows it
+    // tapping a flight (yours, a hired pilot's or a co-op pilot's) opens its bubble: follow, favourite, details
+    _opsMap = new WorldMap(host, { interactive: true, onSelect: id => { if (!id) showSel(null); } });
     const pts: number[][] = [];
     liveOf().forEach(f => { pts.push(apt(f.from).pos); if (!f.noDest) pts.push(apt(f.to).pos); if (f.pos) pts.push(f.pos); });
     if (!pts.length) pts.push(apt(company().hub).pos, [apt(company().hub).pos[0] + 8, apt(company().hub).pos[1] + 4]);
     _opsMap.fit(pts, 40);
     const mine = yourFlight(); if (mine) _opsMap.selected = mine.id;
+    (window as any).__opsShowSel = showSel;
     function showSel(id: string) {
       const box = $('#ops-sel', root); if (!box) return;
       const f = State.live.filter(x => x.id === id)[0];

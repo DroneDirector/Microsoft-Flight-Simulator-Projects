@@ -1,4 +1,5 @@
-// Demo airport list. The finished app reads airports from the simulator's own navigation data.
+// The main airports, with hand-checked names. Every other airport in the world comes from World
+// (world-airports.ts), and the simulator's own airports are added when the app is linked.
 interface Airport { icao: string; name: string; city: string; country: string; pos: number[] }
 
 const AIRPORTS: { [icao: string]: Airport } = {};
@@ -69,4 +70,4 @@ const AIRPORTS: { [icao: string]: Airport } = {};
   ['MPTO', 'Panama Tocumen', 'Panama City', 'Panama', -79.3835, 9.0714],
 ] as any[]).forEach(r => { AIRPORTS[r[0]] = { icao: r[0], name: r[1], city: r[2], country: r[3], pos: [r[4], r[5]] }; });
 
-function apt(icao: string): Airport { return AIRPORTS[icao]; }
+function apt(icao: string): Airport { return AIRPORTS[icao] || (typeof World !== 'undefined' ? World.get(icao) : null); }

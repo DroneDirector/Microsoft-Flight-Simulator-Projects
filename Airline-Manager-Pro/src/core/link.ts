@@ -123,6 +123,8 @@ const Link = {
         else if (m.type === 'state') onSimState(m.s);
         else if (m.type === 'event') onSimEvent(m.e);
         else if (m.type === 'airports') onAirports(m.list);
+        else if (m.type === 'layout') { try { AirportLayouts.received(m.icao, m.layout, m.error); } catch (e) { /* ignore */ } }
+        else if (m.type === 'all-airports') { try { onSimAirportList(m); } catch (e) { /* ignore */ } }
         else if (m.type === 'pong') this.latency = Date.now() - m.t;
       };
       ws.onclose = () => {

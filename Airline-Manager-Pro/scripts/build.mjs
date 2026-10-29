@@ -72,6 +72,9 @@ if (existsSync(three)) {
 const humans = join(root, 'assets/humans.bin');
 copyFileSync(humans, join(root, 'www/humans.bin'));
 
+// Every airport and runway in the world (OurAirports, public domain; see tools/airports)
+for (const f of ['airports-world.json', 'runways-world.json']) copyFileSync(join(root, 'assets', f), join(root, 'www', f));
+
 const tpl = readFileSync(join(root, 'www/index.template.html'), 'utf8');
 writeFileSync(join(root, 'www/index.html'), tpl.replace(/%APP_NAME%/g, cfg.appName).replace(/%APP_VERSION%/g, cfg.version));
 

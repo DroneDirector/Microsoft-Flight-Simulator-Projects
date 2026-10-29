@@ -25,6 +25,28 @@ export class FakeSim extends EventEmitter implements SimSource {
   }
   stop() { clearInterval(this.timer); }
   requestAirports() { this.emit('airports', FAKE_AIRPORTS); }
+  allAirports() { return Promise.resolve(FAKE_AIRPORTS.slice()); }
+  /** A small made-up layout (one runway, a parallel taxiway, an apron with stands) for the demo. */
+  getLayout(icao: string): Promise<any> {
+    const a = FAKE_AIRPORTS.filter(x => x.icao === icao)[0];
+    if (!a) return Promise.reject(new Error('The simulated flight only has EKVG, EKCH, EKRK and ENBR'));
+    const hdg = icao === 'EKVG' ? 127 : 40, len = icao === 'EKVG' ? 1799 : 3300, rad = hdg * Math.PI / 180;
+    const ax = Math.sin(rad), az = Math.cos(rad), px = Math.cos(rad), pz = -Math.sin(rad);   // along and across the runway
+    const pt = (s: number, o: number) => [Math.round((ax * s + px * o) * 10) / 10, Math.round((az * s + pz * o) * 10) / 10];
+    const half = len / 2, points: number[][] = [], paths: number[][] = [], parks: number[][] = [];
+    const add = (s: number, o: number, type = 1) => { points.push([...pt(s, o), type]); return points.length - 1; };
+    const r0 = add(-half, 0, 2), r1 = add(half, 0, 2);
+    paths.push([2, 45, r0, r1, 0, Math.round(hdg / 10), 0]);
+    const t0 = add(-half + 60, 180), tm = add(0, 180), t1 = add(half - 60, 180);
+    paths.push([1, 23, t0, tm, 1, 0, 0], [1, 23, tm, t1, 1, 0, 0]);
+    const c0 = add(-half + 60, 0), c1 = add(half - 60, 0);
+    paths.push([1, 23, c0, t0, 2, 0, 0], [1, 23, c1, t1, 3, 0, 0]);
+    for (let i = 0; i < 6; i++) { const [x, z] = pt(-180 + i * 60, 320); parks.push([x, z, Math.round((hdg + 270) % 360), 25, 9, 10, i + 1]); const ap = add(-180 + i * 60, 240); paths.push([3, 20, ap, i, 0, 0, 0]); }
+    for (let i = 0; i < 6; i++) paths.push([1, 23, tm, add(-180 + i * 60, 240), 4, 0, 0]);
+    const num = (h: number) => String(Math.round(h / 10) % 36 || 36).padStart(2, '0');
+    return Promise.resolve({ icao, name: icao === 'EKVG' ? 'Vagar' : icao, lat: a.lat, lon: a.lon, alt: 0, magvar: 0,
+      runways: [{ lat: a.lat, lon: a.lon, hdg, len, wid: 45, surf: 4, a: num(hdg), b: num(hdg + 180) }], points, parks, paths, names: ['', 'A', 'B', 'C', 'D'] });
+  }
 
   /** State of the flight at time t (seconds). Returns null when the flight is over. */
   at(t: number): RawSnapshot {

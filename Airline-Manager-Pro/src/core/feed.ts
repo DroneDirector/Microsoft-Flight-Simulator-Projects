@@ -32,15 +32,26 @@ function loadKnownAirports() {
   const k = (State as any).knownAirports || {};
   for (const icao of Object.keys(k)) if (!AIRPORTS[icao]) AIRPORTS[icao] = { icao, name: icao, city: icao, country: '', pos: k[icao] };
 }
-function nearestKnownAirport(lon: number, lat: number, maxNm: number): string {
-  let best = '', bd = maxNm;
-  for (const k of Object.keys(AIRPORTS)) { const d = gcDistanceNm([lon, lat], AIRPORTS[k].pos); if (d < bd) { bd = d; best = k; } }
-  return best;
-}
+/** Keep an airport from the world list with the airline's saved airports, so routes always find it. */
+function registerWorldAirport(icao: string) { if (AIRPORTS[icao]) return; const a = World.get(icao); if (a) { registerAirport(icao, a.pos[0], a.pos[1]); AIRPORTS[icao] = { icao, name: a.name, city: a.city, country: a.country, pos: a.pos }; } }
+function nearestKnownAirport(lon: number, lat: number, maxNm: number): string { return World.nearest(lon, lat, maxNm); }
 
 function onAirports(list: { icao: string; lat: number; lon: number }[]) {
   for (const a of list || []) registerAirport(a.icao, a.lon, a.lat);
+  try { World.addSim(list); } catch (e) { /* ignore */ }
   Store.soon();
+}
+
+/** Every airport the simulator has (in parts): added to the airport list, so the app has the same airports. */
+function onSimAirportList(m: { list: [string, number, number][]; part: number; parts: number; total: number }) {
+  World.addSim(m.list.map(r => ({ icao: r[0], lat: r[1], lon: r[2] })));
+  if (m.part + 1 >= m.parts) { (State as any).simAirportCount = m.total; Store.soon(); toast(`${num(m.total)} airports from the simulator are available`, 'ok'); }
+}
+/** Send a message to the PC app (when linked). */
+function linkSend(m: any): boolean {
+  const ws: any = (Link as any).ws;
+  if (!ws || Link.status !== 'connected' || ws.readyState !== 1) return false;
+  ws.send(JSON.stringify(m)); return true;
 }
 
 function onLinked() {
@@ -49,6 +60,8 @@ function onLinked() {
   const mine = plane((State as any).myReg[State.companyId]);
   if (mine && mine.status === 'flying' && !State.live.some(f => f.reg === mine.reg)) mine.status = 'parked';
   Sound.chime(); toast(`Linked to ${Link.pc.name}`, 'ok');
+  // the simulator's own airports, once per link (MSFS 2024)
+  setTimeout(() => linkSend({ type: 'all-airports' }), 3000);
   refresh();
 }
 

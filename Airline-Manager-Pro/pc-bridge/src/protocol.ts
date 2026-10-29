@@ -72,10 +72,16 @@ export type ToPhone =
   | { type: 'state'; s: SimSnapshot }
   | { type: 'event'; e: FlightEvent }
   | { type: 'airports'; list: Airport[] }
+  /** an airport's layout from the simulator (runways, taxiways, stands), or why there is none */
+  | { type: 'layout'; icao: string; layout?: any; error?: string }
+  /** every airport the simulator has, as [ident, latitude, longitude], in parts */
+  | { type: 'all-airports'; list: [string, number, number][]; part: number; parts: number; total: number }
   | { type: 'pong'; t: number };
 
 export type ToPc =
   | { type: 'hello'; device: string; token?: string }
   | { type: 'pair'; code: string; device: string }
   | { type: 'ping'; t: number }
-  | { type: 'plan'; from?: string; to?: string; reg?: string };
+  | { type: 'plan'; from?: string; to?: string; reg?: string }
+  | { type: 'layout'; icao: string }
+  | { type: 'all-airports' };

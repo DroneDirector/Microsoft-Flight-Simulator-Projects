@@ -66,7 +66,7 @@ class WorldMap {
   base: HTMLCanvasElement; baseDirty = true;
   w = 0; h = 0; dpr = 1;
   cx = 0; cy = 0; R = 200; // view centre in radians-space, pixels per radian
-  opts: MapOpts; selected: string = null; raf = 0; alive = true; last = 0;
+  opts: MapOpts; selected: string = null; mark: string = null; raf = 0; alive = true; last = 0;
   ptrs: { [id: number]: { x: number; y: number } } = {}; pinch0 = 0; R0 = 0; moved = false;
   anim: any = null; colors: any; lastFit: any = null; userMoved = false;
   ro: any; ml: any = null; mlHost: HTMLElement = null;
@@ -236,6 +236,7 @@ class WorldMap {
       if (d < bd) { bd = d; best = f.id; }
     }
     this.selected = best;
+    if (best) this.openBubble(best); else this.closeBubble();
     if (this.opts.onSelect) this.opts.onSelect(best);
   }
 
@@ -264,16 +265,20 @@ class WorldMap {
       }
       c.fill();
     }
-    // company airports
+    // only the airports that matter: on your routes (yours, your hired pilots' and co-op pilots'), where
+    // flights are going right now, and the airport you searched for; the other 49,000 stay hidden
     const used: { [k: string]: boolean } = {};
-    for (const rt of State.routes) if (rt.companyId === State.companyId) for (const l of rt.legs) used[l] = true;
+    for (const rt of State.routes) if (rt.companyId === State.companyId && !rt.flownAt) for (const l of rt.legs) used[l] = true;
+    for (const f of State.live) { used[f.from] = true; if (!f.noDest) used[f.to] = true; }
     used[company().hub] = true;
+    if (this.mark) used[this.mark] = true;
     c.font = '600 10px Inter, sans-serif';
     const degPx2 = this.degPx();
     for (const k in used) {
       const a = apt(k); if (!a) continue;
       const p = this.px(a.pos[0], a.pos[1]);
-      const hub = k === company().hub;
+      const hub = k === company().hub, marked = k === this.mark;
+      if (marked) { c.beginPath(); c.arc(p[0], p[1], 11, 0, Math.PI * 2); c.strokeStyle = col.mag; c.lineWidth = 2; c.stroke(); }
       c.save(); c.translate(p[0], p[1]); c.rotate(Math.PI / 4);
       c.fillStyle = col.bg; c.strokeStyle = hub ? col.cyan : col.dim; c.lineWidth = 1.4;
       const s = hub ? 4.2 : 3;
@@ -281,7 +286,7 @@ class WorldMap {
       c.restore();
       if (degPx2 > 1.4 && this.opts.labels !== false) {
         if (this.ml) { c.lineWidth = 3; c.lineJoin = 'round'; c.strokeStyle = 'rgba(5,15,28,.85)'; c.strokeText(k, p[0] + 7, p[1] + 3.5); }
-        c.fillStyle = hub ? col.cyan : (this.ml ? col.ink : col.dim); c.fillText(k, p[0] + 7, p[1] + 3.5);
+        c.fillStyle = marked ? col.mag : hub ? col.cyan : (this.ml ? col.ink : col.dim); c.fillText(k, p[0] + 7, p[1] + 3.5);
       }
     }
     this.baseDirty = false;
@@ -341,7 +346,7 @@ class WorldMap {
       let hdg: number;
       if (f.real && f.hdg != null) hdg = f.hdg;
       else { const ah = this.px.apply(this, gcInterpolate(a, b, Math.min(f.t + 0.01, 1))); hdg = Math.atan2(ah[0] - here[0], -(ah[1] - here[1])) / D2R; }
-      const t = acType(plane(f.reg).typeId);
+      const t = acType(flightTypeId(f));
       const prop = t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga';
       if (sel || mine) {
         const pulse = (now / 1000) % 1.6 / 1.6;
@@ -352,11 +357,37 @@ class WorldMap {
       drawPlaneGlyph(c, here[0], here[1], hdg, mine ? 22 : 18, prop, mine ? (light ? '#0B8FB0' : col.cyan) : (light ? '#14243A' : col.ink), light ? '#FFFFFF' : col.bg);
       if (this.opts.labels !== false && (degPx > 3.2 || sel || mine)) {
         c.font = '600 11px Inter, sans-serif';
-        const label = f.callsign, w = c.measureText(label).width;
+        const fav = !!((State as any).favs || {})[f.pilotId] && !mine;
+        const label = (fav ? '★ ' : '') + f.callsign, w = c.measureText(label).width;
         const lx = here[0] + 14, ly = here[1] - 12;
         c.fillStyle = 'rgba(6,16,30,.82)'; c.fillRect(lx - 4, ly - 11, w + 8, 16);
-        c.fillStyle = mine ? col.cyan : col.ink; c.fillText(label, lx, ly + 1);
+        c.fillStyle = mine ? col.cyan : fav ? col.amber : col.ink; c.fillText(label, lx, ly + 1);
       }
     }
+    this.placeBubble();
+  }
+
+  /* ---------- the flight's speech bubble: follow, favourite, details ---------- */
+  bubbleId: string = null; bubbleEl: HTMLElement = null;
+  openBubble(id: string) {
+    this.bubbleId = id;
+    if (!this.bubbleEl) { this.bubbleEl = document.createElement('div'); this.bubbleEl.className = 'fbub'; this.el.appendChild(this.bubbleEl); }
+    this.bubbleEl.innerHTML = flightBubbleHtml(id, this.following === id);
+    this.bubbleEl.classList.remove('in'); void this.bubbleEl.offsetWidth; this.bubbleEl.classList.add('in');
+    this.placeBubble();
+  }
+  closeBubble() { this.bubbleId = null; if (this.bubbleEl) { this.bubbleEl.remove(); this.bubbleEl = null; } }
+  placeBubble() {
+    if (!this.bubbleId || !this.bubbleEl) return;
+    const f = State.live.filter(x => x.id === this.bubbleId)[0];
+    if (!f) { this.closeBubble(); return; }
+    const p = this.px.apply(this, flightPos(f));
+    const off = p[0] < -20 || p[1] < -20 || p[0] > this.w + 20 || p[1] > this.h + 20;
+    this.bubbleEl.style.visibility = off ? 'hidden' : '';
+    // keep the box inside the map; the pointer line still ends on the aircraft
+    const half = Math.min(110, (this.bubbleEl.firstElementChild as HTMLElement || this.bubbleEl).offsetWidth / 2 || 100);
+    const shift = clamp(p[0], half + 6, Math.max(half + 6, this.w - half - 6)) - p[0];
+    this.bubbleEl.style.transform = `translate(${p[0].toFixed(1)}px, ${p[1].toFixed(1)}px)`;
+    this.bubbleEl.style.setProperty('--shift', shift.toFixed(1) + 'px');
   }
 }

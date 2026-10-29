@@ -6,6 +6,7 @@
   Store.restoreIfEmpty();
   if (DESKTOP) { Desk.init(); SETTINGS.unshift({ id: 'display', title: 'Display', icon: 'pc', items: [{ type: 'html', html: desktopSettingsHtml }] } as any); }
   loadKnownAirports();
+  World.load();
   ensurePeople();
   ensurePayroll();
   Store.bind();

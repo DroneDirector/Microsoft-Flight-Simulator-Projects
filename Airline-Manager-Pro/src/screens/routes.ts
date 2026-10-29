@@ -33,14 +33,13 @@ SCREENS.routes = {
   },
 };
 
-let _nr = { stops: [] as string[], typeId: '', test: false };
+let _nr = { stops: [] as string[], typeId: '', test: false, q: '' };
 /** Usable range: published range minus an IFR reserve (about 45 minutes at cruise speed). */
 function usableRange(t: AircraftType): number { return Math.round(t.rangeNm - t.cruiseKt * 0.75); }
 function legBlockMin(t: AircraftType, nm: number): number { return Math.round(nm / t.cruiseKt * 60 + 25); }
 
 function newRouteHtml(): string {
   const c = company();
-  const opts = Object.keys(AIRPORTS).filter(k => c.kind === 'bush' ? k[0] === 'P' : k[0] !== 'P');
   const fleetTypes = State.fleet.filter(a => a.companyId === c.id).map(a => a.typeId).filter((t, i, arr) => arr.indexOf(t) === i);
   const t = _nr.typeId ? acType(_nr.typeId) : null;
   const max = t ? usableRange(t) : 99999;
@@ -58,10 +57,8 @@ function newRouteHtml(): string {
         ? `${bad.map(l => `${l.from} to ${l.to} is ${num(l.d)} nm`).join(', ')}: too far for the ${esc(t.model)} (${num(max)} nm with fuel reserves). Add a fuel stop or pick a longer-range aircraft.`
         : `${esc(t.model)}: up to ${num(max)} nm per leg with fuel reserves (range ${num(t.rangeNm)} nm).${crewMax > 2 ? ` The longest leg needs ${crewMax} pilots.` : ''}`}</span></div>` : ''}
       <h3>${_nr.test ? 'Airport' : 'Add a stop'}</h3>
-      <div class="apt-grid">${opts.filter(k => _nr.test || k !== last).map(k => {
-        const d = gcDistanceNm(apt(last).pos, apt(k).pos), far = !!t && d > max;
-        return `<button class="apt-btn ${far ? 'far' : ''}" data-act="nr-add" data-icao="${k}" ${far ? 'disabled' : ''}><b>${k}</b><small>${esc(apt(k).city)}, ${esc(apt(k).country)}</small><small class="d">${num(d)} nm${far ? ', too far' : ''}</small></button>`;
-      }).join('')}</div>
+      <label class="apt-search">${icon('pin')}<input id="nr-q" type="search" placeholder="Search ${World.ready ? num(World.list.length + Object.keys(AIRPORTS).length) : ''} airports by ICAO, IATA, name or city" value="${esc(_nr.q)}" autocomplete="off"></label>
+      <div class="apt-grid" id="nr-grid">${nrGridHtml()}</div>
       <h3>Aircraft</h3>
       <div class="seg wrap">${fleetTypes.map(id => `<button class="${_nr.typeId === id ? 'on' : ''}" data-act="nr-type" data-t="${id}">${esc(acType(id).model)} <small>${num(usableRange(acType(id)))} nm</small></button>`).join('')}</div>
       <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="nr-save" ${(_nr.test ? _nr.stops.length < 1 : _nr.stops.length < 2 || bad.length) ? 'disabled' : ''}>${_nr.test ? 'Create test flight' : 'Create route'}</button></div>
@@ -70,11 +67,27 @@ function newRouteHtml(): string {
 ACTIONS['new-route'] = () => {
   const c = company();
   const ft = State.fleet.filter(a => a.companyId === c.id)[0];
-  _nr = { stops: [c.hub], typeId: ft ? ft.typeId : '', test: false };
+  _nr = { stops: [c.hub], typeId: ft ? ft.typeId : '', test: false, q: '' };
   openLayer('modal', newRouteHtml(), { cls: 'wide nr-pop' });
 };
 function rerenderNr() { const p = $('.nr-pop .panel'); if (p) p.innerHTML = newRouteHtml(); }
-ACTIONS['nr-add'] = el => { const k = el.getAttribute('data-icao'); if (_nr.test) _nr.stops = [k]; else _nr.stops.push(k); Sound.tick(); rerenderNr(); };
+/** Airports to add: your search across every airport, otherwise the main airports near the last stop. */
+function nrGridHtml(): string {
+  const c = company(), last = _nr.stops[_nr.stops.length - 1], t = _nr.typeId ? acType(_nr.typeId) : null, max = t ? usableRange(t) : 99999;
+  const L = apt(last);
+  let list: Airport[] = _nr.q.trim() ? World.search(_nr.q, 36, a => _nr.test || a.icao !== last)
+    : Object.keys(AIRPORTS).map(k => AIRPORTS[k]).filter(a => a.icao !== 'DEP' && (_nr.test || a.icao !== last) && (c.kind === 'bush' ? a.icao[0] === 'P' : a.icao[0] !== 'P'));
+  if (!_nr.q.trim() && L) list = list.slice().sort((a, b) => gcDistanceNm(L.pos, a.pos) - gcDistanceNm(L.pos, b.pos));
+  return list.map(a => {
+    const d = L ? gcDistanceNm(L.pos, a.pos) : 0, far = !!t && d > max && !_nr.test;
+    return `<button class="apt-btn ${far ? 'far' : ''}" data-act="nr-add" data-icao="${esc(a.icao)}" ${far ? 'disabled' : ''}><b>${esc(a.icao)}</b><small>${esc(a.name !== a.icao ? a.name : a.city)}${a.country ? ', ' + esc(a.country) : ''}</small><small class="d">${_nr.test ? '' : num(d) + ' nm' + (far ? ', too far' : '')}</small></button>`;
+  }).join('') || `<p class="fine-print">No airport matches "${esc(_nr.q)}".</p>`;
+}
+document.addEventListener('input', e => {
+  const el = e.target as HTMLInputElement;
+  if (el && el.id === 'nr-q') { _nr.q = el.value; const g = $('#nr-grid'); if (g) g.innerHTML = nrGridHtml(); }
+});
+ACTIONS['nr-add'] = el => { const k = el.getAttribute('data-icao'); registerWorldAirport(k); if (_nr.test) _nr.stops = [k]; else _nr.stops.push(k); _nr.q = ''; Sound.tick(); rerenderNr(); };
 ACTIONS['nr-test'] = () => { _nr.test = !_nr.test; _nr.stops = [_nr.stops[0] || company().hub]; Sound.tick(); rerenderNr(); };
 ACTIONS['nr-remove'] = el => { _nr.stops.splice(parseInt(el.getAttribute('data-i'), 10), 1); Sound.tick(); rerenderNr(); };
 ACTIONS['nr-type'] = el => { _nr.typeId = el.getAttribute('data-t'); Sound.tick(); rerenderNr(); };

@@ -5,6 +5,7 @@
 import { EventEmitter } from 'events';
 import { LB_TO_KG } from './geo';
 import type { SimSnapshot, Airport } from './protocol';
+import { LayoutReader, AirportLayout } from './airport-layout';
 
 export type RawSnapshot = Omit<SimSnapshot, 'phase' | 'from'>;
 
@@ -13,6 +14,10 @@ export interface SimSource extends EventEmitter {
   start(): void;
   stop(): void;
   requestAirports(): void;
+  /** an airport's layout as the simulator has it (runways, taxiways, stands) */
+  getLayout?(icao: string): Promise<AirportLayout>;
+  /** every airport the simulator has */
+  allAirports?(): Promise<Airport[]>;
   // events: 'snapshot' (RawSnapshot), 'crash', 'airports' (Airport[]), 'status' (connected: boolean, text: string)
 }
 
@@ -21,7 +26,7 @@ const MAX_STATIONS = 20;
 enum Def { MAIN = 1, TEXT = 2, STATIONS = 3, STATION_NAMES = 4, GSX = 5 }
 enum Req { MAIN = 1, TEXT = 2, STATIONS = 3, STATION_NAMES = 4, GSX = 5 }
 enum Evt { CRASHED = 1, PAUSE = 2, SIM = 3, FLIGHT_LOADED = 4 }
-const AIRPORT_REQ = 10;
+const AIRPORT_REQ = 10, ALL_AIRPORTS_REQ = 11;
 
 // [name, unit] read as FLOAT64, in this exact order
 const MAIN_VARS: [string, string][] = [
@@ -54,6 +59,11 @@ export class SimConnectSource extends EventEmitter implements SimSource {
   private snap: RawSnapshot = emptySnapshot();
   private stationCount = 0;
   private stationNames: string[] = [];
+  private layouts: LayoutReader = null;
+  private proto = 0;
+  private all: Airport[] = null;
+  private allParts: Airport[] = [];
+  private allWait: ((l: Airport[]) => void)[] = [];
 
   constructor(lib: any) { super(); this.lib = lib; }
 
@@ -66,6 +76,25 @@ export class SimConnectSource extends EventEmitter implements SimSource {
     this.handle = null;
   }
 
+  getLayout(icao: string): Promise<AirportLayout> {
+    if (!this.layouts) return Promise.reject(new Error('Flight Simulator isn\'t running'));
+    return this.layouts.get(icao);
+  }
+
+  /** Every airport in the simulator (MSFS 2024): read once per session. */
+  allAirports(): Promise<Airport[]> {
+    if (this.all) return Promise.resolve(this.all);
+    if (!this.handle) return Promise.reject(new Error('Flight Simulator isn\'t running'));
+    if (this.proto < this.lib.Protocol.SunRise) return Promise.reject(new Error('The full airport list needs Microsoft Flight Simulator 2024'));
+    return new Promise((resolve, reject) => {
+      this.allWait.push(resolve);
+      if (this.allWait.length > 1) return;
+      this.allParts = [];
+      try { this.handle.requestAllFacilities(ALL_AIRPORTS_REQ, this.lib.FacilityListType.AIRPORT); } catch (e) { this.allWait = []; reject(e); }
+      setTimeout(() => { if (this.allWait.length) { const w = this.allWait; this.allWait = []; this.all = this.allParts.length ? this.allParts : null; w.forEach(f => f(this.allParts)); } }, 60000);
+    });
+  }
+
   requestAirports() {
     if (!this.handle) return;
     try { this.handle.requestFacilitiesList(this.lib.FacilityListType.AIRPORT, AIRPORT_REQ); } catch (e) { /* not supported */ }
@@ -76,8 +105,14 @@ export class SimConnectSource extends EventEmitter implements SimSource {
     const L = this.lib;
     this.emit('status', false, 'Looking for Microsoft Flight Simulator…');
     let res: any = null;
-    for (const proto of [L.Protocol.KittyHawk, L.Protocol.FSX_SP2]) {
-      try { res = await L.open('Airline Manager Pro', proto); break; } catch (e) { res = null; }
+    // MSFS 2024 first (it gives the full airport list), then MSFS 2020, then older
+    for (const proto of [L.Protocol.SunRise, L.Protocol.KittyHawk, L.Protocol.FSX_SP2].filter((p: any) => p != null)) {
+      try {
+        res = await L.open('Airline Manager Pro', proto);
+        // the 2024 protocol only with MSFS 2024 (version 12 and later); MSFS 2020 uses its own
+        if (proto === L.Protocol.SunRise && res && res.recvOpen && res.recvOpen.applicationVersionMajor < 12) { try { res.handle.close(); } catch (e) { /* ignore */ } res = null; continue; }
+        this.proto = proto; break;
+      } catch (e) { res = null; }
     }
     if (!res) { this.retry = setTimeout(() => this.connect(), 5000); return; }
     const h = this.handle = res.handle;
@@ -118,9 +153,17 @@ export class SimConnectSource extends EventEmitter implements SimSource {
       if (e.clientEventId === Evt.SIM) this.snap.inFlight = e.data === 1;
       if (e.clientEventId === Evt.FLIGHT_LOADED) this.requestAirports();
     });
+    this.layouts = new LayoutReader(h);
+    this.layouts.on('note', (t: string) => this.emit('note', t));
+    this.all = null;
     h.on('airportList', (r: any) => {
       const list: Airport[] = (r.airports || []).map((a: any) => ({ icao: String(a.icao).trim(), lat: a.latitude, lon: a.longitude }))
-        .filter((a: Airport) => /^[A-Z0-9]{3,5}$/.test(a.icao));
+        .filter((a: Airport) => /^[A-Z0-9]{2,6}$/.test(a.icao));
+      if (r.requestID === ALL_AIRPORTS_REQ) {
+        this.allParts.push(...list);
+        if (r.entryNumber + 1 >= r.outOf) { this.all = this.allParts; const w = this.allWait; this.allWait = []; w.forEach(f => f(this.all)); }
+        return;
+      }
       this.emit('airports', list);
     });
     // usually a variable this aircraft doesn't have: carry on, but note it in the log

@@ -29,9 +29,13 @@ const LADDERS = {
 function _tierOf(i: number, n: number): number { return Math.min(5, Math.floor(i / Math.max(1, n) * 6)); }
 function _fmtN(v: number): string { return v >= 1e6 ? (v / 1e6) + ' million' : num(v); }
 
-let _badgeDefs: BadgeDef[] = null;
+let _badgeDefs: BadgeDef[] = null, _badgeKey = '';
 function badgeDefs(): BadgeDef[] {
-  if (_badgeDefs) return _badgeDefs;
+  // airport and country badges exist for the places you have landed (there are about 49,000 airports)
+  const landed = Array.from(new Set(State.logbook.map(l => l.to).concat(State.logbook.map(l => l.from)))).filter(k => apt(k)).sort();
+  const key = landed.join(',');
+  if (_badgeDefs && key === _badgeKey) return _badgeDefs;
+  _badgeKey = key;
   const out: BadgeDef[] = [];
   const ladder = (group: BadgeDef['group'], cat: string, metric: string, steps: number[], icon: string, title: (v: number, i: number) => string, desc: (v: number) => string) =>
     steps.forEach((v, i) => out.push({ id: metric + ':' + v, group, cat, metric, need: v, tier: _tierOf(i, steps.length), icon, title: title(v, i), desc: desc(v) }));
@@ -52,17 +56,17 @@ function badgeDefs(): BadgeDef[] {
     ladder('pilot', 'Aircraft', 'p.type.' + t.id, LADDERS.type, 'fleet', v => `${t.model}: ${_fmtN(v)} ${v === 1 ? 'flight' : 'flights'}`, v => `Fly the ${t.maker} ${t.model} ${_fmtN(v)} ${v === 1 ? 'time' : 'times'}.`);
     ladder('pilot', 'Aircraft', 'p.typeh.' + t.id, LADDERS.typeH, 'clock', v => `${t.model}: ${_fmtN(v)} hours`, v => `Log ${_fmtN(v)} hours in the ${t.maker} ${t.model}.`);
   }
-  for (const k of Object.keys(AIRPORTS)) {
-    const a = AIRPORTS[k]; if (!a || k === 'DEP') continue;
+  for (const k of landed) {
+    const a = apt(k); if (!a || k === 'DEP') continue;
     ladder('pilot', 'Airports', 'p.apt.' + k, LADDERS.airport, 'pin', v => `${a.city} ${v === 1 ? 'visitor' : '×' + v}`, v => `Land at ${a.name} (${k}) ${_fmtN(v)} ${v === 1 ? 'time' : 'times'}.`);
   }
-  const countries = Array.from(new Set(Object.keys(AIRPORTS).map(k => AIRPORTS[k].country).filter(Boolean)));
+  const countries = Array.from(new Set(landed.map(k => apt(k).country).filter(Boolean)));
   for (const c of countries) ladder('pilot', 'Countries', 'p.cty.' + c, LADDERS.country, 'map', v => `${c}: ${_fmtN(v)} ${v === 1 ? 'landing' : 'landings'}`, v => `Land in ${c} ${_fmtN(v)} ${v === 1 ? 'time' : 'times'}.`);
   // ---- the airline
   ladder('airline', 'Fleet', 'a.fleet', [1, 2, 3, 5, 8, 10, 15, 20, 30, 50, 75, 100, 150, 200], 'fleet', v => `Fleet of ${v}`, v => `Own ${v} ${v === 1 ? 'aircraft' : 'aircraft'} at once.`);
   for (const t of AIRCRAFT) ladder('airline', 'Fleet', 'a.ftype.' + t.id, LADDERS.fleetType, 'fleet', v => `${t.model} operator${v > 1 ? ' ×' + v : ''}`, v => `Have ${v} ${t.maker} ${t.model} in the fleet.`);
   for (const t of AIRCRAFT) ladder('airline', 'Operations', 'a.tlegs.' + t.id, [10, 50, 100, 250, 500, 1000, 2500], 'clock', v => `${t.model} fleet: ${_fmtN(v)} flights`, v => `Fly your airline's ${t.maker} ${t.model} ${_fmtN(v)} times yourself.`);
-  for (const k of Object.keys(AIRPORTS)) { const a = AIRPORTS[k]; if (!a || k === 'DEP') continue;
+  for (const k of landed) { const a = apt(k); if (!a || k === 'DEP') continue;
     ladder('airline', 'Airports', 'a.apt.' + k, [10, 100, 500, 1000], 'pin', v => `${a.city} station ×${_fmtN(v)}`, v => `Land your airline at ${a.name} (${k}) ${_fmtN(v)} times yourself.`); }
   ladder('airline', 'Money', 'a.revenue', LADDERS.money, 'finance', v => `${money(v, { compact: true })} revenue`, v => `Earn ${money(v)} in revenue.`);
   ladder('airline', 'Money', 'a.balance', LADDERS.money, 'finance', v => `${money(v, { compact: true })} in the bank`, v => `Have a balance of ${money(v)}.`);

@@ -203,9 +203,15 @@ function fleetOf(cid?: string): Aircraft[] {
   return State.fleet.filter(a => a.companyId === c && (State.divisionId === 'all' || !a.divisionId || a.divisionId === State.divisionId || cid));
 }
 function liveOf(cid?: string): LiveFlight[] {
-  const c = cid || State.companyId;
-  return State.live.filter(f => { const a = plane(f.reg); return a && a.companyId === c; });
+  const c = cid || State.companyId, co: any = (State as any).coop;
+  // co-op pilots' flights belong to the co-op airline even when they fly without one of its aircraft
+  const list = State.live.filter(f => { const a = plane(f.reg); return a ? a.companyId === c : !!((f as any).coop && co && co.on && co.companyId === c); });
+  // favourites first
+  const fav = (State as any).favs || {};
+  return list.filter(f => fav[f.pilotId]).concat(list.filter(f => !fav[f.pilotId]));
 }
+/** The aircraft type of a flight (co-op flights may have no aircraft of the fleet). */
+function flightTypeId(f: LiveFlight): string { const a = plane(f.reg); return a ? a.typeId : (f as any).typeId || 'a320-fenix'; }
 function profileOfCompany(cid: string): Profile { const c = company(cid); for (const p of State.profiles) if (p.id === c.profileId) return p; return State.profiles[0]; }
 function myPilot(): Pilot { const pr = profileOfCompany(State.companyId); return pilot(pr.pilotId); }
 function unreadCount(): number { return State.notices.filter(n => !n.read).length; }

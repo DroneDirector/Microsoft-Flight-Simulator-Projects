@@ -43,6 +43,20 @@ export function run(source: SimSource, server: LinkServer, log: (s: string) => v
     log(describe(e));
     server.broadcast({ type: 'event', e });
   });
+  // the airport view asks for an airport's layout; the airport search for every airport in the sim
+  server.on('message', (c: any, m: any) => {
+    if (m.type === 'layout' && source.getLayout) {
+      const icao = String(m.icao || '').toUpperCase().slice(0, 8);
+      source.getLayout(icao).then(l => c.send({ type: 'layout', icao, layout: l }), (e: any) => c.send({ type: 'layout', icao, error: String(e && e.message || e) }));
+    } else if (m.type === 'all-airports' && source.allAirports) {
+      source.allAirports().then(list => {
+        const rows: [string, number, number][] = list.map(a => [a.icao, Math.round(a.lat * 1e5) / 1e5, Math.round(a.lon * 1e5) / 1e5]);
+        const size = 4000, parts = Math.max(1, Math.ceil(rows.length / size));
+        for (let i = 0; i < parts; i++) c.send({ type: 'all-airports', list: rows.slice(i * size, (i + 1) * size), part: i, parts, total: rows.length });
+        log(`Sent ${rows.length} simulator airports to ${c.device}`);
+      }, (e: any) => log(`Airport list: ${String(e && e.message || e)}`));
+    }
+  });
   server.on('paired', (c: any) => {
     log(`Phone linked: ${c.device} (${c.ip})`);
     c.send({ type: 'state', s: clean(tracker.update(last)) });
