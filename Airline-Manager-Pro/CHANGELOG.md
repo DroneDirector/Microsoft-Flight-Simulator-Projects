@@ -1,8 +1,14 @@
 # Changelog
 
+## 0.5.9 (2026-10-29)
+
+- Real airport layouts from OpenStreetMap in the airport view (runways, taxiways, taxilanes, aprons, terminals, numbered stands), kept on the device; split runways joined, official lengths
+- Repair time setting: instant, or 5 to 90 minutes decided by the job; one payment repairs all of an aircraft's reports
+- Details opens for your own flight in Live operations
+
 ## 0.5.8 (2026-10-29)
 
-- Paying for a repair fixes the aircraft at once and makes it available; one payment covers all its open reports; aircraft stuck in the hangar are released; the hangar shows grounded aircraft
+- One payment covers all of an aircraft's open reports; aircraft stuck in the hangar are released
 
 ## 0.5.7 (2026-10-29)
 
