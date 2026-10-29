@@ -20,12 +20,12 @@ function hangarSvg(): string {
   </svg>`;
 }
 function hangarHtml(jobs: Issue[]): string {
-  if (!jobs.length) return `<div class="hangar empty">${hangarSvg()}<span class="hg-msg">${icon('check')}The hangar is empty. Grounded aircraft wait here until they're repaired.</span></div>`;
+  if (!jobs.length) return `<div class="hangar empty">${hangarSvg()}<span class="hg-msg">${icon('check')}The hangar is empty. Repairs you pay for show up here.</span></div>`;
   return jobs.map(i => {
     const a = plane(i.reg), c = company(a.companyId);
     return `<button class="hangar" data-act="ac-detail" data-reg="${esc(i.reg)}">${hangarSvg()}
       <span class="hg-plane">${aircraftArt(a.typeId, { color: c.color, color2: c.color2, reg: a.reg, ground: true })}</span>
-      <span class="hg-tag">${statusChip('grounding')}<b>${esc(i.reg)}</b><span>${esc(i.title)}</span><small>Grounded until it's repaired</small></span>
+      <span class="hg-tag">${statusChip('scheduled')}<b>${esc(i.reg)}</b><span>${esc(State.issues.filter(x => x.reg === i.reg && x.status === 'scheduled').map(x => x.title).join(', '))}</span><small>${plane(i.reg).status === 'flying' ? 'Starts when it lands' : Math.max(1, Math.ceil(((i as any).startedAt + (i as any).durMin * 60000 - Date.now()) / 60000)) + ' min left'}</small></span>
     </button>`;
   }).join('');
 }
@@ -35,7 +35,7 @@ SCREENS.maint = {
     const fl = fleetOf();
     const regs = fl.map(a => a.reg);
     const issues = State.issues.filter(i => regs.indexOf(i.reg) >= 0);
-    const open = issues.filter(i => i.status === 'open'), sched = open.filter(i => i.severity === 'grounding').filter((i, k, l) => l.findIndex(x => x.reg === i.reg) === k);
+    const open = issues.filter(i => i.status === 'open'), sched = issues.filter(i => i.status === 'scheduled').filter((i, k, l) => l.findIndex(x => x.reg === i.reg) === k);
     const sorted = fl.slice().sort((a, b) => a.condition - b.condition);
     return `
     <div class="screen-head">
@@ -50,7 +50,7 @@ SCREENS.maint = {
             <div class="ic-top">${statusChip(i.severity)}<b>${esc(i.reg)}</b><small>${esc(t.model)}, ${esc(i.date)}</small></div>
             <h4>${esc(i.title)}</h4><p>${esc(i.detail)}</p>
             <small class="src">${icon('sliders')}${esc(i.source)}</small>
-            <div class="ic-foot"><span><b>${money(i.cost)}</b><small>${repairTotal(i.reg).n > 1 ? `${repairTotal(i.reg).n} reports on ${esc(i.reg)}, ${money(repairTotal(i.reg).cost)} for all` : 'Ready to fly once paid'}</small></span>
+            <div class="ic-foot"><span><b>${money(i.cost)}</b><small>${repairTotal(i.reg).n > 1 ? `${repairTotal(i.reg).n} reports on ${esc(i.reg)}, ${money(repairTotal(i.reg).cost)} for all` : ((State.settings as any).repairTime === 'instant' ? 'Ready to fly once paid' : `About ${i.severity === 'grounding' ? '50-90' : i.severity === 'major' ? '20-40' : '5-15'} min in the hangar`)}</small></span>
               <button class="btn ghost sm" data-act="open-issue" data-id="${i.id}">${icon('volume')}Mechanic</button>
               <button class="btn ghost sm" data-act="fix-later" data-id="${i.id}">Later</button>
               <button class="btn primary sm" data-act="fix-now" data-id="${i.id}">${repairTotal(i.reg).n > 1 ? 'Pay and fix all' : 'Pay and fix now'}</button></div>

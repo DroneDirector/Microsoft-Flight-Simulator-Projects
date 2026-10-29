@@ -63,19 +63,19 @@ class AirportView {
   setLayout(L: AirportLayout) {
     this.L = L;
     const src = $('#apv-src');
-    if (src) src.textContent = L.source === 'sim' ? 'Layout from your simulator' : L.runways.length ? 'Real runways · taxiways and apron drawn schematically' : 'No runway data for this airport';
-    if (src) src.classList.toggle('sim', L.source === 'sim');
+    if (src) src.textContent = L.source === 'sim' ? 'Layout from your simulator' : L.source === 'osm' ? 'Real airport layout · © OpenStreetMap contributors' : L.runways.length ? 'Real runways · taxiways and apron drawn schematically' : 'No runway data for this airport';
+    if (src) src.classList.toggle('sim', L.source !== 'runways');
     this.buildGraph(); this.pickRunway(); this.fit();
     const note = $('#apv-note');
     if (note) setTimeout(() => { note.style.transition = 'opacity .6s'; note.style.opacity = '0'; }, 7000);
-    if (note) note.innerHTML = L.source === 'sim' ? '' : `${icon('info')}<span>${Link.status === 'connected' ? 'The simulator has no detailed layout for this airport.' : 'Link the app to the simulator to see the real taxiways, aprons and stands.'}</span>`;
+    if (note) note.innerHTML = L.source !== 'runways' ? '' : `${icon('info')}<span>${Link.status === 'connected' ? 'The simulator has no detailed layout for this airport.' : 'Link the app to the simulator to see the real taxiways, aprons and stands.'}</span>`;
   }
 
   /** Taxi network: from the simulator's taxi paths, or a schematic parallel taxiway and apron. */
   buildGraph() {
     const L = this.L, adj: { [k: string]: [string, number][] } = {};
     const link = (a: string, b: string, d: number) => { (adj[a] = adj[a] || []).push([b, d]); (adj[b] = adj[b] || []).push([a, d]); };
-    if (L.source === 'sim' && L.points.length && L.paths.length) {
+    if (L.source !== 'runways' && L.points.length && L.paths.length) {
       const P = L.points;
       for (const p of L.paths) {
         const [type, , st, en] = p;
@@ -134,10 +134,15 @@ class AirportView {
   }
 
   /* ---------- where each aircraft is ---------- */
+  routes: { [k: string]: number[][] } = {};
   route(fromKey: string, toKey: string): number[][] {
+    const rk = fromKey + '>' + toKey; if (this.routes[rk]) return this.routes[rk];
+    return (this.routes[rk] = this.findRoute(fromKey, toKey));
+  }
+  findRoute(fromKey: string, toKey: string): number[][] {
     const g = this.graph; if (!g || !g.adj[fromKey] || !g.adj[toKey]) return [];
     const dist: { [k: string]: number } = { [fromKey]: 0 }, prev: { [k: string]: string } = {}, done: { [k: string]: boolean } = {};
-    for (let guard = 0; guard < 6000; guard++) {
+    for (let guard = 0; guard < 20000; guard++) {
       let u: string = null, ud = 1e18; for (const k in dist) if (!done[k] && dist[k] < ud) { ud = dist[k]; u = k; }
       if (!u || u === toKey) break; done[u] = true;
       for (const [v, d] of g.adj[u] || []) if (!done[v] && ud + d < (dist[v] == null ? 1e18 : dist[v])) { dist[v] = ud + d; prev[v] = u; }
@@ -267,13 +272,19 @@ class AirportView {
     c.fillStyle = cssVar('--map-dot');
     if ((x1 - x0) / step < 160) for (let x = Math.ceil(x0 / step) * step; x < x1; x += step) for (let y = Math.ceil(y0 / step) * step; y < y1; y += step) { const p = this.scr(x, y); c.fillRect(p[0] - 0.8, p[1] - 0.8, 1.6, 1.6); }
     const g = this.graph;
+    // aprons and terminal buildings
+    for (const ar of L.areas || []) {
+      c.beginPath(); ar.pts.forEach((q, i) => { const p = this.scr(q[0], q[1]); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath();
+      if (ar.k === 'apron') { c.fillStyle = '#0f2238'; c.fill(); c.strokeStyle = 'rgba(147,169,193,.18)'; c.lineWidth = 1; c.stroke(); }
+      else { c.fillStyle = '#1a3352'; c.fill(); c.strokeStyle = 'rgba(63,208,232,.35)'; c.lineWidth = 1; c.stroke(); }
+    }
     // taxiways (wide pavement, then a centre line)
     if (g) {
       const paths = g.schematic ? null : L.paths;
       const drawSeg = (a: number[], b: number[], wm: number, fill: string) => { const p = this.scr(a[0], a[1]), q = this.scr(b[0], b[1]); c.strokeStyle = fill; c.lineWidth = Math.max(1.5, wm * s); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); };
       c.lineCap = 'round';
       if (paths) {
-        for (const p of paths) { const [type, wid, st, en] = p; if (type === 1 || type === 4) { const a = g.pts[st], b = g.pts[en]; if (a && b) drawSeg(a, b, wid || 20, '#132a45'); } else if (type === 3) { const a = g.pts[st], k = g.parks[en]; if (a && k) drawSeg(a, k, Math.max(10, wid || 15), '#11263f'); } }
+        for (const p of paths) { const [type, wid, st, en] = p; if (type === 1 || type === 4) { const a = g.pts[st], b = g.pts[en]; if (a && b) drawSeg(a, b, wid || 20, '#1a3554'); } else if (type === 3) { const a = g.pts[st], k = g.parks[en]; if (a && k) drawSeg(a, k, Math.max(10, wid || 15), '#16304d'); } }
         if (s > 0.25) { c.setLineDash([]); for (const p of paths) { const [type, , st, en] = p; if (type === 1 || type === 4) { const a = g.pts[st], b = g.pts[en]; if (a && b) drawSeg(a, b, 0.3 / s, 'rgba(242,179,61,.45)'); } } }
       } else {
         const seen: { [k: string]: boolean } = {};
@@ -284,7 +295,7 @@ class AirportView {
         const q = this.scr(p[0], p[1]), r = Math.max(2.5, (p[3] || 15) * s);
         c.fillStyle = '#10243c'; c.beginPath(); c.arc(q[0], q[1], r, 0, Math.PI * 2); c.fill();
         c.strokeStyle = g.schematic ? 'rgba(147,169,193,.25)' : 'rgba(147,169,193,.4)'; c.lineWidth = 1; c.setLineDash(g.schematic ? [3, 3] : []); c.stroke(); c.setLineDash([]);
-        if (s > 0.6 && p[6]) { c.fillStyle = col.dim3; c.font = '600 9px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(standName(p), q[0], q[1] + 3); }
+        if (s > 0.6 && p[6]) { c.fillStyle = col.dim3; c.font = '600 9px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(L.parkNames && L.parkNames[i] != null ? L.parkNames[i] : standName(p), q[0], q[1] + 3); }
       });
       c.textAlign = 'left';
     }

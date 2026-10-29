@@ -54,6 +54,7 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'damage', label: 'Damage detection', hint: 'Tail strikes, hard landings, overspeed, engine failures and overstress the simulator can detect.' },
     { type: 'toggle', key: 'turbulence', label: 'Severe turbulence damage', hint: 'Only extreme turbulence counts, with realistic results: inspections, overstress, cabin damage.' },
     { type: 'toggle', key: 'crashPrompt', label: 'Ask me before registering a crash', hint: 'Choose to register or disregard each crash.' },
+    { type: 'choice', key: 'repairTime', label: 'Repair time', hint: 'Instant: the aircraft is ready to fly as soon as you pay. Decided by the app: it stays in the hangar for 5, 10, 15, 20, 25, 30, 40, 50, 60 or 90 minutes, depending on the job and how good your mechanics are.', options: [['instant', 'Instant'], ['auto', 'Decided by the app']] },
   ] },
   { id: 'voice', title: 'Mechanic voice', icon: 'volume', items: [
     { type: 'toggle', key: 'mechanicVoice', label: 'Mechanic speaks his messages', hint: 'Runs fully on this device, no internet needed.' },
@@ -114,7 +115,7 @@ const SETTINGS: SetSection[] = [
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>
-      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>three.js by the three.js authors, MIT License.</p><p>Human body model and shape targets from MakeHuman, CC0 1.0 (public domain).</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p></div>` },
+      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>three.js by the three.js authors, MIT License.</p><p>Human body model and shape targets from MakeHuman, CC0 1.0 (public domain).</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p><p>Airport layouts © OpenStreetMap contributors, available under the Open Database License (ODbL). Airport and runway list from OurAirports (public domain).</p></div>` },
   ] },
 ];
 

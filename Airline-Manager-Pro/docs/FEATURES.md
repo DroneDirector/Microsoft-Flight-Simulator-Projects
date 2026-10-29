@@ -132,6 +132,8 @@ Only damage the simulator can actually detect.
 | Flight menu on the map: follow, favourite and details | Built |
 | Co-op: run an airline together with other pilots, online through Supabase | Coming soon |
 | Airport view: runways, taxiways and stands with aircraft taxiing, taking off and landing | Built |
+| Real airport layouts from OpenStreetMap: taxiways, aprons, terminals and numbered stands | Built |
+| Repair time: instant, or 5 to 90 minutes depending on the job | Built |
 | Fly for a real-world airline (names and codes only, no logos) | Built |
 | Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |
