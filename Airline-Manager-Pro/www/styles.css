@@ -1834,3 +1834,7 @@ button.coop-e:hover { border-color: var(--line-2); }
 .calm .batt-fill { animation: none !important; }
 @media (max-width: 560px) { .batt b { display: none; } .batt { padding: 0 6px; } }
 .batt-bolt { width: 13px; height: 13px; margin-left: -1px; }
+
+/* The map (base map, airports, aircraft) stays in its own layer, below every panel and button on it */
+.map-host { z-index: 0; isolation: isolate; }
+.bigmap > .mf-panel, .bigmap > .map-zoom, .bigmap > .back-btn.on-map, .bigmap > .map-detail, .ops-map > .map-sel, .ops-map > .map-tools, .ops-map .map-label, .ops-map > :not(.map-host) { z-index: 3; }

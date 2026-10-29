@@ -147,9 +147,11 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   // about 120 nm for an A320 or 737 at FL370, 125-135 nm for the big twins and four-engine jets,
   // about 110 nm for a CRJ, 80 nm for an ATR at FL250, 25-35 nm for a Cessna or Twin Otter.
   const GLIDE = 318;   // ft per nm on a 3° path
+  // take-off roll and landing roll from the type's speeds (docs/reference), at a typical 80% load
+  const SPD = flightSpeeds(typeId, Math.round(t.seats * 0.8), gc), accel = P.jet ? 2.0 : 2.4, decel = P.jet ? 1.9 : 1.6;
   const descPlan = (top: number) => {
     const finalAlt = Math.min(top, P.finalNm * GLIDE), low = Math.min(top, 10000);
-    const nodes: number[][] = [[0, 0, P.appKt], [P.finalNm, finalAlt, P.appKt + (P.jet ? 25 : 15)]];   // [miles out, altitude, indicated speed]
+    const nodes: number[][] = [[0, 0, SPD.vthr], [P.finalNm, finalAlt, SPD.vapp + (P.jet ? 25 : 15)]];   // [miles out, altitude, indicated speed]
     const lowNm = P.finalNm + Math.max(0, low - finalAlt) / 1000 * P.descK + P.decelNm * Math.min(1, low / 10000);
     nodes.push([lowNm, low, P.jet ? 250 : Math.min(P.descIas, 250)]);
     if (top > low) nodes.push([lowNm + (top - low) / 1000 * P.descK, top, P.descIas]);
@@ -207,7 +209,7 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   const taxiOut = P.taxiOut + (P.jet ? BIG_HUBS[from] || 0 : 0), taxiIn = P.taxiIn + (P.jet ? (BIG_HUBS[to] || 0) * 0.5 : 0);
   push('Taxi out', 0);
   s += taxiOut * 60; push('Taxi out', 12);
-  const rollS = P.jet ? 40 : 25; s += rollS; d += 0.6; push('Takeoff', P.appKt);
+  const rollS = Math.round(SPD.vr * KT / accel + 4); s += rollS; d += 0.6; push('Takeoff', SPD.v2);
   const STEP = 20;
   // climb
   while (h < cruise) {
@@ -235,7 +237,7 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
     s += st.dt; d += st.dd; h = st.h; acc += st.dd;
     if (acc >= 2 || st.ph === 'Final' || i === down.steps.length - 1 || st.ph !== down.steps[i + 1].ph) { push(st.ph, st.gs); acc = 0; }
   }
-  d = routeNm; h = 0; s += 45; push('Landing', 25);
+  d = routeNm; h = 0; s += Math.round((SPD.vtd - 15) * KT / decel + 8); push('Landing', 15);
   s += taxiIn * 60; push('Taxi in', 0);
   const airS = s - taxiOut * 60 - taxiIn * 60;
   const prof = { pts, totalS: s, routeNm, cruiseAlt: cruise, airS };

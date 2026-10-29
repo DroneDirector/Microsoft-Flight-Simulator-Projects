@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.3 (2026-10-29)
+
+- Take-off and landing speeds and weights per aircraft type (docs/reference), by weight and wind; take-off and landing rolls from them
+- Taxi speeds by situation (5-30 kt), pushback, waiting at the gate until it is time to taxi; speeds shown on labels
+- Map panels and buttons always in front of the airport drawing
+
 ## 0.7.2 (2026-10-29)
 
 - Published SIDs, STARs and approaches read from the simulator by the PC app, kept on the phone, chosen by runway in use and direction; generated ones where there are none

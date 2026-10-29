@@ -19,6 +19,7 @@
     "src/data/world-airports.ts",
     "src/data/airport-layouts.ts",
     "src/data/aircraft.ts",
+    "src/data/speeds.ts",
     "src/data/demo.ts",
     "src/core/store.ts",
     "src/graphics/aircraft-art.ts",
