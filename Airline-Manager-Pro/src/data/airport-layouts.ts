@@ -23,7 +23,8 @@ const AirportLayouts = {
   waiting: {} as { [icao: string]: { ok: (l: AirportLayout) => void; timer: any }[] },
 
   /** The best layout to show right now (straight away: the real runways if nothing better is kept), and
-   *  `better` is called when a fuller one arrives: the simulator's when linked, else OpenStreetMap's. */
+   *  `better` is called when a fuller one arrives: the simulator's when linked, else OpenStreetMap's;
+   *  or with null when there is nothing better to come. */
   get(icao: string, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     icao = String(icao || '').toUpperCase();
     const linked = Link.status === 'connected';
@@ -31,8 +32,8 @@ const AirportLayouts = {
     if (c && (c.source === 'sim' || (!linked && c.source === 'osm'))) return Promise.resolve(c);
     const now = c ? Promise.resolve(c) : this.fromRunways(icao);
     now.then(first => {
-      const upgrade = (l: AirportLayout) => { if (l && l !== first && l.source !== 'runways' && better) better(l); };
-      const viaOsm = () => (c && c.source === 'osm' ? Promise.resolve(c) : this.fromOsm(icao)).then(l => { if (l && (!c || c.source !== 'osm')) upgrade(l); }).catch(() => { /* runways stay */ });
+      const upgrade = (l: AirportLayout) => { if (better) better(l && l !== first && l.source !== 'runways' ? l : null); };
+      const viaOsm = () => (c && c.source === 'osm' ? Promise.resolve(c) : this.fromOsm(icao)).then(l => upgrade(l && (!c || c.source !== 'osm') ? l : null)).catch(() => upgrade(null));
       if (linked && linkSend({ type: 'layout', icao })) {
         const w = { ok: (l: AirportLayout) => { if (l && l.source === 'sim') upgrade(l); else viaOsm(); }, timer: setTimeout(() => this.received(icao, null, 'timeout'), 8000) };
         (this.waiting[icao] = this.waiting[icao] || []).push(w);

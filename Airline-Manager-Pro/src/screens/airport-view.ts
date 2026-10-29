@@ -42,7 +42,11 @@ class AirportView {
     this.size(); this.bind();
     this.loop = this.loop.bind(this);
     this.fetching = navigator.onLine !== false || Link.status === 'connected';
-    AirportLayouts.get(icao, L => { if (this.alive) { this.setLayout(L, true); toast(L.source === 'sim' ? 'Layout from your simulator' : 'Real airport layout loaded', 'ok'); } })
+    AirportLayouts.get(icao, L => {
+      if (!this.alive) return;
+      if (!L) { this.fetching = false; if (this.L) this.setLayout(this.L, true); return; }   // nothing better: say so
+      this.setLayout(L, true); toast(L.source === 'sim' ? 'Layout from your simulator' : 'Real airport layout loaded', 'ok');
+    })
       .then(L => { if (!this.alive) return; this.setLayout(L); if (L.source !== 'runways') this.fetching = false; this.labelSource();
         // nothing better came within 45 seconds: stop saying it is coming
         setTimeout(() => { if (this.alive && this.fetching) { this.fetching = false; this.labelSource(); } }, 45000); });
