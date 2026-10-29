@@ -9,3 +9,5 @@ capacitor.config.json
 src/**/*.js
 www/vendor/
 www/humans.bin
+www/airports-world.json
+www/runways-world.json

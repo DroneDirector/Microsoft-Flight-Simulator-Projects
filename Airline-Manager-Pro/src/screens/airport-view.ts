@@ -19,7 +19,7 @@ class AirportView {
   host: HTMLElement; root: HTMLElement; cv: HTMLCanvasElement; ctx: CanvasRenderingContext2D;
   icao: string; L: AirportLayout = null; w = 0; h = 0; dpr = 1;
   cx = 0; cy = 0; s = 0.25; raf = 0; alive = true;
-  track: string = null; userMoved = false; fromWorld: WorldMap = null;
+  track: string = null; seen = false; userMoved = false; fromWorld: WorldMap = null;
   ptrs: { [id: number]: { x: number; y: number } } = {}; pinch0 = 0; s0 = 0; moved = false;
   graph: { pts: number[][]; adj: { [k: string]: [string, number][] }; parks: number[][]; schematic: boolean } = null;
   active: { tx: number; ty: number; ux: number; uy: number; len: number; name: string; wind: number; windKt: number } = null;
@@ -67,6 +67,7 @@ class AirportView {
     if (src) src.classList.toggle('sim', L.source === 'sim');
     this.buildGraph(); this.pickRunway(); this.fit();
     const note = $('#apv-note');
+    if (note) setTimeout(() => { note.style.transition = 'opacity .6s'; note.style.opacity = '0'; }, 7000);
     if (note) note.innerHTML = L.source === 'sim' ? '' : `${icon('info')}<span>${Link.status === 'connected' ? 'The simulator has no detailed layout for this airport.' : 'Link the app to the simulator to see the real taxiways, aprons and stands.'}</span>`;
   }
 
@@ -250,8 +251,8 @@ class AirportView {
     // follow the tracked aircraft; hand over to the world map when it leaves the airport
     if (this.track) {
       const p = this.planes.filter(x => x.id === this.track)[0];
-      if (p) { if (!this.userMoved) { this.cx += (p.x - this.cx) * 0.12; this.cy += (p.y - this.cy) * 0.12; } }
-      else if (State.live.some(f => f.id === this.track) && this.fromWorld) { toast('The aircraft has left the airport, following it on the map', 'info'); this.close(true); return; }
+      if (p) { this.seen = true; if (!this.userMoved) { this.cx += (p.x - this.cx) * 0.12; this.cy += (p.y - this.cy) * 0.12; } }
+      else if (this.seen && State.live.some(f => f.id === this.track) && this.fromWorld) { toast('The aircraft has left the airport, following it on the map', 'info'); this.close(true); return; }
     }
     this.draw(now);
     if (now - this.lastList > 1000) { this.lastList = now; this.renderList(); }
@@ -317,7 +318,7 @@ class AirportView {
     }
     // aircraft
     for (const p of this.planes) {
-      const q = this.scr(p.x, p.y), size = Math.max(p.parked ? 11 : 14, p.span * s * 1.05);
+      const q = this.scr(p.x, p.y), size = Math.max(p.parked ? 14 : 19, p.span * s * 1.05);
       const tracked = p.id === this.track;
       if (tracked) { const pulse = (now / 1000) % 1.6 / 1.6; c.beginPath(); c.arc(q[0], q[1], size * 0.7 + 6 + pulse * 14, 0, Math.PI * 2); c.strokeStyle = col.mag; c.globalAlpha = 0.6 * (1 - pulse); c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }
       if (p.alt > 50) { c.globalAlpha = 0.25; drawPlaneGlyph(c, q[0] + Math.min(18, p.alt / 120), q[1] + Math.min(18, p.alt / 120), p.hdg, size, p.prop, '#000', 'transparent'); c.globalAlpha = 1; }
@@ -338,8 +339,10 @@ class AirportView {
   renderList() {
     const el = $('#apv-list'); if (!el) return;
     const moving = this.planes.filter(p => !p.parked);
-    el.innerHTML = moving.length ? moving.map(p => `<button class="apv-row ${p.id === this.track ? 'on' : ''} ${p.you ? 'you' : ''}" data-act="apv-track" data-id="${esc(p.id)}"><b>${esc(p.label)}</b><small>${esc(p.phase)}${p.kt ? ` · ${p.kt} kt` : ''}${p.alt > 50 ? ` · ${num(p.alt)} ft` : ''}</small></button>`).join('')
-      : `<p class="fine-print">No arrivals or departures right now.${this.planes.length ? ` ${this.planes.length} of your aircraft parked here.` : ''}</p>`;
+    const away: any = this.track && !this.planes.some(p => p.id === this.track) ? State.live.filter(f => f.id === this.track)[0] : null;
+    const awayHtml = away ? `<div class="apv-row away"><b>${esc(away.callsign)}</b><small>${esc(away.phase || 'Flying')}, ${away.from === this.icao ? 'has left ' + esc(this.icao) : away.to === this.icao ? 'on its way here' : 'not coming here'}${away.to === this.icao && Math.round((away.left || 0)) ? ' · ' + num(away.left) + ' nm to go' : ''}</small></div>` : '';
+    el.innerHTML = awayHtml + (moving.length ? moving.map(p => `<button class="apv-row ${p.id === this.track ? 'on' : ''} ${p.you ? 'you' : ''}" data-act="apv-track" data-id="${esc(p.id)}"><b>${esc(p.label)}</b><small>${esc(p.phase)}${p.kt ? ` · ${p.kt} kt` : ''}${p.alt > 50 ? ` · ${num(p.alt)} ft` : ''}</small></button>`).join('')
+      : `<p class="fine-print">No arrivals or departures right now.${this.planes.length ? ` ${this.planes.length} of your aircraft parked here.` : ''}</p>`);
   }
 
   /* ---------- touch and mouse ---------- */

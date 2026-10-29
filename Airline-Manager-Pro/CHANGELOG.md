@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.7 (2026-10-29)
+
+- Airport view: runways, taxiways and stands (from the simulator when linked, real runways otherwise), aircraft taxiing, taking off, landing and taxiing in, runway in use by wind, tracking carried over from the world map and back
+
 ## 0.5.6 (2026-10-29)
 
 - Registration in Settings: keys tied to the first device, re-registering on the same device as often as needed, reactivation codes (one use each) for a new device; online register ready for Supabase
