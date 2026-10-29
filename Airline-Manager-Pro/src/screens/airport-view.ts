@@ -25,6 +25,8 @@ class AirportView {
   active: { tx: number; ty: number; ux: number; uy: number; len: number; name: string; wind: number; windKt: number } = null;
   planes: ApvPlane[] = [];
   lastList = 0;
+  /** Drawn inside the world map (zoomed in to airport level) instead of on its own screen. */
+  embedded = false; map: WorldMap = null; col: any = null;
 
   constructor(host: HTMLElement, icao: string, track: string, fromWorld: WorldMap) {
     this.host = host; this.icao = icao; this.track = track; this.fromWorld = fromWorld;
@@ -66,11 +68,17 @@ class AirportView {
     const L = this.L, k = Math.cos(L.lat * Math.PI / 180);
     return [(lon - L.lon) * 111320 * k, (lat - L.lat) * 110540];
   }
-  scr(x: number, y: number): number[] { return [this.w / 2 + (x - this.cx) * this.s, this.h / 2 - (y - this.cy) * this.s]; }
+  scr(x: number, y: number): number[] {
+    if (this.embedded) { const L = this.L; return this.map.px(L.lon + x / (111320 * Math.cos(L.lat * Math.PI / 180)), L.lat + y / 110540); }
+    return [this.w / 2 + (x - this.cx) * this.s, this.h / 2 - (y - this.cy) * this.s];
+  }
+  /** Local metres -> lon/lat. */
+  lonLat(x: number, y: number): number[] { const L = this.L; return [L.lon + x / (111320 * Math.cos(L.lat * Math.PI / 180)), L.lat + y / 110540]; }
 
   fetching = false;
   setLayout(L: AirportLayout, upgrade?: boolean) {
     this.L = L; this.routes = {};
+    if (this.embedded) { this.buildGraph(); this.pickRunway(); return; }
     if (L.source !== 'runways') this.fetching = false;
     this.labelSource();
     this.buildGraph(); this.pickRunway();
@@ -283,13 +291,17 @@ class AirportView {
   }
 
   draw(now: number) {
-    const c = this.ctx, L = this.L, s = this.s, col = { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') };
+    const c = this.ctx, L = this.L, s = this.s, col = this.col || { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') };
+    if (!this.embedded) {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = col.bg; c.fillRect(0, 0, this.w, this.h);
     // dot grid every 100 m (or 500 m far out)
     const step = s > 0.12 ? 100 : 500, x0 = this.cx - this.w / 2 / s, x1 = this.cx + this.w / 2 / s, y0 = this.cy - this.h / 2 / s, y1 = this.cy + this.h / 2 / s;
     c.fillStyle = cssVar('--map-dot');
     if ((x1 - x0) / step < 160) for (let x = Math.ceil(x0 / step) * step; x < x1; x += step) for (let y = Math.ceil(y0 / step) * step; y < y1; y += step) { const p = this.scr(x, y); c.fillRect(p[0] - 0.8, p[1] - 0.8, 1.6, 1.6); }
+    }
+    const sat = this.embedded && State.settings.mapStyle === 'satellite';
+    if (sat) c.globalAlpha = 0.62;
     const g = this.graph;
     // aprons and terminal buildings
     for (const ar of L.areas || []) {
@@ -329,6 +341,7 @@ class AirportView {
       });
       c.textAlign = 'left';
     }
+    c.globalAlpha = 1;
     // runways
     for (const r of L.runways) {
       const cc = this.xy(r.lat, r.lon), h = r.hdg * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h), px = Math.cos(h), py = -Math.sin(h);
@@ -371,6 +384,7 @@ class AirportView {
         c.fillStyle = p.you ? col.cyan : tracked ? col.mag : p.parked ? col.dim : col.ink; c.fillText(text, lx, ly + 1);
       }
     }
+    if (this.embedded) return;
     // scale bar
     const m = [50, 100, 200, 500, 1000, 2000, 5000].filter(v => v * s >= 50)[0] || 5000;
     c.fillStyle = col.dim3; c.font = '500 10px Inter, sans-serif';
@@ -420,14 +434,13 @@ function standName(p: number[]): string {
 }
 function cssVar(n: string): string { return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#3FD0E8'; }
 
-/** Open the airport view on top of the map that is showing (Overview or full map). */
+/** Go to an airport: the map flies down to it at its real place and shows its layout, still following the
+ *  aircraft if one is given (it stays followed when it taxis out, takes off and flies on). */
 function openAirportView(icao: string, track?: string) {
   const m = _curMap(); if (!m) return;
   if (_apv) _apv.close(false);
   m.closeBubble();
-  const host = m.el.parentElement || m.el;
-  _apv = new AirportView(host, icao, track || m.following || null, m);
-  m.following = null;
+  m.flyToAirport(icao, track || m.following || null);
   Sound.tick();
 }
 
@@ -442,3 +455,12 @@ ACTIONS['apv-retry'] = () => {
   AirportLayouts.fromOsm(v.icao).then(L => { if (!v.alive) return; v.fetching = false; if (L) { v.setLayout(L, true); toast('Real airport layout loaded', 'ok'); } else v.setLayout(v.L, true); })
     .catch(() => { if (v.alive) { v.fetching = false; v.setLayout(v.L, true); } });
 };
+
+/** An airport drawn inside the world map: its layout loads in the background (runways first). */
+function makeAirportScene(icao: string, map: WorldMap): AirportView {
+  const v: AirportView = Object.create(AirportView.prototype);
+  Object.assign(v, { embedded: true, map, icao, alive: true, track: null, planes: [], routes: {}, ptrs: {}, s: 1, w: 0, h: 0, cx: 0, cy: 0, fetching: true,
+    col: { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') } });
+  AirportLayouts.get(icao, L => { if (L && v.alive) v.setLayout(L, true); v.fetching = false; }).then(L => { if (v.alive && L && (!v.L || v.L.source === 'runways' || L.source !== 'runways')) v.setLayout(L); });
+  return v;
+}
