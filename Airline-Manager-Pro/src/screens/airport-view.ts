@@ -1,0 +1,393 @@
+// Airport view: a digital map of one airport in the live operations' style, with the aircraft taxiing,
+// taking off, landing and taxiing in.
+//  - The layout: linked to the simulator, its own runways, taxiways and stands (through the PC app);
+//    otherwise the airport's real runways, with the apron and taxiway drawn schematically.
+//  - The active runway follows the wind (the simulator's weather when linked).
+//  - Your flight is drawn where the simulator says it is. Hired and co-op pilots' flights follow their
+//    real flight profile: taxi from the stand along the taxiways, take-off roll and climb-out; approach,
+//    landing roll and taxi in to a stand. Aircraft parked here stand at their gates.
+//  - Track an aircraft and the view follows it; when it leaves the airport, the world map takes over
+//    and keeps following it.
+
+interface ApvPlane { id: string; x: number; y: number; hdg: number; alt: number; phase: string; label: string; you: boolean; span: number; prop: boolean; parked?: boolean; kt?: number }
+
+const APV_RANGE = 14000;       // metres from the airport within which aircraft are shown
+
+let _apv: AirportView = null;
+
+class AirportView {
+  host: HTMLElement; root: HTMLElement; cv: HTMLCanvasElement; ctx: CanvasRenderingContext2D;
+  icao: string; L: AirportLayout = null; w = 0; h = 0; dpr = 1;
+  cx = 0; cy = 0; s = 0.25; raf = 0; alive = true;
+  track: string = null; userMoved = false; fromWorld: WorldMap = null;
+  ptrs: { [id: number]: { x: number; y: number } } = {}; pinch0 = 0; s0 = 0; moved = false;
+  graph: { pts: number[][]; adj: { [k: string]: [string, number][] }; parks: number[][]; schematic: boolean } = null;
+  active: { tx: number; ty: number; ux: number; uy: number; len: number; name: string; wind: number; windKt: number } = null;
+  planes: ApvPlane[] = [];
+  lastList = 0;
+
+  constructor(host: HTMLElement, icao: string, track: string, fromWorld: WorldMap) {
+    this.host = host; this.icao = icao; this.track = track; this.fromWorld = fromWorld;
+    const a: any = apt(icao);
+    this.root = document.createElement('div'); this.root.className = 'apv';
+    this.root.innerHTML = `<canvas></canvas>
+      <div class="apv-head"><button class="icon-btn apv-back" data-act="apv-close" aria-label="Back to the world map">${icon('chevron', 'flip')}</button>
+        <span class="apv-t"><b>${esc(icao)}</b><small>${esc(a ? a.name : icao)}</small></span><span class="apv-src" id="apv-src">Loading the layout…</span></div>
+      <div class="apv-tools"><button class="icon-btn" data-act="apv-zoom" data-f="1.5" aria-label="Zoom in">${icon('plus')}</button><button class="icon-btn" data-act="apv-zoom" data-f="0.667" aria-label="Zoom out"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12h14"/></svg></button><button class="icon-btn" data-act="apv-fit" aria-label="Whole airport">${icon('focus')}</button></div>
+      <div class="apv-rwy" id="apv-rwy"></div>
+      <div class="apv-list" id="apv-list"></div>
+      <div class="apv-note" id="apv-note"></div>`;
+    host.appendChild(this.root);
+    this.cv = this.root.querySelector('canvas'); this.ctx = this.cv.getContext('2d');
+    this.size(); this.bind();
+    this.loop = this.loop.bind(this);
+    AirportLayouts.get(icao).then(L => { if (!this.alive) return; this.setLayout(L); });
+    this.raf = requestAnimationFrame(this.loop);
+  }
+
+  close(resumeWorld: boolean) {
+    this.alive = false; cancelAnimationFrame(this.raf); this.root.remove(); _apv = null;
+    const m = this.fromWorld;
+    if (m && resumeWorld && this.track && State.live.some(f => f.id === this.track)) { m.mark = null; m.follow(this.track); m.openBubble(this.track); }
+  }
+
+  size() { const r = this.host.getBoundingClientRect(); this.dpr = Math.min(2, window.devicePixelRatio || 1); this.w = r.width; this.h = r.height; this.cv.width = Math.round(this.w * this.dpr); this.cv.height = Math.round(this.h * this.dpr); }
+
+  /* ---------- geometry ---------- */
+  xy(lat: number, lon: number): number[] {
+    const L = this.L, k = Math.cos(L.lat * Math.PI / 180);
+    return [(lon - L.lon) * 111320 * k, (lat - L.lat) * 110540];
+  }
+  scr(x: number, y: number): number[] { return [this.w / 2 + (x - this.cx) * this.s, this.h / 2 - (y - this.cy) * this.s]; }
+
+  setLayout(L: AirportLayout) {
+    this.L = L;
+    const src = $('#apv-src');
+    if (src) src.textContent = L.source === 'sim' ? 'Layout from your simulator' : L.runways.length ? 'Real runways · taxiways and apron drawn schematically' : 'No runway data for this airport';
+    if (src) src.classList.toggle('sim', L.source === 'sim');
+    this.buildGraph(); this.pickRunway(); this.fit();
+    const note = $('#apv-note');
+    if (note) note.innerHTML = L.source === 'sim' ? '' : `${icon('info')}<span>${Link.status === 'connected' ? 'The simulator has no detailed layout for this airport.' : 'Link the app to the simulator to see the real taxiways, aprons and stands.'}</span>`;
+  }
+
+  /** Taxi network: from the simulator's taxi paths, or a schematic parallel taxiway and apron. */
+  buildGraph() {
+    const L = this.L, adj: { [k: string]: [string, number][] } = {};
+    const link = (a: string, b: string, d: number) => { (adj[a] = adj[a] || []).push([b, d]); (adj[b] = adj[b] || []).push([a, d]); };
+    if (L.source === 'sim' && L.points.length && L.paths.length) {
+      const P = L.points;
+      for (const p of L.paths) {
+        const [type, , st, en] = p;
+        if (type === 3) { const a = P[st], k = L.parks[en]; if (a && k) link('n' + st, 'p' + en, Math.hypot(a[0] - k[0], a[1] - k[1])); }
+        else if (type === 1 || type === 2 || type === 4) { const a = P[st], b = P[en]; if (a && b) link('n' + st, 'n' + en, Math.hypot(a[0] - b[0], a[1] - b[1]) * (type === 2 ? 3 : 1)); }
+      }
+      this.graph = { pts: P, adj, parks: L.parks, schematic: false };
+      return;
+    }
+    // schematic: along the longest runway, a parallel taxiway, an apron with stands, links at both ends and the middle
+    const r = L.runways.slice().sort((a, b) => b.len - a.len)[0];
+    if (!r) { this.graph = { pts: [], adj, parks: [], schematic: true }; return; }
+    const c = this.xy(r.lat, r.lon), h = r.hdg * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h), px = Math.cos(h), py = -Math.sin(h);
+    const half = r.len / 2, off = Math.max(140, r.wid * 3), apr = off + 120;
+    const P: number[][] = [], at = (s: number, o: number) => { P.push([c[0] + ux * s + px * o, c[1] + uy * s + py * o, 1]); return P.length - 1; };
+    const ends = [-half + 40, -half / 2, 0, half / 2, half - 40];
+    const tw = ends.map(s => at(s, off)), rw = ends.map(s => at(s, 0));
+    for (let i = 0; i < tw.length; i++) { link('n' + tw[i], 'n' + rw[i], off); if (i) link('n' + tw[i - 1], 'n' + tw[i], ends[i] - ends[i - 1]); }
+    const parks: number[][] = [], n = Math.max(4, Math.min(14, Math.round(r.len / 220)));
+    for (let i = 0; i < n; i++) {
+      const s = (i - (n - 1) / 2) * Math.min(70, (r.len * 0.6) / n), k = [c[0] + ux * s + px * apr, c[1] + uy * s + py * apr];
+      parks.push([k[0], k[1], (r.hdg + 270) % 360, r.len > 1800 ? 30 : 14, r.len > 1800 ? 9 : 2, 10, i + 1]);
+      const lead = at(s, off + 55); link('n' + lead, 'p' + i, 65);
+      let best = tw[0], bd = 1e9; for (const t of tw) { const d = Math.hypot(P[t][0] - P[lead][0], P[t][1] - P[lead][1]); if (d < bd) { bd = d; best = t; } }
+      link('n' + lead, 'n' + best, bd);
+    }
+    this.graph = { pts: P, adj, parks, schematic: true };
+  }
+
+  /** The runway in use: the longest one with the most headwind. */
+  pickRunway() {
+    const L = this.L; if (!L.runways.length) { this.active = null; return; }
+    const sw: any = Link.sim && Link.sim.wx && Link.sim.lat && gcDistanceNm([Link.sim.lon, Link.sim.lat], [L.lon, L.lat]) < 60 ? Link.sim.wx : null;
+    const wind = sw ? sw.windDir : (_hashStr(this.icao + new Date().toDateString()) % 360), windKt = sw ? Math.round(sw.windKt) : 6 + (_hashStr(this.icao) % 12);
+    let best: any = null, bs = -1e9;
+    for (const r of L.runways) for (const dir of [0, 1]) {
+      const hd = (r.hdg + dir * 180) % 360, head = Math.cos((wind - hd) * Math.PI / 180);
+      const score = head * 2 + Math.min(r.len, 4000) / 1500;
+      if (score > bs) { bs = score; best = { r, dir, hd }; }
+    }
+    const r = best.r, c = this.xy(r.lat, r.lon), h = best.hd * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
+    this.active = { tx: c[0] - ux * r.len / 2, ty: c[1] - uy * r.len / 2, ux, uy, len: r.len, name: best.dir ? r.b : r.a, wind, windKt };
+    const el = $('#apv-rwy');
+    if (el) el.innerHTML = `<b>Runway ${esc(this.active.name || '')}</b><small>Wind ${String(Math.round(wind)).padStart(3, '0')}° at ${windKt} kt${sw ? '' : ' (estimated)'}</small>`;
+  }
+
+  fit() {
+    const L = this.L; const xs: number[] = [], ys: number[] = [];
+    for (const r of L.runways) { const c = this.xy(r.lat, r.lon), h = r.hdg * Math.PI / 180; for (const k of [-.5, .5]) { xs.push(c[0] + Math.sin(h) * r.len * k); ys.push(c[1] + Math.cos(h) * r.len * k); } }
+    for (const p of (this.graph ? this.graph.parks : [])) { xs.push(p[0]); ys.push(p[1]); }
+    if (!xs.length) { xs.push(-1000, 1000); ys.push(-1000, 1000); }
+    const x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    this.cx = (x0 + x1) / 2; this.cy = (y0 + y1) / 2;
+    this.s = clamp(Math.min(this.w / Math.max(400, x1 - x0) , this.h / Math.max(400, y1 - y0)) * 0.82, 0.01, 4);
+    this.userMoved = false;
+  }
+
+  /* ---------- where each aircraft is ---------- */
+  route(fromKey: string, toKey: string): number[][] {
+    const g = this.graph; if (!g || !g.adj[fromKey] || !g.adj[toKey]) return [];
+    const dist: { [k: string]: number } = { [fromKey]: 0 }, prev: { [k: string]: string } = {}, done: { [k: string]: boolean } = {};
+    for (let guard = 0; guard < 6000; guard++) {
+      let u: string = null, ud = 1e18; for (const k in dist) if (!done[k] && dist[k] < ud) { ud = dist[k]; u = k; }
+      if (!u || u === toKey) break; done[u] = true;
+      for (const [v, d] of g.adj[u] || []) if (!done[v] && ud + d < (dist[v] == null ? 1e18 : dist[v])) { dist[v] = ud + d; prev[v] = u; }
+    }
+    if (dist[toKey] == null) return [];
+    const out: number[][] = []; let k = toKey;
+    while (k) { out.unshift(this.nodeXY(k)); k = prev[k]; }
+    return out;
+  }
+  nodeXY(k: string): number[] { const g = this.graph, i = +k.slice(1); return k[0] === 'p' ? [g.parks[i][0], g.parks[i][1]] : [g.pts[i][0], g.pts[i][1]]; }
+  nearestNode(x: number, y: number): string {
+    const g = this.graph; let best: string = null, bd = 1e18;
+    for (const k in g.adj) if (k[0] === 'n') { const p = g.pts[+k.slice(1)], d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < bd) { bd = d; best = k; } }
+    return best;
+  }
+  standFor(seed: string, big: boolean): string {
+    const g = this.graph; if (!g || !g.parks.length) return null;
+    const ok = g.parks.map((p, i) => i).filter(i => g.adj['p' + i] && (big ? [5, 8, 9, 10, 15].indexOf(g.parks[i][4]) >= 0 || g.schematic : [1, 2, 3, 4, 14, 11].indexOf(g.parks[i][4]) >= 0 || g.schematic));
+    const pool = ok.length ? ok : g.parks.map((p, i) => i).filter(i => g.adj['p' + i]);
+    return pool.length ? 'p' + pool[_hashStr(seed) % pool.length] : null;
+  }
+  along(path: number[][], fr: number): number[] {
+    if (!path.length) return null; if (path.length === 1) return [path[0][0], path[0][1], 0];
+    let total = 0; const seg: number[] = []; for (let i = 1; i < path.length; i++) { const d = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]); seg.push(d); total += d; }
+    let want = clamp(fr, 0, 1) * total;
+    for (let i = 0; i < seg.length; i++) {
+      if (want <= seg[i] || i === seg.length - 1) { const k = seg[i] ? Math.min(1, want / seg[i]) : 0, a = path[i], b = path[i + 1];
+        return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI]; }
+      want -= seg[i];
+    }
+    return null;
+  }
+  /** Start and end (seconds into the flight) of a phase of the profile. */
+  span(p: FlightProfile, ph: string): number[] {
+    const pts = p.pts; let a = -1, b = -1;
+    for (let i = 1; i < pts.length; i++) if (pts[i].ph === ph) { if (a < 0) a = pts[i - 1].s; b = pts[i].s; }
+    return a < 0 ? null : [a, b];
+  }
+
+  computePlanes(now: number) {
+    const out: ApvPlane[] = [], L = this.L, A = this.active, g = this.graph;
+    const icao = this.icao, typeOf = (f: any) => acType(flightTypeId(f));
+    const spanOf = (t: AircraftType) => t.cls === 'ga' || t.cls === 'bush' ? 12 : t.cls === 'turboprop' ? 27 : t.seats > 300 ? 64 : t.seats > 200 ? 58 : t.seats > 100 ? 35 : 26;
+    for (const f of liveOf()) {
+      const F: any = f, t = typeOf(f), big = t.seats >= 60, prop = t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga';
+      const base = { id: f.id, label: f.callsign, you: !!f.you, span: spanOf(t), prop };
+      // your flight: where the simulator has it
+      if (f.you && f.real && Link.sim && Link.sim.lat) {
+        const p = this.xy(Link.sim.lat, Link.sim.lon);
+        if (Math.hypot(p[0], p[1]) < APV_RANGE) out.push(Object.assign(base, { x: p[0], y: p[1], hdg: Link.sim.hdg, alt: Link.sim.aglFt || 0, phase: f.phase || (Link.sim.onGround ? 'On the ground' : 'Flying'), kt: Link.sim.gs }));
+        continue;
+      }
+      if (!A || !F.depAt || !g) continue;
+      const prof: FlightProfile = F.coop ? flightProfile(F.typeId, f.from, f.to, F.depAt) : aiProfile(F);
+      const el = (now - F.depAt) * (F.spd || 1) / 1000;
+      const roll = Math.min(A.len * 0.65, big ? 2200 : 700), lift = [A.tx + A.ux * roll, A.ty + A.uy * roll];
+      let pos: number[] = null, alt = 0, phase = '', kt = 0;
+      // departing from here
+      if (f.from === icao) {
+        const tx = this.span(prof, 'Taxi out'), to = this.span(prof, 'Takeoff'), cl = this.span(prof, 'Climb');
+        if (tx && el < tx[1]) {
+          const stand = this.standFor(f.reg + 'd' + f.from, big), hold = this.nearestNode(A.tx + A.ux * 60, A.ty + A.uy * 60);
+          const path = stand && hold ? this.route(stand, hold).concat([[A.tx, A.ty]]) : [];
+          const fr = (el - tx[0]) / Math.max(1, tx[1] - tx[0]);
+          pos = this.along(path, fr < 0.12 ? 0 : (fr - 0.12) / 0.88); phase = fr < 0.12 ? 'Pushback' : 'Taxi out'; kt = fr < 0.12 ? 3 : 15;
+        } else if (to && el < to[1]) {
+          const fr = (el - to[0]) / Math.max(1, to[1] - to[0]), d = roll * fr * fr;
+          pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; phase = 'Take-off roll'; kt = Math.round(150 * fr);
+        } else if (cl) {
+          const tt = el - (to ? to[1] : cl[0]), d = roll + tt * 80;
+          if (d < APV_RANGE) { pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(tt * 30); phase = 'Climbing out'; kt = 170; }
+        }
+      }
+      // arriving here
+      if (!pos && f.to === icao && !f.noDest) {
+        const ld = this.span(prof, 'Landing'), ti = this.span(prof, 'Taxi in');
+        const td = ld ? ld[0] : prof.totalS;
+        if (el < td) {
+          const d = (td - el) * 72;
+          if (d < APV_RANGE) { pos = [A.tx - A.ux * d, A.ty - A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; alt = Math.round(d * 0.0525 * 3.28); phase = d < 6000 ? 'Final' : 'Approach'; kt = 140; }
+        } else if (ld && el < ld[1]) {
+          const fr = (el - ld[0]) / Math.max(1, ld[1] - ld[0]), d = A.len * 0.55 * (1 - (1 - fr) * (1 - fr));
+          pos = [A.tx + A.ux * d, A.ty + A.uy * d, Math.atan2(A.ux, A.uy) * 180 / Math.PI]; phase = 'Landing roll'; kt = Math.round(130 * (1 - fr) + 20);
+        } else if (ti && el < ti[1] + 30) {
+          const exit = this.nearestNode(A.tx + A.ux * A.len * 0.6, A.ty + A.uy * A.len * 0.6), stand = this.standFor(f.reg + 'a' + f.to, big);
+          const path = [[A.tx + A.ux * A.len * 0.55, A.ty + A.uy * A.len * 0.55]].concat(exit && stand ? this.route(exit, stand) : []);
+          pos = this.along(path, (el - ti[0]) / Math.max(1, ti[1] - ti[0])); phase = el > ti[1] ? 'At the gate' : 'Taxi in'; kt = el > ti[1] ? 0 : 15;
+        }
+      }
+      if (pos) out.push(Object.assign(base, { x: pos[0], y: pos[1], hdg: pos[2] || 0, alt, phase, kt }));
+    }
+    // the fleet's aircraft parked here
+    const used: { [k: string]: boolean } = {}; out.forEach(p => used[p.id] = true);
+    for (const a of fleetOf(State.companyId)) {
+      if (a.location !== icao || a.status === 'flying' || State.live.some(f => f.reg === a.reg)) continue;
+      const t = acType(a.typeId), st = this.standFor(a.reg + 'a' + icao, t.seats >= 60); if (!st) continue;
+      const k = this.nodeXY(st), park = g.parks[+st.slice(1)];
+      out.push({ id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? park[2] : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
+    }
+    this.planes = out;
+  }
+
+  /* ---------- drawing ---------- */
+  loop(now: number) {
+    if (!this.alive) return;
+    this.raf = requestAnimationFrame(this.loop);
+    if (!this.root.isConnected) { this.alive = false; _apv = null; return; }
+    const r = this.host.getBoundingClientRect(); if (Math.abs(r.width - this.w) > 1 || Math.abs(r.height - this.h) > 1) this.size();
+    if (!this.L) return;
+    this.computePlanes(Date.now());
+    // follow the tracked aircraft; hand over to the world map when it leaves the airport
+    if (this.track) {
+      const p = this.planes.filter(x => x.id === this.track)[0];
+      if (p) { if (!this.userMoved) { this.cx += (p.x - this.cx) * 0.12; this.cy += (p.y - this.cy) * 0.12; } }
+      else if (State.live.some(f => f.id === this.track) && this.fromWorld) { toast('The aircraft has left the airport, following it on the map', 'info'); this.close(true); return; }
+    }
+    this.draw(now);
+    if (now - this.lastList > 1000) { this.lastList = now; this.renderList(); }
+  }
+
+  draw(now: number) {
+    const c = this.ctx, L = this.L, s = this.s, col = { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') };
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    c.fillStyle = col.bg; c.fillRect(0, 0, this.w, this.h);
+    // dot grid every 100 m (or 500 m far out)
+    const step = s > 0.12 ? 100 : 500, x0 = this.cx - this.w / 2 / s, x1 = this.cx + this.w / 2 / s, y0 = this.cy - this.h / 2 / s, y1 = this.cy + this.h / 2 / s;
+    c.fillStyle = cssVar('--map-dot');
+    if ((x1 - x0) / step < 160) for (let x = Math.ceil(x0 / step) * step; x < x1; x += step) for (let y = Math.ceil(y0 / step) * step; y < y1; y += step) { const p = this.scr(x, y); c.fillRect(p[0] - 0.8, p[1] - 0.8, 1.6, 1.6); }
+    const g = this.graph;
+    // taxiways (wide pavement, then a centre line)
+    if (g) {
+      const paths = g.schematic ? null : L.paths;
+      const drawSeg = (a: number[], b: number[], wm: number, fill: string) => { const p = this.scr(a[0], a[1]), q = this.scr(b[0], b[1]); c.strokeStyle = fill; c.lineWidth = Math.max(1.5, wm * s); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); };
+      c.lineCap = 'round';
+      if (paths) {
+        for (const p of paths) { const [type, wid, st, en] = p; if (type === 1 || type === 4) { const a = g.pts[st], b = g.pts[en]; if (a && b) drawSeg(a, b, wid || 20, '#132a45'); } else if (type === 3) { const a = g.pts[st], k = g.parks[en]; if (a && k) drawSeg(a, k, Math.max(10, wid || 15), '#11263f'); } }
+        if (s > 0.25) { c.setLineDash([]); for (const p of paths) { const [type, , st, en] = p; if (type === 1 || type === 4) { const a = g.pts[st], b = g.pts[en]; if (a && b) drawSeg(a, b, 0.3 / s, 'rgba(242,179,61,.45)'); } } }
+      } else {
+        const seen: { [k: string]: boolean } = {};
+        for (const k in g.adj) for (const [v] of g.adj[k]) { const key = k < v ? k + v : v + k; if (seen[key]) continue; seen[key] = true; drawSeg(this.nodeXY(k), this.nodeXY(v), 22, '#122840'); }
+      }
+      // stands
+      g.parks.forEach((p, i) => {
+        const q = this.scr(p[0], p[1]), r = Math.max(2.5, (p[3] || 15) * s);
+        c.fillStyle = '#10243c'; c.beginPath(); c.arc(q[0], q[1], r, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = g.schematic ? 'rgba(147,169,193,.25)' : 'rgba(147,169,193,.4)'; c.lineWidth = 1; c.setLineDash(g.schematic ? [3, 3] : []); c.stroke(); c.setLineDash([]);
+        if (s > 0.6 && p[6]) { c.fillStyle = col.dim3; c.font = '600 9px Inter, sans-serif'; c.textAlign = 'center'; c.fillText(standName(p), q[0], q[1] + 3); }
+      });
+      c.textAlign = 'left';
+    }
+    // runways
+    for (const r of L.runways) {
+      const cc = this.xy(r.lat, r.lon), h = r.hdg * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h), px = Math.cos(h), py = -Math.sin(h);
+      const corner = (a: number, b: number) => this.scr(cc[0] + ux * a + px * b, cc[1] + uy * a + py * b);
+      const hl = r.len / 2, hw = Math.max(r.wid / 2, 1.5 / s);
+      const act = this.active && Math.abs(Math.abs(((this.active.ux * ux + this.active.uy * uy))) - 1) < 1e-3 && Math.hypot(this.active.tx + this.active.ux * this.active.len / 2 - cc[0], this.active.ty + this.active.uy * this.active.len / 2 - cc[1]) < 5;
+      c.fillStyle = r.surf === 1 ? '#1d3a2c' : r.surf === 9 ? '#123553' : '#1f3049';
+      c.beginPath(); [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]].forEach((k, i) => { const p = corner(k[0], k[1]); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath(); c.fill();
+      c.strokeStyle = act ? col.cyan : 'rgba(230,238,247,.55)'; c.lineWidth = act ? 1.6 : 1; c.stroke();
+      // centre line and threshold bars
+      if (s * r.wid > 6) {
+        c.setLineDash([Math.max(3, 30 * s), Math.max(3, 20 * s)]); c.strokeStyle = 'rgba(230,238,247,.6)'; c.lineWidth = 1;
+        const a = corner(-hl + 60, 0), b = corner(hl - 60, 0); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.setLineDash([]);
+        for (const e of [-1, 1]) for (let k = -3; k <= 3; k++) { if (!k) continue; const o = (k / 3.6) * hw, p = corner(e * (hl - 8), o), q = corner(e * (hl - 40), o); c.strokeStyle = 'rgba(230,238,247,.6)'; c.lineWidth = Math.max(1, 1.8 * s); c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
+      }
+      // numbers at both ends
+      c.font = '700 11px Inter, sans-serif'; c.textAlign = 'center';
+      for (const [e, name] of [[-1, r.a], [1, r.b]] as [number, string][]) {
+        if (!name) continue; const p = corner(e * (hl + 70 / Math.max(s, 0.05) * 0.02 + 30), 0);
+        c.fillStyle = act && this.active.name === name ? col.cyan : col.dim; c.fillText(name, p[0], p[1] + 4);
+      }
+      c.textAlign = 'left';
+    }
+    // approach path to the active runway
+    if (this.active) {
+      const A = this.active, a = this.scr(A.tx, A.ty), b = this.scr(A.tx - A.ux * 12000, A.ty - A.uy * 12000);
+      c.setLineDash([4, 6]); c.strokeStyle = 'rgba(224,75,214,.35)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.setLineDash([]);
+    }
+    // aircraft
+    for (const p of this.planes) {
+      const q = this.scr(p.x, p.y), size = Math.max(p.parked ? 11 : 14, p.span * s * 1.05);
+      const tracked = p.id === this.track;
+      if (tracked) { const pulse = (now / 1000) % 1.6 / 1.6; c.beginPath(); c.arc(q[0], q[1], size * 0.7 + 6 + pulse * 14, 0, Math.PI * 2); c.strokeStyle = col.mag; c.globalAlpha = 0.6 * (1 - pulse); c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }
+      if (p.alt > 50) { c.globalAlpha = 0.25; drawPlaneGlyph(c, q[0] + Math.min(18, p.alt / 120), q[1] + Math.min(18, p.alt / 120), p.hdg, size, p.prop, '#000', 'transparent'); c.globalAlpha = 1; }
+      drawPlaneGlyph(c, q[0], q[1], p.hdg, size, p.prop, p.you ? col.cyan : p.parked ? col.dim : col.ink, col.bg);
+      if (!p.parked || s > 0.5 || tracked) {
+        c.font = '600 10.5px Inter, sans-serif';
+        const text = p.label + (p.parked ? '' : ' · ' + p.phase), w = c.measureText(text).width, lx = q[0] + size * 0.55 + 6, ly = q[1] - size * 0.4;
+        c.fillStyle = 'rgba(6,16,30,.82)'; c.fillRect(lx - 4, ly - 10, w + 8, 15);
+        c.fillStyle = p.you ? col.cyan : tracked ? col.mag : p.parked ? col.dim : col.ink; c.fillText(text, lx, ly + 1);
+      }
+    }
+    // scale bar
+    const m = [50, 100, 200, 500, 1000, 2000, 5000].filter(v => v * s >= 50)[0] || 5000;
+    c.fillStyle = col.dim3; c.font = '500 10px Inter, sans-serif';
+    c.fillRect(14, this.h - 18, m * s, 2); c.fillText(m >= 1000 ? m / 1000 + ' km' : m + ' m', 14, this.h - 24);
+  }
+
+  renderList() {
+    const el = $('#apv-list'); if (!el) return;
+    const moving = this.planes.filter(p => !p.parked);
+    el.innerHTML = moving.length ? moving.map(p => `<button class="apv-row ${p.id === this.track ? 'on' : ''} ${p.you ? 'you' : ''}" data-act="apv-track" data-id="${esc(p.id)}"><b>${esc(p.label)}</b><small>${esc(p.phase)}${p.kt ? ` · ${p.kt} kt` : ''}${p.alt > 50 ? ` · ${num(p.alt)} ft` : ''}</small></button>`).join('')
+      : `<p class="fine-print">No arrivals or departures right now.${this.planes.length ? ` ${this.planes.length} of your aircraft parked here.` : ''}</p>`;
+  }
+
+  /* ---------- touch and mouse ---------- */
+  bind() {
+    const cv = this.cv; cv.style.touchAction = 'none';
+    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); this.ptrs[e.pointerId] = { x: e.offsetX, y: e.offsetY }; this.moved = false; const ids = Object.keys(this.ptrs); if (ids.length === 2) { const a = this.ptrs[+ids[0]], b = this.ptrs[+ids[1]]; this.pinch0 = Math.hypot(a.x - b.x, a.y - b.y); this.s0 = this.s; } });
+    cv.addEventListener('pointermove', e => {
+      const p = this.ptrs[e.pointerId]; if (!p) return; const ids = Object.keys(this.ptrs);
+      if (ids.length === 1) { const dx = e.offsetX - p.x, dy = e.offsetY - p.y; if (Math.abs(dx) + Math.abs(dy) > 3) { this.moved = true; this.userMoved = true; } this.cx -= dx / this.s; this.cy += dy / this.s; }
+      p.x = e.offsetX; p.y = e.offsetY;
+      if (ids.length === 2) { const a = this.ptrs[+ids[0]], b = this.ptrs[+ids[1]]; this.s = clamp(this.s0 * Math.hypot(a.x - b.x, a.y - b.y) / this.pinch0, 0.01, 6); this.moved = true; }
+    });
+    const up = (e: PointerEvent) => { if (!this.moved && Object.keys(this.ptrs).length === 1) this.tap(e.offsetX, e.offsetY); delete this.ptrs[e.pointerId]; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', e => { delete this.ptrs[e.pointerId]; });
+    cv.addEventListener('wheel', e => { e.preventDefault(); this.zoom(e.deltaY < 0 ? 1.2 : 1 / 1.2, e.offsetX, e.offsetY); }, { passive: false } as any);
+  }
+  zoom(f: number, x?: number, y?: number) {
+    x = x == null ? this.w / 2 : x; y = y == null ? this.h / 2 : y;
+    const wx = this.cx + (x - this.w / 2) / this.s, wy = this.cy - (y - this.h / 2) / this.s;
+    this.s = clamp(this.s * f, 0.01, 6);
+    this.cx = wx - (x - this.w / 2) / this.s; this.cy = wy + (y - this.h / 2) / this.s;
+  }
+  tap(x: number, y: number) {
+    let best: ApvPlane = null, bd = 30;
+    for (const p of this.planes) { const q = this.scr(p.x, p.y), d = Math.hypot(q[0] - x, q[1] - y); if (d < bd) { bd = d; best = p; } }
+    if (best && !best.parked) { this.track = best.id; this.userMoved = false; Sound.tick(); this.renderList(); }
+  }
+}
+
+function standName(p: number[]): string {
+  const n = p[5], num = p[6];
+  if (n >= 12 && n <= 37) return String.fromCharCode(65 + n - 12) + num;   // GATE_A … GATE_Z
+  return String(num || '');
+}
+function cssVar(n: string): string { return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#3FD0E8'; }
+
+/** Open the airport view on top of the map that is showing (Overview or full map). */
+function openAirportView(icao: string, track?: string) {
+  const m = _curMap(); if (!m) return;
+  if (_apv) _apv.close(false);
+  m.closeBubble();
+  const host = m.el.parentElement || m.el;
+  _apv = new AirportView(host, icao, track || m.following || null, m);
+  m.following = null;
+  Sound.tick();
+}
+
+ACTIONS['apv-close'] = () => { if (_apv) { const t = _apv.track; _apv.close(!!t); } };
+ACTIONS['apv-zoom'] = el => { if (_apv) _apv.zoom(parseFloat(el.getAttribute('data-f'))); };
+ACTIONS['apv-fit'] = () => { if (_apv) _apv.fit(); };
+ACTIONS['apv-track'] = el => { if (_apv) { _apv.track = el.getAttribute('data-id'); _apv.userMoved = false; _apv.renderList(); Sound.tick(); } };
