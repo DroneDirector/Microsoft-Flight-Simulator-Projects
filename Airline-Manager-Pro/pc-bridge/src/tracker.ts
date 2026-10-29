@@ -57,6 +57,7 @@ export class FlightTracker extends EventEmitter {
   update(s: RawSnapshot): SimSnapshot {
     const p = this.last;
     this.last = s;
+    if (s.wx) s = Object.assign({}, s, { wx: Object.assign({}, s.wx, { turb: this.turbulence(s) }) });
     if (!s.connected || !s.inFlight) { if (this.phase !== 'idle') this.reset('idle'); return Object.assign({}, s, { phase: this.phase, from: '' }); }
     if (s.paused) return Object.assign({}, s, { phase: this.phase, from: this.fromIcao });
     const now = s.t, L = limitsFor(s.emptyKg);
@@ -148,6 +149,19 @@ export class FlightTracker extends EventEmitter {
       });
     }
     void p;
+  }
+
+  /** Turbulence as pilots report it, from the swing in load factor over the last 10 seconds (peak to peak):
+   *  light under about 0.5 g, moderate 0.5-1.0 g, severe above 1.0 g. */
+  private turbWin: { t: number; g: number }[] = [];
+  private turbulence(s: RawSnapshot): 'none' | 'light' | 'moderate' | 'severe' {
+    if (s.onGround || !s.inFlight) { this.turbWin = []; return 'none'; }
+    this.turbWin.push({ t: s.t, g: s.g });
+    while (this.turbWin.length && s.t - this.turbWin[0].t > 10000) this.turbWin.shift();
+    if (this.turbWin.length < 4) return 'none';
+    let hi = -9, lo = 9; for (const x of this.turbWin) { if (x.g > hi) hi = x.g; if (x.g < lo) lo = x.g; }
+    const pp = hi - lo;
+    return pp > 1.0 ? 'severe' : pp > 0.5 ? 'moderate' : pp > 0.15 ? 'light' : 'none';
   }
 
   private held(key: string, on: boolean, now: number, ms: number, fn: () => void) {

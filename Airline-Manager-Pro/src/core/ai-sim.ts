@@ -28,6 +28,34 @@ function aiUpdate(f: LiveFlight, now: number) {
   f.t = clamp(q.d / p.routeNm, 0, 1);
   f.alt = q.alt; f.gs = q.gs; f.phase = q.ph;
   F.leftNm = q.left; F.toGoS = q.toGoS / (F.spd || 1); F.routeNm = p.routeNm;
+  const td = p.pts.filter(x => x.ph === 'Landing')[0];
+  F.toTdS = td ? Math.max(0, td.s - el) / (F.spd || 1) : F.toGoS;
+}
+
+// Messages at the real points of each flight: top of descent and established on final. Only phase
+// changes seen while the app is open are announced, so opening the app doesn't bring a burst of old news.
+const _aiLastPh = new Map<string, string>();
+function aiAnnounce(f: LiveFlight) {
+  const F: any = f, was = _aiLastPh.get(f.id);
+  _aiLastPh.set(f.id, f.phase);
+  if (!was || was === f.phase) return;
+  const p = pilot(f.pilotId), who = p ? p.name : f.callsign, A = apt(f.from), B = apt(f.to);
+  const mins = (s: number) => Math.max(1, Math.round(s / 60)), minTxt = (s: number) => mins(s) + (mins(s) === 1 ? ' minute' : ' minutes');
+  const fl = f.alt >= 18000 ? 'FL' + Math.round(f.alt / 100) : num(Math.round(f.alt / 100) * 100) + ' ft';
+  let title = '', body = '';
+  if (f.phase === 'Descent') {
+    title = `${who} is descending into ${f.to}`;
+    body = `${f.callsign} from ${A ? A.city : f.from}: top of descent ${Math.round(F.leftNm)} nm out at ${fl}. At the gate in about ${minTxt(F.toGoS)}.`;
+  } else if (f.phase === 'Final') {
+    title = `${who} is on final at ${f.to}`;
+    body = `${f.callsign} from ${A ? A.city : f.from}, established ${Math.round(F.leftNm)} nm out at ${fl}${B ? ', ' + B.name : ''}. Landing in about ${minTxt(F.toTdS)}.`;
+  } else return;
+  State.notices.unshift({ id: uid(), kind: 'pilot', title, body, time: 'Now', read: false, ref: f.id } as any);
+  try {
+    renderTopbar();
+    // a pop-up for finals at normal speed; faster speeds would make them too frequent
+    if (f.phase === 'Final' && aiSpeed() <= 2) { Sound.chime(); toast(title, 'info', { label: 'Show', act: 'show-flight', data: f.id }); }
+  } catch (e) { /* interface not ready */ }
 }
 
 /** Give flights from older saves (and the demo) real off-blocks times, keeping where they are now. */
@@ -174,12 +202,12 @@ function startAiClock() {
   setInterval(() => {
     if (document.hidden) return;
     const now = Date.now();
-    for (const f of State.live) if (aiOn(f)) aiUpdate(f, now);
+    for (const f of State.live) if (aiOn(f)) { aiUpdate(f, now); aiAnnounce(f); }
     aiRefreshCards();
   }, 1000);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { aiScheduleNotifications(); Store.save(); }
-    else { aiScheduleNotificationsCancel(); aiAdvance(Date.now(), false, true); try { refresh(); } catch (e) { /* nothing on screen yet */ } }
+    else { aiScheduleNotificationsCancel(); _aiLastPh.clear(); aiAdvance(Date.now(), false, true); try { refresh(); } catch (e) { /* nothing on screen yet */ } }
   });
   window.addEventListener('pagehide', () => aiScheduleNotifications());
   // opening the app cancels the reminders; they are set again when it goes to the background

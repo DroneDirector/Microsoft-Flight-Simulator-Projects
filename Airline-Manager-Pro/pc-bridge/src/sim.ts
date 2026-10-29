@@ -33,6 +33,9 @@ const MAIN_VARS: [string, string][] = [
   ['FLAPS HANDLE INDEX', 'number'], ['GEAR HANDLE POSITION', 'bool'], ['FLAP SPEED EXCEEDED', 'bool'], ['GEAR SPEED EXCEEDED', 'bool'],
   ['FUEL TOTAL QUANTITY WEIGHT', 'pounds'], ['EMPTY WEIGHT', 'pounds'], ['TOTAL WEIGHT', 'pounds'], ['MAX GROSS WEIGHT', 'pounds'],
   ['PLANE TOUCHDOWN NORMAL VELOCITY', 'feet per second'], ['PLANE TOUCHDOWN PITCH DEGREES', 'degrees'], ['PAYLOAD STATION COUNT', 'number'],
+  // weather around the aircraft
+  ['AMBIENT WIND DIRECTION', 'degrees'], ['AMBIENT WIND VELOCITY', 'knots'], ['AMBIENT VISIBILITY', 'meters'], ['AMBIENT TEMPERATURE', 'celsius'],
+  ['SEA LEVEL PRESSURE', 'millibars'], ['AMBIENT PRECIP STATE', 'mask'], ['AMBIENT PRECIP RATE', 'millimeters of water'], ['AMBIENT IN CLOUD', 'bool'],
 ];
 const GSX_VARS: [string, string][] = [
   ['L:FSDT_GSX_COUATL_STARTED', 'number'], ['L:FSDT_GSX_BOARDING_STATE', 'number'],
@@ -157,6 +160,10 @@ export class SimConnectSource extends EventEmitter implements SimSource {
       s.fuelKg = v[i++] * LB_TO_KG; s.emptyKg = v[i++] * LB_TO_KG; s.totalKg = v[i++] * LB_TO_KG; s.mtowKg = v[i++] * LB_TO_KG;
       (s as any)._tdFpm = Math.abs(v[i++] * 60); (s as any)._tdPitch = -v[i++];
       this.stationCount = Math.min(MAX_STATIONS, Math.round(v[i++]));
+      const wDir = v[i++], wKt = v[i++], vis = v[i++], temp = v[i++], qnh = v[i++], pState = v[i++], pRate = v[i++], cloud = v[i++];
+      // precipitation state is a bit mask: 2 none, 4 rain, 8 snow
+      s.wx = { windDir: Math.round(wDir), windKt: Math.round(wKt), visM: Math.round(vis), tempC: Math.round(temp), qnhHpa: Math.round(qnh),
+        precip: (pState & 8) ? 'snow' : (pState & 4) ? 'rain' : 'none', precipMm: Math.round(pRate * 10) / 10, inCloud: cloud > 0.5, turb: 'none' };
       if (!s.inFlight && (s.lat !== 0 || s.lon !== 0) && s.totalKg > 0) s.inFlight = true;
       s.t = Date.now();
       this.emit('snapshot', Object.assign({}, s, { stations: s.stations.slice() }));
@@ -182,5 +189,6 @@ export function emptySnapshot(): RawSnapshot {
     lat: 0, lon: 0, altFt: 0, aglFt: 0, hdg: 0, ias: 0, gs: 0, vsFpm: 0, g: 1, pitch: 0, onGround: true, parkingBrake: true,
     enginesRunning: 0, engines: 0, flapsIndex: 0, gearDown: true, fuelKg: 0, emptyKg: 0, totalKg: 0, mtowKg: 0, stations: [],
     gsx: { running: false, boardingState: 0, paxBoarded: 0, paxTotal: 0, cargoPct: 0 }, approachAirport: '',
+    wx: { windDir: 0, windKt: 0, visM: 0, tempC: 15, qnhHpa: 1013, precip: 'none', precipMm: 0, inCloud: false, turb: 'none' },
   };
 }

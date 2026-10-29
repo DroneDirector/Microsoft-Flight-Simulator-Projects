@@ -16,6 +16,9 @@ interface PerfSpec {
   airway: number;        // distance flown along airways compared with the straight line
   procNm: number;        // extra miles for departure and arrival procedures
   climbPerNm: number; altBase: number; // cruise altitude for short legs: altBase + distance × climbPerNm
+  // descent planning as flown in the real world: miles per 1,000 ft to lose, extra miles to slow down,
+  // and how far out the aircraft is established on final (on the 3° glide path, about 318 ft per mile)
+  descK: number; decelNm: number; finalNm: number;
 }
 
 interface ProfilePoint { s: number; d: number; alt: number; gs: number; ph: string }
@@ -30,16 +33,76 @@ function iasToTas(ias: number, h: number) {
 }
 
 function perfFor(t: AircraftType): PerfSpec {
+  const base = perfForClass(t), name = t.maker + ' ' + t.model + ' ' + t.variant;
+  for (const m of MODEL_PERF) if (m.re.test(name)) return Object.assign(base, m.p);
+  return base;
+}
+
+/** Defaults by size class, for models not in MODEL_PERF. */
+function perfForClass(t: AircraftType): PerfSpec {
   const kt = t.cruiseKt;
   // heavy four-engine and 777-size aircraft start lower and step-climb later; the newer twins go higher sooner
-  if (t.cls === 'widebody') return { maxAlt: t.seats >= 350 ? 35000 : 37000, jet: true, mach: kt / soundKt(36000), climbIas: 310, climbMach: 0.84, descIas: 290, rocSL: 2800, rocTop: 800, rod: 2300, appKt: 148, taxiOut: 17, taxiIn: 8, airway: 1.06, procNm: 28, climbPerNm: 85, altBase: 9000 };
-  if (t.cls === 'airliner') return { maxAlt: 37000, jet: true, mach: kt / soundKt(36000), climbIas: 290, climbMach: 0.76, descIas: 280, rocSL: 3000, rocTop: 1000, rod: 2300, appKt: 138, taxiOut: 14, taxiIn: 7, airway: 1.045, procNm: 22, climbPerNm: 85, altBase: 9000 };
-  if (t.cls === 'regional') return { maxAlt: 35000, jet: true, mach: kt / soundKt(35000), climbIas: 290, climbMach: 0.74, descIas: 280, rocSL: 3300, rocTop: 900, rod: 2200, appKt: 138, taxiOut: 11, taxiIn: 6, airway: 1.04, procNm: 16, climbPerNm: 90, altBase: 8000 };
-  if (t.cls === 'turboprop' || kt >= 250) return { maxAlt: t.cls === 'turboprop' ? 25000 : 26000, jet: false, mach: 0, climbIas: 170, climbMach: 0, descIas: 235, rocSL: 1700, rocTop: 500, rod: 1500, appKt: 112, taxiOut: 9, taxiIn: 5, airway: 1.03, procNm: 10, climbPerNm: 80, altBase: 4000 };
+  if (t.cls === 'widebody') return { maxAlt: t.seats >= 350 ? 35000 : 37000, jet: true, mach: kt / soundKt(36000), climbIas: 310, climbMach: 0.84, descIas: 290, rocSL: 2800, rocTop: 800, rod: 2300, appKt: 148, taxiOut: 17, taxiIn: 8, airway: 1.06, procNm: 28, climbPerNm: 85, altBase: 9000, descK: 3.3, decelNm: 12, finalNm: 11 };
+  if (t.cls === 'airliner') return { maxAlt: 37000, jet: true, mach: kt / soundKt(36000), climbIas: 290, climbMach: 0.76, descIas: 280, rocSL: 3000, rocTop: 1000, rod: 2300, appKt: 138, taxiOut: 14, taxiIn: 7, airway: 1.045, procNm: 22, climbPerNm: 85, altBase: 9000, descK: 3.0, decelNm: 10, finalNm: 10 };
+  if (t.cls === 'regional') return { maxAlt: 35000, jet: true, mach: kt / soundKt(35000), climbIas: 290, climbMach: 0.74, descIas: 280, rocSL: 3300, rocTop: 900, rod: 2200, appKt: 138, taxiOut: 11, taxiIn: 6, airway: 1.04, procNm: 16, climbPerNm: 90, altBase: 8000, descK: 3.0, decelNm: 8, finalNm: 9 };
+  if (t.cls === 'turboprop' || kt >= 250) return { maxAlt: t.cls === 'turboprop' ? 25000 : 26000, jet: false, mach: 0, climbIas: 170, climbMach: 0, descIas: 235, rocSL: 1700, rocTop: 500, rod: 1500, appKt: 112, taxiOut: 9, taxiIn: 5, airway: 1.03, procNm: 10, climbPerNm: 80, altBase: 4000, descK: t.cls === 'turboprop' ? 3.0 : 3.2, decelNm: t.cls === 'turboprop' ? 4 : 3, finalNm: t.cls === 'turboprop' ? 8 : 6 };
   // piston singles, Caravans, Otters and Beavers: low, slow and mostly direct
   const top = clamp(Math.round((kt - 100) * 110 / 500) * 500 + 3500, 4500, 12500);
-  return { maxAlt: top, jet: false, mach: 0, climbIas: Math.round(kt * 0.62), climbMach: 0, descIas: Math.round(kt * 1.02), rocSL: kt > 160 ? 1000 : 700, rocTop: kt > 160 ? 550 : 400, rod: 600, appKt: Math.round(kt * 0.55), taxiOut: 5, taxiIn: 3, airway: 1.015, procNm: 2, climbPerNm: 60, altBase: 2500 };
+  return { maxAlt: top, jet: false, mach: 0, climbIas: Math.round(kt * 0.62), climbMach: 0, descIas: Math.round(kt * 1.02), rocSL: kt > 160 ? 1000 : 700, rocTop: kt > 160 ? 550 : 400, rod: 600, appKt: Math.round(kt * 0.55), taxiOut: 5, taxiIn: 3, airway: 1.015, procNm: 2, climbPerNm: 60, altBase: 2500,
+    // a cruise descent at about 500-700 ft/min, then a visual final of about 3 miles from the traffic pattern
+    descK: clamp(kt / 60 / (kt > 160 ? 700 : 500) * 1000, 3.5, 4.5), decelNm: 0, finalNm: 3 };
 }
+
+// Real-world numbers per aircraft model, laid over the size-class defaults above. Matched on maker,
+// model and variant, so add-ons and aircraft detected in the sim get them too.
+//   maxAlt   usual initial cruise level (heavy long-haul jets start lower and step-climb later)
+//   descIas  descent speed above 10,000 ft (below it: 250 kt or less)
+//   appKt    final approach speed (around Vref + 5)
+//   descK    miles per 1,000 ft in the descent (the 3:1 rule; heavier and cleaner jets glide further)
+//   decelNm  extra miles to slow down for the approach
+//   finalNm  miles from the runway where it is established on final (ILS intercept, or a visual final)
+// With these, an A320 or 737 at FL370 starts down about 120 nm out, a 777 or 747 about 125-135 nm,
+// a CRJ about 110 nm, an ATR at FL250 about 80 nm and a Cessna at 6,500 ft about 25 nm.
+const MODEL_PERF: { re: RegExp; p: Partial<PerfSpec> }[] = [
+  // Airbus
+  { re: /airbus.*a380/i,               p: { maxAlt: 35000, descIas: 300, appKt: 140, descK: 3.4, decelNm: 13, finalNm: 12 } },
+  { re: /airbus.*a35\d/i,              p: { maxAlt: 37000, descIas: 300, appKt: 142, descK: 3.3, decelNm: 12, finalNm: 11 } },
+  { re: /airbus.*a33\d/i,              p: { maxAlt: 37000, descIas: 300, appKt: 140, descK: 3.3, decelNm: 12, finalNm: 11 } },
+  { re: /airbus.*a3(00|10)/i,            p: { maxAlt: 35000, descIas: 290, appKt: 138, descK: 3.2, decelNm: 11, finalNm: 10 } },
+  { re: /airbus.*a32\d.*neo|a32\dn/i,  p: { maxAlt: 37000, descIas: 290, appKt: 135, descK: 3.0, decelNm: 10, finalNm: 10 } },
+  { re: /airbus.*a3(18|19|20|21)/i,    p: { maxAlt: 37000, descIas: 290, appKt: 137, descK: 3.0, decelNm: 10, finalNm: 10 } },
+  { re: /airbus.*a220|bombardier.*cs[13]00/i, p: { maxAlt: 39000, descIas: 290, appKt: 128, descK: 3.0, decelNm: 9, finalNm: 9 } },
+  // Boeing
+  { re: /boeing.*747/i,                p: { maxAlt: 33000, descIas: 310, appKt: 158, descK: 3.4, decelNm: 13, finalNm: 12 } },
+  { re: /boeing.*777/i,                p: { maxAlt: 33000, descIas: 310, appKt: 152, descK: 3.4, decelNm: 12, finalNm: 12 } },
+  { re: /boeing.*787/i,                p: { maxAlt: 37000, descIas: 300, appKt: 148, descK: 3.3, decelNm: 12, finalNm: 11 } },
+  { re: /boeing.*767/i,                p: { maxAlt: 35000, descIas: 290, appKt: 142, descK: 3.2, decelNm: 11, finalNm: 11 } },
+  { re: /boeing.*757/i,                p: { maxAlt: 37000, descIas: 290, appKt: 135, descK: 3.1, decelNm: 10, finalNm: 10 } },
+  { re: /boeing.*737.*(max|-[789]\b)|737-[89]|737 max/i, p: { maxAlt: 37000, descIas: 280, appKt: 147, descK: 3.0, decelNm: 10, finalNm: 10 } },
+  { re: /boeing.*737/i,                p: { maxAlt: 37000, descIas: 280, appKt: 135, descK: 3.0, decelNm: 10, finalNm: 10 } },
+  // regional jets
+  { re: /crj.?(900|1000)|crj9/i,       p: { maxAlt: 35000, descIas: 290, appKt: 142, descK: 3.0, decelNm: 8, finalNm: 9 } },
+  { re: /crj/i,                        p: { maxAlt: 35000, descIas: 290, appKt: 138, descK: 3.0, decelNm: 8, finalNm: 9 } },
+  { re: /embraer.*(e?19\d|e2)/i,       p: { maxAlt: 37000, descIas: 290, appKt: 135, descK: 3.0, decelNm: 8, finalNm: 9 } },
+  { re: /embraer.*(e?17\d)/i,          p: { maxAlt: 37000, descIas: 290, appKt: 130, descK: 3.0, decelNm: 8, finalNm: 9 } },
+  // business jets
+  { re: /citation|learjet|phenom|praetor|challenger|global|gulfstream|falcon|hondajet/i, p: { maxAlt: 41000, descIas: 280, appKt: 115, descK: 3.0, decelNm: 7, finalNm: 8 } },
+  // turboprops
+  { re: /atr\s*72/i,                   p: { maxAlt: 23000, descIas: 240, appKt: 113, descK: 3.0, decelNm: 4, finalNm: 8 } },
+  { re: /atr\s*42/i,                   p: { maxAlt: 21000, descIas: 235, appKt: 108, descK: 3.0, decelNm: 4, finalNm: 8 } },
+  { re: /dash\s*8|q400|dhc-8/i,        p: { maxAlt: 25000, descIas: 245, appKt: 120, descK: 3.0, decelNm: 5, finalNm: 8 } },
+  { re: /saab|jetstream|beech.*1900/i, p: { maxAlt: 21000, descIas: 230, appKt: 115, descK: 3.0, decelNm: 4, finalNm: 7 } },
+  { re: /pc-?12/i,                     p: { maxAlt: 26000, descIas: 235, appKt: 90,  descK: 3.2, decelNm: 3, finalNm: 6 } },
+  { re: /tbm/i,                        p: { maxAlt: 28000, descIas: 240, appKt: 88,  descK: 3.2, decelNm: 3, finalNm: 6 } },
+  { re: /king\s*air/i,                 p: { maxAlt: 25000, descIas: 230, appKt: 105, descK: 3.2, decelNm: 3, finalNm: 6 } },
+  // utility and bush aircraft: low, slow, often a visual final
+  { re: /caravan|208/i,                p: { maxAlt: 10000, descIas: 165, appKt: 82,  descK: 3.6, decelNm: 1, finalNm: 4 } },
+  { re: /kodiak/i,                     p: { maxAlt: 11000, descIas: 160, appKt: 78,  descK: 3.6, decelNm: 1, finalNm: 4 } },
+  { re: /twin otter|dhc-6/i,           p: { maxAlt: 8000,  descIas: 145, appKt: 80,  descK: 3.8, decelNm: 1, finalNm: 3 } },
+  { re: /beaver|dhc-2/i,               p: { maxAlt: 5500,  descIas: 120, appKt: 65,  descK: 4.0, decelNm: 0, finalNm: 2 } },
+  // light singles and twins
+  { re: /cessna.*1[5-8]\d|skyhawk|skylane|piper|cherokee|archer|diamond|da[24]0|cirrus|sr2\d/i, p: { maxAlt: 6500, descIas: 115, appKt: 65, descK: 3.8, decelNm: 0, finalNm: 2 } },
+];
 
 /** Cruise true airspeed at an altitude: the cruise Mach for jets, the book cruise speed (a little slower down low) for propellers. */
 function cruiseTas(P: PerfSpec, t: AircraftType, h: number) {
@@ -78,24 +141,35 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   const trackAt = (frac: number) => A && B && gc > 5 ? bearingDeg(gcInterpolate(A.pos, B.pos, clamp(frac, 0, 0.99)), B.pos) : track0;
   const wind = (h: number, d: number) => tailwindKt(h, latAt(d / routeNm), trackAt(d / routeNm), month);
 
-  // descent, worked backwards from the runway: how far and how long from each altitude down
-  const descFrom = (top: number) => {
-    let h = 0, d = 0, s = 0; const tbl: number[][] = [[0, 0, 0]];
-    while (h < top) {
-      const dh = Math.min(250, top - h);
-      let ias: number, rate: number;
-      if (h < 2000) { ias = P.appKt; rate = 0; }
-      else if (h < 4000) { ias = Math.min(P.appKt + 50, 210); rate = Math.min(P.rod, 1200); }
-      else if (h < 10000) { ias = Math.min(250, P.descIas); rate = P.rod * 0.85; }
-      else { ias = P.descIas; rate = P.rod; }
-      let tas = P.jet ? Math.min(iasToTas(ias, h), P.mach * soundKt(h)) : (h > 4000 ? Math.min(iasToTas(ias, h), cruiseTas(P, t, h) * 1.05) : iasToTas(ias, h));
-      const gs = Math.max(50, tas + wind(h, routeNm - d) * 0.9);
-      if (!rate) rate = gs * 101.27 * Math.tan(3 * Math.PI / 180); // the 3° glide path
-      const dt = dh / rate * 60;
-      s += dt; d += gs * dt / 3600; h += dh;
-      tbl.push([h, d, s]);
+  // Descent as planned in the real world, worked out from the runway: established on final at
+  // finalNm on the 3° glide path, then back up at descK miles per 1,000 ft with decelNm extra miles
+  // to slow down below 10,000 ft (250 kt), up to the cruise level. That gives the top of descent:
+  // about 120 nm for an A320 or 737 at FL370, 125-135 nm for the big twins and four-engine jets,
+  // about 110 nm for a CRJ, 80 nm for an ATR at FL250, 25-35 nm for a Cessna or Twin Otter.
+  const GLIDE = 318;   // ft per nm on a 3° path
+  const descPlan = (top: number) => {
+    const finalAlt = Math.min(top, P.finalNm * GLIDE), low = Math.min(top, 10000);
+    const nodes: number[][] = [[0, 0, P.appKt], [P.finalNm, finalAlt, P.appKt + (P.jet ? 25 : 15)]];   // [miles out, altitude, indicated speed]
+    const lowNm = P.finalNm + Math.max(0, low - finalAlt) / 1000 * P.descK + P.decelNm * Math.min(1, low / 10000);
+    nodes.push([lowNm, low, P.jet ? 250 : Math.min(P.descIas, 250)]);
+    if (top > low) nodes.push([lowNm + (top - low) / 1000 * P.descK, top, P.descIas]);
+    const todNm = nodes[nodes.length - 1][0];
+    // approach starts at 10,000 ft for airliners and turboprops, about 10 miles out for light aircraft
+    const apprNm = P.jet || P.maxAlt > 15000 ? lowNm : Math.min(todNm, P.finalNm + 7);
+    const at = (dn: number, k: number) => { for (let i = 1; i < nodes.length; i++) if (dn <= nodes[i][0]) { const a = nodes[i - 1], b = nodes[i], f = (dn - a[0]) / ((b[0] - a[0]) || 1); return a[k] + (b[k] - a[k]) * f; } return nodes[nodes.length - 1][k]; };
+    // fly it from the top of descent to the runway in half-mile steps
+    const steps: { dd: number; dt: number; h: number; gs: number; ph: string }[] = [];
+    let s = 0;
+    for (let dn = todNm; dn > 1e-6;) {
+      const dd = Math.min(0.5, dn), mid = dn - dd / 2, h = at(mid, 1), ias = at(mid, 2);
+      let tas = iasToTas(ias, h);
+      if (P.jet) tas = Math.min(tas, P.mach * soundKt(h));
+      else if (h > 4000) tas = Math.min(tas, cruiseTas(P, t, h) * 1.08);
+      const gs = Math.max(45, tas + wind(h, routeNm - mid) * 0.9), dt = dd / gs * 3600;
+      dn -= dd; s += dt;
+      steps.push({ dd, dt, h: at(dn, 1), gs, ph: dn < P.finalNm ? 'Final' : dn < apprNm ? 'Approach' : 'Descent' });
     }
-    return tbl;
+    return { todNm, steps, s };
   };
   const climbTo = (top: number) => {
     let h = 0, d = 0, s = 0;
@@ -121,9 +195,9 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
     return Math.max(k * 1000 + (P.jet || h >= 18000 ? 0 : 500), 1500);
   };
   cruise = level(cruise);
-  let up = climbTo(cruise), down = descFrom(cruise);
-  while (up.d + down[down.length - 1][1] > routeNm * 0.92 && cruise > 2500) {
-    cruise = level(cruise - 2000); up = climbTo(cruise); down = descFrom(cruise);
+  let up = climbTo(cruise), down = descPlan(cruise);
+  while (up.d + down.todNm > routeNm * 0.95 && cruise > 2500) {
+    cruise = level(cruise - 2000); up = climbTo(cruise); down = descPlan(cruise);
   }
 
   // fly it forwards
@@ -147,20 +221,19 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
     push('Climb', gs);
   }
   // cruise until the top of descent
-  const todNm = down[down.length - 1][1];
+  const todNm = down.todNm;
   while (d < routeNm - todNm) {
     const gs = Math.max(60, cruiseTas(P, t, h) + wind(h, d));
     const step = Math.min(gs * STEP / 3600, routeNm - todNm - d);
     s += step / gs * 3600; d += step; push('Cruise', gs);
     if (step < 1e-6) break;
   }
-  // descent and approach, following the table from the top down
-  for (let i = down.length - 2; i >= 0; i--) {
-    const [hh, dd, ss] = down[i], [, dd1, ss1] = down[i + 1];
-    const dt = ss1 - ss, dd2 = dd1 - dd;
-    s += dt; d += dd2; h = hh;
-    const ph = hh <= 2000 ? 'Final' : hh < 4000 ? 'Approach' : 'Descent';
-    if (i % 3 === 0 || hh <= 2000) push(ph, dd2 / dt * 3600);
+  // descent, approach and final
+  let acc = 0;
+  for (let i = 0; i < down.steps.length; i++) {
+    const st = down.steps[i];
+    s += st.dt; d += st.dd; h = st.h; acc += st.dd;
+    if (acc >= 2 || st.ph === 'Final' || i === down.steps.length - 1 || st.ph !== down.steps[i + 1].ph) { push(st.ph, st.gs); acc = 0; }
   }
   d = routeNm; h = 0; s += 45; push('Landing', 25);
   s += taxiIn * 60; push('Taxi in', 0);

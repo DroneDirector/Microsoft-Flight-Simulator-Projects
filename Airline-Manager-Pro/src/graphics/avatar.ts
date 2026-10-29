@@ -50,7 +50,29 @@ function dressed(l: Look, role: CrewRole): Look {
   if (!d.bottom) d.bottom = 'trousers';
   if (!d.shoes) d.shoes = 'oxford';
   if (!d.neck) d.neck = 'open';
+  // garments follow the person: no skirts, blouses, low heels, scarves or pillbox hats for men,
+  // and no men's Oxford shoes for women (they get low heels)
+  if (d.sex === 'm') {
+    if (d.top === 'blouse') d.top = role === 'fa' ? 'vest' : 'shirt';
+    if (d.bottom === 'skirt') d.bottom = 'trousers';
+    if (d.shoes === 'pumps') d.shoes = 'oxford';
+    if (d.neck === 'scarf') d.neck = 'tie';
+    if (d.hat === 'pillbox') d.hat = 'cap';
+  } else { if (d.shoes === 'oxford') d.shoes = 'pumps'; d.facial = 'none'; }
   return d;
+}
+
+/** Garment choices that suit a man or a woman in a given role (used by the look editor). */
+function garmentOptions(sex: 'm' | 'f', role: CrewRole) {
+  const f = sex === 'f', fa = role === 'fa', mech = role === 'mech';
+  return {
+    top: fa ? (f ? [['blouse', 'Blouse'], ['vest', 'Waistcoat'], ['jacket', 'Jacket'], ['pullover', 'Pullover']] : [['vest', 'Waistcoat'], ['jacket', 'Jacket'], ['pullover', 'Pullover']])
+      : [['jacket', 'Jacket'], ['shirt', 'Short-sleeve shirt'], ['pullover', 'Pullover']],
+    bottom: f ? [['trousers', 'Trousers'], ['skirt', 'Skirt'], ['shorts', 'Shorts']] : [['trousers', 'Trousers'], ['shorts', 'Shorts']],
+    neck: f ? [['tie', 'Tie'], ['scarf', 'Scarf'], ['open', 'Open collar']] : [['tie', 'Tie'], ['open', 'Open collar']],
+    shoes: f ? [['pumps', 'Low heels'], ['boots', 'Boots'], ['sneakers', 'Sneakers']] : [['oxford', 'Oxfords'], ['boots', 'Boots'], ['sneakers', 'Sneakers']],
+    hat: mech ? [['none', 'No hat'], ['cap', 'Cap']] : fa ? (f ? [['none', 'No hat'], ['cap', 'Uniform cap'], ['pillbox', 'Pillbox hat']] : [['none', 'No hat'], ['cap', 'Uniform cap']]) : [['none', 'No hat'], ['cap', 'Pilot\'s cap']],
+  };
 }
 
 function defaultLook(sex: 'm' | 'f', role: CrewRole): Look {

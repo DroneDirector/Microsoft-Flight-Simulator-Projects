@@ -165,6 +165,8 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + decl + GLSL_NOISE)
         .replace('#include <color_fragment>', `#include <color_fragment>
           vec3 R = vRest; float onArm = step(0.5, vA.y), headW = vA.w;
+          // under a skirt the hips and thighs are hidden, so they can never show through it
+          if (uSkirt > 0.5 && onArm < 0.5 && headW < 0.5 && R.y < uHemY && R.y > uKneeY + 0.06) discard;
           vec3 col = uSkin; float rough = 0.55, metal = 0.0, isSkin = 1.0;
           float low = fbm(R * 22.0), mid = fbm(R * 90.0);
           col *= 0.95 + 0.1 * low;
@@ -308,7 +310,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
           if (isSkin < 0.5) material.sheenColor = diffuseColor.rgb * 0.7;`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          if (isSkin > 0.5) { float rimL = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0); totalEmissiveRadiance += uSkin * vec3(0.42, 0.12, 0.08) * (0.05 + 0.18 * rimL); }`);
+          if (isSkin > 0.5) { float rimL = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0); totalEmissiveRadiance += uSkin * vec3(0.5, 0.14, 0.08) * (0.06 + 0.2 * rimL); }`);
     };
     m.customProgramCacheKey = () => 'crew-body';
     return m;
@@ -382,6 +384,11 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     for (let i = 0; i < n; i++) { P.array[i * 3] += N.getX(i) * th[i]; P.array[i * 3 + 1] += N.getY(i) * th[i]; P.array[i * 3 + 2] += N.getZ(i) * th[i]; }
     P.needsUpdate = true; geo.computeVertexNormals();
   }
+
+  // Skin colours for the lit 3D figures, one for each tone in the look editor. Real skin reflects far less
+  // light than its swatch suggests, and even the fairest skin keeps a warm pink-beige colour, so these sit
+  // below the swatches and carry more warmth; under the studio lights they read as the swatch, not as white.
+  const SKIN_3D = ['#E2B192', '#D9A281', '#CD926E', '#BE7F5A', '#AA6D4B', '#91593B', '#7A4A30', '#623A25', '#4B2C1C', '#352015'];
 
   /* ================= strands (hair, moustaches) ================= */
   function rng(seed) { let h = seed >>> 0 || 1; return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return (h >>> 0) / 4294967296; }; }
@@ -1008,7 +1015,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
   /* ================= look → outfit ================= */
   function outfit(L, role, accent, I) {
     const f = L.sex === 'f', pilot = role === 'captain' || role === 'fo', mech = role === 'mech' || L.top === 'overalls';
-    const skin = shade(SKIN_TONES[L.skin] || SKIN_TONES[2], -0.07), hair = HAIR_COLORS[L.hairColor] || HAIR_COLORS[1], uni = UNIFORM_COLORS[L.uniform] || UNIFORM_COLORS[0];
+    const skin = SKIN_3D[L.skin] || SKIN_3D[2], hair = HAIR_COLORS[L.hairColor] || HAIR_COLORS[1], uni = UNIFORM_COLORS[L.uniform] || UNIFORM_COLORS[0];
     const dark = L.skin > 5;
     const lip = '#' + new THREE.Color(shade(skin, dark ? -0.34 : -0.14)).lerp(new THREE.Color(dark ? '#4a2220' : '#c4645c'), dark ? 0.35 : 0.55).getHexString();
     const iris = L.skin >= 5 ? '#6b4428' : ['#6a4a2c', '#5d86a8', '#5f7a48', '#7a5634', '#4f6f8f'][(L.skin + (L.hairColor || 0)) % 5];
@@ -1111,18 +1118,19 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       for (const [dx, ang, len] of [[0.042, -0.6, 0.06], [0.03, -0.2, 0.05]]) { const t = new THREE.Mesh(new THREE.ConeGeometry(0.016, len, 3, 1), m); t.scale.z = 0.25; t.position.set(dx, I.neckY - 0.012 - len / 2, kz - 0.002); t.rotation.set(0, 0, Math.PI + ang); root.add(t); }
     }
     if (c.skirt) {
-      const P = b.pos, A = b.A, top = c.hemY + 0.012, bot = I.kneeY + 0.04, rings = []; let prevX = 0, prevZ = 0;
+      // sized from the dressed body (not the bare one), with room to spare, so nothing pokes through
+      const P = geo.attributes.position.array, A = b.A, top = c.hemY + 0.012, bot = I.kneeY + 0.04, rings = []; let prevX = 0, prevZ = 0;
       for (let k = 0; k <= 14; k++) {
         const y = top - (top - bot) * k / 14; let mx = 0, z0 = 9, z1 = -9;
         for (let i = 0; i < P.length / 3; i++) { if (A[i * 4 + 1] > 0.3) continue; if (Math.abs(P[i * 3 + 1] - y) > 0.012) continue; mx = Math.max(mx, Math.abs(P[i * 3])); z0 = Math.min(z0, P[i * 3 + 2]); z1 = Math.max(z1, P[i * 3 + 2]); }
-        const rx = Math.max(prevX, mx + 0.008 + 0.024 * k / 14), rz = Math.max(prevZ, (z1 - z0) / 2 + 0.008 + 0.018 * k / 14); prevX = rx; prevZ = rz;
+        const rx = Math.max(prevX, mx + 0.012 + 0.024 * k / 14), rz = Math.max(prevZ, (z1 - z0) / 2 + 0.012 + 0.018 * k / 14); prevX = rx; prevZ = rz;
         rings.push([y, rx, rz, (z0 + z1) / 2]);
       }
       const pos = [], idx = [], S = 64;
       rings.forEach(([y, rx, rz, cz], k) => { const fold = 0.035 * (k / 14); for (let j = 0; j <= S; j++) { const a = j / S * Math.PI * 2, ff = 1 + fold * Math.sin(a * 10) * (0.6 + 0.4 * Math.sin(a * 3 + 1)); pos.push(Math.sin(a) * rx * ff, y, cz + Math.cos(a) * rz * ff); } });
       for (let r = 0; r < rings.length - 1; r++) for (let j = 0; j < S; j++) { const a = r * (S + 1) + j, cc = a + S + 1; idx.push(a, a + 1, cc, a + 1, cc + 1, cc); }
       const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); sg.setIndex(idx); sg.computeVertexNormals();
-      const sk = new THREE.Mesh(sg, cloth(c.skirtCol)); sk.material.side = THREE.DoubleSide; root.add(sk);
+      const sk = new THREE.Mesh(sg, cloth(c.skirtCol)); sk.material.side = THREE.DoubleSide; sk.material.shadowSide = THREE.BackSide; root.add(sk);
     }
     root.traverse(o => { if (o.isMesh && !(o.material && o.material.isShaderMaterial)) { o.castShadow = true; o.receiveShadow = true; } });
     tick('props', t0);

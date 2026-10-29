@@ -57,6 +57,11 @@ export class FakeSim extends EventEmitter implements SimSource {
     if (this.o.turbulence && t > T_CLIMB + 300 && t < T_CLIMB + 340) { s.g = Math.sin(t * 6) > 0 ? 2.3 : -0.4; }
     if (this.o.crash && t > T_LAND - 3) { this.emit('crash'); return null; }
     const p = pos(f); s.lat = p.lat; s.lon = p.lon; s.hdg = 125;
+    // demo weather: westerly wind, colder and windier at height, a band of rain and cloud on the way down, a little chop in the climb
+    const alt = s.altFt, inCloud = alt > 4000 && alt < 9000 && t > T_DESC;
+    if (!this.o.turbulence && alt > 3000 && alt < 12000 && !s.onGround) s.g = 1 + 0.12 * Math.sin(t * 3.1) * Math.sin(t * 0.7);
+    s.wx = { windDir: 260, windKt: Math.round(12 + alt / 1000 * 2.2), visM: inCloud ? 800 : t > T_DESC && alt < 4000 ? 6000 : 10000, tempC: Math.round(9 - alt / 1000 * 2),
+      qnhHpa: 1009, precip: t > T_DESC && alt < 9000 ? 'rain' : 'none', precipMm: t > T_DESC && alt < 9000 ? 2.4 : 0, inCloud, turb: 'none' };
     return s;
   }
 }

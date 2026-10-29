@@ -23,8 +23,19 @@ export interface SimSnapshot {
   stations: { name: string; kg: number }[];
   gsx: { running: boolean; boardingState: number; paxBoarded: number; paxTotal: number; cargoPct: number };
   approachAirport: string;
+  wx: Weather;               // the weather around the aircraft, as the simulator has it
   phase: FlightPhase;
   from: string;              // departure airport of the current leg, when known
+}
+
+/** Weather at the aircraft, read from the simulator (or made up by the demo flight). */
+export interface Weather {
+  windDir: number; windKt: number;      // wind direction (true, from) and speed
+  visM: number;                         // visibility in metres
+  tempC: number; qnhHpa: number;        // outside air temperature, sea-level pressure
+  precip: 'none' | 'rain' | 'snow'; precipMm: number;   // precipitation and its rate
+  inCloud: boolean;
+  turb: 'none' | 'light' | 'moderate' | 'severe';       // graded from the aircraft's load-factor swings
 }
 
 export type FlightPhase = 'idle' | 'parked' | 'taxi-out' | 'takeoff' | 'climb' | 'cruise' | 'descent' | 'approach' | 'landed' | 'taxi-in' | 'arrived';
