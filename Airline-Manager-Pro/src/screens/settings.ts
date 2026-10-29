@@ -42,6 +42,7 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'sttQuality', label: 'Speech recognition quality', hint: 'Higher quality uses more of your PC while you fly.', options: [['light', 'Light'], ['balanced', 'Balanced'], ['accurate', 'Accurate']], when: () => State.settings.atcSource === 'beyondatc' && State.settings.atcListen },
   ] },
   { id: 'staff', title: 'Staff', icon: 'pilots', items: [
+    { type: 'toggle', key: 'conduct', label: 'Conduct reports and behaviour', hint: 'Misconduct, warnings and court cases for your AI crew. Switching off never removes what already happened; court cases pause and carry on when you switch back on.' },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Most of the time your staff behave well. Choose how often someone steps out of line. You'll be asked to discipline or dismiss them when it happens.</p>` },
     { type: 'html', html: () => [['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['fo', 'Co-pilots']].map(r => `<div class="ch-row"><span><b>${r[1]}</b><small>How often they misbehave</small></span><div class="seg">${[['never', 'Never'], ['rare', 'Rarely'], ['normal', 'Sometimes'], ['often', 'Often']].map(o => `<button class="${(State.settings as any).misconduct[r[0]] === o[0] ? 'on' : ''}" data-act="set-misconduct" data-r="${r[0]}" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>`).join('') },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Rarely is about 2% of the time, sometimes about 5–10%, often about 20%.</p>` },
@@ -74,6 +75,7 @@ const SETTINGS: SetSection[] = [
       return `<div class="set-card col"><div class="sc-h">${icon('user')}<span><b>${esc(pl.name)}</b><small>${esc(pr.label)}</small></span></div>
         ${State.companies.filter(c => c.profileId === pr.id).map(c => `<div class="sc-co"><span class="co-badge sm" style="--co:${c.color};--co2:${c.color2}">${esc(c.icao)}</span><b>${esc(c.name)}</b>
           <small>${c.divisions.length ? c.divisions.map(d => esc(d.name)).join(' and ') + ' divisions, shared money and reputation' : 'Separate company'}, ${State.fleet.filter(a => a.companyId === c.id).length} aircraft, ${money(c.balance, { compact: true })}</small>
+          <button class="del-btn edit" data-act="edit-company" data-co="${c.id}" aria-label="Edit ${esc(c.name)}">${icon('sliders')}</button>
           <button class="del-btn" data-act="delete-company" data-co="${c.id}" aria-label="Delete ${esc(c.name)}">${icon('trash')}</button></div>`).join('')}</div>`;
     }).join('') + `<div class="btn-row"><button class="btn ghost" data-act="new-company">${icon('plus')}New company</button><button class="btn ghost" data-act="new-division">${icon('plus')}New division</button></div>
       <div class="danger-zone"><span><b>Saved on this device</b><small>Your companies are saved automatically and kept when the app updates.</small></span><button class="btn ghost sm danger-txt" data-act="reset-ask">${icon('trash')}Delete everything</button></div>` },
@@ -81,12 +83,12 @@ const SETTINGS: SetSection[] = [
   { id: 'backup', title: 'Backup and restore', icon: 'shield', items: [
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Everything is saved on this phone the moment it changes: settings, looks, staff, fleet, money, flight logs and the link to your PC. When you open the app again it is exactly as you left it, also after updates.</p>` },
     { type: 'html', html: () => {
-      const f = Backup.folder, native = !!Backup.tools();
+      const f = Backup.folder, native = !!Backup.tools() || DESKTOP;
       if (!native) return `<div class="set-card"><span class="pc-ic">${icon('shield')}</span><span><b>Backups</b><small>Save a backup file and open it again on any device.</small></span></div>`;
       const last = f && f.lastWrite ? 'last saved ' + dateStr(new Date(f.lastWrite)) : 'no backup written yet';
       return `<div class="set-card ${f && f.set ? 'ok' : ''}"><span class="pc-ic">${icon('shield')}</span><span><b>${f && f.set ? 'Automatic backups are on' : 'Choose a backup folder'}</b>
         <small>${f && f.set ? `To ${esc(f.name || 'your folder')}, ${esc(last)}. Clearing the app's data or reinstalling doesn't touch it.` : 'Pick a folder outside the app (Documents, an SD card or a Google Drive folder). The airline is copied there automatically, and after a reinstall or on a new phone you pick it again to get everything back.'}</small></span>
-        <button class="btn ${f && f.set ? 'ghost' : 'primary'} sm" data-act="backup-folder">${f && f.set ? 'Change' : 'Choose folder'}</button></div>`
+        ${DESKTOP ? '' : `<button class="btn ${f && f.set ? 'ghost' : 'primary'} sm" data-act="backup-folder">${f && f.set ? 'Change' : 'Choose folder'}</button>`}</div>`
         + (f && f.set ? `<div class="btn-row"><button class="btn ghost sm" data-act="backup-now">${icon('check')}Back up now</button></div>` : '');
     } },
     { type: 'html', html: () => `<div class="btn-row"><button class="btn ghost sm" data-act="backup-export">${icon('download')}Save a backup file</button><button class="btn ghost sm" data-act="backup-import">${icon('sync')}Restore from a backup</button></div>` },
@@ -171,6 +173,7 @@ ACTIONS.toggle = el => {
   if (key === 'mk-installed') { _mkInstalled = on; refresh(); return; }
   if (key === 'reduceMotion') document.documentElement.classList.toggle('calm', on);
   if (key === 'muteAll') { if (on) Voice.stop(); renderTopbar(); }
+  if (key === 'conduct') setConduct(on);
   if (key in State.settings) { Store.save(); setTimeout(() => rerenderSettingsBody(), 180); }
 };
 
@@ -235,3 +238,31 @@ ACTIONS['delete-company-do'] = el => {
 ACTIONS['reset-do'] = () => Store.reset();
 
 ACTIONS['set-misconduct'] = el => { (State.settings as any).misconduct[el.getAttribute('data-r')] = el.getAttribute('data-v'); Sound.tick(); rerenderSettingsBody(); };
+
+/* ---------- Edit an airline: name, codes, home base, colours (asks before applying) ---------- */
+const CO_COLORS = ['#2C8CFF', '#3FB6A8', '#E2A23B', '#D2553A', '#9C7CFF', '#E04BD6', '#1F4E9C', '#D81939', '#2D8C3C', '#F2C14E', '#0B1560', '#7FC4FF'];
+let _coEdit: any = null;
+ACTIONS['edit-company'] = el => {
+  const c = company(el.getAttribute('data-co')); if (!c) return;
+  _coEdit = { id: c.id, color: c.color };
+  openLayer('modal', `<div class="modal-head"><div><h2>Edit ${esc(c.name)}</h2><small>Name, codes, home base and colours</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body">
+      <div class="le-group"><b>Name</b><input class="le-in" data-co-name value="${esc(c.name)}" maxlength="40" autocomplete="off"></div>
+      <div class="le-row2"><div class="le-group"><b>ICAO code</b><input class="le-in" data-co-icao value="${esc(c.icao)}" maxlength="3" autocomplete="off"></div>
+        <div class="le-group"><b>Callsign</b><input class="le-in" data-co-cs value="${esc(c.callsign)}" maxlength="16" autocomplete="off"></div></div>
+      <div class="le-group"><b>Home base</b><select class="le-in" data-co-hub>${Object.keys(AIRPORTS).filter(k => k !== 'DEP').sort().map(k => `<option value="${k}" ${k === c.hub ? 'selected' : ''}>${k}, ${esc(AIRPORTS[k].name)}</option>`).join('')}</select></div>
+      <div class="le-group"><b>Colour</b><div class="le-sw">${CO_COLORS.map(col => `<button class="sw ${col === c.color ? 'on' : ''}" style="--c:${col}" data-act="co-color" data-c="${col}" aria-label="Colour ${col}"></button>`).join('')}</div></div>
+      <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="co-save">${icon('check')}Save</button></div>
+    </div>`, { cls: 'narrow' });
+};
+ACTIONS['co-color'] = el => { if (!_coEdit) return; _coEdit.color = el.getAttribute('data-c'); $all('[data-act=co-color]').forEach(b => b.classList.toggle('on', b.getAttribute('data-c') === _coEdit.color)); Sound.tick(); };
+ACTIONS['co-save'] = () => {
+  if (!_coEdit) return;
+  const c = company(_coEdit.id), v = (sel: string) => (($(sel) as HTMLInputElement) || {} as any).value;
+  const next = { name: (v('[data-co-name]') || c.name).trim() || c.name, icao: (v('[data-co-icao]') || c.icao).trim().toUpperCase().slice(0, 3) || c.icao, callsign: (v('[data-co-cs]') || c.callsign).trim().toUpperCase() || c.callsign, hub: v('[data-co-hub]') || c.hub, color: _coEdit.color };
+  const changed = (Object.keys(next) as (keyof typeof next)[]).some(k => (c as any)[k] !== next[k]);
+  if (!changed) { closeAll(); return; }
+  confirmChange(`Change ${c.name}?`, `${next.name !== c.name ? 'New name ' + next.name + '. ' : ''}${next.hub !== c.hub ? 'Home base moves to ' + next.hub + '. ' : ''}The change applies everywhere in the app.`, 'Yes, change it', 'No, keep it as it is',
+    () => { Object.assign(c, next); closeAll(); applyCompanyTheme(true); Store.save(); renderTopbar(); refresh(); toast(`${c.name} updated`, 'ok'); },
+    () => { closeAll(); toast('Nothing changed', 'info'); });
+};

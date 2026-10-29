@@ -89,8 +89,8 @@ ACTIONS['buy-confirm'] = () => {
   const regs = nextRegs(c, _buy.qty);
   const from = c.balance;
   c.balance -= t.price * _buy.qty;
-  regs.forEach(r => State.fleet.push({ reg: r, typeId: t.id, companyId: c.id, divisionId: _buy.div || undefined, base: c.hub, location: c.hub, hoursMin: 0, cycles: 0, condition: 100, status: 'parked', delivered: '2026-10-28' }));
-  State.txns.unshift({ id: uid(), companyId: c.id, date: '2026-10-28', time: new Date().toTimeString().slice(0, 5), label: `Purchase: ${_buy.qty}× ${t.maker} ${t.model}`, amount: -t.price * _buy.qty, kind: 'purchase',
+  regs.forEach(r => State.fleet.push({ reg: r, typeId: t.id, companyId: c.id, divisionId: _buy.div || undefined, base: c.hub, location: c.hub, hoursMin: 0, cycles: 0, condition: 100, status: 'parked', delivered: dateStr(new Date()).slice(0, 10) }));
+  State.txns.unshift({ id: uid(), companyId: c.id, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Purchase: ${_buy.qty}× ${t.maker} ${t.model}`, amount: -t.price * _buy.qty, kind: 'purchase',
     reg: regs.join(', '), lines: regs.map(r => [`${t.maker} ${t.model} ${r}, ${t.dev}`, -t.price] as [string, number]), link: { kind: 'aircraft', id: regs[0] } });
   closeAll();
   Sound.purchase(); Haptics.success();

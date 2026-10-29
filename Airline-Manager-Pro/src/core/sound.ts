@@ -6,6 +6,8 @@ function audio(): AudioContext {
     const C = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!C) return null;
     _ctx = new C();
+    // on the PC: the sound output chosen in Settings → Display
+    const sink = (window as any).__audioSink; if (sink && sink !== 'default' && (_ctx as any).setSinkId) (_ctx as any).setSinkId(sink).catch(() => { /* device gone */ });
   }
   if (_ctx.state === 'suspended') _ctx.resume();
   return _ctx;

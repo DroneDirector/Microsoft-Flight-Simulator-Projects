@@ -44,7 +44,9 @@ const Link = {
   get pc(): { ip: string; name: string; token: string } { return (State as any).linkPc || null; },
 
   init() {
-    if (this.pc) this.connect(this.pc.ip);
+    // the app on the PC talks to the PC app on the same computer, no pairing needed
+    if (DESKTOP) { (State as any).linkPc = { ip: '127.0.0.1', name: 'This PC', token: 'local' }; (State as any).linkedOnce = true; this.connect('127.0.0.1'); }
+    else if (this.pc) this.connect(this.pc.ip);
     setInterval(() => this.heartbeat(), 5000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden && this.pc && this.status !== 'connected') this.connect(this.pc.ip); });
   },
@@ -97,8 +99,9 @@ const Link = {
       const timer = setTimeout(() => { if (ws.readyState !== 1) { try { ws.close(); } catch (e) { /* closed */ } finish({ ok: false, reason: 'The PC didn\'t answer. Check that the PC app is running and that the PC is on the same Wi-Fi or your phone\'s hotspot.' }); } }, 5000);
       ws.onopen = () => {
         clearTimeout(timer);
-        const device = 'Android phone';
-        if (code) ws.send(JSON.stringify({ type: 'pair', code, device }));
+        const device = DESKTOP ? 'This PC' : 'Android phone';
+        if (DESKTOP) ws.send(JSON.stringify({ type: 'hello', device, local: true }));
+        else if (code) ws.send(JSON.stringify({ type: 'pair', code, device }));
         else ws.send(JSON.stringify({ type: 'hello', device, token: this.pc ? this.pc.token : undefined }));
       };
       ws.onmessage = ev => {
@@ -107,7 +110,7 @@ const Link = {
         if (m.type === 'welcome') { (ws as any)._pcName = m.pcName; (ws as any)._version = m.version; }
         else if (m.type === 'pair-result') {
           if (m.ok) {
-            (State as any).linkPc = { ip, name: (ws as any)._pcName || ip, token: m.token };
+            (State as any).linkPc = { ip, name: DESKTOP ? 'This PC' : (ws as any)._pcName || ip, token: m.token };
             (State as any).linkedOnce = true;
             this.status = 'connected'; Store.save(); linkChanged();
             onLinked();

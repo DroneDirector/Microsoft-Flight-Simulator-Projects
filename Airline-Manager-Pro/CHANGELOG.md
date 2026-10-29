@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 (2026-10-29)
+
+- The whole app on Windows, opened by the PC app in its own window (Microsoft Edge app mode), connected straight to the sim; window, borderless and full screen; scales to any screen size including ultrawide; graphics card and sound output choice; backups to Documents
+- Weekly payroll, hiring fees, a hiring list that changes over time, conduct reports switch
+- Confirmation before changing a look or the airline; airline editor
+- Correct dates on all spending
+
 ## 0.5.1 (2026-10-29)
 
 - Ranking screen: pilot and airline ranks, pilot rating, airline popularity, 1,197 badges in six tiers

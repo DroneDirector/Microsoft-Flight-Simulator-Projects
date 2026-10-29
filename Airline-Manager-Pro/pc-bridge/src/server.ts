@@ -67,6 +67,8 @@ export class LinkServer extends EventEmitter {
   private udp: dgram.Socket = null;
   private devices: Paired[] = [];
   private store: string;
+  /** Extra HTTP handler (the app on this PC); returns true when it answered. */
+  web: (req: http.IncomingMessage, res: http.ServerResponse) => boolean = null;
 
   constructor(dataDir: string, public version: string) {
     super();
@@ -85,7 +87,7 @@ export class LinkServer extends EventEmitter {
         if (req.url === '/info') {
           res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
           res.end(JSON.stringify(this.info()));
-        } else { res.writeHead(404); res.end(); }
+        } else if (!(this.web && this.web(req, res))) { res.writeHead(404); res.end(); }
       });
       this.http.on('upgrade', (req, sock) => {
         const key = req.headers['sec-websocket-key'];
@@ -124,6 +126,8 @@ export class LinkServer extends EventEmitter {
     if (!m || typeof m !== 'object') return;
     if (m.type === 'hello') {
       c.device = String(m.device || 'Phone').slice(0, 60);
+      // the app window on this same PC is trusted without a code
+      if ((m as any).local && (c.ip === '127.0.0.1' || c.ip === '::1')) { c.paired = true; c.device = 'This PC'; c.send({ type: 'pair-result', ok: true, token: 'local' }); this.emit('paired', c); this.emit('clients', this.pairedClients().length); return; }
       if (m.token && this.devices.some(d => d.token === m.token)) { c.paired = true; c.send({ type: 'pair-result', ok: true, token: m.token }); this.emit('paired', c); }
     } else if (m.type === 'pair') {
       if (String(m.code).replace(/\D/g, '') === this.code) {

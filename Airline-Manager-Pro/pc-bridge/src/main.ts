@@ -11,6 +11,7 @@ import type { Airport } from './protocol';
 
 import { VERSION } from './version';
 import { openLog, writeLog, fatal, catchEverything, logFile } from './errors';
+import { Desktop } from './desktop';
 export { VERSION };
 
 export function dataDir(): string {
@@ -82,6 +83,7 @@ function banner(server: LinkServer, status: string, phones: number, lines: strin
     '  Recent:',
     ...lines.slice(-8).map(l => '   ' + l),
     '',
+    '  The app on this PC: type A and press Enter to open its window again.',
     '  Keep this window open while you fly. Press Ctrl+C to quit.',
     logFile() ? '  Log file: ' + logFile() : '',
   ];
@@ -96,6 +98,8 @@ export async function main() {
   const lines: string[] = [];
   let status = 'Starting…', phones = 0;
   const server = new LinkServer(dir, VERSION);
+  const desktop = new Desktop(dir);
+  server.web = (req, res) => desktop.handle(req, res);
   const redraw = () => banner(server, status, phones, lines);
   const log = (s: string) => { writeLog(s); lines.push(new Date().toTimeString().slice(0, 8) + '  ' + s); if (lines.length > 200) lines.shift(); redraw(); };
   try { await server.start(); }
@@ -110,6 +114,9 @@ export async function main() {
   run(source, server, log);
   source.start();
   redraw();
+  // the app on this PC
+  if (process.argv.indexOf('--no-window') < 0 && desktop.prefs.open && desktop.appDir()) setTimeout(() => { if (desktop.openWindow()) log('Opened Airline Manager Pro on this PC'); }, 800);
+  process.stdin.on('data', d => { if (/^\s*a/i.test(String(d)) && desktop.appDir()) desktop.openWindow(); });
   process.on('SIGINT', () => { source.stop(); server.stop(); process.exit(0); });
 }
 

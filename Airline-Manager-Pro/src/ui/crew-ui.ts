@@ -52,7 +52,7 @@ function openStaff(id: string) {
 ACTIONS['edit-staff-look'] = el => {
   const p = staffById(el.getAttribute('data-id')); if (!p) return;
   closeTop();
-  openLookEditor({ title: `${p.name}'s look`, role: personRole(p), look: p.look, onAccept: look => { p.look = look; Store.save(); refresh(); toast('Look saved', 'ok'); } });
+  openLookEditor({ title: `${p.name}'s look`, role: personRole(p), look: p.look, confirmName: p.name, onAccept: look => { p.look = look; Store.save(); refresh(); toast('Look saved', 'ok'); } });
 };
 
 ACTIONS['dismiss-ask'] = el => {
@@ -115,6 +115,7 @@ const MISCONDUCT_P: { [k: string]: number } = { never: 0, rare: 0.02, normal: 0.
 
 function maybeIncident() {
   const S: any = State;
+  if (!conductOn()) return;   // switched off in Settings: nothing new happens, nothing is removed
   const cid = State.companyId;
   // the AI crew only: hired pilots, co-pilots, flight attendants and mechanics (never you)
   const roles: string[] = ['fa', 'mech', 'fo', 'pilot'];
@@ -191,7 +192,7 @@ ACTIONS['copilot-sex'] = () => {
   const cid = State.companyId, cp = (State as any).coPilot[cid];
   const cur = State.pilots.filter((p: any) => p.coPilotFor === cid)[0];
   closeAll();
-  openLookEditor({ title: 'Your co-pilot', role: 'fo', look: cur ? cur.look : defaultLook(cp.sex, 'fo'), sexOnly: true,
+  openLookEditor({ title: 'Your co-pilot', role: 'fo', look: cur ? cur.look : defaultLook(cp.sex, 'fo'), sexOnly: true, confirmName: cur ? cur.name : undefined,
     onAccept: look => {
       cp.sex = look.sex; cp.gen = (cp.gen || 0) + 1;
       const p: any = ensureCoPilot(cid);
@@ -236,11 +237,11 @@ ACTIONS['hire-do'] = el => {
   const p = S.staffCandidates.filter((x: Staff) => x.id === id)[0]; if (!p) return;
   const c = company();
   S.staffCandidates = S.staffCandidates.filter((x: Staff) => x.id !== id);
-  p.companyId = c.id; p.base = c.hub; p.hired = '2026-10-28'; p.status = 'on duty';
+  p.companyId = c.id; p.base = c.hub; p.hired = dateStr(new Date()).slice(0, 10); p.status = 'on duty';
+  chargeHiring(p);
   if (p.role === 'fo') State.pilots.push({ id: p.id, name: p.name, rank: 'First officer', hoursMin: 1500 * 60, landings: 900, base: c.hub, salary: p.salary, rating: p.rating, status: 'standby', types: [], sex: p.sex, nat: p.nat, dob: p.dob, look: p.look, companyId: c.id, warnings: 0, rules: { maxDutyHrs: 10, maxLandingFpm: 500, ifrOnly: true, homeBaseReturn: true } } as any);
   else S.staff.push(p);
-  // keep the candidate list topped up
-  S.staffCandidates.push(makePerson('cand-' + p.role + uid(), p.role, '', ['EKVG', 'EKCH', 'PALH', 'EKBI'][Math.floor(Math.random() * 4)]));
+  // the hiring list refills over time (staffing.ts)
   closeAll(); Haptics.success(); Store.save(); refresh();
   toast(`${p.name} joined ${c.name}`, 'ok');
 };

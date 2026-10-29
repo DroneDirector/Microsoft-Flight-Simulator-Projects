@@ -170,7 +170,7 @@ function av3Frame(model: any, view: string, w: number, h: number) {
 }
 
 function av3Size(el: HTMLCanvasElement): number[] {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = Math.min((window.devicePixelRatio || 1) * uiScale(), 3);
   return [Math.round(el.clientWidth * dpr), Math.round(el.clientHeight * dpr)];
 }
 
@@ -452,7 +452,7 @@ function heroTick(now: number) {
     if (m) { if (Hero.model) Hero.stage.remove(Hero.model.root); Hero.model = m; Hero.key = key; Hero.stage.add(m.root); el.classList.add('in'); }
   }
   const model = Hero.model; if (!model) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = Math.round(el.clientWidth * dpr), h = Math.round(el.clientHeight * dpr);
+  const dpr = Math.min((window.devicePixelRatio || 1) * uiScale(), 3), w = Math.round(el.clientWidth * dpr), h = Math.round(el.clientHeight * dpr);
   if (!w || !h) return;
   if (el.width !== w || el.height !== h) Hero.r.setSize(w, h, false);
   // idle motion

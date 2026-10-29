@@ -37,7 +37,7 @@ function renderTopbar() {
   const div = c.divisions.filter(d => d.id === State.divisionId)[0];
   const b = State.bridge;
   const st = Link.status;
-  const linkTxt = st === 'connected' ? (Link.sim && !Link.sim.connected ? 'Linked, sim not running' : Link.via === 'wifi' ? 'Linked over Wi-Fi' : Link.via === 'usb' ? 'Linked over USB' : 'Linked via hotspot')
+  const linkTxt = st === 'connected' ? (Link.sim && !Link.sim.connected ? 'Linked, sim not running' : DESKTOP ? 'Linked on this PC' : Link.via === 'wifi' ? 'Linked over Wi-Fi' : Link.via === 'usb' ? 'Linked over USB' : 'Linked via hotspot')
     : st === 'unpaired' ? ((State as any).linkedOnce ? 'Link your PC' : 'Demo, link your PC') : 'Looking for your PC';
   const n = unreadCount();
   $('.topbar').innerHTML = `

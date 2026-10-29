@@ -63,7 +63,7 @@ const State = {
     muteAll: false, crewStyle: 'balanced' as 'natural' | 'balanced' | 'stylised', mapStyle: 'classic' as 'classic' | 'street' | 'satellite', purchaseSound: true, paySound: true, uiSounds: true, haptics: true, reduceMotion: false,
     units: 'imperial' as 'imperial' | 'metric', clock24: true,
     timeMode: 'real' as 'real' | 'sim', simRate: 'month' as 'week' | 'month' | 'quarter',
-    aiSpeed: '1', aiNotify: true,
+    aiSpeed: '1', aiNotify: true, conduct: true,
   },
   profiles: [
     { id: 'p1', pilotId: 'you', label: 'Main profile' },

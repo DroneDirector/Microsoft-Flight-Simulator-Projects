@@ -29,6 +29,12 @@ jobs:
         with:
           node-version: 22
 
+      - name: Build the app for the PC window
+        working-directory: Airline-Manager-Pro
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
       - name: Install
         run: npm install --no-audit --no-fund
 
@@ -51,6 +57,9 @@ jobs:
           Start-Sleep -Seconds 6
           $r = Invoke-RestMethod -Uri "http://127.0.0.1:47610/info"
           Write-Output ("PC app answered: " + $r.app + " " + $r.version)
+          $h = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:47610/"
+          if ($h.Content -notmatch "app.js") { Write-Output "The app page was not served"; Stop-Process -Id $p.Id -Force; exit 1 }
+          Write-Output "The app page is served"
           Stop-Process -Id $p.Id -Force
           if ($r.app -ne "Airline Manager Pro") { exit 1 }
 

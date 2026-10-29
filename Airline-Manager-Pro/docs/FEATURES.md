@@ -9,7 +9,7 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | Android app, landscape only (phones and tablets) | Built |
 | One app name in `app.config.json`, renamed everywhere from there | Built |
 | Interface written so it runs unchanged in a Windows app and the MSFS 2024 toolbar panel (next to ATC) | Built (foundation) |
-| Windows version | Planned |
+| Windows version: the whole app in its own window from the PC app, connected straight to the sim; window, borderless, full screen; any screen size including ultrawide; graphics card and sound output choice | Built |
 | In-sim toolbar panel | Planned |
 
 ## Linking with the simulator

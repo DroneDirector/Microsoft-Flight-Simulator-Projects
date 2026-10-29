@@ -15,6 +15,7 @@ const Backup = {
   tools(): any { return Store.native(); },
 
   init() {
+    if (DESKTOP) { this.folder = { set: true, name: 'Documents\\Airline Manager Pro', lastWrite: 0 }; return; }
     const T = this.tools();
     if (T && T.backupFolderInfo) T.backupFolderInfo().then((r: any) => { this.folder = r; }).catch(() => { /* older app */ });
   },
@@ -32,6 +33,11 @@ const Backup = {
     if (now || Date.now() - this._last > 3 * 60000) this.writeFolder();
   },
   writeFolder() {
+    if (DESKTOP && this._pending) {
+      const json = this._pending; this._pending = ''; this._last = Date.now();
+      fetch('/api/backup', { method: 'PUT', body: json }).then(r => r.json()).then(() => { if (this.folder) this.folder.lastWrite = Date.now(); if ($('#set-body')) rerenderSettingsBody(); }).catch(() => { /* PC app closed */ });
+      return;
+    }
     const T = this.tools(), json = this._pending; if (!T || !json) return;
     this._pending = ''; this._last = Date.now();
     T.backupFolderWrite({ data: json }).then(() => { if (this.folder) this.folder.lastWrite = Date.now(); if ($('#set-body')) rerenderSettingsBody(); })
@@ -91,6 +97,10 @@ const Backup = {
 
   /** First start with nothing saved (a new phone, a reinstall, cleared data): offer to bring the airline back. */
   offerRestoreOnFirstStart() {
+    if (DESKTOP && Store.wasEmpty) {
+      fetch('/api/backup').then(r => r.json()).then(r => { if (r && r.data) setTimeout(() => this.confirmRestore(r.data, 'Found in Documents\\Airline Manager Pro on this PC'), 1500); }).catch(() => { /* none */ });
+      return;
+    }
     if (!Store.wasEmpty || !this.tools()) return;
     setTimeout(() => openLayer('modal', `<div class="modal-head"><div><h2>Welcome to ${esc(APP.name)}</h2><small>Have you used the app before?</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
       <p class="lede">If you made backups on another phone or before reinstalling, you can bring your airline back now: settings, looks, staff, fleet, money and flight logs.</p>

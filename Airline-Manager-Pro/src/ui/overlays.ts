@@ -265,7 +265,7 @@ ACTIONS['fine-pay'] = el => {
   const ref = el.getAttribute('data-ref'); const f = State.fines[ref]; if (!f) return;
   const c = company(), from = c.balance;
   c.balance -= f.amount;
-  State.txns.unshift({ id: uid(), companyId: c.id, date: '2026-10-28', time: new Date().toTimeString().slice(0, 5), label: `Fine: ${f.title.toLowerCase()} (${f.flight})`, amount: -f.amount, kind: 'fine', reg: f.reg, flight: f.flight,
+  State.txns.unshift({ id: uid(), companyId: c.id, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Fine: ${f.title.toLowerCase()} (${f.flight})`, amount: -f.amount, kind: 'fine', reg: f.reg, flight: f.flight,
     route: f.airport + ' runway ' + f.runway, lines: [[f.authority, -f.amount]] });
   delete State.fines[ref];
   State.notices = State.notices.filter(n => n.ref !== ref);
@@ -309,7 +309,7 @@ ACTIONS['crash-decide'] = el => {
   const a = plane(l.reg);
   if (l.decision === 'registered') {
     a.status = 'grounded'; a.condition = 12;
-    State.issues.unshift({ id: uid(), reg: a.reg, title: 'Crash damage', detail: 'Airframe damaged in the crash. Major structural repair needed before the next flight.', source: 'Crash registered by you', severity: 'grounding', cost: 410000, days: 9, status: 'open', date: '2026-10-28' });
+    State.issues.unshift({ id: uid(), reg: a.reg, title: 'Crash damage', detail: 'Airframe damaged in the crash. Major structural repair needed before the next flight.', source: 'Crash registered by you', severity: 'grounding', cost: 410000, days: 9, status: 'open', date: dateStr(new Date()).slice(0, 10) });
     company(a.companyId).reputation -= 6;
   }
   State.notices = State.notices.filter(n => n.ref !== l.id);
@@ -337,7 +337,7 @@ ACTIONS['create-company'] = el => {
     const n = names[kind] || names.major;
     const id = uid();
     State.companies.push({ id, profileId, name: n[0], icao: n[1], callsign: n[0].split(' ')[0].toUpperCase(), hub: kind === 'bush' ? 'PALH' : 'EKVG', color: n[2], color2: '#1A2433',
-      balance: kind === 'bush' ? 1500000 : 25000000, reputation: 50, founded: '2026-10-28', kind, divisions: [] } as any);
+      balance: kind === 'bush' ? 1500000 : 25000000, reputation: 50, founded: dateStr(new Date()).slice(0, 10), kind, divisions: [] } as any);
     (State as any).coPilot[id] = { sex: 'f', id: '' };
     State.companyId = id; State.divisionId = 'all';
     applyCompanyTheme(true); Store.save(); go('ops'); renderTopbar();

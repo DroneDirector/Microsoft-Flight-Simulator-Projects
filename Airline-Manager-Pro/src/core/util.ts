@@ -38,6 +38,11 @@ function $all(sel: string, root?: ParentNode): HTMLElement[] {
   return Array.prototype.slice.call((root || document).querySelectorAll(sel));
 }
 
+/** Running as the Windows app (served by the PC app on this PC) rather than on the phone. */
+const DESKTOP = /^https?:$/.test(location.protocol) && /^(127\.0\.0\.1|localhost)$/.test(location.hostname) && location.port === '47610';
+/** How much the interface is scaled up on big screens (1 on the phone). */
+function uiScale(): number { return (window as any).__uiZoom || 1; }
+
 function reducedMotion(): boolean {
   return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 }

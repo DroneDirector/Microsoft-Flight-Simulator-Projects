@@ -3,7 +3,7 @@
 
 interface LookEditOpts {
   title: string; role: CrewRole; look: Look; identity?: { name: string; dob: string; nat: string };
-  sexOnly?: boolean; onAccept: (look: Look, identity?: { name: string; dob: string; nat: string }) => void;
+  sexOnly?: boolean; confirmName?: string; onAccept: (look: Look, identity?: { name: string; dob: string; nat: string }) => void;
 }
 
 let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string } = null;
@@ -137,7 +137,23 @@ ACTIONS['le-shuffle'] = () => {
 ACTIONS['le-accept'] = () => {
   leReadIdentity();
   const o = _le.o, look = dressed(_le.look, o.role), id = _le.id;
+  const before = JSON.stringify(dressed(o.look, o.role)), changed = JSON.stringify(look) !== before || (o.identity && JSON.stringify(id) !== JSON.stringify(o.identity));
+  const apply = () => { Haptics.success(); o.onAccept(look, id); };
+  // someone who already exists: ask first; "No" keeps the look they have now
+  if (o.confirmName && changed) {
+    confirmChange(`Change ${o.confirmName}'s appearance?`, 'The new look is used everywhere in the app from now on.', 'Yes, change it', 'No, keep the current look',
+      () => { closeAll(); apply(); }, () => { closeAll(); toast('Nothing changed', 'info'); });
+    return;
+  }
   closeTop();
-  Haptics.success();
-  o.onAccept(look, id);
+  apply();
 };
+
+/** "Are you sure?" before a change is applied. Yes applies it; No leaves everything as it was. */
+function confirmChange(title: string, body: string, yes: string, no: string, onYes: () => void, onNo: () => void) {
+  (window as any).__confirmYes = onYes; (window as any).__confirmNo = onNo;
+  openLayer('modal', `<div class="modal-head"><div><h2>${esc(title)}</h2><small>${esc(body)}</small></div></div>
+    <div class="modal-actions"><button class="btn ghost" data-act="confirm-no">${esc(no)}</button><button class="btn primary" data-act="confirm-yes">${icon('check')}${esc(yes)}</button></div>`, { cls: 'narrow', onClose: () => { (window as any).__confirmYes = null; } });
+}
+ACTIONS['confirm-yes'] = () => { const f = (window as any).__confirmYes; (window as any).__confirmYes = (window as any).__confirmNo = null; if (f) f(); };
+ACTIONS['confirm-no'] = () => { const f = (window as any).__confirmNo; (window as any).__confirmYes = (window as any).__confirmNo = null; if (f) f(); else closeTop(); };

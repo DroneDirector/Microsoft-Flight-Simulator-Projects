@@ -123,7 +123,7 @@ class WorldMap {
   resize() {
     const r = this.el.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.dpr = Math.min((window.devicePixelRatio || 1) * uiScale(), 3);
     this.w = r.width; this.h = r.height;
     for (const c of [this.cv, this.base]) { c.width = Math.round(this.w * this.dpr); c.height = Math.round(this.h * this.dpr); }
     this.cv.style.width = this.w + 'px'; this.cv.style.height = this.h + 'px';

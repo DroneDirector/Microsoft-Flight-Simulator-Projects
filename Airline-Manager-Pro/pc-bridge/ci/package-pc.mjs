@@ -1,7 +1,7 @@
 // Packages the PC app for Windows: one .exe (Node single executable) plus node-simconnect
 // as its own unmodified library folder next to it (LGPL-3.0: replaceable by the user).
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, existsSync, cpSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,6 +21,11 @@ const exe = join(pkg, 'AirlineManagerPro-PC.exe');
 copyFileSync(process.execPath, exe);
 run(`npx postject "${exe}" NODE_SEA_BLOB build/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2`);
 
+// the app itself (the same build as the phone's), shown in its own window on this PC
+const web = join(here, '..', 'www');
+if (!existsSync(join(web, 'index.html')) || !existsSync(join(web, 'app.js'))) throw new Error('Build the app first (npm run build in Airline-Manager-Pro)');
+cpSync(web, join(pkg, 'app'), { recursive: true, filter: s => !/index\.template\.html$/.test(s) });
+
 // node-simconnect and its dependencies, unmodified, in lib/
 const lib = join(pkg, 'lib');
 mkdirSync(lib, { recursive: true });
@@ -31,7 +36,15 @@ if (!existsSync(join(lib, 'node_modules', 'node-simconnect'))) throw new Error('
 
 writeFileSync(join(pkg, 'README.txt'), [
   `Airline Manager Pro PC app ${app.version}`, '',
-  'Links Microsoft Flight Simulator 2024 (and 2020) to the Airline Manager Pro Android app over your Wi-Fi.', '',
+  'The full Airline Manager Pro app for Windows, connected straight to Microsoft Flight Simulator 2024 (and 2020),',
+  'and the link to the Android app over your Wi-Fi. Use either or both.', '',
+  'The app on this PC',
+  '  Double-click AirlineManagerPro-PC.exe: the app opens in its own window and connects to Flight Simulator.',
+  '  Window, borderless or full screen, the size of everything, the graphics card and the sound output are in',
+  '  Settings > Display. F11 switches full screen. It fits any screen, including ultrawide, without stretching.',
+  '  Your airline is saved on this PC and backed up to Documents\\Airline Manager Pro.',
+  '  The window uses Microsoft Edge, which is part of Windows. Closed it? Type A and press Enter in the PC app.', '',
+  'The phone app',
   '1. Start Microsoft Flight Simulator.',
   '2. Double-click AirlineManagerPro-PC.exe. When Windows asks, allow it on private networks',
   '   (and on public networks too if you will use your phone\'s hotspot).',

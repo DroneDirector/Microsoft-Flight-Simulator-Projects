@@ -4,6 +4,7 @@
   ErrorLog.init();
   Store.load();
   Store.restoreIfEmpty();
+  if (DESKTOP) { Desk.init(); SETTINGS.unshift({ id: 'display', title: 'Display', icon: 'pc', items: [{ type: 'html', html: desktopSettingsHtml }] } as any); }
   loadKnownAirports();
   ensurePeople();
   ensurePayroll();
@@ -22,6 +23,7 @@
   scheduleBirthdayNotification();
   startConductClock();
   startCourtClock();
+  startStaffing();
   startProgress();
   startConditionClock();
   Link.init();

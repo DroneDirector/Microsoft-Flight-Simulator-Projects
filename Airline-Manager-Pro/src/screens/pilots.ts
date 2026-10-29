@@ -95,11 +95,12 @@ ACTIONS.hire = el => {
   p.status = 'standby'; p.base = company().hub; p.companyId = State.companyId;
   p.rules = { maxDutyHrs: 10, maxLandingFpm: 500, ifrOnly: true, homeBaseReturn: true };
   State.pilots.push(p);
+  chargeHiring(p);
   Haptics.success(); Store.save(); refresh(); toast(`${p.name} joined ${company().name}`, 'ok');
 };
 ACTIONS['edit-my-look'] = () => {
   const me: any = myPilot();
-  openLookEditor({ title: 'Your pilot', role: 'captain', look: me.look, identity: { name: me.name, dob: me.dob, nat: me.nat },
+  openLookEditor({ title: 'Your pilot', role: 'captain', look: me.look, identity: { name: me.name, dob: me.dob, nat: me.nat }, confirmName: 'your pilot',
     onAccept: (look, id) => {
       me.look = look; me.sex = look.sex; me.lookAccepted = true;
       if (id) { me.name = id.name; me.dob = id.dob; me.nat = id.nat; }

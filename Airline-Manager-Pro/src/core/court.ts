@@ -144,6 +144,7 @@ function courtPunishAirline(c: CourtCase, guilty: boolean) {
 /** Move every open case on to now (also catches up after the app was closed). */
 function courtAdvance() {
   const S: any = State; if (!S.cases) return;
+  if (!conductOn()) return;   // paused while conduct reports are switched off
   const now = Date.now(); let changed = false;
   for (const c of S.cases as CourtCase[]) {
     if (c.status !== 'open') continue;
