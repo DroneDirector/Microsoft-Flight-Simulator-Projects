@@ -113,6 +113,7 @@ Only damage the simulator can actually detect.
 | Real-world fares (distance, domestic or international, aircraft type, cabin mix), on-board sales, bags, cargo | Built |
 | Real-world costs per leg: fuel, landing, handling, navigation, maintenance by part, sales fees, catering, crew hotels, overheads | Built |
 | Landing messages open the flight's income and expenses | Built |
+| GSX Pro ground services charged at real-world rates as GSX completes them (setting); standard charges without GSX | Built |
 | Real-world years or simulated years at a chosen speed | Built (setting) |
 | Transactions list | Built |
 

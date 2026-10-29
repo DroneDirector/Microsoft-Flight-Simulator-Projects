@@ -72,6 +72,7 @@ const BURN_KG_H: { [cls: string]: number } = { ga: 30, bush: 120, turboprop: 650
 function onSimState(s: SimSnapshot) {
   Link.sim = s;
   try { paxOnState(s); } catch (e) { /* never stop the feed */ }
+  try { if (s && s.connected) gsxOnState(s, nearestKnownAirport(s.lon, s.lat, 8) || s.from || ((State.live.filter(f => f.id === 'me')[0] || {} as any).from) || ''); } catch (e) { /* never stop the feed */ }
   const b: any = State.bridge, S: any = State;
   if (!s || !s.connected) {
     b.sim = s ? 'Flight Simulator not running' : b.sim;
@@ -264,7 +265,7 @@ function finishLeg(e: FlightEvent) {
   try { conditionAfterFlight(a, sm.blockMin); } catch (er) { /* ignore */ }
   // money
   // real-world fares, on-board sales and costs (economics.ts), with the fuel actually burned in the sim
-  const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg);
+  const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg, gsxTakeLegFlag() && !!(State.settings as any).gsx);
   const now = new Date(), day = dateStr(now).slice(0, 10), time = dateStr(now).slice(11);
   const flight = c.icao + (100 + (_hashStr(a.reg) % 800));
   const rev = m.revenue, fuel = m.costs, fees = 0;

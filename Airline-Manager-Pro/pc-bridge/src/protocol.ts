@@ -21,7 +21,10 @@ export interface SimSnapshot {
   flapsIndex: number; gearDown: boolean;
   fuelKg: number; emptyKg: number; totalKg: number; mtowKg: number;
   stations: { name: string; kg: number }[];
-  gsx: { running: boolean; boardingState: number; paxBoarded: number; paxTotal: number; cargoPct: number };
+  // GSX Pro: passengers, and the state of each ground service (0 unknown, 1 available, 2 not available,
+  // 3 bypassed, 4 requested, 5 being done, 6 completed)
+  gsx: { running: boolean; boardingState: number; paxBoarded: number; paxTotal: number; cargoPct: number;
+    deboarding?: number; catering?: number; refueling?: number; departure?: number; deicing?: number; fuelHose?: boolean };
   approachAirport: string;
   wx: Weather;               // the weather around the aircraft, as the simulator has it
   phase: FlightPhase;

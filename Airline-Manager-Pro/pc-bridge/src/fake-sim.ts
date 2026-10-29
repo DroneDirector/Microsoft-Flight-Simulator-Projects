@@ -32,7 +32,8 @@ export class FakeSim extends EventEmitter implements SimSource {
     Object.assign(s, { connected: true, sim: 'MSFS 2024', inFlight: true, title: 'FenixA320 CFM - Atlantic North', atcId: 'OY-ANA', atcModel: 'A320', atcType: 'AIRBUS',
       engines: 2, emptyKg: 42600, mtowKg: 78000, t: 1700000000000 + t * 1000 });
     const boarded = Math.min(168, Math.floor(t / 2));
-    s.gsx = { running: !!this.o.gsx, boardingState: t < 340 ? 6 : 7, paxBoarded: this.o.gsx ? boarded : 0, paxTotal: 168, cargoPct: Math.min(100, t / 3.4) };
+    s.gsx = { running: !!this.o.gsx, boardingState: t < 340 ? 5 : 6, paxBoarded: this.o.gsx ? boarded : 0, paxTotal: 168, cargoPct: Math.min(100, t / 3.4),
+      catering: t < 120 ? 5 : 6, refueling: t < 60 ? 1 : t < 200 ? 5 : 6, departure: t < 440 ? 1 : t < 500 ? 5 : 6, deicing: 1, deboarding: 1, fuelHose: t >= 60 && t < 200 };
     s.stations = [{ name: 'Passengers zone A', kg: boarded * 42 }, { name: 'Passengers zone B', kg: boarded * 42 }, { name: 'Forward cargo', kg: 1150 }, { name: 'Aft baggage', kg: 2520 }];
     const fuel0 = 6840;
     const legNm = 726, cruiseKt = 450;
@@ -41,6 +42,7 @@ export class FakeSim extends EventEmitter implements SimSource {
     s.totalKg = s.emptyKg + s.fuelKg + s.stations.reduce((a, b) => a + b.kg, 0);
     const frac = (x: number) => Math.max(0, Math.min(1, x));
     const pos = (f: number) => ({ lat: EKVG.lat + (EKCH.lat - EKVG.lat) * f, lon: EKVG.lon + (EKCH.lon - EKVG.lon) * f });
+    if (t > T_TAXI_IN) s.gsx.deboarding = t < T_TAXI_IN + 20 ? 5 : 6;
     if (t > T_END) return null;
     let f = 0;
     s.onGround = true; s.parkingBrake = t < T_PARK || t > T_TAXI_IN; s.enginesRunning = t > T_PARK - 120 && t < T_TAXI_IN + 20 ? 2 : 0;

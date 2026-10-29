@@ -40,6 +40,9 @@ const MAIN_VARS: [string, string][] = [
 const GSX_VARS: [string, string][] = [
   ['L:FSDT_GSX_COUATL_STARTED', 'number'], ['L:FSDT_GSX_BOARDING_STATE', 'number'],
   ['L:FSDT_GSX_NUMPASSENGERS_BOARDING_TOTAL', 'number'], ['L:FSDT_GSX_NUMPASSENGERS', 'number'], ['L:FSDT_GSX_BOARDING_CARGO_PERCENT', 'number'],
+  // the other ground services, so the phone can charge what was actually used
+  ['L:FSDT_GSX_DEBOARDING_STATE', 'number'], ['L:FSDT_GSX_CATERING_STATE', 'number'], ['L:FSDT_GSX_REFUELING_STATE', 'number'],
+  ['L:FSDT_GSX_DEPARTURE_STATE', 'number'], ['L:FSDT_GSX_DEICING_STATE', 'number'], ['L:FSDT_GSX_FUELHOSE_CONNECTED', 'number'],
 ];
 
 export class SimConnectSource extends EventEmitter implements SimSource {
@@ -178,7 +181,8 @@ export class SimConnectSource extends EventEmitter implements SimSource {
       this.stationNames = n;
     } else if (r.requestID === Req.GSX) {
       const g: number[] = GSX_VARS.map(() => d.readFloat64());
-      s.gsx = { running: g[0] > 0.5, boardingState: Math.round(g[1]), paxBoarded: Math.round(g[2]), paxTotal: Math.round(g[3]), cargoPct: g[4] };
+      s.gsx = { running: g[0] > 0.5, boardingState: Math.round(g[1]), paxBoarded: Math.round(g[2]), paxTotal: Math.round(g[3]), cargoPct: g[4],
+        deboarding: Math.round(g[5]), catering: Math.round(g[6]), refueling: Math.round(g[7]), departure: Math.round(g[8]), deicing: Math.round(g[9]), fuelHose: g[10] > 0.5 };
     }
   }
 }

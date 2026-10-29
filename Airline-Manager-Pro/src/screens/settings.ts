@@ -32,7 +32,7 @@ const SETTINGS: SetSection[] = [
         + (pc ? `<div class="btn-row"><button class="btn ghost sm" data-act="link-forget">${icon('close')}Unpair ${esc(pc.name)}</button></div>` : '');
     } },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}The app links to the ${esc(APP.shortName)} PC app over your local network: put the phone and the PC with Flight Simulator on the same Wi-Fi, or connect the PC to your phone's hotspot to use mobile data.</p>` },
-    { type: 'toggle', key: 'gsx', label: 'Passenger numbers from GSX', hint: 'Reads boarded passengers from GSX Pro. Falls back to the app’s own numbers.' },
+    { type: 'toggle', key: 'gsx', label: 'I use GSX Pro', hint: 'Boarded passengers and the ground services you actually use in GSX (boarding, deboarding, catering, fuelling, pushback, de-icing) are taken from GSX and charged at real-world ground handling rates in Finance. Off, or without GSX: the app’s own passenger numbers and a standard handling and catering charge per flight.' },
   ] },
   { id: 'atc', title: 'ATC', icon: 'radio', items: [
     { type: 'choice', key: 'atcSource', label: 'ATC source', options: [['builtin', 'Built-in ATC'], ['beyondatc', 'BeyondATC']] },

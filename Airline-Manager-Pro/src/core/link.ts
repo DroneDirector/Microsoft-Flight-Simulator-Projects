@@ -17,7 +17,10 @@ interface SimSnapshot {
   lat: number; lon: number; altFt: number; aglFt: number; hdg: number; ias: number; gs: number; vsFpm: number; g: number; pitch: number;
   onGround: boolean; parkingBrake: boolean; enginesRunning: number; engines: number; flapsIndex: number; gearDown: boolean;
   fuelKg: number; emptyKg: number; totalKg: number; mtowKg: number; stations: { name: string; kg: number }[];
-  gsx: { running: boolean; boardingState: number; paxBoarded: number; paxTotal: number; cargoPct: number };
+  // GSX Pro: passengers, and the state of each ground service (0 unknown, 1 available, 2 not available,
+  // 3 bypassed, 4 requested, 5 being done, 6 completed)
+  gsx: { running: boolean; boardingState: number; paxBoarded: number; paxTotal: number; cargoPct: number;
+    deboarding?: number; catering?: number; refueling?: number; departure?: number; deicing?: number; fuelHose?: boolean };
   approachAirport: string; phase: string; from: string;
   wx?: SimWeather;              // weather at the aircraft from the simulator (PC app 0.5.1 and later)
 }

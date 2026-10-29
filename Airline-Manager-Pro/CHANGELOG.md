@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3 (2026-10-29)
+
+- "I use GSX Pro": GSX ground services (boarding, deboarding, catering, fuelling, pushback, de-icing) read by the PC app and charged at real-world rates when GSX completes them; standard charges without GSX
+
 ## 0.5.2 (2026-10-29)
 
 - The whole app on Windows, opened by the PC app in its own window (Microsoft Edge app mode), connected straight to the sim; window, borderless and full screen; scales to any screen size including ultrawide; graphics card and sound output choice; backups to Documents
