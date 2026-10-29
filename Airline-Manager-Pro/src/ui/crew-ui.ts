@@ -39,6 +39,7 @@ function openStaff(id: string) {
           <div><small>Rating</small><b>${(p.rating || 4).toFixed(1)} ★</b></div>
           <div><small>Conduct</small><b class="${p.warnings ? 'amber' : 'green'}">${p.warnings ? p.warnings + ' warning' + (p.warnings > 1 ? 's' : '') : 'Clean record'}</b></div>
         </div>
+        ${warnHistory(p)}
         <div class="modal-actions">
           ${editable ? `<button class="btn ghost" data-act="edit-staff-look" data-id="${p.id}">${icon('user')}Change look</button>` : ''}
           ${isCo ? `<button class="btn ghost" data-act="copilot-sex">${icon('swap')}Male or female</button>` : ''}
@@ -82,19 +83,33 @@ function dismissStaff(id: string, incId?: string) {
 }
 ACTIONS['go-hire'] = el => { const t = el.closest('.toast'); if (t) t.remove(); _pilotTab = 'hire'; _hireRole = el.getAttribute('data-id') || 'all'; closeAll(); go('pilots'); };
 
+/** Warnings so far, by severity: "2 light, 1 severe". */
+function warnSummary(p: any): string {
+  const w = p.warnLog || [], n = (k: string) => w.filter((x: any) => x.sev === k).length;
+  const old = (p.warnings || 0) - w.length;   // warnings given before severities were recorded
+  const parts = [n('severe') ? n('severe') + ' severe' : '', n('moderate') + Math.max(0, old) ? (n('moderate') + Math.max(0, old)) + ' moderate' : '', n('light') ? n('light') + ' light' : ''].filter(Boolean);
+  return parts.length ? parts.join(', ') : 'none';
+}
+function warnHistory(p: any): string {
+  const w = (p.warnLog || []).slice().reverse();
+  if (!w.length && !p.warnings) return '';
+  return `<div class="warn-hist"><small>Warnings: ${esc(warnSummary(p))}${p.learned ? `, improved after ${p.learned}` : ''}${p.stubborn ? `, ignored ${p.stubborn}` : ''}</small>
+    ${w.slice(0, 6).map((x: any) => `<span class="wh-row sev-${x.sev}"><i>${esc(x.sev)}</i>${esc(x.title)}<em>${esc(x.date)}</em></span>`).join('')}</div>`;
+}
+
 /* ---------- Conduct reports ---------- */
 const INCIDENTS: { [role: string]: string[][] } = {
-  fa: [['Late for duty', '{n} arrived late for the pre-flight briefing at {b}, and boarding started 15 minutes behind schedule.'],
-    ['Rude to a passenger', 'A passenger complained that {n} was dismissive and rude during the meal service.'],
-    ['Skipped a safety check', '{n} signed off the cabin safety check without checking the emergency equipment.'],
-    ['Argument with a colleague', '{n} had a loud argument with another crew member in the galley, in front of passengers.']],
-  mech: [['Missed a deadline', '{n} didn\'t finish a scheduled inspection on time, so an aircraft left {b} 40 minutes late.'],
-    ['Tools left on the apron', '{n} left a toolbox on the apron at {b}. Ramp staff found it before it caused damage.'],
-    ['Paperwork not signed', '{n} returned an aircraft to service without completing the maintenance paperwork.'],
-    ['Late for shift', '{n} turned up an hour late for the night shift at {b}.']],
-  fo: [['Late for the flight', '{n} reported for duty late, and the departure from {b} was delayed.'],
-    ['Checklist shortcuts', 'The flight data shows {n} skipped parts of the before-take-off checklist.'],
-    ['Unprofessional radio calls', 'ATC filed a complaint about {n}\'s radio manners on a recent flight.']],
+  fa: [['Late for duty', '{n} arrived late for the pre-flight briefing at {b}, and boarding started 15 minutes behind schedule.', 'light'],
+    ['Rude to a passenger', 'A passenger complained that {n} was dismissive and rude during the meal service.', 'moderate'],
+    ['Skipped a safety check', '{n} signed off the cabin safety check without checking the emergency equipment.', 'severe'],
+    ['Argument with a colleague', '{n} had a loud argument with another crew member in the galley, in front of passengers.', 'moderate']],
+  mech: [['Missed a deadline', '{n} didn\'t finish a scheduled inspection on time, so an aircraft left {b} 40 minutes late.', 'moderate'],
+    ['Tools left on the apron', '{n} left a toolbox on the apron at {b}. Ramp staff found it before it caused damage.', 'severe'],
+    ['Paperwork not signed', '{n} returned an aircraft to service without completing the maintenance paperwork.', 'severe'],
+    ['Late for shift', '{n} turned up an hour late for the night shift at {b}.', 'light']],
+  fo: [['Late for the flight', '{n} reported for duty late, and the departure from {b} was delayed.', 'light'],
+    ['Checklist shortcuts', 'The flight data shows {n} skipped parts of the before-take-off checklist.', 'severe'],
+    ['Unprofessional radio calls', 'ATC filed a complaint about {n}\'s radio manners on a recent flight.', 'light']],
 };
 const MISCONDUCT_P: { [k: string]: number } = { never: 0, rare: 0.02, normal: 0.07, often: 0.2 };
 
@@ -112,12 +127,12 @@ function maybeIncident() {
       : staffOf(cid, r as CrewRole)).filter((x: any) => !x.suspended);
     if (!pool.length) continue;
     const who: any = pool[Math.floor(Math.random() * pool.length)];
-    // well-rated staff behave: the chance falls as their rating rises
-    if (Math.random() > conductFactor(who.rating)) continue;
+    // well-rated staff behave: the chance falls as their rating rises, and with every warning they learned from
+    if (Math.random() > conductFactor(who.rating) * Math.pow(0.6, who.learned || 0)) continue;
     // very rarely it's a crime: police, the aviation authority and a court case
     if (maybeCriminal(who, r)) return;
     const t = INCIDENTS[r === 'pilot' ? 'fo' : r][Math.floor(Math.random() * INCIDENTS[r === 'pilot' ? 'fo' : r].length)];
-    const inc: Incident = { id: uid(), staffId: who.id, title: t[0], text: t[1].replace('{n}', who.name).replace('{b}', who.base), date: dateStr(new Date()).slice(0, 10), status: 'open' };
+    const inc: Incident = { id: uid(), staffId: who.id, sev: (t[2] || 'moderate') as any, title: t[0], text: t[1].replace('{n}', who.name).replace('{b}', who.base), date: dateStr(new Date()).slice(0, 10), status: 'open' };
     S.incidents.unshift(inc);
     // being late, skipping work and the like costs rating (and for mechanics, the quality of their work)
     who.rating = clamp(Math.round(((who.rating || 3.5) - 0.15) * 100) / 100, 1, 5);
@@ -142,7 +157,8 @@ function incidentPopup(id: string) {
       <div class="inc-main">
         <div class="modal-head"><div><small>Conduct report, ${esc(inc.date)}</small><h2>${esc(inc.title)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
         <p class="speech">${esc(inc.text)}</p>
-        <div class="inc-who"><b>${esc(p.name)}</b><small>${ROLE_NAMES[role]}, ${natLabel(p.nat)}, ${ageOf(p.dob)}, base ${esc(p.base)}</small><small class="${p.warnings ? 'amber' : ''}">${p.warnings ? `Already ${p.warnings} warning${p.warnings > 1 ? 's' : ''} on record` : 'No earlier warnings'}</small></div>
+        <div class="inc-who"><b>${esc(p.name)}</b><small>${ROLE_NAMES[role]}, ${natLabel(p.nat)}, ${ageOf(p.dob)}, base ${esc(p.base)}</small><small class="${p.warnings ? 'amber' : ''}">${p.warnings ? `Already ${p.warnings} warning${p.warnings > 1 ? 's' : ''} on record: ${esc(warnSummary(p))}` : 'No earlier warnings'}</small><small>This report: <b class="sev-${inc.sev || 'moderate'}">${esc(inc.sev || 'moderate')}</b></small></div>
+        ${warnHistory(p)}
         ${inc.status === 'open' ? `<div class="decide">
           <button class="decide-card" data-act="discipline" data-id="${inc.id}"><b>Discipline</b><small>A formal warning on their record. They stay on the team.</small></button>
           <button class="decide-card bad" data-act="dismiss-inc" data-id="${inc.id}"><b>Dismiss</b><small>They leave the company. You'll need to hire a replacement.</small></button>
@@ -152,7 +168,14 @@ function incidentPopup(id: string) {
 }
 ACTIONS.discipline = el => {
   const inc = (State as any).incidents.filter((x: Incident) => x.id === el.getAttribute('data-id'))[0]; if (!inc) return;
-  const p = staffById(inc.staffId); if (p) { p.warnings = (p.warnings || 0) + 1; p.rating = clamp(Math.round(((p.rating || 3.5) - 0.3) * 100) / 100, 1, 5); }
+  const p = staffById(inc.staffId);
+  if (p) {
+    p.warnings = (p.warnings || 0) + 1;
+    p.warnLog = (p.warnLog || []).concat([{ date: inc.date, title: inc.title, sev: inc.sev || 'moderate' }]);
+    p.rating = clamp(Math.round(((p.rating || 3.5) - (inc.sev === 'severe' ? 0.4 : inc.sev === 'light' ? 0.1 : 0.25)) * 100) / 100, 1, 5);
+    // most people take a warning to heart and become more careful; some don't, and it gets less likely with each warning
+    if (Math.random() < 0.75 - 0.12 * (p.warnings - 1)) p.learned = (p.learned || 0) + 1; else p.stubborn = (p.stubborn || 0) + 1;
+  }
   inc.status = 'disciplined';
   State.notices = State.notices.filter(n => n.ref !== inc.id);
   closeAll(); Sound.tick(); Store.save(); refresh();

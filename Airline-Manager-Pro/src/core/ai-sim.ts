@@ -98,16 +98,13 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   const t = acType(a.typeId), c = company(a.companyId), prof = aiProfile(F), blockMin = Math.round(prof.totalS / 60);
   if (p) { p.hoursMin += blockMin; p.landings += 1; }
   a.hoursMin += blockMin; a.cycles += 1; a.location = f.to; a.status = 'parked';
-  const nm = gcDistanceNm(apt(f.from).pos, apt(f.to).pos);
-  const route = State.routes.filter(r => r.companyId === c.id && r.legs.indexOf(f.from) >= 0 && r.legs.indexOf(f.to) >= 0)[0];
-  const yieldPax = route ? route.yieldPerPax : Math.round(40 + 0.22 * nm);
-  const rev = f.pax * yieldPax, burnH = BURN_KG_H[t.cls] || 2000;
+  // real-world fares, on-board sales and costs (economics.ts)
+  const burnH = BURN_KG_H[t.cls] || 2000;
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
-  const fuel = Math.round(burnKg * 0.85), fees = Math.round(f.pax * 6 + (t.price > 1e7 ? 900 : 120));
-  const net = rev - fuel - fees, d = new Date(at), ds = dateStr(d);
+  const m = legEconomics(a.typeId, f.from, f.to, f.pax, 0, blockMin, burnKg);
+  const net = m.net, d = new Date(at), ds = dateStr(d);
   State.txns.unshift({ id: uid(), companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.callsign} ${f.from} to ${f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
-    amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`,
-    lines: [[`${f.pax} passengers × ${money(yieldPax)}`, rev], [`Fuel, ${num(burnKg)} kg`, -fuel], ['Landing and handling', -fees]] } as any);
+    amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: m.lines } as any);
   c.balance += net;
   // keep the day's flown legs for the schedule (the last two days)
   const S: any = State; S.aiDay = (S.aiDay || []).filter((x: any) => x.end > Date.now() - 2 * 864e5);

@@ -263,17 +263,12 @@ function finishLeg(e: FlightEvent) {
   a.hoursMin += sm.blockMin; a.cycles += 1; a.location = to; a.status = grounded ? 'grounded' : 'parked';
   try { conditionAfterFlight(a, sm.blockMin); } catch (er) { /* ignore */ }
   // money
-  const route = State.routes.filter(r => r.companyId === c.id && r.legs.indexOf(from) >= 0 && r.legs.indexOf(to) >= 0)[0];
-  const yieldPax = route ? route.yieldPerPax : Math.round(40 + 0.22 * sm.distanceNm);
+  // real-world fares, on-board sales and costs (economics.ts), with the fuel actually burned in the sim
+  const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg);
   const now = new Date(), day = dateStr(now).slice(0, 10), time = dateStr(now).slice(11);
-  const rev = sm.pax * yieldPax + Math.round(sm.cargoKg * 1.3);
-  const fuel = Math.round(sm.fuelUsedKg * 0.85);
-  const fees = Math.round((t.price > 1e7 ? 8 : 3) * ((S.myLoad.mtowKg || 20000) / 1000) + sm.pax * 6);
   const flight = c.icao + (100 + (_hashStr(a.reg) % 800));
-  const tx = (label: string, amount: number, kind: Txn['kind'], lines: [string, number][]) => State.txns.unshift({ id: uid(), companyId: c.id, date: day, time, label, amount, kind, reg: a.reg, flight, route: `${from} → ${to}`, lines });
-  if (rev > 0) tx(`Ticket revenue ${from} to ${to}`, rev, 'revenue', [[`${sm.pax} passengers × ${money(yieldPax)}`, sm.pax * yieldPax], [`Cargo ${num(sm.cargoKg)} kg`, Math.round(sm.cargoKg * 1.3)]]);
-  if (fuel > 0) tx(`Fuel ${from} to ${to}`, -fuel, 'fuel', [[`${num(sm.fuelUsedKg)} kg burned`, -fuel]]);
-  tx(`Landing and handling at ${to}`, -fees, 'fees', [['Landing fee', -Math.round(fees * 0.6)], ['Handling', -Math.round(fees * 0.4)]]);
+  const rev = m.revenue, fuel = m.costs, fees = 0;
+  State.txns.unshift({ id: uid(), companyId: c.id, date: day, time, label: `${flight} ${from} to ${to}`, amount: m.net, kind: m.net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight, route: `${from} → ${to}`, lines: m.lines } as any);
   const before = c.balance;
   c.balance += rev - fuel - fees;
   // today's legs

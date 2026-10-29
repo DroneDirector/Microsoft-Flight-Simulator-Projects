@@ -99,6 +99,9 @@ ACTIONS['new-company'] = () => {
           <button class="choice" data-act="create-company" data-kind="${k[0]}">
             <div class="choice-art">${aircraftArt(k[3], { color: '#3FD0E8', color2: '#0D3A4A', ground: false })}</div>
             <b>${k[1]}</b><small>${k[2]}</small></button>`).join('')}
+        <button class="choice" data-act="real-airline">
+          <div class="choice-art">${aircraftArt('b738-pmdg', { color: '#F2C14E', color2: '#3A2A0A', ground: false })}</div>
+          <b>Fly for a real airline</b><small>Join Atlantic Airways, SAS, British Airways, Emirates and many more.</small></button>
       </div>
       <div class="field-row">
         <label class="tg-row"><span><b>Use my main pilot</b><small>Turn off to create a separate pilot profile for this company</small></span>${toggle('nc-pilot', true)}</label>
@@ -350,3 +353,5 @@ ACTIONS['create-company'] = el => {
       make(prid);
     } });
 };
+
+ACTIONS['real-airline'] = () => realAirlinePicker();

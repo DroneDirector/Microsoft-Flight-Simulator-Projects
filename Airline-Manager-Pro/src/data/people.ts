@@ -5,7 +5,7 @@ interface Staff {
   companyId: string; base: string; salary: number; hired: string; warnings: number; rating: number;
   status: 'on duty' | 'off' | 'resting';
 }
-interface Incident { id: string; staffId: string; title: string; text: string; date: string; status: 'open' | 'disciplined' | 'dismissed' }
+interface Incident { id: string; staffId: string; title: string; text: string; date: string; status: 'open' | 'disciplined' | 'dismissed'; sev?: 'light' | 'moderate' | 'severe' }
 
 // ISO 3166 country codes. Names come from the device's language data, flags from the code.
 const COUNTRY_CODES = ('AF AL DZ AD AO AG AR AM AU AT AZ BS BH BD BB BY BE BZ BJ BT BO BA BW BR BN BG BF BI CV KH CM CA CF TD CL CN CO KM CG CD CR CI HR CU CY CZ DK DJ DM DO EC EG SV GQ ER EE SZ ET FO FJ FI FR GA GM GE DE GH GR GL GD GT GN GW GY HT HN HK HU IS IN ID IR IQ IE IL IT JM JP JO KZ KE KI KW KG LA LV LB LS LR LY LI LT LU MO MG MW MY MV ML MT MH MR MU MX FM MD MC MN ME MA MZ MM NA NR NP NL NZ NI NE NG KP MK NO OM PK PW PS PA PG PY PE PH PL PT PR QA RO RU RW KN LC VC WS SM ST SA SN RS SC SL SG SK SI SB SO ZA KR SS ES LK SD SR SE CH SY TW TJ TZ TH TL TG TO TT TN TR TM TV UG UA AE GB US UY UZ VU VA VE VN YE ZM ZW').split(' ');
