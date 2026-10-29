@@ -4,12 +4,15 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebView;
 
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -25,6 +28,8 @@ import java.util.List;
  *   shade or system buttons straight away.
  * - The left and right edges are excluded from the system back gesture where Android allows it,
  *   and the back gesture itself is handled inside the app (it never quits by accident).
+ * - When Android shuts down the app's web view in the background to free memory, the app is
+ *   brought back instead of closing; everything is saved, so it opens where it was.
  */
 public class MainActivity extends BridgeActivity {
 
@@ -34,6 +39,13 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppToolsPlugin.class);
         keepCrashReports();
         super.onCreate(savedInstanceState);
+        if (getBridge() != null) getBridge().addWebViewListener(new WebViewListener() {
+            @Override
+            public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
+                runOnUiThread(() -> recreate());
+                return true;   // handled: don't close the app
+            }
+        });
         enterImmersive();
         protectEdges();
     }

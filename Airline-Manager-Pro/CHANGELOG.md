@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 (2026-10-29)
+
+- Lease aircraft: 1, 3 or 6 years, monthly rent, deposit, extend, buy out or return early; Leases in Finance
+- The app survives being minimised (web view shut down by Android is recovered), saves on leaving, and reopens where you left off within 12 hours
+- Split screen and pop-up windows, with a narrow-window layout
+- Airport view shows the real runways at once and swaps in the full layout; faster OpenStreetMap download; PC app answers at once without a simulator layout
+
 ## 0.5.9 (2026-10-29)
 
 - Real airport layouts from OpenStreetMap in the airport view (runways, taxiways, taxilanes, aprons, terminals, numbered stands), kept on the device; split runways joined, official lengths

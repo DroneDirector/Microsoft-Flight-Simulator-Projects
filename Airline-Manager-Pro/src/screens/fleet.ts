@@ -10,7 +10,7 @@ function fleetCard(a: Aircraft, i: number): string {
     <div class="ac-stage">${aircraftArt(a.typeId, { color: div ? div.color : c.color, color2: c.color2, reg: a.reg })}</div>
     <div class="ac-info">
       ${_blocked[a.reg] ? `<span class="crew-short">${icon('pilots')}${esc(_blocked[a.reg].join(', '))}</span>` : ''}
-      <div class="ac-row1"><b class="ac-reg">${esc(a.reg)}</b>${State.myReg[a.companyId] === a.reg ? '<span class="you-tag">You fly this</span>' : ''}${statusChip(a.status)}</div>
+      <div class="ac-row1"><b class="ac-reg">${esc(a.reg)}</b>${State.myReg[a.companyId] === a.reg ? '<span class="you-tag">You fly this</span>' : ''}${(a as any).lease ? '<span class="lease-tag">Leased</span>' : ''}${statusChip(a.status)}</div>
       <div class="ac-type">${esc(t.maker)} ${esc(t.model)}</div>
       <div class="ac-dev"><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span>${div ? `<span class="div-tag" style="--dc:${div.color}">${esc(div.name)}</span>` : ''}</div>
       <div class="ac-meta">
@@ -34,7 +34,7 @@ SCREENS.fleet = {
     return `
     <div class="screen-head">
       <div><h1>Fleet</h1><p class="sub">${all.length} aircraft, ${all.filter(a => a.status === 'flying').length} in the air, ${all.filter(a => a.status === 'grounded').length} grounded</p></div>
-      <button class="btn primary" data-act="go" data-screen="market">${icon('plus')}Buy aircraft</button>
+      <div class="btn-row nowrap"><button class="btn primary" data-act="go-market">${icon('plus')}Buy aircraft</button><button class="btn ghost" data-act="go-lease">${icon('key')}Lease aircraft</button></div>
     </div>
     <div class="filter-row">${classes.map(c => `<button class="fchip ${_fleetFilter === c[0] || (c[0] === 'types' && acType(_fleetFilter)) ? 'on' : ''}" data-act="fleet-filter" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>
     ${_fleetFilter === 'types' ? fleetTypesHtml(all)
@@ -64,7 +64,8 @@ function fleetTypesHtml(all: Aircraft[]): string {
 }
 
 ACTIONS['fleet-filter'] = el => { _fleetFilter = el.getAttribute('data-f'); Sound.tick(); refresh(); };
-ACTIONS['go-market'] = () => go('market');
+ACTIONS['go-market'] = () => { _mkMode = 'buy'; go('market'); };
+ACTIONS['go-lease'] = () => { _mkMode = 'lease'; go('market'); };
 
 ACTIONS['ac-detail'] = el => {
   const a = plane(el.getAttribute('data-reg')); if (!a) return;
@@ -87,6 +88,7 @@ ACTIONS['ac-detail'] = el => {
         <div><small>Range</small><b>${num(t.rangeNm)} nm</b></div>
         <div><small>Base</small><b>${esc(a.base)}</b></div>
       </div>
+      ${leasePanelHtml(a)}
       ${f ? `<p class="lede">${icon('fleet')}Flying ${esc(f.callsign)} from ${esc(apt(f.from).city)} to ${esc(apt(f.to).city)}${f.you ? ' with you at the controls' : ', ' + esc(pilot(f.pilotId).name)}.</p>` : ''}
       <div class="two-col">
         <div><h3>Maintenance</h3>${issues.length ? issues.map(i => `<button class="mini-row" data-act="open-issue" data-id="${i.id}">${statusChip(i.status)}<span>${esc(i.title)}</span><small>${esc(i.date)}</small></button>`).join('') : '<p class="muted">No damage on record.</p>'}</div>

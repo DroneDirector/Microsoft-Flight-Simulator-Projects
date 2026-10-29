@@ -134,6 +134,8 @@ Only damage the simulator can actually detect.
 | Airport view: runways, taxiways and stands with aircraft taxiing, taking off and landing | Built |
 | Real airport layouts from OpenStreetMap: taxiways, aprons, terminals and numbered stands | Built |
 | Repair time: instant, or 5 to 90 minutes depending on the job | Built |
+| Lease aircraft for 1, 3 or 6 years: monthly rent, extend, buy out or return early | Built |
+| Picks up where you left off after being minimised or closed; runs in split screen | Built |
 | Fly for a real-world airline (names and codes only, no logos) | Built |
 | Backup folder outside the app, backup files, restore on a fresh install | Built (Android) |
 | Full-screen mode, edge-swipe protection, back gesture never quits by accident | Built (Android) |

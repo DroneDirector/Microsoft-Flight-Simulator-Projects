@@ -32,7 +32,7 @@ interface Notice {
   title: string; body: string; time: string; read: boolean; ref?: string;
 }
 interface Txn {
-  id: string; date: string; label: string; amount: number; kind: 'revenue' | 'fuel' | 'crew' | 'maint' | 'fine' | 'purchase' | 'fees' | 'salary';
+  id: string; date: string; label: string; amount: number; kind: 'revenue' | 'fuel' | 'crew' | 'maint' | 'fine' | 'purchase' | 'lease' | 'fees' | 'salary';
   companyId?: string; time?: string; reg?: string; flight?: string; route?: string; personId?: string;
   lines?: [string, number][]; note?: string; link?: { kind: 'log' | 'issue' | 'staff' | 'aircraft'; id: string };
 }

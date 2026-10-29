@@ -41,7 +41,15 @@ class AirportView {
     this.cv = this.root.querySelector('canvas'); this.ctx = this.cv.getContext('2d');
     this.size(); this.bind();
     this.loop = this.loop.bind(this);
-    AirportLayouts.get(icao).then(L => { if (!this.alive) return; this.setLayout(L); });
+    this.fetching = navigator.onLine !== false || Link.status === 'connected';
+    AirportLayouts.get(icao, L => {
+      if (!this.alive) return;
+      if (!L) { this.fetching = false; if (this.L) this.setLayout(this.L, true); return; }   // nothing better: say so
+      this.setLayout(L, true); toast(L.source === 'sim' ? 'Layout from your simulator' : 'Real airport layout loaded', 'ok');
+    })
+      .then(L => { if (!this.alive) return; this.setLayout(L); if (L.source !== 'runways') this.fetching = false; this.labelSource();
+        // nothing better came within 45 seconds: stop saying it is coming
+        setTimeout(() => { if (this.alive && this.fetching) { this.fetching = false; this.labelSource(); } }, 45000); });
     this.raf = requestAnimationFrame(this.loop);
   }
 
@@ -60,15 +68,22 @@ class AirportView {
   }
   scr(x: number, y: number): number[] { return [this.w / 2 + (x - this.cx) * this.s, this.h / 2 - (y - this.cy) * this.s]; }
 
-  setLayout(L: AirportLayout) {
-    this.L = L;
-    const src = $('#apv-src');
-    if (src) src.textContent = L.source === 'sim' ? 'Layout from your simulator' : L.source === 'osm' ? 'Real airport layout · © OpenStreetMap contributors' : L.runways.length ? 'Real runways · taxiways and apron drawn schematically' : 'No runway data for this airport';
-    if (src) src.classList.toggle('sim', L.source !== 'runways');
-    this.buildGraph(); this.pickRunway(); this.fit();
+  fetching = false;
+  setLayout(L: AirportLayout, upgrade?: boolean) {
+    this.L = L; this.routes = {};
+    if (L.source !== 'runways') this.fetching = false;
+    this.labelSource();
+    this.buildGraph(); this.pickRunway();
+    if (!upgrade || !this.userMoved) { const keepS = upgrade ? this.s : 0; this.fit(); if (keepS && this.track) this.s = keepS; }
     const note = $('#apv-note');
-    if (note) setTimeout(() => { note.style.transition = 'opacity .6s'; note.style.opacity = '0'; }, 7000);
-    if (note) note.innerHTML = L.source !== 'runways' ? '' : `${icon('info')}<span>${Link.status === 'connected' ? 'The simulator has no detailed layout for this airport.' : 'Link the app to the simulator to see the real taxiways, aprons and stands.'}</span>`;
+    if (note) note.innerHTML = L.source !== 'runways' || this.fetching ? '' : `${icon('info')}<span>${navigator.onLine === false ? 'You\'re offline: showing the real runways. The full layout loads when you\'re back online.' : 'No detailed layout is available for this airport, so the real runways are shown.'}</span>`;
+    if (note && note.innerHTML) { note.style.opacity = '1'; setTimeout(() => { note.style.transition = 'opacity .6s'; note.style.opacity = '0'; }, 7000); }
+  }
+  labelSource() {
+    const src = $('#apv-src'), L = this.L; if (!src || !L) return;
+    src.innerHTML = L.source === 'sim' ? 'Layout from your simulator' : L.source === 'osm' ? 'Real airport layout · © OpenStreetMap contributors'
+      : this.fetching ? '<span class="apv-spin"></span>Real runways · getting the full layout…' : L.runways.length ? 'Real runways · taxiways and apron drawn simplified' : 'No runway data for this airport';
+    src.classList.toggle('sim', L.source !== 'runways');
   }
 
   /** Taxi network: from the simulator's taxi paths, or a schematic parallel taxiway and apron. */

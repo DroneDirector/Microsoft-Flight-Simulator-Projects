@@ -96,7 +96,7 @@ function setConduct(on: boolean) {
 }
 
 function startStaffing() {
-  payrollAdvance(true); poolAdvance();
-  setInterval(() => { payrollAdvance(); poolAdvance(); }, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { payrollAdvance(); poolAdvance(); } });
+  payrollAdvance(true); poolAdvance(); leaseAdvance(true);
+  setInterval(() => { payrollAdvance(); poolAdvance(); leaseAdvance(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { payrollAdvance(); poolAdvance(); leaseAdvance(); } });
 }

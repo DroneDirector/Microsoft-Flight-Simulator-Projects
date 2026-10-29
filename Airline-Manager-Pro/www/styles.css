@@ -1052,7 +1052,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 
 #rotate-hint { display: none; }
 @media (orientation: portrait) and (max-width: 700px) {
-  #rotate-hint { display: grid; place-items: center; position: fixed; inset: 0; z-index: 200; padding: 30px; text-align: center; background: var(--bg); color: var(--ink-2); font-size: 15px; }
+  html:not(.split) #rotate-hint { display: grid; place-items: center; position: fixed; inset: 0; z-index: 200; padding: 30px; text-align: center; background: var(--bg); color: var(--ink-2); font-size: 15px; }
 }
 
 /* ---------- Size adaptations ---------- */
@@ -1756,3 +1756,45 @@ button.coop-e:hover { border-color: var(--line-2); }
 .apv-row.away { border-style: dashed; cursor: default; } .apv-row.away b { color: var(--magenta); }
 .sel-pop { position: relative; } .sel-pop .sel-x { position: absolute; right: 8px; top: 8px; z-index: 2; width: 30px; height: 30px; }
 .sel-pop .card-h { padding-right: 34px; }
+
+/* Leasing */
+.mk-mode { display: inline-flex; margin: 0 0 12px; }
+.mk-mode button { display: inline-flex; align-items: center; gap: 6px; }
+.mk-mode .ic { width: 16px; height: 16px; }
+.mk-price small { font-size: 12px; font-weight: 500; color: var(--ink-2); }
+.lease-tag { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; color: var(--cyan); border: 1px solid rgba(63,208,232,.4); white-space: nowrap; }
+.lease-terms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 10px; }
+.lease-terms > div { padding: 8px 10px; border-radius: 11px; background: var(--bg-2); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+.lease-terms small { font-size: 11px; color: var(--ink-2); } .lease-terms b { font-size: 14px; } .lease-terms em { font-style: normal; font-size: 10.5px; color: var(--ink-3); }
+.lease-box { margin: 10px 0; padding: 12px 14px; border-radius: 14px; background: var(--bg-2); border: 1px solid rgba(63,208,232,.3); }
+.lease-box .lb-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.lease-box .lb-h .ic { color: var(--cyan); width: 18px; height: 18px; } .lease-box .lb-h small { color: var(--ink-2); font-size: 12px; }
+.btn-row.nowrap { flex-wrap: nowrap; }
+@media (max-width: 700px) { .lease-terms { grid-template-columns: 1fr; } }
+.buy-sum > div { display: flex; flex-direction: column; gap: 2px; } .buy-sum small { color: var(--ink-2); font-size: 12px; }
+.apv-spin { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 50%; border: 2px solid rgba(63,208,232,.3); border-top-color: var(--cyan); animation: apvSpin .8s linear infinite; }
+@keyframes apvSpin { to { transform: rotate(360deg); } }
+
+/* ---------- Narrow windows (split screen on a phone, pop-up windows) ---------- */
+@media (max-width: 560px) {
+  :root { --rail: 62px; --top: 48px; }
+  .rail-btn span { font-size: 8.5px; letter-spacing: -.01em; }
+  .w-seg { transform: scale(.82); transform-origin: right center; }
+  .w-seg span { padding-left: 6px; padding-right: 6px; }
+  .topbar { gap: 4px; padding-left: 8px; padding-right: 6px; }
+  .co-switch { flex: none; padding-right: 4px; }
+  .co-switch .co-text, .co-switch .co-chev { display: none; }
+  .link-pill { flex: none; padding: 0 9px; }
+  .link-pill span, .link-pill em { display: none; }
+  .sound-btn, .power-btn { display: none; }
+  .balance b { font-size: 15px; }
+  .screen { padding: 10px 10px 24px; }
+  .w-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; }
+  .w-legend { display: none; }
+  .ov-main { grid-template-columns: minmax(0, 1fr) !important; height: auto !important; }
+  .ov-main .ops-map { height: 300px !important; min-height: 240px; }
+  .screen-head { flex-wrap: wrap; gap: 8px; }
+  .screen-head .btn-row.nowrap { flex-wrap: wrap; }
+  .ac-grid, .mk-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .modal .panel, .layer .panel { max-width: calc(100vw - 16px); }
+}

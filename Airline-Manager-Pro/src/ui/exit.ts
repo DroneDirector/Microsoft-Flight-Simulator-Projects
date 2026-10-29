@@ -73,6 +73,7 @@ function farewell() {
   requestAnimationFrame(() => f.classList.add('on'));
   setTimeout(() => {
     const app = (window as any).Capacitor && (window as any).Capacitor.Plugins && (window as any).Capacitor.Plugins.App;
+    try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: State.screen })); } catch (e) { /* ignore */ }
     if (app && app.exitApp) { app.exitApp(); return; }
     // In a browser preview there is nothing to close: bring the app back.
     window.close();

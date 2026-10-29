@@ -81,8 +81,12 @@ const Store = {
   bind() {
     // after every tap that does something, when leaving the app, and every half minute for flight progress
     document.addEventListener('click', ev => { if ((ev.target as HTMLElement).closest('[data-act]')) this.soon(); }, true);
-    document.addEventListener('visibilitychange', () => { if (document.hidden) this.save(); });
-    window.addEventListener('pagehide', () => this.save());
+    // minimised or closed: save everything now and note where the app was, so that when it opens again
+    // (after it was swiped away, exited, or closed by Android to free memory) it is right there
+    const away = () => { this.save(); this.flushNative(); try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: State.screen })); } catch (e) { /* ignore */ } };
+    document.addEventListener('visibilitychange', () => { if (document.hidden) away(); });
+    setInterval(() => { if (!document.hidden) try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: State.screen })); } catch (e) { /* ignore */ } }, 15000);
+    window.addEventListener('pagehide', away);
     setInterval(() => this.save(), 30000);
   },
 };
