@@ -1,0 +1,4 @@
+classic maplibre=true
+classic after fly: zoom 11.00 scenes EKVG:runways
+satellite maplibre=true
+satellite after fly: zoom 15.04 scenes EKVG:runways
