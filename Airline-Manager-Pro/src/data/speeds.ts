@@ -43,9 +43,9 @@ function speedSpec(typeId: string): SpeedSpec {
 }
 
 /** Take-off and landing weights (tonnes) of a flight: empty aircraft, crew, passengers at 100 kg, cargo, fuel. */
-function flightWeights(typeId: string, pax: number, distNm: number): { tow: number; lw: number; zfw: number } {
+function flightWeights(typeId: string, pax: number, distNm: number, cargoT?: number): { tow: number; lw: number; zfw: number } {
   const S = speedSpec(typeId), t = acType(typeId) || AIRCRAFT[0];
-  const crew = t.seats > 100 ? 0.6 : t.seats > 20 ? 0.3 : 0.1, payload = Math.max(0, pax) * 0.1, cargo = payload * 0.15;
+  const crew = t.seats > 100 ? 0.6 : t.seats > 20 ? 0.3 : 0.1, payload = Math.max(0, pax) * 0.1, cargo = cargoT != null ? Math.max(0, cargoT) : payload * 0.15;
   const range = Math.max(200, t.rangeNm || 1000), share = clamp(distNm / range, 0, 1);
   const zfw = S.oew + crew + payload + cargo;
   // fuel for the trip plus reserves, within the maximum take-off weight

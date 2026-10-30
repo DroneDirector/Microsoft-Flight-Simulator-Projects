@@ -56,6 +56,7 @@ function flightCard(f: LiveFlight): string {
       ${coPilotChip()}
     </div>` : `<div class="fc-sync"><div class="sync-item">${icon('user')}<span><small>Flown by</small><b>${esc(pilot(f.pilotId).name)}</b></span></div>
       ${onBoardHtml(onBoardFlight(f))}</div>`}
+    <div class="fc-docs"><button class="btn ghost sm" data-act="pax-list" data-id="${esc(f.id)}">${icon('pax')}Passenger list</button><button class="btn ghost sm" data-act="loadsheet" data-id="${esc(f.id)}">${icon('fuel')}Loadsheet</button></div>
   </div>`;
 }
 

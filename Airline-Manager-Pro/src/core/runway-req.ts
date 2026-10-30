@@ -65,7 +65,7 @@ function runwayNeed(typeId: string, tow: number, lw: number, depElevFt: number, 
 
 /** Can this type fly from one airport to another with this many passengers? With `maxPax`, the most it
  *  can take when the runways limit the weight (a payload-limited flight). */
-function legRunwayCheck(typeId: string, from: string, to: string, pax?: number): { ok: boolean; why: string; maxPax: number; full: boolean } {
+function legRunwayCheck(typeId: string, from: string, to: string, pax?: number, cargoKg?: number): { ok: boolean; why: string; maxPax: number; full: boolean } {
   const t = acType(typeId) || AIRCRAFT[0], seats = pax == null ? t.seats : pax;
   if (!World.runways) return { ok: true, why: '', maxPax: seats, full: true };
   const A: any = apt(from), B: any = apt(to); if (!A || !B) return { ok: true, why: '', maxPax: seats, full: true };
@@ -78,7 +78,7 @@ function legRunwayCheck(typeId: string, from: string, to: string, pax?: number):
     }
   }
   const dist = gcDistanceNm(A.pos, B.pos);
-  const fits = (p: number) => { const W = flightWeights(typeId, p, dist), need = runwayNeed(typeId, W.tow, W.lw, A.elev || 0, B.elev || 0); return { need, ok: (!rd || need.to <= rd.len) && (!ra || need.ld <= ra.len) }; };
+  const fits = (p: number) => { const W = flightWeights(typeId, p, dist, cargoKg != null ? cargoKg / 1000 : undefined), need = runwayNeed(typeId, W.tow, W.lw, A.elev || 0, B.elev || 0); return { need, ok: (!rd || need.to <= rd.len) && (!ra || need.ld <= ra.len) }; };
   const full = fits(seats);
   if (full.ok) return { ok: true, why: '', maxPax: seats, full: true };
   // the most passengers that still fit both runways

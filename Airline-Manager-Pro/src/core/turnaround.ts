@@ -88,6 +88,21 @@ function aiPlannedLoad(n: any): { pax: number; paxJ: number; paxF: number; cargo
   try { n.ld = test || n.ferry ? { pax: 0, paxJ: 0, paxF: 0, cargoKg: 0 } : n.job ? Jobs.loadFor(n.job) : aiLoad(n.reg, n.from, n.to, n.leg || 0); }
   catch (e) { n.ld = { pax: 0, paxJ: 0, paxF: 0, cargoKg: 0 }; }
   // a runway that limits the weight limits the passengers
-  try { const a = plane(n.reg), rc = a ? legRunwayCheck(a.typeId, n.from, n.to, n.ld.pax) : null; if (rc && rc.maxPax < n.ld.pax) { const k = rc.maxPax / Math.max(1, n.ld.pax); n.ld = Object.assign({}, n.ld, { pax: rc.maxPax, paxJ: Math.floor((n.ld.paxJ || 0) * k), paxF: Math.floor((n.ld.paxF || 0) * k) }); } } catch (e) { /* ignore */ }
+  // the loaders keep within the runway's weight limit: cargo comes off first, then passengers
+  try {
+    const a = plane(n.reg), L = n.ld;
+    if (a) {
+      const cargo = L.cargoKg || 0, full = legRunwayCheck(a.typeId, n.from, n.to, L.pax, cargo);
+      if (full.maxPax < L.pax) {
+        if (cargo && legRunwayCheck(a.typeId, n.from, n.to, L.pax, 0).maxPax >= L.pax) {
+          let lo = 0, hi = cargo; while (hi - lo > 50) { const m = (lo + hi) / 2; if (legRunwayCheck(a.typeId, n.from, n.to, L.pax, m).maxPax >= L.pax) lo = m; else hi = m; }
+          n.ld = Object.assign({}, L, { cargoKg: Math.floor(lo / 10) * 10, offloadKg: cargo - Math.floor(lo / 10) * 10 });
+        } else {
+          const rc = legRunwayCheck(a.typeId, n.from, n.to, L.pax, 0), k = rc.maxPax / Math.max(1, L.pax);
+          n.ld = Object.assign({}, L, { cargoKg: 0, offloadKg: cargo, pax: rc.maxPax, paxJ: Math.floor((L.paxJ || 0) * k), paxF: Math.floor((L.paxF || 0) * k), offloadPax: L.pax - rc.maxPax });
+        }
+      }
+    }
+  } catch (e) { /* ignore */ }
   return n.ld;
 }

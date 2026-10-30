@@ -42,6 +42,8 @@ function aiUpdate(f: LiveFlight, now: number) {
   if (fe.hold) { if (fe.hold.kind !== 'gate') noteHold(F, fe.hold); f.phase = holdLabel(fe.hold); if (fe.hold.kind === 'gate' || fe.hold.kind === 'runway') f.gs = 0; }
   const extra = holdsLeft(F, fe);
   F.leftNm = q.left; F.toGoS = (q.toGoS + extra) / (F.spd || 1); F.routeNm = p.routeNm;
+  // the boarding scan, while the flight is still at the gate (only while you are watching)
+  if (!F.scanned && el < 600 && now - F.depAt < 15 * 60000) { F.scanned = true; try { boardingScan(f); } catch (e) { /* ignore */ } }
   const td = p.pts.filter(x => x.ph === 'Landing')[0];
   F.toTdS = td ? (Math.max(0, td.s - el) + extra) / (F.spd || 1) : F.toGoS;
   // the arrival countdown runs from take-off to touchdown on the planned air time; holds after take-off

@@ -92,6 +92,7 @@
     "src/core/flight-trace.ts",
     "src/core/turnaround.ts",
     "src/core/runway-req.ts",
+    "src/core/manifest.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/main.ts"
