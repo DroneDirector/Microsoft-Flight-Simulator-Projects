@@ -2085,3 +2085,4 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .sel-pop .fc-top { cursor: grab; touch-action: none; }
 .dragging .sel-pop { animation: none; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
 .dragging .sel-pop .fc-top { cursor: grabbing; }
+.n-received { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
