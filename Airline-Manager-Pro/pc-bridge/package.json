@@ -5,7 +5,7 @@
   "main": "dist/cli.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node test/tracker.test.js && node test/link.test.js",
+    "test": "node test/tracker.test.js && node test/replay.test.js && node test/link.test.js",
     "demo": "node dist/cli.js --demo 30"
   },
   "dependencies": {

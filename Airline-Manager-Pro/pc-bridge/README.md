@@ -15,6 +15,12 @@ Download `AirlineManagerPro-PC-<version>.zip` from Releases, unzip it, and run `
 
 Windows may warn about an unrecognised app the first time, because the test builds aren't code-signed yet: choose **More info → Run anyway**. Allow it on **private networks** when the firewall asks.
 
+## Sim check and flight recordings
+
+- `AirlineManagerPro-PC.exe --check` (or **Check Flight Simulator.cmd**): with a flight loaded, reads everything the app uses from the simulator and the loaded aircraft, marks anything missing, refused or out of place, and saves the report to `Documents\Airline Manager Pro\Diagnostics`.
+- Every flight is recorded to `Documents\Airline Manager Pro\Recordings` as the simulator sent it (`--no-record` to turn it off). `--replay <file> [speed]` (or drag the file onto **Play back a flight.cmd**) plays it back to the phone as if the simulator were flying it.
+- Recordings copied into `test/recordings/` are played through the flight tracker by `npm test`; a `.expect.json` next to one holds the results it must give.
+
 ## Develop
 
 ```bash

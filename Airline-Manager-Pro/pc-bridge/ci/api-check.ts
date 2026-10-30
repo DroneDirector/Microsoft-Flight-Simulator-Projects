@@ -4,7 +4,7 @@ import { open, Protocol, SimConnectDataType, SimConnectConstants, SimConnectPeri
 
 async function check() {
   const { recvOpen, handle } = await open('check', Protocol.KittyHawk);
-  void Protocol.FSX_SP2; void recvOpen.applicationName;
+  void Protocol.FSX_SP2; void Protocol.SunRise; void recvOpen.applicationName; void recvOpen.applicationVersionMinor; void recvOpen.simConnectVersionMajor; void recvOpen.simConnectBuildMinor;
   handle.addToDataDefinition(1, 'PLANE LATITUDE', 'degrees', SimConnectDataType.FLOAT64);
   handle.addToDataDefinition(1, 'TITLE', null, SimConnectDataType.STRING256);
   handle.addToDataDefinition(1, 'ATC ID', null, SimConnectDataType.STRING32);
@@ -16,7 +16,7 @@ async function check() {
   handle.on('simObjectData', r => { const d = r.data; d.readFloat64(); d.readString256(); d.readString32(); d.readString64(); void r.requestID; });
   handle.on('event', e => { void e.clientEventId; void e.data; });
   handle.on('airportList', r => { r.airports.forEach(a => { void a.icao; void a.latitude; void a.longitude; }); });
-  handle.on('quit', () => {}); handle.on('close', () => {}); handle.on('exception', x => { void x.exception; void x.sendId; void x.index; });
+  handle.on('quit', () => {}); handle.on('close', () => {}); handle.on('exception', x => { void x.exception; void x.sendId; void x.index; void x.exceptionName; });
   handle.close();
 }
 void check;

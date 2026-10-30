@@ -67,6 +67,12 @@ export class SimConnectSource extends EventEmitter implements SimSource {
   private all: Airport[] = null;
   private allParts: Airport[] = [];
   private allWait: ((l: Airport[]) => void)[] = [];
+  /** what each request sent to SimConnect was, so an exception can name the variable it's about */
+  private sent: { [sendId: number]: string } = {};
+  /** variables or requests the simulator refused this session (name → reason) */
+  refused: { [name: string]: string } = {};
+  /** protocol and version the simulator reported when connecting */
+  info = { protocol: '', appName: '', appVersion: '', simConnectVersion: '' };
 
   constructor(lib: any) { super(); this.lib = lib; }
 
@@ -130,16 +136,22 @@ export class SimConnectSource extends EventEmitter implements SimSource {
     this.snap.sim = /2024/.test(simName) || (res.recvOpen && res.recvOpen.applicationVersionMajor >= 12) ? 'MSFS 2024' : simName.replace('KittyHawk', 'MSFS 2020');
     this.emit('status', true, `Connected to ${this.snap.sim}`);
 
+    const ro = res.recvOpen || {};
+    this.info = { protocol: String((L.Protocol && L.Protocol[this.proto]) || this.proto), appName: String(ro.applicationName || ''),
+      appVersion: [ro.applicationVersionMajor, ro.applicationVersionMinor, ro.applicationBuildMajor, ro.applicationBuildMinor].filter((x: any) => x != null).join('.'),
+      simConnectVersion: [ro.simConnectVersionMajor, ro.simConnectVersionMinor, ro.simConnectBuildMajor, ro.simConnectBuildMinor].filter((x: any) => x != null).join('.') };
+    this.sent = {}; this.refused = {};
+    const def = (d: number, n: string, u: string, t: any) => { try { this.sent[h.addToDataDefinition(d, n, u, t)] = n; } catch (e) { this.refused[n] = String(e && (e as any).message || e); } };
     const F64 = L.SimConnectDataType.FLOAT64;
-    for (const [n, u] of MAIN_VARS) h.addToDataDefinition(Def.MAIN, n, u, F64);
-    h.addToDataDefinition(Def.TEXT, 'TITLE', null, L.SimConnectDataType.STRING256);
-    h.addToDataDefinition(Def.TEXT, 'ATC ID', null, L.SimConnectDataType.STRING32);
-    h.addToDataDefinition(Def.TEXT, 'ATC MODEL', null, L.SimConnectDataType.STRING32);
-    h.addToDataDefinition(Def.TEXT, 'ATC TYPE', null, L.SimConnectDataType.STRING32);
-    h.addToDataDefinition(Def.TEXT, 'GPS APPROACH AIRPORT ID', null, L.SimConnectDataType.STRING32);
-    for (let i = 1; i <= MAX_STATIONS; i++) h.addToDataDefinition(Def.STATIONS, `PAYLOAD STATION WEIGHT:${i}`, 'pounds', F64);
-    for (let i = 1; i <= MAX_STATIONS; i++) h.addToDataDefinition(Def.STATION_NAMES, `PAYLOAD STATION NAME:${i}`, null, L.SimConnectDataType.STRING64);
-    for (const [n, u] of GSX_VARS) h.addToDataDefinition(Def.GSX, n, u, F64);
+    for (const [n, u] of MAIN_VARS) def(Def.MAIN, n, u, F64);
+    def(Def.TEXT, 'TITLE', null, L.SimConnectDataType.STRING256);
+    def(Def.TEXT, 'ATC ID', null, L.SimConnectDataType.STRING32);
+    def(Def.TEXT, 'ATC MODEL', null, L.SimConnectDataType.STRING32);
+    def(Def.TEXT, 'ATC TYPE', null, L.SimConnectDataType.STRING32);
+    def(Def.TEXT, 'GPS APPROACH AIRPORT ID', null, L.SimConnectDataType.STRING32);
+    for (let i = 1; i <= MAX_STATIONS; i++) def(Def.STATIONS, `PAYLOAD STATION WEIGHT:${i}`, 'pounds', F64);
+    for (let i = 1; i <= MAX_STATIONS; i++) def(Def.STATION_NAMES, `PAYLOAD STATION NAME:${i}`, null, L.SimConnectDataType.STRING64);
+    for (const [n, u] of GSX_VARS) def(Def.GSX, n, u, F64);
 
     const USER = L.SimConnectConstants.OBJECT_ID_USER, P = L.SimConnectPeriod;
     // about 6–10 times a second, so touchdowns and G spikes aren't missed
@@ -181,7 +193,9 @@ export class SimConnectSource extends EventEmitter implements SimSource {
     h.on('exception', (x: any) => {
       const key = `${x && x.exception}/${x && x.sendId}/${x && x.index}`;
       if (seenEx[key]) return; seenEx[key] = true;
-      this.emit('note', `SimConnect exception ${x && x.exception} (send ${x && x.sendId}, index ${x && x.index})`);
+      const what = x && this.sent[x.sendId], why = (x && x.exceptionName) || `exception ${x && x.exception}`;
+      if (what) this.refused[what] = why;
+      this.emit('note', what ? `Flight Simulator refused ${what}: ${why}` : `SimConnect ${why} (send ${x && x.sendId}, index ${x && x.index})`);
     });
     const lost = () => {
       if (this.handle !== h) return;
