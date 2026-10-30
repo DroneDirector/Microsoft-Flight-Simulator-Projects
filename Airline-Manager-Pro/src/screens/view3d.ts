@@ -38,7 +38,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
   V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false;
-  V3d.open = true; V3d.target = id; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
+  V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0;
   const root = document.createElement('div'); root.className = 'v3d';
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
@@ -179,17 +179,36 @@ function v3dCentre(f: LiveFlight, pos: number[]): { pos: number[]; icao: string 
 }
 
 /** Where a flight is, in lon/lat with heading and altitude above the sea (m), from the airport scene when close. */
-function v3dWhere(f: LiveFlight): { lon: number; lat: number; hdg: number; altM: number; onGround: boolean; phase: string } {
+function v3dWhere(f: LiveFlight): { lon: number; lat: number; hdg: number; altM: number; onGround: boolean; phase: string; vs?: number; turn?: number; smooth?: boolean } {
   const sc = V3d.aptScene;
   if (sc && sc.L && sc.planes) {
     const p: ApvPlane = sc.planes.filter((x: ApvPlane) => x.id === f.id)[0];
-    if (p) { const ll = sc.lonLat(p.x, p.y); return { lon: ll[0], lat: ll[1], hdg: p.hdg, altM: (sc.L.alt || 0) + (p.alt || 0) * 0.3048, onGround: (p.alt || 0) < 3, phase: p.phase }; }
+    if (p) { const ll = sc.lonLat(p.x, p.y); return { lon: ll[0], lat: ll[1], hdg: p.hdg, altM: (sc.L.alt || 0) + (p.alt || 0) * 0.3048, onGround: (p.alt || 0) < 3, phase: p.phase, smooth: true }; }
   }
   const F: any = f;
-  let pos: number[], hdg = f.hdg || 0;
+  let pos: number[], hdg = f.hdg || 0, altFt = f.alt || 0, vs: number = F.vs || 0, turn = 0, smooth = false;
   if (f.real && f.pos) pos = f.pos;
-  else { const pp = F.depAt ? flightPathPos(f) : null; if (pp) { pos = pp.pos; hdg = pp.hdg; } else { const A = apt(f.from), B = apt(f.noDest ? f.from : f.to); pos = gcInterpolate(A.pos, B.pos, f.t); hdg = geoBrg(A.pos, B.pos); } }
-  return { lon: pos[0], lat: pos[1], hdg, altM: (f.alt || 0) * 0.3048, onGround: (f.alt || 0) < 50, phase: String(f.phase || '') };
+  else {
+    const now = Date.now(), pp = F.depAt ? flightPathPos(f, now) : null;
+    if (pp) {
+      pos = pp.pos; hdg = pp.hdg; smooth = true;
+      // every frame from the flight's own profile: the height (not the once-a-second value), the climb or
+      // descent, and a heading and turn rate taken over a few seconds so corners in the route are flown smoothly
+      try {
+        const prof = F.coop ? flightProfile(F.typeId, f.from, f.to, F.depAt) : aiProfile(F);
+        const at = (ms: number) => profileAt(prof, flightEl(F, ms).el);
+        const q0 = at(now - 2000), q1 = at(now), q2 = at(now + 2000);
+        altFt = q1.alt; vs = (q2.alt - q0.alt) / 4 * 60;
+        const a = flightPathPos(f, now - 4000), b = flightPathPos(f, now + 4000);
+        if (a && b && gcDistanceNm(a.pos, b.pos) > 0.01) {
+          hdg = geoBrg(a.pos, b.pos);
+          const a2 = flightPathPos(f, now - 8000), b2 = flightPathPos(f, now + 8000);
+          if (a2 && b2) { const h1 = geoBrg(a2.pos, pos), h2 = geoBrg(pos, b2.pos); turn = (((h2 - h1) + 540) % 360 - 180) / 8; }   // degrees a second
+        }
+      } catch (e) { /* the once-a-second values */ }
+    } else { const A = apt(f.from), B = apt(f.noDest ? f.from : f.to); pos = gcInterpolate(A.pos, B.pos, f.t); hdg = geoBrg(A.pos, B.pos); }
+  }
+  return { lon: pos[0], lat: pos[1], hdg, altM: altFt * 0.3048, onGround: altFt < 50, phase: String(f.phase || ''), vs, turn, smooth };
 }
 
 /* ---------- the ground: see v3d-terrain.ts ---------- */
@@ -306,13 +325,15 @@ function v3dLoop(now: number) {
     const y = w.onGround ? ground : Math.max(ground + 2, w.altM);
     P.tgt.set(q[0], y - v3dCurve(q[0], q[1]), q[1]);
     if (!P.pos) P.pos = P.tgt.clone();
-    // glide to the new position (positions update a few times a second)
-    const k = Math.min(1, dt * 4);
-    if (P.pos.distanceTo(P.tgt) > 3000) P.pos.copy(P.tgt); else P.pos.lerp(P.tgt, k);
+    // a hired pilot's flight is worked out every frame, so it is placed exactly; your own flight's position
+    // comes from the simulator a few times a second, so it glides to each new one
+    if (w.smooth || P.pos.distanceTo(P.tgt) > 3000) P.pos.copy(P.tgt); else P.pos.lerp(P.tgt, Math.min(1, dt * 4));
     let dh = ((w.hdg - P.hdg + 540) % 360) - 180;
-    P.hdg = (P.hdg + dh * Math.min(1, dt * 2.5) + 360) % 360;
-    P.bank += (clamp(-dh * 1.6, -25, 25) * (w.onGround ? 0 : 1) - P.bank) * Math.min(1, dt * 2);
-    const vs = (g as any).vs || 0, gs = Math.max(60, g.gs || 140);
+    P.hdg = w.smooth ? (P.hdg + dh * Math.min(1, dt * 6) + 360) % 360 : (P.hdg + dh * Math.min(1, dt * 2.5) + 360) % 360;
+    // bank from the rate of turn (a standard-rate turn, 3° a second, is about 25° of bank in an airliner)
+    const wantBank = w.smooth && w.turn != null ? clamp(w.turn * 8, -25, 25) : clamp(dh * 1.6, -25, 25);
+    P.bank += (wantBank * (w.onGround ? 0 : 1) - P.bank) * Math.min(1, dt * 1.2);
+    const vs = w.vs != null ? w.vs : (g as any).vs || 0, gs = Math.max(60, g.gs || 140);
     P.pitch += (clamp(Math.atan2(vs / 196.85, gs * 0.5144) / D2R + (w.onGround ? 0 : 2.5), -6, 15) - P.pitch) * Math.min(1, dt * 1.5);
     // flaps and gear by phase (the type's own speeds in flight-configs when available)
     const ph = w.phase.toLowerCase();
@@ -347,11 +368,14 @@ function v3dLoop(now: number) {
       V3d.cam.fov = clamp(2 * Math.atan(s.span * 2.2 / d) / D2R, 3, 55); V3d.cam.updateProjectionMatrix();
     } else {
       const d = v3dDist(), base = V3d.mode === 'chase' ? Math.atan2(fwd.x, fwd.z) + Math.PI : Math.atan2(fwd.x, fwd.z) + Math.PI / 2;
-      const a = base + V3d.yaw, el = V3d.pitch;
+      // the camera is fixed to the aircraft; only its angle around it follows the heading, gently
+      const VA: any = V3d; if (VA.camBase == null) VA.camBase = base;
+      VA.camBase += ((((base - VA.camBase) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI) * Math.min(1, dt * 2.5);
+      const a = VA.camBase + V3d.yaw, el = V3d.pitch;
       const want = centre.clone().add(new T.Vector3(Math.sin(a) * Math.cos(el) * d, Math.sin(el) * d, Math.cos(a) * Math.cos(el) * d));
       const ll = v3dLonLat(want.x, want.z), gr = v3dGround(ll[0], ll[1]) + 3 - v3dCurve(want.x, want.z);
       if (want.y < gr) want.y = gr;
-      V3d.cam.position.lerp(want, Math.min(1, dt * 5));
+      V3d.cam.position.copy(want);
       V3d.cam.lookAt(centre);
       if (V3d.cam.fov !== 50) { V3d.cam.fov = 50; V3d.cam.updateProjectionMatrix(); }
     }
