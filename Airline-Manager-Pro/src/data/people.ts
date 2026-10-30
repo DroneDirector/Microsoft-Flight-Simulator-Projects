@@ -114,6 +114,7 @@ function ensurePeople() {
     add('atn', 'fa', 28, ['EKVG', 'EKCH']); add('atn', 'mech', 24, ['EKVG', 'EKCH']);
     add('ndc', 'fa', 3, ['EKBI']); add('ndc', 'mech', 3, ['EKBI']);
     add('rba', 'mech', 2, ['PALH']);
+    add('atn', 'ground', 16, ['EKVG', 'EKCH']); add('ndc', 'ground', 4, ['EKBI']); add('rba', 'ground', 2, ['PALH']);
   }
   if (!S.staffCandidates) {
     S.staffCandidates = [];

@@ -292,6 +292,10 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       if (a && p && p.status !== 'off' && rep.length) { const end = Math.max.apply(null, rep.map(i => (i.startedAt || n.depAt) + (i.durMin || 30) * 60000)); wait(Math.max(n.depAt, end) + 10 * 60e3, 'Repair in the hangar'); continue; }
       // the weather, when it is happening now (catching up on hours the app was closed, today's weather says nothing)
       if (a && ev.at > now - 30 * 60e3) { const wv = wxDepartureBlock(n, a); if (!wv.ok) { wait(wv.kind === 'cancel' ? n.sched + (AI_CANCEL_AFTER_H + 1) * 3600e3 : now + 30 * 60e3, wv.why); continue; } }
+      // ground handling: at your bases your own ground crew turn the aircraft round; without them it can't leave
+      if (a) { const gb = groundBlock(a.companyId, n.from, a.typeId);
+        if (gb.why) { wait(now + 60 * 60e3, gb.why); continue; }
+        if (gb.slowMin > 5 && !n.groundSlowed) { const w2 = aiWait(Object.assign({}, n, { groundSlowed: true }), now + gb.slowMin * 60e3, `Short of ground crew at ${n.from}: a slower turnaround`, a); if (w2) S.aiNext.push(w2); continue; } }
       // off sick: the leg waits for cover (a stand-in or a contract pilot), cabin crew and mechanics likewise
       if (a && p) { const sk = sickBlock(n, a); if (sk) { wait(now + 60 * 60e3, sk); continue; } }
       const sickCovered = p && isSick(p) && p.coverAgency > now;

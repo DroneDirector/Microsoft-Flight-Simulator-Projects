@@ -98,6 +98,7 @@
     "src/core/services.ts",
     "src/core/strikes.ts",
     "src/core/sickness.ts",
+    "src/core/ground.ts",
     "src/core/pax-experience.ts",
     "src/core/weather.ts",
     "src/screens/v3d-terrain.ts",

@@ -173,6 +173,6 @@ function gsxTakeLegFlag(): boolean { const u = _gsxUsedThisLeg; _gsxUsedThisLeg 
  *  only at its main base. */
 function ownApronCrewAt(cid: string, icao: string): boolean {
   const S: any = State, c = company(cid); if (!c) return false;
-  if ((S.settings.groundHandling || 'base') === 'base' && icao !== c.hub) return false;
-  return ((S.staff || []) as any[]).some(p => p.companyId === cid && p.role === 'ground' && p.base === icao && p.status !== 'off');
+  if ((S.settings.groundHandling || 'base') === 'base' && !isBase(cid, icao)) return false;
+  return groundCrewFree(cid, icao).length > 0;
 }

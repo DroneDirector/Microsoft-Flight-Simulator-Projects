@@ -232,7 +232,7 @@ ACTIONS['hire-staff'] = el => {
           <div><small>Age</small><b>${ageOf(p.dob)}</b></div>
           <div><small>Rating</small><b>${p.rating.toFixed(1)} ★</b></div>
           <div><small>Salary</small><b>${money(p.salary)}/wk</b></div>
-          <div><small>Based at</small>${(p.role === 'mech' || p.role === 'ground') && (State.settings as any).groundHandling === 'everywhere' ? `<select class="le-in hire-base">${apronAirports(c.id).map(k => `<option value="${k}" ${k === c.hub ? 'selected' : ''}>${k}, ${esc(apt(k) ? apt(k).city || apt(k).name : k)}</option>`).join('')}</select>` : `<b>${esc(c.hub)}</b>`}</div>
+          <div><small>Based at</small>${(p.role === 'mech' || p.role === 'ground') && apronAirports(c.id).length > 1 ? `<select class="le-in hire-base">${apronAirports(c.id).map(k => `<option value="${k}" ${k === c.hub ? 'selected' : ''}>${k}, ${esc(apt(k) ? apt(k).city || apt(k).name : k)}</option>`).join('')}</select>` : `<b>${esc(c.hub)}</b>`}</div>
         </div>
         <p class="lede">${icon('info')}The salary is paid from ${esc(c.name)}'s balance every week.</p>
         <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Not now</button>
@@ -255,9 +255,9 @@ ACTIONS['hire-do'] = el => {
   const hb = $('.hire-base') as HTMLSelectElement;
   if (p.role === 'mech' || p.role === 'ground') {
     const where = hb && hb.value ? hb.value : c.hub;
-    if (where === c.hub) {
-      const lim = apronLimits(c.id, c.hub), have = staffOf(c.id, p.role).filter((x: any) => x.base === c.hub && !x.apronLeave).length, max = p.role === 'mech' ? lim.mech : lim.ground;
-      if (have >= max) { toast(`${c.hub} has room for ${max} ${p.role === 'mech' ? 'mechanics' : 'ground staff'} with the aircraft based there (you have ${have})`, 'warn'); return; }
+    if (isBase(c.id, where)) {
+      const lim = apronLimits(c.id, where), have = staffOf(c.id, p.role).filter((x: any) => x.base === where && !x.apronLeave).length, max = p.role === 'mech' ? lim.mech : lim.ground;
+      if (have >= max) { toast(`${where} has room for ${max} ${p.role === 'mech' ? 'mechanics' : 'ground staff'} with the aircraft based there (you have ${have})`, 'warn'); return; }
     }
   }
   p.companyId = c.id; p.base = hb && hb.value ? hb.value : c.hub; p.hired = dateStr(new Date()).slice(0, 10); p.status = 'on duty';
@@ -508,10 +508,9 @@ ACTIONS['commend-do'] = el => {
 
 /** Airports where the airline can keep its own apron crew: its base, and with "every airport", every airport it flies to. */
 function apronAirports(cid: string): string[] {
-  const c = company(cid), set: string[] = [c.hub];
+  const set: string[] = companyBases(cid);   // the hub and every base always have your own apron crew
   if ((State.settings as any).groundHandling === 'everywhere') {
     State.routes.filter(r => r.companyId === cid).forEach(r => r.legs.forEach(k => { if (set.indexOf(k) < 0) set.push(k); }));
-    fleetOf(cid).forEach(a => { if (a.base && set.indexOf(a.base) < 0) set.push(a.base); });
   }
   return set.filter(k => apt(k));
 }
@@ -529,7 +528,7 @@ function xferAirports(p: any, cid: string): string[] {
 /** Room for one more apron worker at that airport (home base limits; other airports have none). */
 function xferRoom(p: any, cid: string, icao: string): string {
   const role = personRole(p); if (role !== 'mech' && role !== 'ground') return '';
-  if (icao !== company(cid).hub) return '';
+  if (!isBase(cid, icao)) return '';
   const lim = apronLimits(cid, icao), max = role === 'mech' ? lim.mech : lim.ground;
   const have = staffOf(cid, role).filter((x: any) => x.base === icao && !x.apronLeave && x.id !== p.id).length;
   return have >= max ? `${icao} already has ${have} of ${max} ${role === 'mech' ? 'mechanics' : 'ground staff'} allowed for its size and the aircraft based there.` : '';
@@ -594,7 +593,7 @@ function apronCrewChanged() {
     if (back.length) toast(`${back.length} on leave back at work at their airports`, 'ok');
     return;
   }
-  const away = (S.staff || []).filter((p: any) => p.companyId === cid && (p.role === 'mech' || p.role === 'ground') && p.base !== c.hub && !p.apronLeave);
+  const away = (S.staff || []).filter((p: any) => p.companyId === cid && (p.role === 'mech' || p.role === 'ground') && !isBase(cid, p.base) && !p.apronLeave);
   if (!away.length) return;
   const lim = apronLimits(cid, c.hub);
   openLayer('modal', `<div class="modal-head"><div><h2>Apron crew at other airports</h2><small>${away.length} people no longer have work under "home base only". Room at ${esc(c.hub)}: ${lim.mech} mechanics, ${lim.ground} ground staff.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
