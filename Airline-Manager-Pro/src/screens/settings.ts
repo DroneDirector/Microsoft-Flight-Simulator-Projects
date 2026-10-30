@@ -72,18 +72,20 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'repairTime', label: 'Repair time', hint: 'Instant: the aircraft is ready to fly as soon as you pay. Decided by the app: it stays in the hangar for 5, 10, 15, 20, 25, 30, 40, 50, 60 or 90 minutes, depending on the job and how good your mechanics are.', options: [['instant', 'Instant'], ['auto', 'Decided by the app']] },
   ] },
   { id: 'voice', title: 'Voices', icon: 'volume', items: [
-    { type: 'toggle', key: 'mechanicVoice', label: 'People speak their messages', hint: 'The mechanic, the gate agent and the head of operations read their messages aloud, word for word, with a play button to hear them again. Everything runs on this device.' },
+    { type: 'toggle', key: 'mechanicVoice', label: 'People speak their messages', hint: 'The mechanic, the gate agent, passengers and the head of operations read their messages aloud, word for word, with a play button to hear them again: women with women\'s voices, men with men\'s, angry people sound angry, apologies sound sorry. Everything runs on this device.' },
     { type: 'choice', key: 'voiceEngine', label: 'Voice', hint: 'Natural voices sound like real people. Until they are downloaded, the device\'s own voice reads the messages.', options: [['neural', 'Natural voices'], ['device', 'Device voice']], when: () => State.settings.mechanicVoice },
     { type: 'html', html: () => State.settings.mechanicVoice && (State.settings as any).voiceEngine !== 'device' ? voicePackCard() : '' },
-    { type: 'html', html: () => State.settings.mechanicVoice ? `<div class="btn-row">${Object.keys(SPEAKERS).map(k => `<button class="btn ghost sm" data-act="voice-test" data-who="${k}">${icon('play')}${esc(SPEAKERS[k].title)}</button>`).join('')}</div>` : '' },
+    { type: 'html', html: () => State.settings.mechanicVoice ? `<div class="btn-row">${VOICE_TESTS.map(t => `<button class="btn ghost sm" data-act="voice-test" data-k="${t[0]}">${icon('play')}${esc(t[1])}</button>`).join('')}</div>` : '' },
   ] },
   { id: 'sound', title: 'Sound and feel', icon: 'volume', items: [
-    { type: 'toggle', key: 'muteAll', label: 'Mute all sounds', hint: 'Silences every sound in the app, including the mechanic’s voice.' },
-    { type: 'toggle', key: 'purchaseSound', label: 'Purchase sound', hint: 'Plays when you buy an aircraft.', when: () => !State.settings.muteAll },
-    { type: 'html', html: () => State.settings.muteAll ? '' : `<button class="btn ghost" data-act="sound-test">${icon('play')}Play purchase sound</button>` },
-    { type: 'toggle', key: 'paySound', label: 'Payment sound', hint: 'Plays when you pay a bill, repair or fine.', when: () => !State.settings.muteAll },
-    { type: 'html', html: () => State.settings.muteAll ? '' : `<button class="btn ghost" data-act="pay-test">${icon('play')}Play payment sound</button>` },
-    { type: 'toggle', key: 'uiSounds', label: 'Interface sounds', when: () => !State.settings.muteAll },
+    { type: 'toggle', key: 'muteAll', label: 'Mute all sounds', hint: 'Silences every sound in the app, voices too.' },
+    { type: 'toggle', key: 'mechanicVoice', label: 'Voices in dialogues', hint: 'The mechanic, the gate agent, passengers and the head of operations speak their messages. Off: no voices and no play buttons, the messages are only written.', when: () => !State.settings.muteAll },
+    { type: 'toggle', key: 'onlyVoices', label: 'Only the voices', hint: 'Every other sound is off (purchases, payments, taps, chimes), but the people in the dialogues still speak. Switch off to have all sounds again.', when: () => !State.settings.muteAll },
+    { type: 'toggle', key: 'purchaseSound', label: 'Purchase sound', hint: 'Plays when you buy an aircraft.', when: () => !State.settings.muteAll && !(State.settings as any).onlyVoices },
+    { type: 'html', html: () => State.settings.muteAll || (State.settings as any).onlyVoices ? '' : `<button class="btn ghost" data-act="sound-test">${icon('play')}Play purchase sound</button>` },
+    { type: 'toggle', key: 'paySound', label: 'Payment sound', hint: 'Plays when you pay a bill, repair or fine.', when: () => !State.settings.muteAll && !(State.settings as any).onlyVoices },
+    { type: 'html', html: () => State.settings.muteAll || (State.settings as any).onlyVoices ? '' : `<button class="btn ghost" data-act="pay-test">${icon('play')}Play payment sound</button>` },
+    { type: 'toggle', key: 'uiSounds', label: 'Interface sounds', when: () => !State.settings.muteAll && !(State.settings as any).onlyVoices },
     { type: 'toggle', key: 'haptics', label: 'Vibration feedback' },
     { type: 'toggle', key: 'reduceMotion', label: 'Reduce motion', hint: 'Shorter animations and a still map.' },
   ] },
@@ -252,18 +254,23 @@ ACTIONS.toggle = el => {
   if (key === 'mk-installed') { _mkInstalled = on; refresh(); return; }
   if (key === 'reduceMotion') document.documentElement.classList.toggle('calm', on);
   if (key === 'muteAll') { if (on) Voice.stop(); renderTopbar(); }
+  if (key === 'mechanicVoice' && !on) Voice.stop();
   if (key === 'conduct') setConduct(on);
   if (key in State.settings) { Store.save(); setTimeout(() => rerenderSettingsBody(), 180); }
 };
 
 ACTIONS['sound-test'] = () => { const was = State.settings.purchaseSound; State.settings.purchaseSound = true; Sound.purchase(); Haptics.success(); State.settings.purchaseSound = was; };
 ACTIONS['pay-test'] = () => { const was = State.settings.paySound; State.settings.paySound = true; Sound.payOut(); Haptics.pulse(30); State.settings.paySound = was; };
-const VOICE_SAMPLES: { [k: string]: string } = {
-  mechanic: 'Morning, captain. I had a look at OY-ANA after that last flight. Everything is in good shape, and she is ready to go.',
-  gate: 'Captain, boarding is complete. One hundred and sixty-eight passengers on board, and the doors are closing.',
-  ops: 'Good afternoon. A short report from operations: all flights left on time today. Well done, everyone.',
-};
-ACTIONS['voice-test'] = el => { const k = (el && el.getAttribute('data-who')) || 'mechanic'; Voice.speak(VOICE_SAMPLES[k] || VOICE_SAMPLES.mechanic, undefined, k); };
+// [key, button, who, line]
+const VOICE_TESTS: string[][] = [
+  ['mechanic', 'Mechanic', 'mechanic', 'Morning, captain. I had a look at OY-ANA after that last flight. Everything is in good shape, and she is ready to go.'],
+  ['gate', 'Gate agent', 'gate', 'Captain, boarding is complete. One hundred and sixty-eight passengers on board, and the doors are closing.'],
+  ['ops', 'Head of operations', 'ops', 'Good afternoon. A short report from operations: all flights left on time today. Well done, everyone.'],
+  ['angry', 'Angry passenger', 'pax|m|angry|Paul Collins', 'This is unacceptable! I have been waiting for three hours, and nobody tells us anything!'],
+  ['sorry', 'Apology', 'gate|f|sorry', 'I am so sorry, captain. The fuel truck was late, and that is our fault. It will not happen again.'],
+  ['drunk', 'Drunk passenger', 'pax|f|drunk|Heidi Larsen', 'I\'m fine. I\'m totally fine! Just let me on the plane, I paid for my ticket!'],
+];
+ACTIONS['voice-test'] = el => { const t = VOICE_TESTS.filter(x => x[0] === ((el && el.getAttribute('data-k')) || 'mechanic'))[0] || VOICE_TESTS[0]; Voice.speak(t[3], undefined, t[2]); };
 function voicePackCard(): string {
   const v = VoicePack, pct = v.total ? Math.round(v.done / v.total * 100) : 0;
   if (v.state === 'ready') return `<div class="set-card ok"><span class="pc-ic">${icon('volume')}</span><span><b>Natural voices are installed</b><small>On this ${DESKTOP ? 'PC' : 'device'}. They work without the internet.</small></span><button class="btn ghost sm" data-act="voicepack-remove">Remove</button></div>`;

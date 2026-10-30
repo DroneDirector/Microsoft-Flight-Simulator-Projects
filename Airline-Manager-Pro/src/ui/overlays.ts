@@ -217,7 +217,15 @@ function mechanicPopup(issueId: string) {
 /** In a dialogue that just opened, the person starts talking (when voices are on). */
 function autoSpeak(wrap: HTMLElement) {
   if (!State.settings.mechanicVoice || State.settings.muteAll) return;
-  setTimeout(() => { const b = wrap && wrap.isConnected ? $('.voice-btn', wrap) as HTMLElement : null; if (b && !Voice.speaking) ACTIONS.say(b, null); }, 650);
+  // everyone in the dialogue speaks in turn, like a conversation
+  const turn = (i: number) => {
+    if (!wrap || !wrap.isConnected) return;
+    const bs = Array.from(wrap.querySelectorAll('.voice-btn')) as HTMLElement[], b = bs[i]; if (!b) return;
+    Voice.stop(); b.setAttribute('data-playing', '1');
+    Voice.speak(b.getAttribute('data-say') || '', () => { b.setAttribute('data-playing', '0'); voiceUiChanged(); setTimeout(() => turn(i + 1), 350); }, b.getAttribute('data-who') || 'mechanic');
+    voiceUiChanged();
+  };
+  setTimeout(() => { if (!Voice.speaking) turn(0); }, 650);
 }
 
 ACTIONS['fix-now'] = el => {

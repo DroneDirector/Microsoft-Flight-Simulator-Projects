@@ -55,5 +55,7 @@
   whatsNewOnStart();
   if ((State as any).linkedOnce) State.live = State.live.filter(f => !(f.you && !f.real));
   // Start-up screen for five seconds, then the Overview
+  // the voices download on the start-up screen the first time, also when the app reopens where it was
   if (!back) showSplash(() => { if (State.screen !== 'ops' && !_layers.length) go('ops', true); });
+  else if (voicesWanted()) showSplash(() => { /* stays where it was */ });
 })();
