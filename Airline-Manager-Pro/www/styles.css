@@ -2086,3 +2086,34 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .dragging .sel-pop { animation: none; box-shadow: 0 18px 40px rgba(0,0,0,.45); }
 .dragging .sel-pop .fc-top { cursor: grabbing; }
 .n-received { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+
+/* 3D view: loading screen (the start-up screen, livelier), growing from the small map, satellite switch */
+.v3d-load.splash { position: absolute; inset: 0; z-index: 5; }
+.v3d-load.out { opacity: 0; transition: opacity .7s ease; pointer-events: none; }
+.v3d-load .spl-glow { animation: v3lGlow 3.2s ease-in-out infinite; }
+@keyframes v3lGlow { 0%, 100% { transform: scale(1); opacity: .85; } 50% { transform: scale(1.12); opacity: 1; } }
+.v3l-hills { position: absolute; left: 0; right: 0; bottom: 0; width: 200%; height: 26%; fill: #0E2A47; opacity: .7; animation: v3lHills 18s linear infinite; }
+.v3l-hills .far { fill: #13355A; opacity: .6; }
+@keyframes v3lHills { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.v3l-orbit { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.v3l-orbit i { position: absolute; left: -130px; top: -130px; width: 260px; height: 260px; border-radius: 50%; border: 1.5px solid rgba(63, 208, 232, .25); border-top-color: #3FD0E8; animation: v3lSpin 2.6s linear infinite; }
+.v3l-orbit i:nth-child(2) { left: -170px; top: -170px; width: 340px; height: 340px; border-color: rgba(224, 75, 214, .18); border-right-color: #E04BD6; animation-duration: 4.1s; animation-direction: reverse; }
+.v3l-orbit i:nth-child(3) { left: -210px; top: -210px; width: 420px; height: 420px; border-color: rgba(63, 208, 232, .1); border-bottom-color: rgba(63, 208, 232, .6); animation-duration: 6.5s; }
+@keyframes v3lSpin { to { transform: rotate(360deg); } }
+.v3d-load .spl-fill { transition: width .35s ease; }
+.v3d-load .spl-tip { transition: left .35s ease; }
+@media (prefers-reduced-motion: reduce) { .v3l-hills, .v3l-orbit i, .v3d-load .spl-glow { animation: none; } }
+.v3d.v3d-from { overflow: hidden; }
+.v3d.v3d-grow { transition: left .7s cubic-bezier(.2,.8,.2,1), top .7s cubic-bezier(.2,.8,.2,1), width .7s cubic-bezier(.2,.8,.2,1), height .7s cubic-bezier(.2,.8,.2,1), border-radius .7s ease; left: 0; top: 0; width: 100vw; height: 100vh; border-radius: 0; }
+.v3d-cv { width: 100% !important; height: 100% !important; }
+.v3d-sat { position: absolute; right: 12px; top: calc(62px + env(safe-area-inset-top)); display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 12px; border: 0; cursor: pointer; background: rgba(8, 20, 36, .78); color: #CFE0F2; font: 600 12.5px Inter, sans-serif; }
+.v3d-sat .ic { width: 16px; height: 16px; }
+.v3d-sat.on { background: #3FD0E8; color: #04121F; }
+@media (max-width: 600px) { .v3d-sat { top: calc(150px + env(safe-area-inset-top)); } }
+/* settings: view distance */
+.v3d-range { width: 100%; margin: 10px 0 2px; accent-color: #3FD0E8; }
+.v3d-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); }
+.v3d-note { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; margin: 10px 0 0; padding: 8px 10px; border-radius: 10px; }
+.v3d-note .ic { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.v3d-note.warn { background: rgba(242, 193, 78, .12); color: #F2C14E; }
+.v3d-note.ok { background: rgba(63, 208, 232, .1); color: #8FE3F2; }
