@@ -196,21 +196,112 @@ const VoiceEngine = {
 /* ---------- speaking ---------- */
 // sentences already spoken or prepared, kept for a while (the same line again plays straight away)
 const _voiceCache = new Map<string, Promise<Float32Array>>();
-function voiceSentence(ps: string, sp: Speaker): Promise<Float32Array> {
+
+// Lines are spoken from a queue: a line you tap goes first, lines being got ready in the background wait.
+// Everything spoken is also kept on the device (the newest 300 sentences), so a line plays at once the
+// next time, also after the app was closed.
+const VoiceQ = { busy: false, hi: [] as any[], lo: [] as any[] };
+function voicePump() {
+  if (VoiceQ.busy) return;
+  const job = VoiceQ.hi.shift() || VoiceQ.lo.shift(); if (!job) return;
+  VoiceQ.busy = true;
+  VoiceEngine.synth(job.ps, job.sp).then(a => { job.ok(a); VoiceStore.put(job.k, a); }, e => job.bad(e))
+    .then(() => { VoiceQ.busy = false; voicePump(); });
+}
+function voiceSentence(ps: string, sp: Speaker, urgent?: boolean): Promise<Float32Array> {
   const k = sp.voice + '|' + sp.speed + '|' + ps;
   let p = _voiceCache.get(k);
-  if (!p) {
-    p = VoiceEngine.synth(ps, sp); _voiceCache.set(k, p);
-    p.catch(() => _voiceCache.delete(k));
-    if (_voiceCache.size > 160) _voiceCache.delete(_voiceCache.keys().next().value);
+  if (p) {
+    // waiting in the background queue: move it to the front
+    if (urgent) { const i = VoiceQ.lo.findIndex(j => j.k === k); if (i >= 0) VoiceQ.hi.push(VoiceQ.lo.splice(i, 1)[0]); }
+    return p;
   }
+  p = new Promise<Float32Array>((ok, bad) => {
+    VoiceStore.get(k).then(hit => {
+      if (hit) { ok(hit); return; }
+      (urgent ? VoiceQ.hi : VoiceQ.lo).push({ k, ps, sp, ok, bad }); voicePump();
+    });
+  });
+  _voiceCache.set(k, p);
+  p.catch(() => _voiceCache.delete(k));
+  if (_voiceCache.size > 240) _voiceCache.delete(_voiceCache.keys().next().value);
   return p;
 }
+
+/** Spoken sentences kept on the device (IndexedDB), as 16-bit sound. */
+const VoiceStore = {
+  db: null as Promise<IDBDatabase>, n: 0,
+  open(): Promise<IDBDatabase> {
+    if (this.db) return this.db;
+    this.db = new Promise((ok, bad) => {
+      try {
+        const r = indexedDB.open('amp-voice-lines', 1);
+        r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('l')) d.createObjectStore('l'); };
+        r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error);
+      } catch (e) { bad(e); }
+    });
+    this.db.catch(() => { /* no storage: lines are made each time */ });
+    return this.db;
+  },
+  get(k: string): Promise<Float32Array> {
+    return this.open().then(d => new Promise<Float32Array>(ok => {
+      try {
+        const q = d.transaction('l', 'readonly').objectStore('l').get(k);
+        q.onsuccess = () => { const v = q.result; if (!v || !v.pcm) { ok(null); return; } const i16 = new Int16Array(v.pcm), f = new Float32Array(i16.length); for (let i = 0; i < i16.length; i++) f[i] = i16[i] / 32767; ok(f); };
+        q.onerror = () => ok(null);
+      } catch (e) { ok(null); }
+    })).catch(() => null);
+  },
+  put(k: string, a: Float32Array) {
+    if (!a || !a.length) return;
+    const i16 = new Int16Array(a.length); for (let i = 0; i < a.length; i++) i16[i] = Math.max(-32767, Math.min(32767, Math.round(a[i] * 32767)));
+    this.open().then(d => {
+      try {
+        const st = d.transaction('l', 'readwrite').objectStore('l');
+        st.put({ pcm: i16.buffer, t: Date.now() }, k);
+        // keep the newest 300 sentences
+        if (++this.n % 25 === 0) { const c = st.count(); c.onsuccess = () => { if (c.result > 300) { let left = c.result - 300; const cur = st.openCursor(); cur.onsuccess = () => { const x = cur.result; if (x && left-- > 0) { x.delete(); x.continue(); } }; } }; }
+      } catch (e) { /* full: skip */ }
+    }).catch(() => { /* no storage */ });
+  },
+};
+
+/** The messages waiting for you (unread notices, the mechanic's open reports), got ready in the background. */
+function voicePrepareWaiting() {
+  try {
+    let n = 0;
+    for (const i of State.issues) if (i.status === 'open' && n++ < 8) Voice.prepare(mechanicLines(i), 'mechanic');
+    for (const m of State.notices) { if (m.read || n++ > 16) continue; const w = noticeSpeaker(m); if (w) Voice.prepare(m.body, w[0]); }
+  } catch (e) { /* nothing waiting */ }
+}
+/** Get every voice line now on screen ready in the background, so pressing play starts at once. */
+let _voicePrepT: any = 0;
+function voicePrepareVisible() {
+  clearTimeout(_voicePrepT);
+  _voicePrepT = setTimeout(() => {
+    for (const b of Array.from(document.querySelectorAll('.voice-btn[data-say]')) as HTMLElement[]) Voice.prepare(b.getAttribute('data-say') || '', b.getAttribute('data-who') || 'mechanic');
+  }, 120);
+}
+try { new MutationObserver(() => { if (document.querySelector('.voice-btn[data-say]')) voicePrepareVisible(); }).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { /* older browser */ }
+// the sound output is woken on the first touch, so the first line doesn't wait for it
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { try { const c = audio(true); if (c && c.state !== 'running') c.resume(); } catch (e) { /* muted */ } }, { capture: true, passive: true } as any));
 
 const Voice = {
   speaking: false, preparing: false, token: 0, sources: [] as AudioBufferSourceNode[], onEnd: null as () => void,
   natural(): boolean { return (State.settings as any).voiceEngine !== 'device' && VoicePack.state === 'ready'; },
-  sentences(text: string, sp: Speaker): string[] { return G2P.phonemize(text, sp.accent).map(p => moodPhonemes(p, sp)); },
+  /** The text as pieces to speak: sentences, with long ones cut at their commas and a short first piece,
+   *  so the voice starts as soon as the first few words are ready. */
+  sentences(text: string, sp: Speaker): string[] {
+    const out: string[] = [];
+    G2P.phonemize(text, sp.accent).forEach((p, i) => {
+      const cut = i === 0 ? 40 : 150;
+      if (p.length <= cut) { out.push(p); return; }
+      const parts = p.split(/(?<=,) /); let cur = '';
+      for (const x of parts) { if (cur && (cur.length + x.length > (out.length ? 150 : cut))) { out.push(cur); cur = x; } else cur = cur ? cur + ' ' + x : x; }
+      if (cur) out.push(cur);
+    });
+    return out.map(p => moodPhonemes(p, sp));
+  },
   /** Get a line ready in the background, so it plays at once when it's needed. */
   prepare(text: string, who?: string) {
     if (!this.natural() || !text || !State.settings.mechanicVoice) return;
@@ -225,14 +316,15 @@ const Voice = {
     this.onEnd = onEnd || null; this.speaking = true;
     if (!this.natural()) { this.device(text, sp, tok); return true; }
     this.preparing = true; voiceUiChanged();
+    let started = false;
     (async () => {
       let ctx: AudioContext;
       try {
         // the voice model loads once (a few seconds); if it doesn't answer, the device's own voice speaks
         await Promise.race([VoiceEngine.ready(), new Promise((ok, bad) => setTimeout(() => bad(new Error('the voice model took too long to load')), 25000))]);
         ctx = audio(true); if (!ctx) { this.finish(); return; } if (ctx.state !== 'running') await ctx.resume();
-        const parts = this.sentences(text, sp).map(s => Promise.race([voiceSentence(s, sp), new Promise<Float32Array>((ok, bad) => setTimeout(() => bad(new Error('the voice took too long')), 30000))]));
-        let at = 0;
+        const parts = this.sentences(text, sp).map(s => Promise.race([voiceSentence(s, sp, true), new Promise<Float32Array>((ok, bad) => setTimeout(() => bad(new Error('the voice took too long')), 30000))]));
+        let at = 0, last: AudioBufferSourceNode = null;
         for (let i = 0; i < parts.length; i++) {
           const pcm = await parts[i];
           if (tok !== this.token) return;
@@ -241,7 +333,7 @@ const Voice = {
           const buf = ctx.createBuffer(1, pcm.length, 24000); buf.copyToChannel(pcm as any, 0);
           const src = ctx.createBufferSource(); src.buffer = buf;
           const g = ctx.createGain(); g.gain.value = 1.15 * (sp.gain || 1); src.connect(g); g.connect(ctx.destination);
-          at = Math.max(at, ctx.currentTime + 0.05);
+          at = Math.max(at, ctx.currentTime + 0.02);
           const rate = Math.pow(2, (sp.cents || 0) / 1200), dur = buf.duration / rate;
           if (sp.wobble) {
             // drunk: the pitch drifts up and down
@@ -250,14 +342,19 @@ const Voice = {
             src.detune.setValueCurveAtTime(curve, at, Math.max(0.05, dur));
           } else src.detune.value = sp.cents || 0;
           src.start(at); at += dur + (sp.mood === 'sorry' ? 0.3 : sp.mood === 'angry' ? 0.08 : 0.18);
-          this.sources.push(src);
-          if (i === parts.length - 1) src.onended = () => { if (tok === this.token) this.finish(); };
+          this.sources.push(src); started = true; last = src;
         }
-        if (!parts.length) this.finish();
+        // done talking: the button stops when the last sound ends (and in any case shortly after)
+        if (!last) { this.finish(); return; }
+        last.onended = () => { if (tok === this.token) this.finish(); };
+        const left = Math.max(0, at - ctx.currentTime) * 1000 + 400;
+        setTimeout(() => { if (tok === this.token && this.speaking) this.finish(); }, left);
       } catch (e: any) {
         if (tok !== this.token) return;
         try { ErrorLog.add('voice', 'The voice couldn\'t speak', (e && e.message) || String(e)); } catch (er) { /* ignore */ }
-        this.device(text, sp, tok);   // the device's own voice instead
+        // one voice for the whole message: once the natural voice has started, it is never swapped for another
+        if (started) { this.finish(); return; }
+        this.device(text, sp, tok);   // nothing played yet: the device's own voice says it all
       }
     })();
     return true;
@@ -357,7 +454,8 @@ function startVoices() {
   if (S.voiceEngine !== 'device') S.voiceEngine = 'neural';
   VoicePack.check().then(st => {
     voiceUiChanged();
-    if (st === 'ready') setTimeout(() => VoiceEngine.ready().catch(() => { /* loads on first use */ }), 4000);
+    // load the voice model straight away and speak one short line silently, so the first real line is quick
+    if (st === 'ready') setTimeout(() => VoiceEngine.ready().then(() => { const sp = resolveSpeaker('mechanic', 'Ready.'); return voiceSentence(Voice.sentences('Ready.', sp)[0], sp); }).then(() => { voicePrepareVisible(); voicePrepareWaiting(); }).catch(() => { /* loads on first use */ }), 300);
     // not downloaded yet: it starts right away, on the start-up screen, and carries on in the background
     else if (S.mechanicVoice && S.voiceEngine !== 'device' && st !== 'downloading') VoicePack.download(true);
   });
