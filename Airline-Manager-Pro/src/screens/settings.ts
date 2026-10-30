@@ -51,7 +51,7 @@ const SETTINGS: SetSection[] = [
   { id: 'online', title: 'Online services', icon: 'wifi', items: [
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}All optional. Your names, codes and the Discord address stay on this device and are only sent to the service they belong to.</p>` },
     { type: 'html', html: () => svcOk('simbriefApi') ? setText('sbUser', 'SimBrief username or pilot ID', 'Your latest SimBrief flight plan in Dispatch: route, fuel, weights, and a flight plan for the simulator.', 'username or 123456') : '' },
-    { type: 'toggle', key: 'liveWx', label: 'Live weather (METAR and TAF)', hint: 'Real weather reports from aviationweather.gov. The real wind decides the runway in use at every airport, and the weather delays of your hired pilots.' },
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}Real-world weather (METAR, TAF and SIGMETs from the Aviation Weather Center) is always used: the real wind picks the runway in use, and your hired pilots delay, hold, divert or cancel when the weather is beyond their aircraft's limits. Show it on the map with the weather button.</p>` },
     { type: 'html', html: () => netChoices().length > 1 ? `<div class="ch-row"><span><b>Online networks</b><small>Controllers online at your airports, your airline's flights online, and their traffic on the map. Updated every minute.</small></span><div class="seg">${netChoices().map(o => `<button class="${Network.which() === o[0] ? 'on' : ''}" data-act="set-choice" data-key="network" data-v="${o[0]}">${esc(o[1])}</button>`).join('')}</div></div>` : '' },
     { type: 'toggle', key: 'netOnMap', label: 'Network traffic on the map', when: () => Network.which() !== 'off' },
     { type: 'html', html: () => Network.which() !== 'off' ? (svcOk('vatsim') ? setText('vatsimId', 'Your VATSIM member ID', 'Shows when you are online yourself.', 'CID', true) : '') + (svcOk('ivao') ? setText('ivaoId', 'Your IVAO VID', '', 'VID', true) : '') : '' },
@@ -74,6 +74,7 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => servicesHtml() },
   ] },
   { id: 'staff', title: 'Staff', icon: 'pilots', items: [
+    { type: 'html', html: () => payScaleHtml() },
     { type: 'choice', key: 'groundHandling', label: 'Apron crew: mechanics, drivers and baggage handlers', hint: 'Home base only: your own apron crew works at your main base; everywhere else the local handling company services your aircraft (you pay its fee per turnaround and can\'t manage its people). Every airport: you hire your own apron crew for any airport you fly to. Co-pilots and cabin crew are always your own.', options: [['base', 'Home base only'], ['everywhere', 'Every airport']] },
     { type: 'toggle', key: 'conduct', label: 'Conduct reports and behaviour', hint: 'Misconduct, warnings and court cases for your AI crew. Switching off never removes what already happened; court cases pause and carry on when you switch back on.' },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Most of the time your staff behave well. Choose how often someone steps out of line. You'll be asked to discipline or dismiss them when it happens.</p>` },

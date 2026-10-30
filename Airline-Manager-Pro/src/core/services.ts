@@ -77,6 +77,7 @@ function serviceEffects(cid: string, cls: string, nm: number, intl: boolean, pY:
   let bags = 0;
   if (s.bags === 'paid') bags += pY * (long ? 6.5 : 5);
   if (s.seats === 'paid') bags += pY * (long ? 2.5 : 2);
+  bags += pax * petFeePerPax(s.pets);   // pet tickets
   // catering cost: buy-on-board stock is cheap, included food costs more, a chef menu more again up front
   const cateringMul = (food === 'bob' ? (long ? 0.7 : 0.45) : food === 'snack' ? 1 : (long ? 1.15 : 2.2)) * (drinks === 'all' ? 1.25 : drinks === 'soft' ? 1.1 : 1);
   const cateringPrem = food === 'chef' ? 1.6 : 1;
@@ -104,6 +105,10 @@ function serviceEffects(cid: string, cls: string, nm: number, intl: boolean, pY:
   pts += s.lounge === 'yes' ? 1 : 0;
   pts += s.pets !== 'no' ? 0.5 : 0;
   // fully no-frills short haul is normal; fully no-frills long haul puts people off
+  // the cabin crew make the service: well-paid, happy, experienced crew lift it; cheap, unhappy crew drag it down
+  const fas = typeof staffOf === 'function' ? staffOf(cid, 'fa').filter((p: any) => !p.onStrike) : [];
+  const crewQ = fas.length ? fas.reduce((a2: number, p: any) => a2 + workRating(p), 0) / fas.length : 4;
+  pts += (crewQ - 4) * 4;
   const expect = long ? 9 : mid ? 4 : 2;
   const demand = clamp(1 + (pts - expect) * 0.008, 0.88, 1.1);
   const score = Math.round(clamp(50 + (pts - expect) * 4, 10, 100));

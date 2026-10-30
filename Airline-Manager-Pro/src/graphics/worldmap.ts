@@ -446,6 +446,7 @@ class WorldMap {
       this.sceneDraws = fade > 0;
       if (fade > 0) for (const icao of Object.keys(this.scenes)) { const sc = this.scenes[icao]; if (sc.L && sc.graph) sc.drawAircraftTo(c, now); }
     }
+    try { WxLayer.draw(c, this, degPx); } catch (e) { /* never stop the map */ }
     try { if (typeof Network !== 'undefined') Network.drawOnMap(c, this, degPx); } catch (e) { /* never stop the map */ }
     for (const f of liveOf()) {
       // (your demo flight moves on the real clock along its profile: demoUpdate in ai-sim.ts)

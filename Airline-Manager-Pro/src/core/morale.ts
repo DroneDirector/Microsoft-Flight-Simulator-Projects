@@ -30,9 +30,7 @@ function moodState(p: any): { [a: string]: number } {
 }
 /** Fair pay for their job and level, to compare their salary with. */
 function marketPay(p: any): number {
-  const base: { [r: string]: number } = { captain: 3900, fo: 2300, fa: 920, mech: 1350, ground: 760 };
-  const lv = levelOf(p.xp).level;
-  return (base[personRole(p)] || 1000) * (1 + clamp(lv, 0, 500) / 500 * 0.8);
+  return goingRate(p);
 }
 /** Overall mood 0-100: the areas (pay counts double), plus recent things you did, fading over a few weeks. */
 function staffMood(p: any): number {
@@ -52,7 +50,9 @@ function moodWord(m: number): string { return m >= 80 ? 'Very happy' : m >= 62 ?
 /** How well they work: their rating, less when unhappy (down to a star and a half). */
 function workRating(p: any): number {
   const m = staffMood(p);
-  return clamp((p.rating || 4) - (m < 45 ? (45 - m) / 45 * 1.5 : 0) + (m > 80 ? 0.15 : 0), 1, 5);
+  const pr = (p.salary || 1) / Math.max(1, goingRate(p));
+  const pay = pr < 0.95 ? -(0.95 - pr) * 2.5 : pr > 1.05 ? Math.min(0.3, (pr - 1.05) * 1.5) : 0;
+  return clamp((p.rating || 4) - (m < 45 ? (45 - m) / 45 * 1.5 : 0) + (m > 80 ? 0.15 : 0) + pay, 1, 5);
 }
 
 /** Once a day or so: areas drift, the most unhappy speak up, and the very unhappy may quit. */
@@ -62,8 +62,11 @@ function moraleAdvance() {
   let rounds = 0;
   while (S.moraleNext <= now && rounds < 14) {
     rounds++; S.moraleNext += 24 * 3600e3;
-    const people = ((S.staff || []) as any[]).concat((State.pilots as any[]).filter(x => x.id !== 'you' && !x.you)).filter(x => x.companyId);
+    try { unionAdvance(); } catch (e) { /* ignore */ }
+    const people = ((S.staff || []) as any[]).concat((State.pilots as any[]).filter(x => x.id !== 'you' && !x.you)).filter(x => x.companyId || (typeof pilotCompany === 'function' && pilotCompany(x)));
     for (const p of people) {
+      try { sicknessDaily(p); } catch (e) { /* ignore */ }
+      if (p.onStrike) continue;
       const s = moodState(p);
       // small drifts: rosters, weather, life
       for (const [a] of MOOD_AREAS) if (a !== 'pay') s[a] = clamp(Math.round((s[a] || 50) + (Math.random() - 0.52) * 3), 5, 98);

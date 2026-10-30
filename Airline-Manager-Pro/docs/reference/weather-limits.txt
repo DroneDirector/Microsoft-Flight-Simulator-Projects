@@ -1,0 +1,48 @@
+Weather limits per aircraft type (src/core/weather.ts, WX_LIMITS)
+==================================================================
+
+What a hired pilot may take off and land in. Beyond these, the flight waits at the gate (cancelled after
+five hours and flown the next day), holds before landing, reroutes around a hazard area, or diverts.
+
+type          crosswind  tailwind  landing vis / DH     take-off vis  IFR  known icing
+A320 / A320neo   38 kt     15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes
+A350-900         40 kt D   15 kt    75 m / 0 ft              125 m     yes  yes
+A310             32 kt D   10 kt    200 m / 50 ft (CAT IIIA) 150 m     yes  yes
+737-800 / -600   33 kt     15 kt    75 m / 0 ft              125 m     yes  yes
+777-300ER        38 kt     15 kt    75 m / 0 ft              125 m     yes  yes
+787-10           40 kt     15 kt    75 m / 0 ft              125 m     yes  yes
+747-8            30 kt D   15 kt    75 m / 0 ft              125 m     yes  yes
+CRJ900 / CRJ700  27 kt     10 kt    350 m / 100 ft (CAT II)  150 m     yes  yes
+ATR 72-600       35 kt     10 kt    300 m / 100 ft (CAT II)  150 m     yes  yes
+DHC-6 Twin Otter 27 kt D   10 kt    550 m / 200 ft (CAT I)   400 m     yes  no
+DHC-2 Beaver     17 kt D    5 kt    VFR: 3 km, cloud base 1,000 ft    no   no
+Cessna 208       20 kt     10 kt    550 m / 200 ft (CAT I)   400 m     yes  yes (FIKI option)
+Kodiak 100       20 kt D   10 kt    550 m / 200 ft (CAT I)   400 m     yes  yes (FIKI option)
+PC-12            25 kt D   10 kt    550 m / 200 ft (CAT I)   400 m     yes  yes
+Cessna 172       15 kt      5 kt    VFR: 5 km, cloud base 1,500 ft    no   no
+
+Crosswind values are the manufacturers' maximum demonstrated crosswind (or the flight crew training
+manual guidance where that is lower), including gusts. D = not confirmed from a published source yet.
+
+Airport limits (by airport size in the app): big airports CAT III (75 m), regional airports CAT I
+(550 m, 200 ft), small airports a non-precision approach (1,500 m, 400 ft). The higher of the aircraft's
+and the airport's minimum applies.
+
+For every aircraft and airport:
+- No take-off or landing with a thunderstorm over the airport (TS in the METAR). Aircraft not approved
+  for IFR also avoid thunderstorms in the vicinity (VCTS). A passing storm at the destination of a flight
+  over 600 nm doesn't hold the departure (it will have moved on).
+- Wind or gusts of 50 kt or more: no movements.
+- Heavy freezing rain or drizzle: no movements (de-icing fluid holdover times too short). Any freezing
+  rain: aircraft without known-icing approval wait.
+- Heavy snow or blowing snow: departures wait for runway clearing and de-icing.
+- Tropical cyclone SIGMET over or within 150 nm of the airport: the flight is cancelled.
+- Volcanic ash SIGMET over the airport: waits; on the route: reroute (25 to 45 minutes extra).
+- Thunderstorm SIGMET on the route: reroute (8 to 25 minutes); severe turbulence: level change.
+- Severe icing SIGMET on the route: aircraft without known-icing approval wait.
+- Thunderstorms or fog in the destination's TAF (TEMPO or PROB): holding 15 to 35 minutes, or about
+  three times in ten a diversion to the nearest airport with good weather and a usable runway; the
+  flight carries on to its destination afterwards.
+Only weather happening now counts: legs caught up after the app was closed are not judged by today's weather.
+
+Data: aviationweather.gov (US National Weather Service, public domain): METAR, TAF, international and US SIGMETs.

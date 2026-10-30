@@ -44,6 +44,8 @@ function aiUpdate(f: LiveFlight, now: number) {
   F.leftNm = q.left; F.toGoS = (q.toGoS + extra) / (F.spd || 1); F.routeNm = p.routeNm;
   // the boarding scan, while the flight is still at the gate (only while you are watching)
   if (!F.scanned && el < 600 && now - F.depAt < 15 * 60000) { F.scanned = true; try { boardingScan(f); } catch (e) { /* ignore */ } }
+  if (F.medical && !F.medical.noted && el > 1200) { try { medicalNote(F); } catch (e) { /* ignore */ } }
+  if (F.wxDivert && !F.wxDivert.noted && F.toGoS < 1800) { try { wxDivertNote(F); } catch (e) { /* ignore */ } }
   const td = p.pts.filter(x => x.ph === 'Landing')[0];
   F.toTdS = td ? (Math.max(0, td.s - el) + extra) / (F.spd || 1) : F.toGoS;
   // the arrival countdown runs from take-off to touchdown on the planned air time; holds after take-off
@@ -196,11 +198,35 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   c.balance += net;
   // keep the day's flown legs for the schedule (the last two days)
   const S: any = State; S.aiDay = (S.aiDay || []).filter((x: any) => x.end > Date.now() - 2 * 864e5);
-  S.aiDay.push({ reg: a.reg, from: f.from, to: f.to, start: F.depAt, end: at });
+  S.aiDay.push({ reg: a.reg, from: f.from, to: f.to, start: F.depAt, end: at, sched: F.sched || F.depAt, schedEnd: F.schedEnd || at, why: aiDelayWhy(F), retry: !!F.retry, callsign: f.callsign });
   summary.legs++; summary.net += net; if (p && summary.names.indexOf(p.name) < 0) summary.names.push(p.name);
   try { Ratings.aiLanding(f, at); } catch (e) { /* ignore */ }
   try { if (F.job) Jobs.delivered(F.job, at, net, txId); } catch (e) { /* ignore */ }
   try { if (f.from !== f.to && !F.ferry) Online.discordAiLanding(f, net); } catch (e) { /* ignore */ }
+}
+
+/** Why a flight ran late: what held it on the ground before it left, then the delays on the way. */
+function aiDelayWhy(F: any): string {
+  const w: string[] = [];
+  if (F.waitWhy) w.push(F.waitWhy);
+  ((F.holds || []) as Hold[]).forEach(h => w.push(h.why));
+  return w.join(', ');
+}
+const AI_CANCEL_AFTER_H = 5;
+/** A leg that has to wait until `until`: moved later, or past five hours cancelled (passengers rebooked)
+ *  and flown at the same time the next day. Returns the leg to put back in the plan. */
+function aiWait(n: any, until: number, why: string, a: any): any {
+  const spd = n.spd || 1, late = (until - n.sched) * spd;
+  if (late <= AI_CANCEL_AFTER_H * 3600e3) return Object.assign({}, n, { depAt: until, why });
+  const S: any = State, block = (n.schedEnd || n.sched + 3600e3) - n.sched;
+  if (!n.cancelNoted) {
+    S.aiDay = S.aiDay || [];
+    S.aiDay.push({ reg: n.reg, from: n.from, to: n.to, start: n.sched, end: n.sched + block, sched: n.sched, schedEnd: n.sched + block, cancelled: true, why, callsign: n.callsign });
+  }
+  // the same time the next day (or the day after, until the reason is over)
+  let retry = n.sched + 864e5 / spd; while (retry < until) retry += 864e5 / spd;
+  State.notices.unshift({ id: uid(), kind: 'pilot', title: `${n.callsign || n.reg} ${n.from} to ${n.to} cancelled`, body: `${why}. The passengers are rebooked; ${n.reg} tries again ${dateStr(new Date(retry)).slice(0, 16).replace('T', ' ')}.`, time: 'Now', at: n.sched, read: false, ref: n.reg } as any);
+  return Object.assign({}, n, { depAt: retry, sched: retry, schedEnd: retry + block, why: '', retry: true, cancelNoted: false });
 }
 
 /** Move every hired pilot on to `now`: land flights that have arrived, start the next legs that are due. */
@@ -227,6 +253,9 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       const f: LiveFlight = ev.f, F: any = f, at = Math.max(ev.at, earliest), spd = F.spd || 1;
       aiLand(f, at, summary);
       try { const pa: any = plane(f.reg); if (pa) { conditionAfterFlight(pa, F.durMs / 60000); conditionRisk(pa, f); } } catch (e) { /* ignore */ }
+      try { rateAiFlight(f, at); } catch (e) { /* ignore */ }
+      if (F.medical && !F.medical.noted) { try { medicalNote(F); } catch (e) { /* ignore */ } }
+      if (F.wxDivert && !F.wxDivert.noted) { try { wxDivertNote(F); } catch (e) { /* ignore */ } }
       try { paxOnAiLanding(f); Progress.afterAiLeg(f.pax, (plane(f.reg) || {} as any).typeId, f.to); } catch (e) { /* ignore */ }
       try { const pa: any = plane(f.reg); if (pa) crewAfterLeg(pa.companyId, { pilotId: f.pilotId, typeId: pa.typeId, from: f.from, to: f.to, blockMin: F.durMs / 60000 }); } catch (e) { /* ignore */ }
       State.live = State.live.filter(x => x !== f);
@@ -239,38 +268,71 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       // a charter: after the ferry to its airport comes the job itself; after the job, back to the route
       const jn = Jobs.afterAiLanding(f, at, spd);
       if (jn) { if (p) p.status = 'flying'; S.aiNext.push(jn); continue; }
-      const next = aiNextLeg(f.pilotId, f.from, f.to), a = plane(f.reg);
+      // after a diversion (medical or weather) the same flight carries on to where it was going
+      const dv = F.medical || F.wxDivert;
+      const next = dv ? dv.orig : aiNextLeg(f.pilotId, F.routeFrom || f.from, f.to), a = plane(f.reg);
       // no route of yours to fly next: the pilot waits on the ground until you assign one
       if (!next) { if (p) p.status = 'standby'; continue; }
       const nextBlock = aiProfile({ reg: f.reg, from: f.to, to: next, depAt: at }).totalS / 60;
       const rest = dutyMin + nextBlock > maxDuty;
       if (p) p.status = rest ? 'resting' : 'flying';
-      S.aiNext.push({ reg: f.reg, pilotId: f.pilotId, from: f.to, to: next, spd, depAt: at + (rest ? AI_REST_H * 3600e3 : AI_TURN_MIN * 60e3) / spd,
-        dutyMin: rest ? 0 : dutyMin, leg: (F.leg || 0) + 1, callsign: f.callsign, paxMax: f.paxMax });
+      const plan = at + (rest ? AI_REST_H * 3600e3 : AI_TURN_MIN * 60e3) / spd;
+      S.aiNext.push({ reg: f.reg, pilotId: f.pilotId, from: f.to, to: next, spd, depAt: plan, sched: plan, schedEnd: plan + nextBlock * 60e3 / spd,
+        dutyMin: rest ? 0 : dutyMin, leg: (F.leg || 0) + 1, callsign: f.callsign, paxMax: f.paxMax,
+        ...(dv ? { medicalDone: true, routeFrom: dv.from, carry: { pax: Math.max(0, f.pax - (F.medical ? 1 : 0)), paxJ: F.paxJ, paxF: F.paxF, cargoKg: F.cargoKg || 0 }, why: F.medical ? `Medical diversion to ${f.to}` : `Weather diversion to ${f.to}` } : {}) });
     } else {
       const n: any = ev.n, a = plane(n.reg), p: any = pilot(n.pilotId);
       S.aiNext = S.aiNext.filter((x: any) => x !== n);
+      if (!n.sched) { n.sched = n.depAt; }
+      // waiting for something: the leg moves later; past five hours it is cancelled and tried again the next day
+      const wait = (until: number, why: string) => { const w = aiWait(n, until, why, a); if (w) S.aiNext.push(w); };
       // an aircraft that went to maintenance, was sold or lost its pilot stays on the ground
       // a repair you paid for comes first: the leg waits until the aircraft is out of the hangar
       const rep = a ? (State.issues as any[]).filter(i => i.reg === a.reg && i.status === 'scheduled') : [];
-      if (a && p && p.status !== 'off' && rep.length) { const end = Math.max.apply(null, rep.map(i => (i.startedAt || n.depAt) + (i.durMin || 30) * 60000)); S.aiNext.push(Object.assign({}, n, { depAt: Math.max(n.depAt, end) + 10 * 60e3 })); continue; }
-      if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || p.status === 'off') continue;
+      if (a && p && p.status !== 'off' && rep.length) { const end = Math.max.apply(null, rep.map(i => (i.startedAt || n.depAt) + (i.durMin || 30) * 60000)); wait(Math.max(n.depAt, end) + 10 * 60e3, 'Repair in the hangar'); continue; }
+      // the weather, when it is happening now (catching up on hours the app was closed, today's weather says nothing)
+      if (a && ev.at > now - 30 * 60e3) { const wv = wxDepartureBlock(n, a); if (!wv.ok) { wait(wv.kind === 'cancel' ? n.sched + (AI_CANCEL_AFTER_H + 1) * 3600e3 : now + 30 * 60e3, wv.why); continue; } }
+      // off sick: the leg waits for cover (a stand-in or a contract pilot), cabin crew and mechanics likewise
+      if (a && p) { const sk = sickBlock(n, a); if (sk) { wait(now + 60 * 60e3, sk); continue; } }
+      const sickCovered = p && isSick(p) && p.coverAgency > now;
+      if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || (p.status === 'off' && !sickCovered)) continue;
       // away on a type rating course: the leg waits until the pilot is back
-      if (p.status === 'training') { S.aiNext.push(Object.assign({}, n, { depAt: Math.max(now, p.trainingUntil || now) + 60e3 })); continue; }
+      if (p.status === 'training') { wait(Math.max(now, p.trainingUntil || now) + 60e3, 'Pilot away on a course'); continue; }
       // no stand at its base: refused take-off until it gets a base with a free stand
-      if ((a as any).noBase) { p.status = 'standby'; S.aiNext.push(Object.assign({}, n, { depAt: now + 15 * 60e3 })); continue; }
+      if ((a as any).noBase) { p.status = 'standby'; wait(now + 15 * 60e3, 'No free stand at its base'); continue; }
       // operating certificate suspended by a court: the airline's aircraft stay on the ground
-      const gu = (S.groundedUntil || {})[a.companyId]; if (gu && gu > n.depAt) { S.aiNext.push(Object.assign({}, n, { depAt: gu })); continue; }
+      const gu = (S.groundedUntil || {})[a.companyId]; if (gu && gu > n.depAt) { wait(gu, 'Operating certificate suspended'); continue; }
+      // a strike: the leg waits (and is cancelled after five hours)
+      const sb = strikeBlock(a.companyId, a.typeId, n.from); if (sb) { wait(now + 60 * 60e3, sb); continue; }
       // never off and back onto the same airport, except a test flight you set up
       const test = n.from === n.to;
       if (!n.to || (test && !aiTestRoute(n.pilotId, n.from))) { p.status = 'standby'; continue; }
       // passengers and cargo from demand on the route (none on a test or ferry flight; a charter's own load)
-      const ld = aiPlannedLoad(n);
-      const depAt = Math.max(n.depAt, earliest), prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
+      const ld = n.carry || aiPlannedLoad(n);
+      const depAt = Math.max(n.depAt, earliest); let prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
       const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF, cargoKg: ld.cargoKg, paxMax: cabinSeats(acType(a.typeId), a) || n.paxMax, test,
-        alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg, ferry: !!n.ferry, job: n.job || undefined, jobNext: n.jobNext || undefined };
+        alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg, ferry: !!n.ferry, job: n.job || undefined, jobNext: n.jobNext || undefined,
+        sched: n.sched || depAt, waitWhy: n.why || '', retry: !!n.retry };
+      f.schedEnd = f.sched + prof.totalS * 1000 / (n.spd || 1);
+      if (n.medicalDone) { f.medicalDone = true; f.routeFrom = n.routeFrom; }
+      // rarely, a passenger falls ill on the way: the flight will divert (planned now, told when it happens)
+      if (!test && maybeMedical(f, a)) { f.medical.from = n.from; prof = aiProfile({ reg: n.reg, from: n.from, to: f.to, depAt }); f.durMs = prof.totalS * 1000; }
       if (!test) assignDelays(f, prof);
-      a.status = 'flying'; p.status = 'flying';
+      // real weather on the way: reroutes, holding, or a diversion to an alternate
+      if (!test && ev.at > now - 30 * 60e3) {
+        try {
+          const before = (f.holds || []).reduce((s2: number, h: Hold) => s2 + h.s, 0);
+          const dvWhy = wxEnroute(f, a, prof);
+          if (dvWhy) {
+            const alt = wxAlternate(a.typeId, f.from, f.to, f.pax);
+            if (alt) { f.wxDivert = { orig: f.to, from: n.routeFrom || n.from, why: dvWhy === 'fog' ? 'fog' : 'thunderstorms' }; f.to = alt; prof = aiProfile({ reg: n.reg, from: n.from, to: alt, depAt }); }
+          }
+          const after = (f.holds || []).reduce((s2: number, h: Hold) => s2 + h.s, 0);
+          f.delayS = after; f.durMs = prof.totalS * 1000 + after * 1000;
+        } catch (e) { /* the weather never stops the simulation */ }
+      }
+      a.status = 'flying'; if (!isSick(p)) p.status = 'flying';
+      if (sickCovered) f.coverBy = 'Contract pilot (covering ' + p.name + ')';
       State.live.push(f);
     }
   }
@@ -345,30 +407,36 @@ function aiScheduleNotificationsCancel() {
 
 /** A hired pilot's day for the schedule, in minutes after midnight: legs flown, the one in progress, and the
  *  next ones projected with real-world block times, turnarounds and rest, until the end of the day. */
-function aiDayBlocks(reg: string): { from: string; to: string; start: number; end: number; live?: boolean }[] {
+function aiDayBlocks(reg: string, day?: number): { from: string; to: string; start: number; end: number; live?: boolean; delayMin?: number; cancelled?: boolean; why?: string; retry?: boolean; sched?: number }[] {
   const S: any = State, a = plane(reg); if (!a) return [];
-  const mid = new Date(); mid.setHours(0, 0, 0, 0); const m0 = mid.getTime(), m1 = m0 + 864e5;
+  const mid = new Date(); mid.setHours(0, 0, 0, 0); mid.setDate(mid.getDate() + (day || 0)); const m0 = mid.getTime(), m1 = m0 + 864e5;
   const toMin = (ms: number) => (ms - m0) / 60000;
+  const late = (end: number, schedEnd: number) => schedEnd ? Math.max(0, Math.round((end - schedEnd) / 60000)) : 0;
   const out: any[] = [];
-  for (const x of (S.aiDay || [])) if (x.reg === reg && x.end > m0) out.push({ from: x.from, to: x.to, start: toMin(x.start), end: toMin(x.end) });
+  for (const x of (S.aiDay || [])) if (x.reg === reg && x.end > m0 && x.start < m1) out.push({ from: x.from, to: x.to, start: toMin(x.start), end: toMin(x.end), sched: x.sched ? toMin(x.sched) : undefined,
+    delayMin: x.cancelled ? 0 : late(x.end, x.schedEnd), cancelled: !!x.cancelled, why: x.why || '', retry: !!x.retry });
   const f: any = State.live.filter(x => x.reg === reg && aiOn(x))[0];
-  let at = 0, from = '', prev = '', spd = aiSpeed(), dutyMin = 0, pilotId = '';
-  if (f && f.depAt) { const end = aiEndAt(f); out.push({ from: f.from, to: f.to, start: toMin(f.depAt), end: toMin(end), live: true }); at = end; from = f.to; prev = f.from; spd = f.spd || 1; dutyMin = (f.dutyMin || 0) + f.durMs / 60000; pilotId = f.pilotId; }
+  let at = 0, from = '', prev = '', spd = aiSpeed(), dutyMin = 0, pilotId = '', knock = 0;
+  if (f && f.depAt) { const end = aiEndAt(f); const d = late(end, f.schedEnd); knock = d;
+    if (end > m0 && f.depAt < m1) out.push({ from: f.from, to: f.to, start: toMin(f.depAt), end: toMin(end), live: true, sched: f.sched ? toMin(f.sched) : undefined, delayMin: d, why: aiDelayWhy(f), retry: !!f.retry });
+    at = end; from = f.to; prev = f.from; spd = f.spd || 1; dutyMin = (f.dutyMin || 0) + f.durMs / 60000 + AI_TURN_MIN; pilotId = f.pilotId; }
   const n: any = (S.aiNext || []).filter((x: any) => x.reg === reg)[0];
-  if (!f && n) { at = n.depAt - AI_TURN_MIN * 60e3 / (n.spd || 1); from = n.from; prev = n.from === n.to ? n.from : ''; spd = n.spd || 1; dutyMin = n.dutyMin || 0; pilotId = n.pilotId; }
+  if (!f && n) { at = n.depAt - AI_TURN_MIN * 60e3 / (n.spd || 1); from = n.from; prev = n.from === n.to ? n.from : ''; spd = n.spd || 1; dutyMin = n.dutyMin || 0; pilotId = n.pilotId; knock = n.sched ? Math.max(0, Math.round((n.depAt - n.sched) / 60000)) : 0; }
   if (!at) return out;
-  // project the rest of the day
+  // project the rest of the day; a delay knocks on to the legs after it
   const p: any = pilot(pilotId), maxDuty = ((p && p.rules && p.rules.maxDutyHrs) || 10) * 60;
   let to = n && !f ? n.to : aiNextLeg(pilotId, prev, from);
-  for (let k = 0; k < 12 && at < m1; k++) {
+  for (let k = 0; k < 40 && at < m1; k++) {
     if (!to || to === from) break;
     const blockMin = flightProfile(a.typeId, from, to, at).totalS / 60;
     let dep = at + AI_TURN_MIN * 60e3 / spd;
-    if (dutyMin + AI_TURN_MIN + blockMin > maxDuty) { dep = at + AI_REST_H * 3600e3 / spd; dutyMin = 0; }
-    if (k === 0 && n && !f) dep = n.depAt;
+    if (dutyMin + AI_TURN_MIN + blockMin > maxDuty) { dep = at + AI_REST_H * 3600e3 / spd; dutyMin = 0; knock = 0; }   // a night's rest absorbs the delay
+    const first = k === 0 && n && !f;
+    if (first) dep = n.depAt;
     const end = dep + blockMin * 60e3 / spd;
     if (dep >= m1) break;
-    out.push({ from, to, start: toMin(dep), end: toMin(end) });
+    if (end > m0) out.push({ from, to, start: toMin(dep), end: toMin(end), delayMin: knock, sched: first && n.sched ? toMin(n.sched) : toMin(dep - knock * 60000),
+      why: first ? (n.why || '') : knock ? 'Knock-on from an earlier delay' : '', retry: first && !!n.retry });
     dutyMin += AI_TURN_MIN + blockMin; at = end;
     const nx = aiNextLeg(pilotId, from, to); prev = from; from = to; to = nx;
   }

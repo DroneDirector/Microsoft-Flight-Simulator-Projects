@@ -39,6 +39,8 @@ function openStaff(id: string) {
           <div><small>Rating</small><b>${(p.rating || 4).toFixed(1)} ★</b></div>
           ${p.you ? '' : (l => `<div class="kv-lvl"><small>Level ${l.level} of ${LEVEL_MAX}</small><b>${esc(levelTitle(p))}</b><span class="lvl-bar"><i style="width:${(l.p * 100).toFixed(0)}%"></i></span><small>${num(p.xp || 0)} XP${l.to > l.from ? ` · ${num(l.to - (p.xp || 0))} to level ${l.level + 1}` : ' · highest level'}</small></div>`)(levelOf(p.xp))}
           ${p.you ? '' : `<button class="kv-btn" data-act="mood-open" data-id="${esc(p.id)}"><small>Mood</small><b class="${staffMood(p) < 40 ? 'amber' : staffMood(p) >= 62 ? 'green' : ''}">${esc(moodWord(staffMood(p)))} ${staffMood(p)}%${icon('chevron')}</b></button>`}
+          ${typeof isSick === 'function' && isSick(p) ? `<button class="kv-btn" data-act="sick-open" data-id="${esc(p.id)}"><small>Health</small><b class="amber">Off sick${icon('chevron')}</b></button>` : ''}
+          ${p.onStrike ? `<div><small>Status</small><b class="amber">On strike</b></div>` : ''}
           ${p.warnings ? `<button class="kv-btn" data-act="warn-open" data-id="${esc(p.id)}"><small>Conduct</small><b class="amber">${p.warnings} warning${p.warnings > 1 ? 's' : ''}${icon('chevron')}</b></button>` : `<div><small>Conduct</small><b class="green">Clean record</b></div>`}
         </div>
         ${warnHistory(p)}

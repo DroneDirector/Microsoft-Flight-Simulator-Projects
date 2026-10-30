@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.6 (2026-10-30)
+
+- Real-world weather always on (METAR, TAF, international and US SIGMETs); per-type weather limits (crosswind, tailwind, minima, IFR, icing) and airport minima by size; AI waits, holds, reroutes, diverts to an alternate and continues, or cancels
+- Map weather layer (toggle): flight categories, present weather, hazard areas, legend; sim weather panel when connected
+- Schedule: planned vs actual, knock-on delays, cancellations retried next day, Tomorrow view
+- Pay at going rates by job, level, region and airline kind; pay scales; union warnings and strikes; one-time pay rebase
+- Sick days with stand-ins, contract pilots and agency cover
+- Pets (cabin/hold, captain's call on temperature), pet tickets; passenger reviews (Ranking → Passengers); celebrities; medical diversions
+- Fixes: passenger bans saved; Icelandic surnames match the person; celebrity notices open the flight
+
 ## 0.9.5 (2026-10-30)
 
 - First-start choice: keep the demo or wipe and found your own airline; start over in Settings

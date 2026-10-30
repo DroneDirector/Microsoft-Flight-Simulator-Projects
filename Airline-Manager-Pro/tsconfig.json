@@ -96,6 +96,10 @@
     "src/core/manifest.ts",
     "src/core/morale.ts",
     "src/core/services.ts",
+    "src/core/strikes.ts",
+    "src/core/sickness.ts",
+    "src/core/pax-experience.ts",
+    "src/core/weather.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/main.ts"
