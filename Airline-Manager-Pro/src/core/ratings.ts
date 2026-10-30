@@ -98,7 +98,7 @@ const Ratings = {
     const p: any = pilot(f.pilotId); if (!p) return;
     const a = plane(f.reg), t = a ? acType(a.typeId) : null, B: any = apt(f.to);
     const w = B ? airportWind(f.to, B.pos) : { kt: 8 };
-    const skill = clamp(5 - (p.rating || 4), 0, 2);
+    const skill = clamp(5 - workRating(p), 0, 2.6);   // an unhappy pilot flies worse
     const r = (k: string) => (hashMix(f.id + k) % 1000) / 1000;
     const fpm = Math.round(70 + skill * 110 + r('a') * 170 + Math.max(0, w.kt - 12) * 6 + (t && (t.cls === 'bush' || t.cls === 'ga') ? 30 : 0) + (r('b') < 0.03 ? 220 : 0));
     const g = Math.round((1.05 + fpm / 1600 + r('g') * 0.08) * 100) / 100;

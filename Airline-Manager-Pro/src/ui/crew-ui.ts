@@ -12,7 +12,7 @@ function staffCard(p: any, i: number, opts?: { hire?: boolean }): string {
   const role = personRole(p);
   return `<button class="staff-card ${opts && opts.hire ? 'hire' : ''}" data-act="${opts && opts.hire ? 'hire-staff' : 'staff-detail'}" data-id="${p.id}" style="--i:${i}">
     <span class="sc-av">${avatarSvg(p.look, role, { view: 'bust', accent: company().color })}</span>
-    <span class="sc-txt"><b>${esc(p.name)}</b><small>${levelChip(p) + ' '}${opts && opts.hire ? ROLE_NAMES[role] : esc(levelTitle(p))}, ${flag(p.nat || 'GB')} ${ageOf(p.dob)}</small>
+    <span class="sc-txt"><b>${esc(p.name)}</b><small>${levelChip(p) + ' '}${role === 'ground' ? esc(groundJobName(p)) : opts && opts.hire ? ROLE_NAMES[role] : esc(levelTitle(p))}, ${flag(p.nat || 'GB')} ${ageOf(p.dob)}</small>
       <small>${opts && opts.hire ? `${esc(apt(p.base) ? apt(p.base).city : p.base)}, ${money(p.salary)}/wk` : `${esc(p.base)}, ${money(p.salary)}/wk`}</small></span>
     ${p.warnings ? `<i class="warn-dot" title="${p.warnings} warning${p.warnings > 1 ? 's' : ''}">${p.warnings}</i>` : ''}
     ${opts && opts.hire ? `<span class="sc-hire">${icon('plus')}Hire</span>` : ''}
@@ -38,12 +38,15 @@ function openStaff(id: string) {
           <div><small>Salary</small><b>${money(p.salary)}/wk</b></div>
           <div><small>Rating</small><b>${(p.rating || 4).toFixed(1)} ★</b></div>
           ${p.you ? '' : (l => `<div class="kv-lvl"><small>Level ${l.level} of ${LEVEL_MAX}</small><b>${esc(levelTitle(p))}</b><span class="lvl-bar"><i style="width:${(l.p * 100).toFixed(0)}%"></i></span><small>${num(p.xp || 0)} XP${l.to > l.from ? ` · ${num(l.to - (p.xp || 0))} to level ${l.level + 1}` : ' · highest level'}</small></div>`)(levelOf(p.xp))}
+          ${p.you ? '' : `<button class="kv-btn" data-act="mood-open" data-id="${esc(p.id)}"><small>Mood</small><b class="${staffMood(p) < 40 ? 'amber' : staffMood(p) >= 62 ? 'green' : ''}">${esc(moodWord(staffMood(p)))} ${staffMood(p)}%${icon('chevron')}</b></button>`}
           ${p.warnings ? `<button class="kv-btn" data-act="warn-open" data-id="${esc(p.id)}"><small>Conduct</small><b class="amber">${p.warnings} warning${p.warnings > 1 ? 's' : ''}${icon('chevron')}</b></button>` : `<div><small>Conduct</small><b class="green">Clean record</b></div>`}
         </div>
         ${warnHistory(p)}
         <div class="modal-actions">
           ${editable ? `<button class="btn ghost" data-act="edit-staff-look" data-id="${p.id}">${icon('user')}Change look</button>` : ''}
           ${isCo ? `<button class="btn ghost" data-act="copilot-sex">${icon('swap')}Male or female</button>` : ''}
+          ${p.you || isCo ? '' : `<button class="btn ghost" data-act="xfer-open" data-id="${p.id}">${icon('swap')}Transfer</button>`}
+          ${p.you ? '' : `<button class="btn ghost" data-act="commend-open" data-id="${p.id}">${icon('trophy')}Commend</button>`}
           <button class="btn danger" data-act="dismiss-ask" data-id="${p.id}">Dismiss</button>
         </div>
       </div>
@@ -104,6 +107,11 @@ const INCIDENTS: { [role: string]: string[][] } = {
     ['Rude to a passenger', 'A passenger complained that {n} was dismissive and rude during the meal service.', 'moderate'],
     ['Skipped a safety check', '{n} signed off the cabin safety check without checking the emergency equipment.', 'severe'],
     ['Argument with a colleague', '{n} had a loud argument with another crew member in the galley, in front of passengers.', 'moderate']],
+  ground: [['Late for the turnaround', '{n} arrived late at the aircraft at {b}, and the bags were loaded 15 minutes behind schedule.', 'light'],
+    ['Drove too fast on the apron', '{n} was seen driving a vehicle well over the apron speed limit near parked aircraft at {b}.', 'moderate'],
+    ['Hit an aircraft with a vehicle', '{n} reversed a vehicle into an aircraft door at {b}. The aircraft needed an inspection before it could fly.', 'severe'],
+    ['Threw passengers\' bags', 'Passengers filmed {n} throwing their suitcases onto the belt loader at {b}.', 'moderate'],
+    ['Left a vehicle unattended', '{n} left a vehicle running and unattended next to an aircraft at {b}.', 'light']],
   mech: [['Missed a deadline', '{n} didn\'t finish a scheduled inspection on time, so an aircraft left {b} 40 minutes late.', 'moderate'],
     ['Tools left on the apron', '{n} left a toolbox on the apron at {b}. Ramp staff found it before it caused damage.', 'severe'],
     ['Paperwork not signed', '{n} returned an aircraft to service without completing the maintenance paperwork.', 'severe'],
@@ -119,7 +127,7 @@ function maybeIncident() {
   if (!conductOn()) return;   // switched off in Settings: nothing new happens, nothing is removed
   const cid = State.companyId;
   // the AI crew only: hired pilots, co-pilots, flight attendants and mechanics (never you)
-  const roles: string[] = ['fa', 'mech', 'fo', 'pilot'];
+  const roles: string[] = ['fa', 'mech', 'ground', 'fo', 'pilot'];
   const me = myPilot();
   for (const r of roles) {
     const p = MISCONDUCT_P[S.settings.misconduct[r === 'pilot' ? 'fo' : r]] || 0;
@@ -130,7 +138,7 @@ function maybeIncident() {
     if (!pool.length) continue;
     const who: any = pool[Math.floor(Math.random() * pool.length)];
     // well-rated staff behave: the chance falls as their rating rises, and with every warning they learned from
-    if (Math.random() > conductFactor(who.rating) * Math.pow(0.6, who.learned || 0)) continue;
+    if (Math.random() > conductFactor(workRating(who)) * Math.pow(0.6, who.learned || 0)) continue;   // unhappy people slip more
     // very rarely it's a crime: police, the aviation authority and a court case
     if (maybeCriminal(who, r)) return;
     const t = INCIDENTS[r === 'pilot' ? 'fo' : r][Math.floor(Math.random() * INCIDENTS[r === 'pilot' ? 'fo' : r].length)];
@@ -222,7 +230,7 @@ ACTIONS['hire-staff'] = el => {
           <div><small>Age</small><b>${ageOf(p.dob)}</b></div>
           <div><small>Rating</small><b>${p.rating.toFixed(1)} ★</b></div>
           <div><small>Salary</small><b>${money(p.salary)}/wk</b></div>
-          <div><small>Based at</small><b>${esc(c.hub)}</b></div>
+          <div><small>Based at</small>${(p.role === 'mech' || p.role === 'ground') && (State.settings as any).groundHandling === 'everywhere' ? `<select class="le-in hire-base">${apronAirports(c.id).map(k => `<option value="${k}" ${k === c.hub ? 'selected' : ''}>${k}, ${esc(apt(k) ? apt(k).city || apt(k).name : k)}</option>`).join('')}</select>` : `<b>${esc(c.hub)}</b>`}</div>
         </div>
         <p class="lede">${icon('info')}The salary is paid from ${esc(c.name)}'s balance every week.</p>
         <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Not now</button>
@@ -242,7 +250,15 @@ ACTIONS['hire-do'] = el => {
   const p = S.staffCandidates.filter((x: Staff) => x.id === id)[0]; if (!p) return;
   const c = company();
   S.staffCandidates = S.staffCandidates.filter((x: Staff) => x.id !== id);
-  p.companyId = c.id; p.base = c.hub; p.hired = dateStr(new Date()).slice(0, 10); p.status = 'on duty';
+  const hb = $('.hire-base') as HTMLSelectElement;
+  if (p.role === 'mech' || p.role === 'ground') {
+    const where = hb && hb.value ? hb.value : c.hub;
+    if (where === c.hub) {
+      const lim = apronLimits(c.id, c.hub), have = staffOf(c.id, p.role).filter((x: any) => x.base === c.hub && !x.apronLeave).length, max = p.role === 'mech' ? lim.mech : lim.ground;
+      if (have >= max) { toast(`${c.hub} has room for ${max} ${p.role === 'mech' ? 'mechanics' : 'ground staff'} with the aircraft based there (you have ${have})`, 'warn'); return; }
+    }
+  }
+  p.companyId = c.id; p.base = hb && hb.value ? hb.value : c.hub; p.hired = dateStr(new Date()).slice(0, 10); p.status = 'on duty';
   chargeHiring(p);
   if (p.role === 'fo') State.pilots.push({ id: p.id, name: p.name, rank: 'First officer', hoursMin: 1500 * 60, landings: 900, base: c.hub, salary: p.salary, rating: p.rating, status: 'standby', types: (() => { const ft = State.fleet.filter(a => a.companyId === c.id && multiCrew(acType(a.typeId))).map(a => a.typeId); return ft.length ? [ft[_hashStr(p.id) % ft.length]] : []; })(), sex: p.sex, nat: p.nat, dob: p.dob, look: p.look, companyId: c.id, warnings: 0, rules: { maxDutyHrs: 10, maxLandingFpm: 500, ifrOnly: true, homeBaseReturn: true } } as any);
   else S.staff.push(p);
@@ -443,4 +459,163 @@ ACTIONS['warn-open'] = el => {
     </div>`).join('');
   openLayer('modal', `<div class="modal-head"><div><h2>Warnings: ${esc(p.name)}</h2><small>${esc(warnSummary(p))}${p.learned ? ` · took ${p.learned} to heart` : ''}${p.stubborn ? ` · ignored ${p.stubborn}` : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body warn-list">${items}${older ? `<p class="fine-print">${icon('info')}${older} earlier warning${older > 1 ? 's' : ''} from before reports were kept with each warning.</p>` : ''}</div>`, { cls: 'narrow', onClose: () => Voice.stop() });
+};
+
+/* ---------- Commending loyal staff ---------- */
+/** Years with the company (from the day they were hired). */
+function serviceYears(p: any): number { const t = Date.parse(p.hired || ''); return isFinite(t) ? Math.max(0, (Date.now() - t) / (365.25 * 864e5)) : 0; }
+function weeklyPay(p: any): number { return p.salary || 1000; }
+
+const COMMENDS: { id: string; title: string; text: (p: any) => string; cost: (p: any) => number; mood: number }[] = [
+  { id: 'thanks', title: 'A personal thank-you', text: p => `A letter from you, read out at the next briefing at ${p.base}.`, cost: () => 0, mood: 6 },
+  { id: 'award', title: 'Long-service award', text: p => `A framed award and a pin for ${Math.max(1, Math.floor(serviceYears(p)))} year${Math.floor(serviceYears(p)) === 1 ? '' : 's'} with the company, handed over in front of the team.`, cost: () => 450, mood: 12 },
+  { id: 'medal', title: 'Medal of excellence', text: () => 'The company\'s medal for outstanding work, with a dinner for the whole crew room.', cost: () => 1800, mood: 18 },
+  { id: 'bonus', title: 'Bonus: a month\'s pay', text: p => `${money(weeklyPay(p) * 4)} on top of the next pay.`, cost: p => weeklyPay(p) * 4, mood: 20 },
+  { id: 'days', title: 'Three extra days off', text: () => 'Paid, starting tomorrow. Someone else covers the duties.', cost: p => Math.round(weeklyPay(p) * 0.6), mood: 14 },
+  { id: 'trip', title: 'A family holiday on your airline', text: () => 'Them and their family flown to a destination they choose on one of your aircraft, hotel and all paid for by the company.', cost: p => 2500 + 900 * familySize(p), mood: 30 },
+];
+function familySize(p: any): number { return 2 + (_hashStr(p.id + 'fam') % 3); }
+
+ACTIONS['commend-open'] = el => {
+  const p: any = staffById(el.getAttribute('data-id')); if (!p) return;
+  closeTop(); Sound.tick();
+  const yrs = serviceYears(p), last = (p.commends || []).slice(-3).reverse();
+  const dests = Array.from(new Set(State.routes.filter(r => r.companyId === (p.companyId || State.companyId)).reduce((a: string[], r) => a.concat(r.legs), []))).filter(k => apt(k)).slice(0, 14);
+  openLayer('modal', `<div class="modal-head"><div><h2>Commend ${esc(p.name)}</h2><small>${yrs >= 1 ? Math.floor(yrs) + ' year' + (Math.floor(yrs) === 1 ? '' : 's') : 'Less than a year'} with the company · mood ${Math.round(staffMood(p))}%</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body commend">
+      ${COMMENDS.map(c => `<button class="commend-opt" data-act="commend-do" data-id="${esc(p.id)}" data-c="${c.id}"><b>${esc(c.title)}</b><small>${esc(c.text(p))}</small><span>${c.cost(p) ? money(c.cost(p)) : 'Free'}</span></button>`).join('')}
+      ${dests.length ? `<div class="le-group"><b>Holiday destination (their choice)</b><select class="le-in commend-dest">${dests.map(k => `<option value="${k}">${k}, ${esc(apt(k).city || apt(k).name)}</option>`).join('')}</select></div>` : ''}
+      ${last.length ? `<p class="fine-print">${icon('info')}Earlier: ${last.map((x: any) => esc(x.title + ' (' + x.date + ')')).join(', ')}</p>` : ''}
+    </div>`, { cls: 'narrow' });
+};
+ACTIONS['commend-do'] = el => {
+  const p: any = staffById(el.getAttribute('data-id')), c = COMMENDS.filter(x => x.id === el.getAttribute('data-c'))[0]; if (!p || !c) return;
+  const cost = c.cost(p), co = company(p.companyId || State.companyId);
+  let title = c.title;
+  if (c.id === 'trip') { const d = ($('.commend-dest') as HTMLSelectElement); const k = d ? d.value : ''; title = `Family holiday${k ? ' to ' + (apt(k).city || k) : ''}`; p.status = 'off'; p.offUntil = Date.now() + 5 * 864e5; }
+  if (c.id === 'days') { p.status = 'off'; p.offUntil = Date.now() + 3 * 864e5; }
+  if (cost) payTxn(co.id, `${title}: ${p.name}`, -cost, 'salary', [[title, -cost]]);
+  p.commends = (p.commends || []).concat([{ id: c.id, title, date: dateStr(new Date()).slice(0, 10) }]);
+  // repeating the same commendation soon after counts for less
+  const recent = (p.commends || []).filter((x: any) => x.id === c.id).length;
+  staffMoodAdd(p, c.mood / Math.max(1, recent * 0.7), title);
+  p.loyalty = clamp((p.loyalty || 50) + c.mood / 2, 0, 100);
+  closeAll(); Sound.tick(); Store.save(); refresh();
+  toast(`${p.name}: ${title.toLowerCase()}${cost ? ', ' + money(cost) : ''}. Mood up.`, 'ok');
+};
+
+/** Airports where the airline can keep its own apron crew: its base, and with "every airport", every airport it flies to. */
+function apronAirports(cid: string): string[] {
+  const c = company(cid), set: string[] = [c.hub];
+  if ((State.settings as any).groundHandling === 'everywhere') {
+    State.routes.filter(r => r.companyId === cid).forEach(r => r.legs.forEach(k => { if (set.indexOf(k) < 0) set.push(k); }));
+    fleetOf(cid).forEach(a => { if (a.base && set.indexOf(a.base) < 0) set.push(a.base); });
+  }
+  return set.filter(k => apt(k));
+}
+/* ---------- Transfers: to another airport of the airline, or to another of your airlines ---------- */
+const XFER_REASONS = ['Needed more there', 'Career step for them', 'Their own request, closer to family', 'Fresh start after a dispute', 'Opening a new base', 'Fewer flights here now', 'Their skills fit that airline better'];
+/** Airports a person of this role can be based at: apron staff only where the airline keeps its own apron crew; flying crew anywhere the airline flies. */
+function xferAirports(p: any, cid: string): string[] {
+  const role = personRole(p);
+  if (role === 'mech' || role === 'ground') return apronAirports(cid);
+  const c = company(cid), set: string[] = [c.hub];
+  State.routes.filter(r => r.companyId === cid).forEach(r => r.legs.forEach(k => { if (set.indexOf(k) < 0) set.push(k); }));
+  fleetOf(cid).forEach(a => { if (a.base && set.indexOf(a.base) < 0) set.push(a.base); });
+  return set.filter(k => apt(k));
+}
+/** Room for one more apron worker at that airport (home base limits; other airports have none). */
+function xferRoom(p: any, cid: string, icao: string): string {
+  const role = personRole(p); if (role !== 'mech' && role !== 'ground') return '';
+  if (icao !== company(cid).hub) return '';
+  const lim = apronLimits(cid, icao), max = role === 'mech' ? lim.mech : lim.ground;
+  const have = staffOf(cid, role).filter((x: any) => x.base === icao && !x.apronLeave && x.id !== p.id).length;
+  return have >= max ? `${icao} already has ${have} of ${max} ${role === 'mech' ? 'mechanics' : 'ground staff'} allowed for its size and the aircraft based there.` : '';
+}
+let _xferTo: 'apt' | 'co' = 'apt';
+ACTIONS['xfer-open'] = el => {
+  const p: any = staffById(el.getAttribute('data-id')); if (!p) return;
+  if (coopOn() && !coopCanBuy()) { toast('In this co-op only the owner transfers staff', 'warn'); return; }
+  const cid = p.companyId || State.companyId, apts = xferAirports(p, cid).filter(k => k !== p.base);
+  const others = State.companies.filter(c => c.id !== cid);
+  if (!apts.length && !others.length) { toast(personRole(p) === 'mech' || personRole(p) === 'ground' ? 'Apron staff work at the home base only. Choose "Own crew at every airport" in Settings to base them elsewhere.' : 'There is nowhere else to transfer them to yet', 'warn'); return; }
+  if (!apts.length) _xferTo = 'co'; if (!others.length) _xferTo = 'apt';
+  const tab = (k: string, t: string, on: boolean) => `<button class="${_xferTo === k ? 'on' : ''}" data-act="xfer-to" data-k="${k}" data-id="${esc(p.id)}" ${on ? '' : 'disabled'}>${t}</button>`;
+  closeTop();
+  openLayer('modal', `<div class="modal-head"><div><h2>Transfer ${esc(p.name)}</h2><small>${ROLE_NAMES[personRole(p)]} · now at ${esc(p.base)}, ${esc(company(cid).name)}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <span class="seg xfer-seg">${tab('apt', 'Another airport', apts.length > 0)}${tab('co', 'Another airline', others.length > 0)}</span>
+    ${_xferTo === 'apt' ? `<label class="field"><span>Airport</span><select class="le-in xfer-apt">${apts.map(k => `<option value="${k}">${k} · ${esc(apt(k).city || apt(k).name)}</option>`).join('')}</select></label>`
+      : `<label class="field"><span>Airline</span><select class="le-in xfer-co">${others.map(c => `<option value="${c.id}">${esc(c.name)} · based at ${c.hub}</option>`).join('')}</select></label><p class="fine-print">${icon('info')}They start at the other airline's home base, keep their level, pay and record.</p>`}
+    <label class="field"><span>Reason</span><select class="le-in xfer-why">${XFER_REASONS.map(r => `<option>${esc(r)}</option>`).join('')}<option value="">Other (write it below)</option></select></label>
+    <label class="field"><span>Note to ${esc(p.name.split(' ')[0])}</span><input class="le-in xfer-note" maxlength="140" placeholder="Optional"></label>
+    <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="xfer-do" data-id="${esc(p.id)}">${icon('swap')}Transfer</button></div>`, { cls: 'xfer-modal' });
+};
+ACTIONS['xfer-to'] = el => { _xferTo = el.getAttribute('data-k') as any; closeTop(); ACTIONS['xfer-open'](el, null); };
+ACTIONS['xfer-do'] = el => {
+  const p: any = staffById(el.getAttribute('data-id')); if (!p) return;
+  const val = (q: string) => { const e = $(q) as HTMLInputElement; return e ? e.value : ''; };
+  const why = (val('.xfer-why') || val('.xfer-note') || 'No reason given').trim(), note = val('.xfer-note').trim();
+  const fromCo = p.companyId || State.companyId, fromApt = p.base;
+  let toCo = fromCo, toApt = fromApt;
+  if (_xferTo === 'co') { toCo = val('.xfer-co'); toApt = company(toCo).hub; } else toApt = val('.xfer-apt');
+  if (!toApt) return;
+  const full = xferRoom(p, toCo, toApt); if (full) { toast(full, 'warn'); return; }
+  if (toCo !== fromCo) { p.companyId = toCo; if (p.coPilotFor) p.coPilotFor = null; }
+  p.base = toApt; p.apronLeave = false; if (p.status === 'off' && p.leavePay) { p.status = 'on duty'; p.leavePay = false; }
+  (p.transfers = p.transfers || []).unshift({ at: Date.now(), fromCo, toCo, fromApt, toApt, why, note });
+  // moving is a change: a wanted move lifts the mood a little, a move away from family lowers it
+  if (typeof staffMoodAdd === 'function') staffMoodAdd(p, /family|career|request/i.test(why) ? 6 : /dispute|fewer/i.test(why) ? -4 : -1);
+  Store.save(); closeAll(); refresh();
+  const where = toCo !== fromCo ? `${company(toCo).name} at ${toApt}` : toApt;
+  toast(`${p.name} transferred to ${where}`, 'ok');
+  State.notices.unshift({ id: uid(), kind: 'staff' as any, title: `${p.name} transferred`, body: `${ROLE_NAMES[personRole(p)]} from ${fromApt}${toCo !== fromCo ? ` (${company(fromCo).name})` : ''} to ${where}. Reason: ${why}.${note ? ` Note: "${note}"` : ''}`, time: 'Now', at: Date.now(), read: false, ref: p.id } as any);
+};
+
+/* ---------- Apron crew limits and the change back to "home base only" ---------- */
+/** How many mechanics and ground staff the home base supports, by its size and the aircraft based there
+ *  (about one turnaround team per aircraft for ground handling, line-maintenance staffing per aircraft
+ *  for mechanics, more for bigger aircraft; a bigger airport allows more shifts). */
+function apronLimits(cid: string, icao: string): { mech: number; ground: number } {
+  const size = typeof aptSize === 'function' ? aptSize(icao) : 1;   // 0 small, 1 regional, 2 large
+  const per: { [c: string]: number[] } = { widebody: [4, 12], airliner: [3, 8], regional: [2, 6], turboprop: [1.5, 5], bush: [1, 2], ga: [0.5, 1] };
+  let mech = 0, ground = 0;
+  for (const a of fleetOf(cid)) if ((a.base || company(cid).hub) === icao) { const f = per[acType(a.typeId).cls] || [2, 5]; mech += f[0]; ground += f[1]; }
+  const shifts = [1, 1.5, 2.2][clamp(size, 0, 2)];
+  return { mech: Math.max(2, Math.ceil(mech * shifts) + 1), ground: Math.max(3, Math.ceil(ground * shifts) + 2) };
+}
+function apronCrewChanged() {
+  const S: any = State, cid = State.companyId, c = company(cid);
+  if ((S.settings.groundHandling || 'base') !== 'base') {
+    // back to every airport: people on leave can come back
+    const back = (S.staff || []).filter((p: any) => p.companyId === cid && p.apronLeave);
+    back.forEach((p: any) => { p.apronLeave = false; p.status = 'on duty'; });
+    if (back.length) toast(`${back.length} on leave back at work at their airports`, 'ok');
+    return;
+  }
+  const away = (S.staff || []).filter((p: any) => p.companyId === cid && (p.role === 'mech' || p.role === 'ground') && p.base !== c.hub && !p.apronLeave);
+  if (!away.length) return;
+  const lim = apronLimits(cid, c.hub);
+  openLayer('modal', `<div class="modal-head"><div><h2>Apron crew at other airports</h2><small>${away.length} people no longer have work under "home base only". Room at ${esc(c.hub)}: ${lim.mech} mechanics, ${lim.ground} ground staff.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body apron-move">
+      ${away.map((p: any) => `<div class="am-row" data-id="${p.id}"><span class="sc-av">${avatarSvg2d(p.look, personRole(p), { view: 'bust', still: true })}</span><span><b>${esc(p.name)}</b><small>${esc(personRole(p) === 'ground' ? groundJobName(p) : 'Mechanic')} at ${esc(p.base)}</small></span>
+        <select class="le-in am-what"><option value="move">Move to ${esc(c.hub)}</option><option value="leave">Put on leave</option><option value="dismiss">Dismiss</option></select></div>`).join('')}
+      <div class="modal-actions"><button class="btn ghost" data-act="am-all" data-v="leave">All on leave</button><button class="btn ghost" data-act="am-all" data-v="dismiss">Dismiss all</button><button class="btn primary" data-act="am-go">${icon('check')}Done</button></div>
+      <p class="fine-print">${icon('info')}On leave: kept on half pay without working, back at their airport if you switch to "Every airport" again. Moving is limited by the room at your home base; anyone who doesn't fit goes on leave.</p>
+    </div>`, { cls: 'narrow' });
+}
+ACTIONS['am-all'] = el => { const v = el.getAttribute('data-v'); $all('.am-what').forEach((s: any) => s.value = v); };
+ACTIONS['am-go'] = () => {
+  const S: any = State, cid = State.companyId, c = company(cid), lim = apronLimits(cid, c.hub);
+  let mech = staffOf(cid, 'mech').filter((p: any) => p.base === c.hub).length, ground = staffOf(cid, 'ground').filter((p: any) => p.base === c.hub).length;
+  const res = { move: 0, leave: 0, dismiss: 0 } as any;
+  for (const row of $all('.am-row') as HTMLElement[]) {
+    const p: any = staffById(row.getAttribute('data-id')); if (!p) continue;
+    let what = (row.querySelector('.am-what') as HTMLSelectElement).value;
+    if (what === 'move') { const isM = p.role === 'mech'; if (isM ? mech < lim.mech : ground < lim.ground) { p.base = c.hub; if (isM) mech++; else ground++; } else what = 'leave'; }
+    if (what === 'leave') { p.apronLeave = true; p.status = 'off'; p.leavePay = true; }
+    if (what === 'dismiss') { S.staff = S.staff.filter((x: any) => x !== p); }
+    res[what]++;
+  }
+  closeAll(); Store.save(); refresh();
+  toast([res.move ? res.move + ' moved' : '', res.leave ? res.leave + ' on leave' : '', res.dismiss ? res.dismiss + ' dismissed' : ''].filter(Boolean).join(', ') || 'Nothing changed', 'ok');
 };

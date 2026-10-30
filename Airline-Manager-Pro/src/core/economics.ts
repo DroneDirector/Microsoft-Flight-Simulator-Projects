@@ -65,8 +65,11 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
   const fare = pax ? Math.round(tickets / pax) : cf.y;
   const longHaul = nm > 2000, small = cls === 'bush' || cls === 'ga';
   // on-board sales: buy-on-board on short haul, mostly included on long haul; bags and seats everywhere
-  const onboard = x.job ? 0 : Math.round(pY * (small ? 0 : longHaul ? 3.5 : cls === 'turboprop' ? 2.5 : 6.5));
-  const bags = x.job ? 0 : Math.round(pY * (small ? 0 : longHaul ? 9 : 7));
+  // services the airline offers (Settings → Services): on-board sales, bag and seat fees, service costs
+  const svc = serviceEffects(cid, cls, nm, !isDomestic(from, to), pY, pJ + pF);
+  const onboard = x.job || x.ferry ? 0 : svc.onboard;
+  const bags = x.job || x.ferry ? 0 : svc.bags;
+  const svcCost = x.job || x.ferry || !pax ? 0 : svc.extraCost;
   const cargo = x.job ? 0 : Math.round(cargoKg * cargoRate(from, to, cls));
   const jobPay = x.job ? x.job.pay : 0;
   const burn = fuelKg != null ? fuelKg : Math.round(bh * (BURN_KG_H[cls] || 2000) * 0.92);
@@ -91,7 +94,7 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
   const nav = small ? 0 : Math.round(km / 100 * Math.sqrt(mtow / 50) * 82);
   const mx = Math.round(bh * (MX_PER_BH[cls] || 800));
   const sales = Math.round(tickets * (small ? 0.03 : 0.06));                         // booking systems, agents, card fees
-  const catering = gsxCharged || x.ferry ? 0 : Math.round(pY * (small ? 0 : longHaul ? 24 : cls === 'turboprop' ? 1.5 : 4) + (pJ + pF) * (small ? 0 : longHaul ? 85 : 18));
+  const catering = gsxCharged || x.ferry ? 0 : Math.round(pY * (small ? 0 : longHaul ? 24 : cls === 'turboprop' ? 1.5 : 4) * svc.cateringMul + (pJ + pF) * (small ? 0 : longHaul ? 85 : 18) * svc.cateringPrem);
   const crewN = small ? 1 : 2 + (typeof faNeeded === 'function' ? faNeeded(t) : 0);
   const crewTrip = Math.round(crewN * (longHaul ? 260 : bh > 3 ? 120 : 45));             // allowances, hotels and transport away from base
   const overhead = Math.round(revenueBase(tickets, onboard, bags, cargo, jobPay) * (small ? 0.06 : 0.09)); // offices, IT, head office staff
@@ -103,22 +106,26 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
     lines.push([`${pY} ${pJ || pF ? 'economy' : 'passengers'} × ${money(cf.y)}${route && routeFares(route).y !== 1 ? ' (your fare)' : ' average fare'}`, pY * cf.y]);
   }
   if (onboard) lines.push(['Food, drinks and duty-free on board', onboard]);
-  if (bags) lines.push(['Bags and seat selection', bags]);
+  if (bags) lines.push(['Bag fees and paid seat selection', bags]);
   if (cargo) lines.push([`Cargo ${num(cargoKg)} kg × ${money(cargoRate(from, to, cls))}`, cargo]);
   // with GSX, handling and catering are charged per service as GSX does them (see gsxOnState)
-  const hd = gsxCharged ? 0 : handling;
+  // apron crew: your own at this airport costs only materials (their pay is in the payroll); otherwise the local handling company's fee
+  const ownCid = x && x.reg && plane(x.reg) ? plane(x.reg).companyId : State.companyId;
+  const ownHere = ownApronCrewAt(ownCid, to);
+  const hd = gsxCharged ? 0 : ownHere ? Math.round(handling * 0.3) : handling;
   if (tankUsed) lines.push([`Fuel, ${num(tankUsed)} kg tankered (paid on the leg before)`, 0]);
   lines.push([`Fuel at ${from}, ${num(burn - tankUsed)} kg × $${price.toFixed(2)}`, -fuel]);
   if (tankCost) lines.push([`Tankering: ${num(tankKg)} kg for the next leg (fuel at ${tankNext} costs $${fuelPrice(tankNext).toFixed(2)})`, -tankCost]);
   lines.push([`Landing fee at ${to}`, -landing], [`Parking and gate at ${to}`, -parking]);
-  if (hd) lines.push(['Passenger handling', -hd]);
+  if (hd) lines.push([ownHere ? `Handling by your own apron crew at ${to} (materials)` : `Handling by the local handling company at ${to}`, -hd]);
   if (nav) lines.push([`Air navigation charges, ${num(km)} km`, -nav]);
   for (const [part, share] of MX_SPLIT) lines.push([`Maintenance reserve: ${part.toLowerCase()}`, -Math.round(mx * share)]);
   if (sales) lines.push(['Ticket sales and booking fees', -sales]);
   if (catering) lines.push(['Catering', -catering]);
+  if (svcCost) svc.extraLines.forEach(l => lines.push(l));
   lines.push(['Crew allowances and hotels', -crewTrip], ['Overheads: offices and IT', -overhead]);
   if (A2 && tankKg) { A2.tankKg = tankKg; A2.tankAt = tankNext; }
-  const revenue = tickets + onboard + bags + cargo + jobPay, costs = fuel + tankCost + landing + parking + hd + nav + mx + sales + catering + crewTrip + overhead;
+  const revenue = tickets + onboard + bags + cargo + jobPay, costs = fuel + tankCost + landing + parking + hd + nav + mx + sales + catering + svcCost + crewTrip + overhead;
   return { revenue, costs, net: revenue - costs, lines, fare, fuelKg: burn };
 }
 
@@ -161,3 +168,11 @@ function gsxOnState(s: any, airport: string) {
 }
 /** Whether GSX charged the ground services for the leg just flown (then the leg itself doesn't). */
 function gsxTakeLegFlag(): boolean { const u = _gsxUsedThisLeg; _gsxUsedThisLeg = false; return u; }
+
+/** Does the airline have its own apron crew (ground staff) at an airport? With "home base only",
+ *  only at its main base. */
+function ownApronCrewAt(cid: string, icao: string): boolean {
+  const S: any = State, c = company(cid); if (!c) return false;
+  if ((S.settings.groundHandling || 'base') === 'base' && icao !== c.hub) return false;
+  return ((S.staff || []) as any[]).some(p => p.companyId === cid && p.role === 'ground' && p.base === icao && p.status !== 'off');
+}

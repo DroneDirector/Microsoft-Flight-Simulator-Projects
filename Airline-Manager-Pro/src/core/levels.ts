@@ -19,9 +19,10 @@ const LEVEL_TITLES: { [role: string]: string[] } = {
   captain: ['New captain', 'Line captain', 'Established captain', 'Experienced captain', 'Senior captain', 'Senior captain', 'Training captain', 'Check captain', 'Chief captain', 'Master captain'],
   fo: ['Junior first officer', 'First officer', 'First officer', 'Experienced first officer', 'Senior first officer', 'Senior first officer', 'Command-ready first officer', 'Command-ready first officer', 'Command-ready first officer', 'Command-ready first officer'],
   fa: ['Trainee attendant', 'Flight attendant', 'Experienced attendant', 'Senior attendant', 'Purser', 'Purser', 'Senior purser', 'Senior purser', 'Chief purser', 'Chief purser'],
+  ground: ['Trainee', 'Ground handler', 'Ground handler', 'Experienced handler', 'Senior handler', 'Senior handler', 'Team leader', 'Team leader', 'Ramp supervisor', 'Ground operations manager'],
   mech: ['Apprentice mechanic', 'Mechanic', 'Licensed engineer', 'Licensed engineer', 'Senior engineer', 'Senior engineer', 'Lead engineer', 'Lead engineer', 'Chief engineer', 'Chief engineer'],
 };
-const NEG_TITLES: { [role: string]: string } = { captain: 'Captain on probation', fo: 'First officer on probation', fa: 'Attendant on probation', mech: 'Mechanic on probation' };
+const NEG_TITLES: { [role: string]: string } = { ground: 'Handler on probation', captain: 'Captain on probation', fo: 'First officer on probation', fa: 'Attendant on probation', mech: 'Mechanic on probation' };
 
 function levelOf(xp: number): { level: number; from: number; to: number; p: number } {
   xp = xp || 0;
@@ -88,6 +89,9 @@ function crewAfterLeg(cid: string, opts: { pilotId?: string; coPilot?: boolean; 
   const mechs = staffOf(cid, 'mech').filter((s: any) => s.status !== 'off');
   const m = mechs.filter(s => s.base === opts.to)[0] || mechs[_hashStr((opts.to || '') + block) % Math.max(1, mechs.length)];
   if (m) gainXp(m, 25, q);
+  // the airline's own ground crew on the turnaround at either end (drivers, baggage, ramp, dispatch)
+  const grd = staffOf(cid, 'ground').filter((s: any) => s.status !== 'off' && !s.apronLeave);
+  [opts.from, opts.to].forEach(k => grd.filter(s => s.base === k).slice(0, 4).forEach(s => gainXp(s, 20, q)));
 }
 
 /** A finished repair: experience for the airline's mechanics at that base. */

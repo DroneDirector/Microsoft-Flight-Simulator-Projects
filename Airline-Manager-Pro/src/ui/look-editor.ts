@@ -61,7 +61,7 @@ function lookEditorBody(): string {
   if (t === 'hair') return `
     <div class="le-group"><b>Hairstyle</b>${leChoice('hair', Object.keys(HAIR_STYLES).map(k => [k, HAIR_STYLES[k]]), L.hair)}</div>
     <div class="le-group"><b>Hair colour</b>${leSwatches('hairColor', HAIR_COLORS, L.hairColor)}</div>`;
-  const mech = role === 'mech', G = garmentOptions(L.sex, role);
+  const mech = role === 'mech' || role === 'ground', G = garmentOptions(L.sex, role);
   return `
     ${mech ? `<p class="fine-print">${icon('info')}Mechanics always wear overalls with a high-visibility vest.</p>` : `
     <div class="le-group"><b>Top</b>${leChoice('top', G.top, L.top)}</div>

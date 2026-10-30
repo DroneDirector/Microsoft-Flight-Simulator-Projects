@@ -98,17 +98,11 @@ const Backup = {
   /** First start with nothing saved (a new phone, a reinstall, cleared data): offer to bring the airline back. */
   offerRestoreOnFirstStart() {
     if (DESKTOP && Store.wasEmpty) {
-      fetch('/api/backup').then(r => r.json()).then(r => { if (r && r.data) setTimeout(() => this.confirmRestore(r.data, 'Found in Documents\\Airline Manager Pro on this PC'), 1500); }).catch(() => { /* none */ });
+      fetch('/api/backup').then(r => r.json()).then(r => { if (r && r.data) setTimeout(() => this.confirmRestore(r.data, 'Found in Documents\\Airline Manager Pro on this PC'), 1500); else setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600); }).catch(() => setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600));
       return;
     }
-    if (!Store.wasEmpty || !this.tools()) return;
-    setTimeout(() => openLayer('modal', `<div class="modal-head"><div><h2>Welcome to ${esc(APP.name)}</h2><small>Have you used the app before?</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-      <p class="lede">If you made backups on another phone or before reinstalling, you can bring your airline back now: settings, looks, staff, fleet, money and flight logs.</p>
-      <div class="btn-col">
-        <button class="btn primary" data-act="backup-folder-restore">${icon('download')}Choose my backup folder</button>
-        <button class="btn ghost" data-act="backup-import">${icon('download')}Open a backup file</button>
-        <button class="btn ghost" data-act="close-layer">Start a new airline</button>
-      </div>`, { cls: 'sm' }), 1800);
+    if (!Store.wasEmpty) return;
+    setTimeout(() => firstStartWelcome(!!this.tools()), SPLASH_MS + 600);
   },
 };
 

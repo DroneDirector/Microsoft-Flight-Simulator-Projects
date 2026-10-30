@@ -79,24 +79,26 @@ function seeded(seed: string) { let h = _hash(seed) || 1; return () => { h ^= h 
 function makePerson(seed: string, role: CrewRole, companyId: string, base: string, sexIn?: 'm' | 'f', natIn?: string): Staff {
   const r = seeded(seed);
   const pick = <T>(a: T[]): T => a[Math.floor(r() * a.length)];
-  const sex: 'm' | 'f' = sexIn || (r() < (role === 'fa' ? 0.65 : role === 'mech' ? 0.25 : 0.3) ? 'f' : 'm');
+  const sex: 'm' | 'f' = sexIn || (r() < (role === 'fa' ? 0.65 : role === 'mech' ? 0.25 : role === 'ground' ? 0.3 : 0.3) ? 'f' : 'm');
   const nat = natIn || pick(NAT_FOR_HUB[base] || Object.keys(NAMES));
   const pool = NAMES[nat] || NAMES.GB;
   const name = pick(sex === 'f' ? pool.f : pool.m) + ' ' + pick(pool.last);
   const look = randomLook(seed, sex, role);
+  if (role === 'ground') look.uniform = 6 + Math.floor(r() * 2);   // hi-vis yellow or orange
   const range = NAT_SKIN[nat] || [0, 4];
   look.skin = range[0] + Math.floor(r() * (range[1] - range[0] + 1));
   if (look.skin > 5 && [4, 5, 6, 7].indexOf(look.hairColor) >= 0) look.hairColor = 0;
   const age = role === 'captain' ? 34 + r() * 24 : role === 'fo' ? 24 + r() * 16 : 21 + r() * 30;
   const y = 2026 - Math.floor(age), m = 1 + Math.floor(r() * 12), d = 1 + Math.floor(r() * 28);
   if (age < 45 && look.hairColor >= 8) look.hairColor = look.skin > 5 ? 0 : 2;
-  const salary = { captain: 3900, fo: 2300, fa: 920, mech: 1350 }[role] * (0.9 + r() * 0.25);
+  const salary = { captain: 3900, fo: 2300, fa: 920, mech: 1350, ground: 760 }[role] * (0.9 + r() * 0.25);
   return {
     id: role + '-' + _hash(seed).toString(36), name, role, sex, look, dob: `${y}-${m < 10 ? '0' : ''}${m}-${d < 10 ? '0' : ''}${d}`, nat,
     companyId, base, salary: Math.round(salary / 10) * 10, hired: '2026-09-' + (10 + Math.floor(r() * 18)), warnings: 0, rating: 3.6 + r() * 1.4,
     status: pick(['on duty', 'on duty', 'off', 'resting'] as any),
     xp: startingXp(seed, role, age),
-  };
+    job: role === 'ground' ? GROUND_JOBS[Math.floor(r() * GROUND_JOBS.length)][0] : undefined,
+  } as any;
 }
 
 /** Fill in everything people-related that a save from an older version doesn't have yet. */
@@ -113,7 +115,7 @@ function ensurePeople() {
   }
   if (!S.staffCandidates) {
     S.staffCandidates = [];
-    const roles: CrewRole[] = ['fa', 'fa', 'fa', 'fa', 'mech', 'mech', 'mech', 'fo', 'fo', 'fa', 'mech', 'fa'];
+    const roles: CrewRole[] = ['fa', 'fa', 'fa', 'fa', 'mech', 'mech', 'mech', 'fo', 'fo', 'fa', 'mech', 'fa', 'ground', 'ground', 'ground', 'ground'];
     roles.forEach((role, i) => S.staffCandidates.push(makePerson('cand-' + role + i, role, '', ['EKVG', 'EKCH', 'PALH', 'EKBI'][i % 4])));
   }
   if (!S.incidents) {
@@ -149,7 +151,10 @@ function ensurePeople() {
   // realistic weekly salaries
   const wk: { [id: string]: number } = { 'p-hl': 4800, 'p-jo': 2300, 'p-mr': 3900, 'p-sb': 3700, 'p-dk': 2200, 'p-tw': 1700, 'c1': 3800, 'c2': 2250, 'c3': 4900, 'c4': 1750 };
   if (!S.salaryV2) { for (const p of (S.pilots as any[]).concat(S.candidates)) if (wk[p.id]) p.salary = wk[p.id]; S.salaryV2 = true; }
-  if (!S.settings.misconduct) S.settings.misconduct = { fa: 'normal', mech: 'normal', fo: 'normal' };
+  if (!S.settings.misconduct) S.settings.misconduct = { fa: 'normal', mech: 'normal', fo: 'normal', ground: 'normal' };
+  if (!S.settings.misconduct.ground) S.settings.misconduct.ground = 'normal';
+  // ground staff on the job market (older saves had none)
+  if (S.staffCandidates && !S.staffCandidates.some((x: any) => x.role === 'ground')) for (let i = 0; i < 5; i++) S.staffCandidates.push(makePerson('cand-ground' + i, 'ground', '', ['EKVG', 'EKCH', 'PALH', 'EKBI'][i % 4]));
   ensureCoPilot(State.companyId);
 }
 
@@ -229,7 +234,13 @@ function crewCheck(cid?: string): CrewCheck {
   return { faNeed, faHave, mechNeed, mechHave, blocked };
 }
 
-const ROLE_NAMES: { [r: string]: string } = { captain: 'Captain', fo: 'First officer', fa: 'Flight attendant', mech: 'Mechanic' };
+/** The jobs on the ramp: who drives what and who handles what. */
+const GROUND_JOBS: [string, string][] = [
+  ['baggage', 'Baggage handler'], ['pushback', 'Push-back tug driver'], ['fuel', 'Fuel truck driver'], ['catering', 'Catering truck driver'],
+  ['deice', 'De-icing operator'], ['bus', 'Apron bus driver'], ['ramp', 'Ramp agent'], ['stairs', 'Stairs and power unit operator'],
+];
+function groundJobName(p: any): string { const j = GROUND_JOBS.filter(x => x[0] === p.job)[0]; return j ? j[1] : 'Ground staff'; }
+const ROLE_NAMES: { [r: string]: string } = { captain: 'Captain', fo: 'First officer', fa: 'Flight attendant', mech: 'Mechanic', ground: 'Ground staff' };
 
 /** Weekly payroll history: one salary payment per person, shown in Finance. */
 function ensurePayroll() {

@@ -92,7 +92,7 @@ function paxFacesLazy() {
     const top = box.getBoundingClientRect().top, bottom = top + box.clientHeight + 200;
     for (const el of Array.from(box.querySelectorAll('.pax-face:not(.done)')) as HTMLElement[]) {
       const r = el.getBoundingClientRect(); if (r.bottom < top - 100 || r.top > bottom) continue;
-      const [fid, key] = (el.getAttribute('data-face') || '').split('|');
+      const df = el.getAttribute('data-face') || '', cut = df.indexOf('|'), fid = df.slice(0, cut), key = df.slice(cut + 1);
       const f = State.live.filter(x => x.id === fid)[0]; if (!f) continue;
       const p = manifestOf(f).filter(x => x.key === key)[0]; if (!p) continue;
       el.innerHTML = avatarSvg2d(p.look, 'fa', { view: 'bust', still: true }); el.classList.add('done');
