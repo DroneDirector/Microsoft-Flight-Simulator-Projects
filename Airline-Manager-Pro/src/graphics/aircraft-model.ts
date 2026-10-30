@@ -605,6 +605,8 @@ function liveryFor(color?: string, color2?: string, companyId?: string): Livery 
   const base = defaultLivery(color || (c && c.color), color2 || (c && c.color2), c ? c.name : '');
   const saved = c && c.livery;
   if (saved && (!color || color === c.color)) return Object.assign(base, saved, { c1: saved.c1 || base.c1 });
+  // a division's aircraft: the airline's design, in the division's colour
+  if (saved) return Object.assign(base, saved, { c1: color, belly: saved.belly === saved.c1 ? color : saved.belly });
   return base;
 }
 

@@ -23,6 +23,8 @@ function legFuel(typeId: string, pax: number, from: string, to: string): { to: n
 
 /** On board a flight right now. */
 function onBoardFlight(f: LiveFlight, now?: number): OnBoard {
+  // only hired pilots' flights: your own flight's passengers and fuel come from the simulator alone
+  if (f.you || f.real) return null;
   now = now || Date.now();
   const F: any = f, t = acType(flightTypeId(f)) || AIRCRAFT[0], paxMax = f.paxMax || t.seats;
   const fuel = legFuel(t.id, f.pax || 0, f.from, f.noDest ? f.from : f.to);
@@ -50,6 +52,8 @@ function onBoardFlight(f: LiveFlight, now?: number): OnBoard {
 
 /** On board an aircraft standing at the gate between flights (the turnaround). */
 function onBoardParked(a: Aircraft, now?: number): OnBoard {
+  // the aircraft you fly yourself: nothing is boarded or fuelled for you
+  if (a.reg === (State as any).myReg[a.companyId]) return null;
   now = now || Date.now();
   const A: any = a, t = acType(a.typeId), S: any = State;
   const next = (S.aiNext || []).filter((n: any) => n.reg === a.reg)[0];

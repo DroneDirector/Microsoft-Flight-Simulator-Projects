@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0 (2026-10-30)
+
+- 3D view from the map controls: the followed aircraft over real terrain heights (Terrain Tiles on AWS) painted like the world map, the airport layout and every aircraft nearby; follows the aircraft, drag to look around, pinch/scroll to zoom; Behind, Around and Tower views; tap an aircraft for its details; flaps and gear move by phase (yours from the simulator)
+- Aircraft models built from each type's published dimensions (src/data/aircraft-shapes.ts); the aircraft pictures are rendered from them in the airline's livery
+- Livery designer: design, colours of body, underside, tail and engines, titles, emblem
+- Fly-by arcs at every corner of the route; flights land on the runway their approach was planned for
+- Your demo flight flies its real profile on the real clock (no more 15-minute crossings)
+- Follow keeps its zoom and stays on until tapped again, also across screens
+- "Arrives in" from take-off to touchdown, negative when late, 0:00 on the ground; heading, vertical and ground speed on the flight card; flight details can be dragged
+- Live turnaround and on-board numbers for hired pilots' flights (deboarding, cleaning, catering, refuelling, boarding with the booked load, fuel burn in flight)
+- One stand per aircraft from taxi-in to push-back, never shared; arriving aircraft stay at their stand
+- Repairs start when the aircraft lands and the pilot waits for the hangar; a report is paid once; quoted repair time is the real one
+- Voices for every staff message (pilots, operations, finance, authority, lawyer); live mute note with "Turn sounds on"; device voice if the natural voice stalls
+- Flight trace log of every flight (marks jumps, overspeed, off-runway or wrong-runway touchdowns, arrivals without touchdown), saved with the error log as one text file
+- Flap, gear and phase-speed data per type (docs/reference/flap-gear-and-phase-speeds.txt, src/data/flight-configs.ts)
+
 ## 0.8.3 (2026-10-30)
 
 - PC app: sim check ("Check Flight Simulator.cmd" or --check) reads everything the app uses from the running simulator and the loaded aircraft, and saves a report in Documents\Airline Manager Pro\Diagnostics

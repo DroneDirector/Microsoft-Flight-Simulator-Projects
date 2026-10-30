@@ -59,7 +59,15 @@ Each widget opens its own page.
 | Profit: daily, weekly, monthly, yearly (all years flown) | Built |
 | Fleet status per aircraft: in flight (green), available (blue), maintenance (red) | Built |
 
+## 3D view
+- 3D button among the map controls: the followed aircraft over real terrain heights painted like the world map, with the airport and nearby aircraft
+- Follows the aircraft; drag to look around, pinch or scroll to zoom; Behind, Around and Tower views
+- Tap any aircraft for its flight details; flaps and gear move by phase (your own from the simulator)
+- Draws only while open, at most 30 frames a second
+
 ## Fleet and market
+- Aircraft pictures rendered from each type's own model (real dimensions) in the airline's livery
+- Livery designer: design, colours, titles and emblem
 
 | Feature | Status |
 |---|---|
