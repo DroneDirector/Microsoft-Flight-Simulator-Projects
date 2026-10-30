@@ -23,6 +23,8 @@
   (`src/data/capacity.ts`), listed in `docs/reference/runway-requirements.txt`.
 - **Weather limits**: every type also gets its crosswind, tailwind, landing and take-off minima, IFR and
   known-icing approval (`WX_LIMITS` in `src/core/weather.ts`), listed in `docs/reference/weather-limits.txt`.
+- **Engines**: every type also lists the engines it is built with (`src/data/engines.ts`, `docs/reference/engines.txt`),
+  with their effect on fuel, maintenance, reliability and price where there is a choice.
 - Taxi speeds (all types): tight turns or near obstacles 5–10 kt; normal straight taxiways 15–25 kt;
   long straight taxiways up to about 30 kt; approaching the runway or the stand 5–10 kt; pushback 3–5 kt.
 

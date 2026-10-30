@@ -175,6 +175,8 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'staff' && n.ref && /^fb-/.test(n.ref)) moralePopup(n.ref.slice(3));
   else if (n.kind === 'staff' && n.ref && /^sk-/.test(n.ref)) strikePopup(n.ref.slice(3));
   else if (n.kind === 'staff' && n.ref && /^si-/.test(n.ref)) sickPopup(n.ref.slice(3));
+  else if (n.kind === 'staff' && n.ref && /^wb-/.test(n.ref)) whistlePopup();
+  else if (n.ref && /^news-/.test(n.ref)) newsOpen(n.ref);
   else if (n.kind === 'staff' && n.ref) incidentPopup(n.ref);
   else if (n.kind === 'birthday') ACTIONS['bday-preview'](null, null);
   else {
@@ -383,11 +385,13 @@ ACTIONS['create-company'] = el => {
     cur.divisions.push({ id: uid(), name: kind === 'bush' ? 'Bush' : kind === 'regional' ? 'Regional' : 'Division ' + (cur.divisions.length + 1), color: '#5FD4A0' });
     Store.save(); renderTopbar(); toast(`New division added to ${cur.name}`, 'ok'); return;
   }
-  const make = (profileId: string) => {
+  const make = (profileId: string, hub?: string) => {
+    if (!hub) { openBasePicker('Home base for the new company', 'Required: where the company is based, its aircraft delivered and its hub crew work.', icao => make(profileId, icao)); return; }
+    State.pilots.filter((x: any) => x.profileId === profileId && x.you && !x.landings).forEach((x: any) => x.base = hub);   // a new pilot starts at the new home base
     const names: any = { major: ['Northern Lights Air', 'NLA', '#3FB6A8'], regional: ['Fjord Regional', 'FJR', '#E2A23B'], bush: ['Tundra Wings', 'TWG', '#D2553A'] };
     const n = names[kind] || names.major;
     const id = uid();
-    State.companies.push({ id, profileId, name: n[0], icao: n[1], callsign: n[0].split(' ')[0].toUpperCase(), hub: kind === 'bush' ? 'PALH' : 'EKVG', color: n[2], color2: '#1A2433',
+    State.companies.push({ id, profileId, name: n[0], icao: n[1], callsign: n[0].split(' ')[0].toUpperCase(), hub, color: n[2], color2: '#1A2433',
       balance: kind === 'bush' ? 1500000 : 25000000, reputation: 50, founded: dateStr(new Date()).slice(0, 10), kind, divisions: [] } as any);
     (State as any).coPilot[id] = { sex: 'f', id: '' };
     State.companyId = id; State.divisionId = 'all';

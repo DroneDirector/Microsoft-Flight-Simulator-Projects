@@ -109,6 +109,8 @@ ACTIONS['nr-save'] = () => {
   const code = c.icao + (700 + State.routes.length);
   State.routes.push({ id: uid(), companyId: c.id, code, legs: _nr.stops.slice(), days: 'Daily', typeId: _nr.typeId, demand: 60 + Math.round(Math.random() * 30), yieldPerPax: 140 + Math.round(Math.random() * 200) });
   closeAll(); refresh(); toast(`Route ${code} created`, 'ok');
+  // the local paper writes about it
+  try { const nr = State.routes[State.routes.length - 1]; setTimeout(() => newsRouteLaunch(nr), 1200); } catch (e) { /* ignore */ }
 };
 
 /* ---------- A route's business: fares, demand, competitors, fuel and fees ---------- */

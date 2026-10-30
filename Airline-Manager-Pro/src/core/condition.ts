@@ -137,7 +137,8 @@ function conditionAfterFlight(a: any, blockMin: number) {
 /** After a hired pilot's landing: worn aircraft may divert with a problem, and in the worst state crash. */
 function conditionRisk(a: any, f: any): boolean {
   const c = a.condition;
-  if (c < 55 && Math.random() < Math.pow((55 - c) / 55, 2) * 0.08) {
+  const engRel = typeof engineOf === 'function' && engineOf(a) ? engineOf(a).rel : 1;   // some engines need more inspections
+  if (c < 55 && Math.random() < Math.pow((55 - c) / 55, 2) * 0.08 * engRel) {
     const sev = c < 35 ? 'grounding' : 'major';
     const what = ['an engine running rough', 'a hydraulic leak', 'smoke from an electrical fault', 'a pressurisation fault', 'a landing gear that wouldn\'t lock down'][Math.floor(Math.random() * 5)];
     State.issues.unshift({ id: uid(), reg: a.reg, title: 'Emergency landing', detail: `${f.callsign} declared an emergency with ${what} and landed safely at ${f.to}. Inspection and repair needed.`, source: `Condition ${Math.round(c)}% at the time`, severity: sev as any, cost: Math.round(acType(a.typeId).price * (sev === 'grounding' ? 0.004 : 0.0015) / 100) * 100, days: 0, status: 'open', date: dateStr(new Date()).slice(0, 10) } as any);
@@ -162,7 +163,7 @@ function conditionAccident(a: any, f: any) {
   try { Progress.popularity(dead ? -30 : -15, 'A serious accident'); } catch (e) { /* ignore */ }
   if (airlineFault) {
     const why = [mq.coverage < 0.8 ? 'too few mechanics for the fleet' : '', mq.skill && mq.skill < 0.65 ? 'poorly qualified, unreliable mechanics' : '', overdue ? `${overdue} known ${overdue === 1 ? 'defect' : 'defects'} left unrepaired` : '', a.condition < 35 ? `the aircraft flown in a condition of ${Math.round(a.condition)}%` : ''].filter(Boolean).join(', ');
-    openCourtCase({ id: 'airline-' + co.id, name: co.name, look: null, base: co.hub, companyId: co.id }, 'airline', dead ? 0 : 1, why);
+    openCourtCase({ id: 'airline-' + co.id, name: co.name, look: null, base: co.hub, companyId: co.id }, 'airline', dead ? 1 : 2, why);
   } else {
     State.notices.unshift({ id: uid(), kind: 'pilot', title: 'Accident report: not the airline\'s fault', body: `The investigation found that the ${a.reg} accident was not caused by its maintenance. No charges against ${co.name}.`, time: 'Now', read: false } as any);
   }

@@ -9,7 +9,7 @@ function firstStartWelcome(withRestore: boolean) {
     ${withRestore ? `<div class="btn-row fs-restore"><small>Used the app before?</small><button class="btn ghost sm" data-act="backup-folder-restore">${icon('download')}Choose my backup folder</button><button class="btn ghost sm" data-act="backup-import">${icon('download')}Open a backup file</button></div>` : ''}`, { cls: 'fs-modal' });
 }
 ACTIONS['fs-demo'] = () => { Sound.tick(); closeAll(); toast('Enjoy the demo. Settings → Backup and restore lets you start from scratch later.', 'ok'); };
-let _fsKind = 'major';
+let _fsKind = 'major', _fsHub = '';
 ACTIONS['fs-scratch'] = () => {
   Sound.tick(); closeAll();
   const kinds = [['major', 'Airline', 'Jets and turboprops on scheduled routes.', 'a320neo', 'EKVG'], ['regional', 'Regional and cargo', 'Smaller jets and turboprops, short hops.', 'atr72', 'EKVG'], ['bush', 'Bush outfit', 'Floatplanes and STOL aircraft.', 'dhc2', 'PALH']];
@@ -19,7 +19,7 @@ ACTIONS['fs-scratch'] = () => {
       <label class="field"><span>Airline name</span><input class="le-in fs-name" maxlength="40" placeholder="Northern Lights Air"></label>
       <label class="field"><span>ICAO code (3 letters)</span><input class="le-in fs-icao" maxlength="3" placeholder="NLA"></label>
       <label class="field"><span>Callsign</span><input class="le-in fs-call" maxlength="16" placeholder="NORTHERN"></label>
-      <label class="field"><span>Home base (airport ICAO)</span><input class="le-in fs-hub" maxlength="4" value="${_fsKind === 'bush' ? 'PALH' : 'EKVG'}"></label>
+      <div class="field"><span>Home base (required)</span><button class="btn ghost fs-hub-btn ${_fsHub ? '' : 'need'}" data-act="fs-hub">${icon('pin')}${_fsHub && apt(_fsHub) ? `${esc(_fsHub)} · ${esc(apt(_fsHub).name)}` : 'Choose your home base'}</button></div>
       <label class="field"><span>Your pilot name</span><input class="le-in fs-pilot" maxlength="40" value="${esc(myPilot().name)}"></label>
     </div>
     <p class="fine-print">${icon('alert')}This removes the demo airlines, aircraft, staff, routes, flights, money and logs. Your settings are kept.</p>
@@ -29,15 +29,19 @@ ACTIONS['fs-back'] = () => { closeAll(); firstStartWelcome(false); };
 ACTIONS['fs-kind'] = el => {
   _fsKind = el.getAttribute('data-k');
   document.querySelectorAll('.fs-kinds .choice').forEach(b => b.classList.toggle('on', b === el));
-  const h = $('.fs-hub') as HTMLInputElement; if (h && (h.value === 'EKVG' || h.value === 'PALH')) h.value = el.getAttribute('data-hub');
   Sound.tick();
+};
+ACTIONS['fs-hub'] = () => {
+  openBasePicker('Your home base', 'The airport your airline is based at. Your aircraft are delivered here and your hub crew work here.', icao => {
+    _fsHub = icao; const b = $('.fs-hub-btn'); if (b) { b.classList.remove('need'); b.innerHTML = `${icon('pin')}${esc(icao)} · ${esc(apt(icao) ? apt(icao).name : icao)}`; }
+  });
 };
 ACTIONS['fs-wipe'] = () => {
   const v = (q: string) => { const e = $(q) as HTMLInputElement; return e ? e.value.trim() : ''; };
   const name = v('.fs-name') || (_fsKind === 'bush' ? 'Tundra Wings' : _fsKind === 'regional' ? 'Fjord Regional' : 'Northern Lights Air');
   const icao = (v('.fs-icao') || name.replace(/[^A-Za-z]/g, '').slice(0, 3)).toUpperCase().padEnd(3, 'X').slice(0, 3);
-  const hub = (v('.fs-hub') || 'EKVG').toUpperCase();
-  if (!apt(hub)) { toast(`${hub} isn't an airport the app knows. Use its ICAO code, like EKVG.`, 'warn'); return; }
+  const hub = _fsHub;
+  if (!hub || !apt(hub)) { toast('Choose your home base first', 'warn'); const b = $('.fs-hub-btn'); if (b) { b.classList.add('need', 'shake'); setTimeout(() => b.classList.remove('shake'), 600); } return; }
   wipeToScratch({ kind: _fsKind, name, icao, callsign: (v('.fs-call') || name.split(' ')[0]).toUpperCase(), hub, pilot: v('.fs-pilot') });
 };
 

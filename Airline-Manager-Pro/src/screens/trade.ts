@@ -56,6 +56,7 @@ function usedMarketHtml(): string {
       <div class="mk-body">
         <div class="mk-name"><b>${esc(t.maker)} ${esc(t.model)}</b><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span></div>
         <div class="mk-cap">${icon('pax')}<span>${esc(capacityText(t.id))}</span></div>
+        ${engineFor(t.id, u.id) ? `<div class="mk-cap mk-eng">${icon('fuel')}<span>${esc(engineOptions(t.id).filter(x => x.id === engineFor(t.id, u.id))[0].name)}</span></div>` : ''}
         <div class="mk-specs"><span><small>Age</small>${u.ageY} yrs</span><span><small>Hours</small>${num(u.hoursMin / 60)}</span><span><small>Cycles</small>${num(u.cycles)}</span><span><small>Condition</small>${u.condition}%</span></div>
         <small class="muted">${esc(u.was)} at ${esc(u.location)}, sold by ${esc(u.seller)}. New: ${money(t.price, { compact: true })}</small>
         <div class="mk-foot"><b class="mk-price">${money(u.price, { compact: true })}</b><button class="btn primary" data-act="buy-used" data-id="${u.id}">Buy</button></div>
@@ -75,6 +76,7 @@ function usedSheetHtml(): string {
       <div class="buy-art">${aircraftArt(t.id, { color: c.color, color2: c.color2, reg })}</div>
       <div class="buy-form">
         <div class="kv-row"><div><small>Hours</small><b>${num(u.hoursMin / 60)}</b></div><div><small>Cycles</small><b>${num(u.cycles)}</b></div><div><small>Condition</small><b>${u.condition}%</b></div><div><small>Now at</small><b>${esc(u.location)}</b></div></div>
+        ${(() => { const e = engineOptions(t.id).filter(x => x.id === engineFor(t.id, u.id))[0]; return e ? `<div class="field"><small>Engines</small><b>${esc(e.name)}</b>${e.note ? `<small class="muted">${esc(e.note)}</small>` : ''}</div>` : ''; })()}
         <div class="field"><small>New registration</small><div class="regs"><span>${esc(reg)}</span></div></div>
         ${baseFieldHtml(base, 1, 'used')}
         <div class="txd-lines"><div><span>Price</span><b>${money(u.price)}</b></div><div><span>Ferry flight ${esc(u.location)} to ${esc(base)}</span><b>${money(ferry)}</b></div></div>
@@ -92,7 +94,7 @@ ACTIONS['buy-used-go'] = () => {
   if (noStandsFor(base, 1)) { toast('Not enough free stands there: choose another base', 'warn'); return; }
   const ferry = ferryCost(t, u.location, base), total = u.price + ferry, reg = nextRegs(c, 1)[0], from = c.balance;
   c.balance -= total;
-  State.fleet.push({ reg, typeId: t.id, companyId: c.id, base, location: base, hoursMin: u.hoursMin, cycles: u.cycles, condition: u.condition, status: 'parked', delivered: dateStr(new Date()).slice(0, 10), ageY: u.ageY, wasReg: u.was } as any);
+  State.fleet.push({ engine: engineFor(t.id, u.id) || undefined, reg, typeId: t.id, companyId: c.id, base, location: base, hoursMin: u.hoursMin, cycles: u.cycles, condition: u.condition, status: 'parked', delivered: dateStr(new Date()).slice(0, 10), ageY: u.ageY, wasReg: u.was } as any);
   State.txns.unshift({ id: uid(), companyId: c.id, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Used aircraft: ${t.maker} ${t.model} ${reg}`, amount: -total, kind: 'purchase', reg,
     lines: [[`${t.maker} ${t.model}, ${u.ageY} years, ex ${u.was}, from ${u.seller}`, -u.price], [`Ferry flight ${u.location} to ${base}`, -ferry]], link: { kind: 'aircraft', id: reg } } as any);
   S.usedMarket.items = list.filter(x => x !== u);

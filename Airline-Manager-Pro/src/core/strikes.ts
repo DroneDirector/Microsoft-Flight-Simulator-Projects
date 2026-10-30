@@ -153,8 +153,7 @@ function strikeBlock(cid: string, typeId: string, from: string): string {
   const t = acType(typeId);
   if (onStrike(cid, 'fa') && t && t.seats >= 20) return 'Cabin crew on strike';
   if (onStrike(cid, 'mech')) return 'Mechanics on strike: no release to service';
-  if (onStrike(cid, 'ground') && typeof ownApronCrewAt === 'function' && ownApronCrewAt(cid, from)) return 'Ground crew on strike';
-  return '';
+  return '';   // ground crew on strike: see groundBlock (their bases have no one to turn aircraft round)
 }
 
 /* ---------- your answer ---------- */

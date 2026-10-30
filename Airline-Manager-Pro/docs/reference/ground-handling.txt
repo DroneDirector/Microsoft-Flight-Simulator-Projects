@@ -1,0 +1,26 @@
+Ground handling: your own ground crew at your bases (src/core/ground.ts)
+=========================================================================
+
+Your hub and every other airport where you base aircraft need your own ground crew. At every other
+airport the local handling company turns your aircraft round for a fee.
+
+Own ramp team on one turnaround (loaders for bags and cargo, push-back/tug driver, ramp lead; fuel and
+catering are the airport's companies):
+  GA (C172, PC-12)      0   the pilot handles it
+  Bush (Beaver, 208...) 1
+  Turboprop (ATR 72)    3
+  Regional (CRJ)        4
+  Narrow-body (A320/737) 6
+  Wide-body (777/787/A350/747) 10
+Other aircraft being turned round at the same base at the same time need their own team. With fewer
+people than the team, the turnaround takes longer (at most two hours more); with nobody, the aircraft
+can't leave. Off shift counts as available (called in); off sick, on leave or on strike doesn't.
+
+Staff a base supports per based aircraft (two shifts, days off and leave): GA 1, bush 2, turboprop 6,
+regional 8, narrow-body 12, wide-body 22, about 15% more at big airports, plus 2.
+
+Background (C = worked out from these, to be refined):
+- A narrow-body turnaround involves up to about 30 people from about six organisations (ramp, baggage,
+  cleaning, catering, fuel, maintenance): aerocorner.com/blog/airline-aircraft-turnaround/
+- Air Canada at Heathrow (wide-body only): 105 ramp, 117 baggage, 37 cabin services, 16 ground support
+  equipment, 8 weight and balance, 21 maintenance: hse.gov.uk/airtransport/case-studies/aircanada.htm

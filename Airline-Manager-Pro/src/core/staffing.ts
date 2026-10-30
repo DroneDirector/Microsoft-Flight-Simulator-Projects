@@ -22,6 +22,7 @@ function payrollAdvance(quiet?: boolean) {
       let total = 0;
       for (const p of people) {
         if (!p.salary) continue;
+        if ((p as any).suspended && (p as any).suspendPay === 0) continue;   // suspended without pay
         const pay = (p as any).apronLeave && (p as any).leavePay ? Math.round(p.salary * 0.6) : p.salary;   // on leave: 60% while they wait
         total += pay;
         S.txns.unshift({ id: uid(), companyId: c.id, date: day, time: '06:00', kind: 'salary', label: `Salary: ${p.name}${pay < p.salary ? ' (on leave, 60%)' : ''}`, amount: -pay, personId: p.id,

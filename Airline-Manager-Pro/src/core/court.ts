@@ -19,6 +19,7 @@ interface CourtCase {
 // with a fine range in dollars; fatal: deliberate act that cost lives (by far the rarest).
 const OFFENCES: { [role: string]: { w: number; title: string; charge: string; text: string; months: number[]; fine: number[]; licence?: boolean; fatal?: boolean }[] } = {
   pilot: [
+    { w: 6, title: 'Flew a whole flight over the alcohol limit', charge: 'Operating an aircraft while under the influence of alcohol', text: 'Tipped off by a witness at the hotel bar, police met {n}\'s flight at {b}. Blood tests after landing showed {n} had flown the whole flight over the legal limit.', months: [10, 18], fine: [5000, 25000], licence: true },
     { w: 40, title: 'Reported for duty over the alcohol limit', charge: 'Attempting to operate an aircraft while impaired by alcohol', text: '{n} failed a breath test at {b} before a departure and was removed from the flight deck.', months: [0, 9], fine: [5000, 25000], licence: true },
     { w: 25, title: 'Falsified flight and duty records', charge: 'Forgery of flight time and duty records', text: 'The authority found that {n} altered logbook and duty-time entries to hide flying beyond the legal limits.', months: [0, 12], fine: [8000, 40000], licence: true },
     { w: 20, title: 'Smuggling on company flights', charge: 'Smuggling of prohibited goods through {b}', text: 'Customs at {b} found prohibited goods hidden in {n}\'s flight bag after a flight.', months: [12, 48], fine: [10000, 60000], licence: true },
@@ -31,15 +32,21 @@ const OFFENCES: { [role: string]: { w: number; title: string; charge: string; te
     { w: 2, title: 'Deliberately withheld help from a dying passenger', charge: 'Manslaughter by gross negligence', text: '{n} ignored repeated calls for help and kept the medical kit locked away from a passenger having a heart attack, on purpose. The passenger died.', months: [48, 144], fine: [0, 0], fatal: true },
   ],
   mech: [
+    { w: 3, title: 'Left a pressurisation switch in the wrong position', charge: 'Manslaughter by gross negligence', text: 'After a pressurisation test on {r}, {n} left a switch in the wrong position and the error was not caught. The crew and passengers lost consciousness at altitude and the aircraft crashed.', months: [24, 72], fine: [0, 0], licence: true, fatal: true },
     { w: 40, title: 'Signed off work that was never done', charge: 'Falsifying maintenance records and endangering the safety of aviation', text: 'An audit at {b} found that {n} certified inspections on {r} that were never carried out.', months: [0, 24], fine: [10000, 60000], licence: true },
     { w: 35, title: 'Stole aircraft parts', charge: 'Theft of aircraft parts and handling stolen goods', text: '{n} took parts from the company stores at {b} and sold them on. Some ended up in other aircraft without paperwork.', months: [6, 36], fine: [5000, 50000], licence: true },
     { w: 3, title: 'Sabotaged an aircraft', charge: 'Murder and sabotage of an aircraft', text: 'Investigators found that {n} deliberately disabled a flight control on {r}. The aircraft crashed and people on board died.', months: [-1, -1], fine: [0, 0], licence: true, fatal: true },
   ],
 };
 OFFENCES.fo = OFFENCES.pilot;
-if (!OFFENCES.ground) OFFENCES.ground = OFFENCES.mech;   // ground staff: the same kind of cases
+OFFENCES.ground = [
+  { w: 40, title: 'Loaded undeclared dangerous goods', charge: 'Carrying dangerous goods without declaring them and endangering the safety of an aircraft', text: '{n} loaded boxes of hazardous material into the hold of {r} at {b} with false paperwork. A fire warning on the next flight brought the aircraft back.', months: [0, 18], fine: [5000, 50000] },
+  { w: 40, title: 'Stole from passengers\' bags', charge: 'Theft from checked baggage', text: 'Cameras in the baggage hall at {b} caught {n} taking valuables from passengers\' suitcases.', months: [3, 24], fine: [1000, 8000] },
+  { w: 20, title: 'Drove a vehicle into an aircraft and hid it', charge: 'Endangering the safety of an aircraft and failing to report damage', text: '{n} struck {r} with a ground vehicle at {b} and did not report it. The dent was found by the next crew\'s walk-round.', months: [0, 12], fine: [2000, 15000] },
+];
 // the airline itself, after an accident that investigators blame on poor maintenance (you are the accountable manager)
 OFFENCES.airline = [
+  { w: 1, title: 'Crews flew beyond their duty limits', charge: 'Breaching flight time limitations and endangering the safety of aircraft', text: 'The authority found that {why}.', months: [-3, -3], fine: [200000, 900000] },
   { w: 1, title: 'Accident caused by poor maintenance, with fatalities', charge: 'Corporate manslaughter and breaching aviation safety law', text: 'The investigation found that the accident was caused by poor maintenance: {why}.', months: [-2, -2], fine: [20000000, 80000000], fatal: true },
   { w: 1, title: 'Accident caused by poor maintenance', charge: 'Breaching aviation safety law and endangering the safety of aircraft', text: 'The investigation found that the accident was caused by poor maintenance: {why}.', months: [-3, -3], fine: [2000000, 15000000] },
 ];
@@ -93,6 +100,7 @@ function openCourtCase(who: any, role: string, offenceIdx?: number, why?: string
       { at: d(60), key: 'verdict', title: 'Verdict', text: '' },
     ],
   };
+  try { courtSetup(c); } catch (e) { /* the basic case still runs */ }
   S.cases = S.cases || []; S.cases.unshift(c);
   // staff are suspended: off duty, their flights stop
   if (role !== 'pax' && role !== 'airline') { who.status = 'off'; who.suspended = c.id; }
@@ -113,6 +121,7 @@ function courtWriteOff(a: Aircraft, c: CourtCase) {
 }
 
 function courtNotice(c: CourtCase, st: CourtStage) {
+  if (st.key === 'charge') { try { newsCourt(c, 'charge'); } catch (e) { /* ignore */ } }
   State.notices.unshift({ id: uid(), kind: 'staff' as any, title: `${c.name}: ${st.title.toLowerCase()}`, body: st.text || c.sentence || '', time: 'Now', read: false, ref: c.id } as any);
 }
 
@@ -146,25 +155,15 @@ function courtPunishAirline(c: CourtCase, guilty: boolean) {
 function courtAdvance() {
   const S: any = State; if (!S.cases) return;
   if (!conductOn()) return;   // paused while conduct reports are switched off
+  try { courtReleases(); whistleAdvance(); } catch (e) { /* ignore */ }
   const now = Date.now(); let changed = false;
   for (const c of S.cases as CourtCase[]) {
-    if (c.status !== 'open') continue;
+    if (c.status !== 'open' && !(c as any).appealing) continue;
     for (const st of c.stages) {
       if (st.done || st.at > now) continue;
       st.done = true; changed = true;
-      if (st.key === 'verdict') {
-        const o = (OFFENCES[c.role] || OFFENCES.fa).filter(x => x.title === c.offence)[0] || OFFENCES.fa[0];
-        const guilty = Math.random() < c.guiltyP;
-        c.status = guilty ? 'guilty' : 'acquitted';
-        c.sentence = guilty ? sentenceText(o, c.role) : '';
-        st.title = guilty ? 'Guilty' : 'Not guilty';
-        st.text = guilty ? `${c.court.replace(/^the /, 'The ')} found ${c.name} guilty of ${c.charge.toLowerCase()}. Sentence: ${c.sentence}.` + (c.fatal ? '' : ' Their employment ends.')
-          : `${c.court.replace(/^the /, 'The ')} found ${c.name} not guilty. They can return to work, or you can let them go.`;
-        const p = c.role === 'airline' || c.role === 'pax' ? null : staffById(c.staffId);
-        if (guilty && p) courtRemove(p);
-        if (c.role === 'airline') courtPunishAirline(c, guilty);
-        if (!guilty && p) { p.suspended = ''; p.status = p.role ? 'standby' : 'standby'; }
-      }
+      if (st.key === 'verdict') courtVerdictApply(c, st);
+      if (st.key === 'appeal') courtAppealApply(c, st);
       courtNotice(c, st);
     }
   }
@@ -196,6 +195,9 @@ function courtPopup(id: string) {
         <div class="inc-who"><b>${esc(c.name)}</b><small>${esc(c.role === 'pax' ? 'Passenger' : c.role === 'airline' ? 'The airline, with you as the accountable manager' : ROLE_NAMES[c.role === 'pilot' ? 'captain' : c.role] || 'Crew')}. Charge: ${esc(c.charge)}</small>
           <small class="${c.status === 'guilty' ? 'amber' : c.status === 'acquitted' ? 'green' : ''}">${c.status === 'open' ? (next ? `Next: ${esc(next.title.toLowerCase())}, around ${esc(when(next.at))}` : 'Awaiting the verdict') : c.status === 'guilty' ? `Guilty: ${esc(c.sentence || '')}` : 'Not guilty'}</small></div>
         <div class="say-row">${voiceButton(courtSpeech(c, next), 'legal', 'Play the lawyer\'s update')}${voiceNoteEl('Company lawyer')}</div>
+        ${typeof sentenceCardHtml === 'function' ? sentenceCardHtml(c) : ''}
+        ${typeof courtChoicesHtml === 'function' ? courtChoicesHtml(c) : ''}
+        ${(c as any).rehireAsk ? `<div class="cc-box"><b class="cc-h">${esc(c.name)} asks for a second chance</b><div class="btn-row"><button class="btn primary sm" data-act="cc-rehire" data-id="${esc(c.id)}" data-v="1">Take them back</button><button class="btn ghost sm" data-act="cc-rehire" data-id="${esc(c.id)}" data-v="0">Decline</button></div></div>` : ''}
         <ol class="court-tl">${c.stages.map(s => `<li class="${s.done ? 'done' : ''}"><time>${s.done || s === next ? esc(when(s.at)) : ''}</time><b>${esc(s.title)}</b>${s.done ? `<p>${esc(s.text)}</p>` : ''}</li>`).join('')}</ol>
       </div>
     </div>`, { cls: 'wide', onClose: () => Voice.stop() });

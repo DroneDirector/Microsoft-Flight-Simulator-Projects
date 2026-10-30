@@ -12,6 +12,7 @@
   ensurePeople();
   ensurePayroll();
   try { payRebase(); } catch (e) { /* ignore */ }
+  try { groundMigrate(); } catch (e) { /* ignore */ }
   try { InstalledAircraft.restore(); Ratings.grandfather(); } catch (e) { /* ignore */ }
   Store.bind();
   if (reducedMotion()) State.settings.reduceMotion = true;

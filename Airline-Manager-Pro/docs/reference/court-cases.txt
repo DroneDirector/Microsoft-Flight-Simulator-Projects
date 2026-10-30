@@ -1,0 +1,22 @@
+Court cases: real prosecutions the case types follow (src/core/court.ts, src/core/court-plus.ts)
+=================================================================================================
+People, airlines and newspapers in the app are made up; these real cases shaped the kinds of offences,
+charges and sentences.
+
+- Flying a whole flight over the alcohol limit: three crew members of a US airline were convicted in
+  1990 after flying a scheduled flight drunk (Northwest Airlines Flight 650); prison sentences of about
+  a year to 16 months, licences revoked.
+- Undeclared dangerous goods: a maintenance contractor was convicted after oxygen generators were loaded
+  as cargo with wrong paperwork (ValuJet 592, 1996); most of the conviction was overturned on appeal.
+- A pressurisation error after maintenance: airline managers were tried for manslaughter after a
+  pressurisation switch was left in the wrong position and the crew lost consciousness (Helios 522, 2005).
+- Managers and controllers convicted of negligent manslaughter after a mid-air collision (Überlingen,
+  2002) and a runway collision (Linate, 2001).
+- An airline and a mechanic convicted after debris on a runway caused a crash (Concorde, 2000); overturned
+  on appeal in 2012.
+- Deliberate acts that cost lives: in real cases the perpetrator usually died; here the case goes to trial.
+
+Court systems: a jury in the United States, United Kingdom, Canada, Australia, Ireland and New Zealand;
+a professional judge with lay judges in the Nordic countries, Germany and Austria; a panel of professional
+judges elsewhere. Release after about two thirds of a prison sentence (85% in the United States), with
+time in custody before the trial deducted.
