@@ -114,7 +114,7 @@ SCREENS.ops = {
           <span class="w-legend"><span><i class="flight"></i>${nFlight} in flight</span><span><i class="avail"></i>${nAvail} available</span><span><i class="maint"></i>${nMaint} maintenance</span></span>`, 'w-fleet', 0)}
         ${widget('map', 'Active flights', `<span class="w-big">${live.length}<small>in the air now</small></span>
           <span class="w-sub"><i class="live-dot"></i>${mine ? 'You and ' + (live.length - 1) + ' pilot' + (live.length - 1 === 1 ? '' : 's') : live.length + ' pilot' + (live.length === 1 ? '' : 's') + ' flying'}</span>`, 'w-active', 1)}
-        ${widget('maint', 'Fleet availability', `<span class="w-ring">${ring(avail)}<b>${avail}<small>%</small></b></span>
+        ${widget('maint', 'Fleet availability', `<span class="w-ring">${ring(avail)}<b class="${avail >= 100 ? 'w3' : ''}">${avail}<small>%</small></b></span>
           <span class="w-sub">${fl.length - nMaint} of ${fl.length} ready to fly</span>`, 'w-avail', 2)}
         ${widget('finance', 'Profit', `
           <span class="w-big ${profit >= 0 ? 'green' : 'red'}">${money(profit, { sign: true, compact: true })}<small>${_ovPeriod === 'year' ? (State.settings.timeMode === 'sim' ? 'Sim year ' : '') + esc(last.label) : PERIOD_NAMES[_ovPeriod]}</small></span>
