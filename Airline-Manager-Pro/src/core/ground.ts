@@ -4,8 +4,13 @@
 // (none hired, all off sick, on leave or on strike) means the aircraft there can't fly; too few means a
 // slower turnaround. At every other airport the local handling company does it for a fee.
 
-// Ground staff needed on one turnaround, by aircraft class (a small aircraft's pilot handles it alone).
-const GROUND_NEED: { [cls: string]: number } = { ga: 0, bush: 1, turboprop: 2, regional: 3, airliner: 4, widebody: 6 };
+// Your own ramp team on one turnaround, by aircraft class (docs/reference/ground-handling.txt): loaders for bags
+// and cargo, the push-back driver and a ramp lead. Fuel and catering come from the airport's companies.
+// A small aircraft's pilot handles it alone.
+const GROUND_NEED: { [cls: string]: number } = { ga: 0, bush: 1, turboprop: 3, regional: 4, airliner: 6, widebody: 10 };
+// Ground staff a base supports for each aircraft based there (two shifts a day, days off and leave):
+// about two ramp teams per based aircraft.
+const GROUND_PER_BASED: { [cls: string]: number } = { ga: 1, bush: 2, turboprop: 6, regional: 8, airliner: 12, widebody: 22 };
 
 /** Your bases: the hub and every airport where one of the airline's aircraft is based. */
 function companyBases(cid: string): string[] {
@@ -27,7 +32,11 @@ function groundBlock(cid: string, icao: string, typeId: string): { why: string; 
   if (!isBase(cid, icao) || groundGraceOn(cid)) return { why: '', slowMin: 0 };    // the local handling company
   const t = acType(typeId), need = GROUND_NEED[t ? t.cls : 'airliner'] != null ? GROUND_NEED[t.cls] : 4;
   if (!need) return { why: '', slowMin: 0 };
-  const free = groundCrewFree(cid, icao).length;
+  // other aircraft being turned round at the same base at the same time take their own teams
+  const S: any = State, now = Date.now();
+  const busy = ((S.aiNext || []) as any[]).filter(x => x.from === icao && plane(x.reg) && plane(x.reg).companyId === cid && x.depAt > now && x.depAt - now < AI_TURN_MIN * 60e3)
+    .reduce((s2, x) => s2 + (GROUND_NEED[acType(plane(x.reg).typeId).cls] || 0), 0);
+  const all = groundCrewFree(cid, icao).length, free = Math.max(Math.min(all, 1), all - Math.max(0, busy - need));
   if (!free) {
     const hired = staffOf(cid, 'ground').filter((p: any) => p.base === icao).length;
     const why = `No ground crew at ${icao}${hired ? (staffOf(cid, 'ground').some((p: any) => p.base === icao && p.onStrike) ? ' (on strike)' : ' (all off sick or on leave)') : ''}: nobody to unload, load, fuel or push back`;

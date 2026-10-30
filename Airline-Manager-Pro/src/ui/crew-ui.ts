@@ -578,11 +578,11 @@ ACTIONS['xfer-do'] = el => {
  *  for mechanics, more for bigger aircraft; a bigger airport allows more shifts). */
 function apronLimits(cid: string, icao: string): { mech: number; ground: number } {
   const size = typeof aptSize === 'function' ? aptSize(icao) : 1;   // 0 small, 1 regional, 2 large
-  const per: { [c: string]: number[] } = { widebody: [4, 12], airliner: [3, 8], regional: [2, 6], turboprop: [1.5, 5], bush: [1, 2], ga: [0.5, 1] };
+  const mechPer: { [c: string]: number } = { widebody: 4, airliner: 3, regional: 2, turboprop: 1.5, bush: 1, ga: 0.5 };
   let mech = 0, ground = 0;
-  for (const a of fleetOf(cid)) if ((a.base || company(cid).hub) === icao) { const f = per[acType(a.typeId).cls] || [2, 5]; mech += f[0]; ground += f[1]; }
+  for (const a of fleetOf(cid)) if ((a.base || company(cid).hub) === icao) { const cls = acType(a.typeId).cls; mech += mechPer[cls] || 2; ground += GROUND_PER_BASED[cls] || 8; }
   const shifts = [1, 1.5, 2.2][clamp(size, 0, 2)];
-  return { mech: Math.max(2, Math.ceil(mech * shifts) + 1), ground: Math.max(3, Math.ceil(ground * shifts) + 2) };
+  return { mech: Math.max(2, Math.ceil(mech * shifts) + 1), ground: Math.max(3, Math.ceil(ground * (size >= 2 ? 1.15 : 1)) + 2) };
 }
 function apronCrewChanged() {
   const S: any = State, cid = State.companyId, c = company(cid);
