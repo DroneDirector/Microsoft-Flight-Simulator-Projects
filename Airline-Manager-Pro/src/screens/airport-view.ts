@@ -22,7 +22,7 @@ class AirportView {
   track: string = null; seen = false; userMoved = false; fromWorld: WorldMap = null;
   ptrs: { [id: number]: { x: number; y: number } } = {}; pinch0 = 0; s0 = 0; moved = false;
   graph: { pts: number[][]; adj: { [k: string]: [string, number][] }; parks: number[][]; schematic: boolean } = null;
-  active: { tx: number; ty: number; ux: number; uy: number; len: number; name: string; wind: number; windKt: number } = null;
+  active: { tx: number; ty: number; ux: number; uy: number; len: number; wid: number; name: string; wind: number; windKt: number } = null;
   planes: ApvPlane[] = [];
   lastList = 0;
   /** Drawn inside the world map (zoomed in to airport level) instead of on its own screen. */
@@ -77,7 +77,7 @@ class AirportView {
 
   fetching = false;
   setLayout(L: AirportLayout, upgrade?: boolean) {
-    this.L = L; this.routes = {};
+    this.L = L; this.routes = {}; this.reachCache = {}; this.joins = null;
     if (this.embedded) { this.buildGraph(); this.pickRunway(); this.pc = null; return; }
     if (L.source !== 'runways') this.fetching = false;
     this.labelSource();
@@ -145,7 +145,8 @@ class AirportView {
       if (score > bs) { bs = score; best = { r, dir, hd }; }
     }
     const r = best.r, c = this.xy(r.lat, r.lon), h = best.hd * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
-    this.active = { tx: c[0] - ux * r.len / 2, ty: c[1] - uy * r.len / 2, ux, uy, len: r.len, name: best.dir ? r.b : r.a, wind, windKt };
+    this.active = { tx: c[0] - ux * r.len / 2, ty: c[1] - uy * r.len / 2, ux, uy, len: r.len, wid: r.wid || 45, name: best.dir ? r.b : r.a, wind, windKt };
+    this.joins = null;
     const el = $('#apv-rwy');
     if (el) el.innerHTML = `<b>Runway ${esc(this.active.name || '')}</b><small>Wind ${String(Math.round(wind)).padStart(3, '0')}° at ${windKt} kt${sw ? '' : ' (estimated)'}</small>`;
   }
@@ -180,17 +181,78 @@ class AirportView {
     while (k) { out.unshift(this.nodeXY(k)); k = prev[k]; }
     return out;
   }
+  /** Where taxiways join the runway in use: the taxi network's points on the runway, by distance along it. */
+  joins: { k: string; along: number }[] = null;
+  runwayJoins(): { k: string; along: number }[] {
+    if (this.joins) return this.joins;
+    const g = this.graph, A = this.active, out: { k: string; along: number }[] = [];
+    if (g && A) for (const k in g.adj) {
+      if (k[0] !== 'n') continue;
+      const p = g.pts[+k.slice(1)], dx = p[0] - A.tx, dy = p[1] - A.ty;
+      const along = dx * A.ux + dy * A.uy, across = Math.abs(dx * A.uy - dy * A.ux);
+      if (along > -60 && along < A.len + 60 && across < Math.max(A.wid / 2 + 12, 30)) out.push({ k, along });
+    }
+    return (this.joins = out.sort((a, b) => a.along - b.along));
+  }
+  /** The point on the runway centre line level with a point of the taxi network. */
+  onCentreline(k: string): number[] { const A = this.active, p = this.nodeXY(k), along = (p[0] - A.tx) * A.ux + (p[1] - A.ty) * A.uy; return [A.tx + A.ux * along, A.ty + A.uy * along]; }
+  /** Every point of the taxi network that can be reached from one point (and how far). */
+  reachCache: { [k: string]: { [k: string]: number } } = {};
+  reach(fromKey: string): { [k: string]: number } {
+    if (this.reachCache[fromKey]) return this.reachCache[fromKey];
+    const g = this.graph, dist: { [k: string]: number } = { [fromKey]: 0 }, done: { [k: string]: boolean } = {};
+    for (let guard = 0; guard < 20000; guard++) {
+      let u: string = null, ud = 1e18; for (const k in dist) if (!done[k] && dist[k] < ud) { ud = dist[k]; u = k; }
+      if (!u) break; done[u] = true;
+      for (const [v, d] of (g.adj[u] || [])) if (!done[v] && ud + d < (dist[v] == null ? 1e18 : dist[v])) dist[v] = ud + d;
+    }
+    return (this.reachCache[fromKey] = dist);
+  }
+  /** After landing: roll on along the runway to a taxiway that leaves it, then follow the taxiways to a stand. */
+  arrivalPath(endAlong: number, seed: string, big: boolean): number[][] {
+    const A = this.active, exitPt = [A.tx + A.ux * endAlong, A.ty + A.uy * endAlong];
+    const joins = this.runwayJoins(), ahead = joins.filter(j => j.along >= endAlong - 30), behind = joins.filter(j => j.along < endAlong - 30).reverse();
+    for (const j of ahead.concat(behind)) {
+      const stand = this.standFor(seed, big, j.k); if (!stand) continue;
+      const r = this.route(j.k, stand); if (r.length < 2) continue;
+      return [exitPt, this.onCentreline(j.k)].concat(r);
+    }
+    // no taxiway on the runway (a simple layout): the nearest point of the network, then the taxiways
+    const exit = this.nearestNode(A.tx + A.ux * (endAlong + 80), A.ty + A.uy * (endAlong + 80)), stand = exit ? this.standFor(seed, big, exit) : null;
+    return [exitPt].concat(exit && stand ? this.route(exit, stand) : []);
+  }
+  /** Leaving: from the stand along the taxiways onto the runway near its start, then to the threshold. */
+  departurePath(seed: string, big: boolean): { path: number[][]; stand: string } {
+    const A = this.active, joins = this.runwayJoins().filter(j => j.along < A.len * 0.5);
+    for (const j of joins) {
+      const stand = this.standFor(seed, big, j.k); if (!stand) continue;
+      const r = this.route(stand, j.k); if (r.length < 2) continue;
+      const on = this.onCentreline(j.k), path = r.concat([on]);
+      if (Math.hypot(on[0] - A.tx, on[1] - A.ty) > 5) path.push([A.tx, A.ty]);
+      return { path, stand };
+    }
+    const hold = this.nearestNode(A.tx + A.ux * 60, A.ty + A.uy * 60), stand = hold ? this.standFor(seed, big, hold) : null;
+    return { path: stand && hold ? this.route(stand, hold).concat([[A.tx, A.ty]]) : [], stand };
+  }
   nodeXY(k: string): number[] { const g = this.graph, i = +k.slice(1); return k[0] === 'p' ? [g.parks[i][0], g.parks[i][1]] : [g.pts[i][0], g.pts[i][1]]; }
   nearestNode(x: number, y: number): string {
     const g = this.graph; let best: string = null, bd = 1e18;
     for (const k in g.adj) if (k[0] === 'n') { const p = g.pts[+k.slice(1)], d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < bd) { bd = d; best = k; } }
     return best;
   }
-  standFor(seed: string, big: boolean): string {
+  /** A stand for an aircraft (the same one each time for the same seed); with `from`, only stands the taxiways lead to from there. */
+  standFor(seed: string, big: boolean, from?: string): string {
     const g = this.graph; if (!g || !g.parks.length) return null;
-    const ok = g.parks.map((p, i) => i).filter(i => g.adj['p' + i] && (big ? [5, 8, 9, 10, 15].indexOf(g.parks[i][4]) >= 0 || g.schematic : [1, 2, 3, 4, 14, 11].indexOf(g.parks[i][4]) >= 0 || g.schematic));
-    const pool = ok.length ? ok : g.parks.map((p, i) => i).filter(i => g.adj['p' + i]);
-    return pool.length ? 'p' + pool[_hashStr(seed) % pool.length] : null;
+    // the stand picked by the seed; when the taxiways don't lead there, the next one that they do lead to
+    // (so an aircraft taxis to the same stand it is later shown parked at)
+    const R = from ? this.reach(from) : null, linked = (i: number) => !!g.adj['p' + i];
+    const sized = g.parks.map((p, i) => i).filter(i => linked(i) && (big ? [5, 8, 9, 10, 15].indexOf(g.parks[i][4]) >= 0 || g.schematic : [1, 2, 3, 4, 14, 11].indexOf(g.parks[i][4]) >= 0 || g.schematic));
+    const all = sized.length ? sized : g.parks.map((p, i) => i).filter(linked);
+    if (!all.length) return null;
+    const h = _hashStr(seed) % all.length;
+    for (let n = 0; n < all.length; n++) { const i = all[(h + n) % all.length]; if (!R || R['p' + i] != null) return 'p' + i; }
+    if (R && sized.length) { const any = g.parks.map((p, i) => i).filter(i => linked(i) && R['p' + i] != null); if (any.length) return 'p' + any[_hashStr(seed) % any.length]; }
+    return null;
   }
   along(path: number[][], fr: number): number[] {
     if (!path.length) return null; if (path.length === 1) return [path[0][0], path[0][1], 0];
@@ -297,8 +359,7 @@ class AirportView {
       if (f.from === icao) {
         const tx = this.span(prof, 'Taxi out'), to = this.span(prof, 'Takeoff'), cl = this.span(prof, 'Climb');
         if (tx && el < tx[1]) {
-          const stand = this.standFor(f.reg + 'd' + f.from, big), hold = this.nearestNode(A.tx + A.ux * 60, A.ty + A.uy * 60);
-          const path = stand && hold ? this.route(stand, hold).concat([[A.tx, A.ty]]) : [];
+          const dp = this.departurePath(f.reg + 'd' + f.from, big), stand = dp.stand, path = dp.path;
           const PUSH = 75;   // pushback: about 75 s at 3-5 kt, nose pointing the other way
           // it waits at the gate and pushes back in time to reach the runway about a minute before its slot
           const need = path.length > 1 ? PUSH + this.taxiTimed(path, 0, 0).total + 60 : 0, wait = Math.max(0, (tx[1] - tx[0]) - need);
@@ -345,8 +406,7 @@ class AirportView {
             const v0 = land.v0, d = 400 + v0 * sIn - 0.5 * land.dec * sIn * sIn;
             pos = [A.tx + A.ux * d, A.ty + A.uy * d, rwyHdg]; phase = sIn < 2 ? 'Touchdown' : 'Landing roll'; kt = Math.round((v0 - land.dec * sIn) / KT + hw);
           } else {
-            const exitPt = [A.tx + A.ux * land.end, A.ty + A.uy * land.end], exit = this.nearestNode(A.tx + A.ux * (land.end + 80), A.ty + A.uy * (land.end + 80)), stand = this.standFor(f.reg + 'a' + f.to, big);
-            const path = [exitPt].concat(exit && stand ? this.route(exit, stand) : []);
+            const path = this.arrivalPath(land.end, f.reg + 'a' + f.to, big);
             const r = this.taxiTimed(path, 15, 0), q = this.timedAt(r, sIn - land.t);
             // at the gate for half a minute, then it is one of the parked aircraft
             if (q && sIn - land.t < r.total + 30) { pos = q.pos; kt = q.kt; phase = sIn - land.t >= r.total ? 'At the gate' : 'Taxi in'; }
@@ -360,7 +420,7 @@ class AirportView {
     const used: { [k: string]: boolean } = {}; out.forEach(p => used[p.id] = true);
     for (const a of fleetOf(State.companyId)) {
       if (a.location !== icao || a.status === 'flying' || State.live.some(f => f.reg === a.reg)) continue;
-      const t = acType(a.typeId), st = this.standFor(a.reg + 'a' + icao, t.seats >= 60); if (!st) continue;
+      const j0 = this.runwayJoins()[0], t = acType(a.typeId), st = this.standFor(a.reg + 'a' + icao, t.seats >= 60, j0 ? j0.k : undefined); if (!st) continue;
       const k = this.nodeXY(st), park = g.parks[+st.slice(1)];
       out.push({ id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? park[2] : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
     }
