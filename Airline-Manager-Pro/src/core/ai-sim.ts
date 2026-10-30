@@ -210,12 +210,17 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
   const earliest = now - AI_MAX_CATCHUP_D * 864e5;
   const summary = { legs: 0, net: 0, names: [] as string[], tx: [] as string[] };
   const before = company().balance;
+  noticesAt(now);   // anything already waiting is from now
+  let lastEvAt = 0;
   for (let guard = 0; guard < 2000; guard++) {
     // the next thing that happens, in time order
     let ev: any = null;
     for (const f of State.live) { const F: any = f; if (aiOn(f) && F.depAt) { const e = aiEndAt(F); if (e <= now && (!ev || e < ev.at)) ev = { kind: 'land', f, at: e }; } }
     for (const n of S.aiNext) if (n.depAt <= now && (!ev || n.depAt < ev.at)) ev = { kind: 'dep', n, at: n.depAt };
-    if (!ev) break;
+    if (!ev) { if (lastEvAt) noticesAt(lastEvAt); break; }
+    // messages from the event before this one carry that event's time
+    if (lastEvAt) noticesAt(lastEvAt);
+    lastEvAt = Math.max(ev.at, earliest);
     if (ev.kind === 'land') {
       const f: LiveFlight = ev.f, F: any = f, at = Math.max(ev.at, earliest), spd = F.spd || 1;
       aiLand(f, at, summary);

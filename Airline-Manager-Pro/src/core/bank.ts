@@ -101,7 +101,7 @@ const Bank = {
         payTxn(l.companyId, `Loan instalment: ${l.lender}`, -(interest + principal), 'loan', [['Interest', -interest], ['Repayment', -principal]], l.nextAt);
         l.left -= principal; l.paid += interest + principal; l.nextAt += BANK_MONTH; n++; changed = true;
       }
-      if (l.left <= 0) { b.loans = b.loans.filter(x => x !== l); State.notices.unshift({ id: uid(), kind: 'finance', title: `Loan paid off: ${l.lender}`, body: `The ${money(l.amount)} loan is fully paid back.`, time: 'Now', read: false } as any); }
+      if (l.left <= 0) { noticesAt(now); b.loans = b.loans.filter(x => x !== l); State.notices.unshift({ id: uid(), kind: 'finance', title: `Loan paid off: ${l.lender}`, body: `The ${money(l.amount)} loan is fully paid back.`, time: 'Now', read: false } as any); noticesAt(l.nextAt - BANK_MONTH); }
     }
     for (const c of State.companies) {
       const lvl = insuranceOf(c.id);

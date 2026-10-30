@@ -43,7 +43,8 @@ const Ratings = {
     const now = Date.now(); let changed = false;
     for (const p of State.pilots as any[]) {
       if (p.status !== 'training' || !p.training || p.training.until > now) continue;
-      const tr = p.training, t = acType(tr.typeId);
+      const tr = p.training, t = acType(tr.typeId), endAt = tr.until || now;
+      noticesAt(now);
       // the better the pilot, the likelier the pass: 80% to 97%
       const pass = Math.random() < clamp(0.62 + (p.rating || 4) * 0.075, 0.8, 0.97) + (tr.retake ? 0.05 : 0);
       p.status = p.prevStatus && p.prevStatus !== 'training' ? p.prevStatus : 'standby'; delete p.training; delete p.trainingUntil; changed = true;
@@ -57,6 +58,7 @@ const Ratings = {
         p.failedType = tr.typeId;
         State.notices.unshift({ id: uid(), kind: 'pilot', title: `${p.name} didn't pass the check ride`, body: `${t.maker} ${t.model}: the examiner wants to see it again. Book the check ride again under Pilots for ${money(Math.round(this.cost(tr.typeId) * 0.34))}.`, time: 'Now', read: false } as any);
       }
+      noticesAt(endAt);
     }
     if (changed) { Store.save(); try { renderTopbar(); if (State.screen === 'pilots') refresh(); } catch (e) { /* ignore */ } }
   },

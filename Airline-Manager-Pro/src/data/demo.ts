@@ -219,6 +219,14 @@ function profileOfCompany(cid: string): Profile { const c = company(cid); for (c
 function myPilot(): Pilot { const pr = profileOfCompany(State.companyId); return pilot(pr.pilotId); }
 function unreadCount(): number { pruneNotices(); stampNotices(); return State.notices.filter(n => !n.read).length; }
 
+/** Messages made just now for something that happened at `at` (catching up after the app was closed):
+ *  they carry the real time of that event. */
+function noticesAt(at: number) {
+  if (!at || !isFinite(at)) return;
+  const t = Math.min(at, Date.now());
+  for (const n of State.notices as any[]) { if (n.at) break; n.at = t; n.time = new Date(t).toTimeString().slice(0, 5); }
+}
+
 /** Every notification gets the moment it arrived (older saves: worked out from the time they show). */
 function stampNotices() {
   const now = Date.now();

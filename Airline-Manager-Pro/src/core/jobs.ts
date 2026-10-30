@@ -76,7 +76,9 @@ const Jobs = {
         const fee = Math.round(j.pay * 0.2);
         payTxn(j.companyId, `Charter cancelled: ${j.title}`, -fee, 'charter', [[`Not delivered to ${j.to} in time: 20% of ${money(j.pay)}`, -fee]]);
         try { Progress.popularity(-1, 'A charter not delivered'); } catch (e) { /* ignore */ }
+noticesAt(Date.now());
         State.notices.unshift({ id: uid(), kind: 'company', title: `Job not delivered: ${j.title}`, body: `${j.from} to ${j.to} was due ${dateStr(new Date(j.due))}. ${money(fee)} paid to ${j.client}.`, time: 'Now', read: false } as any);
+        noticesAt(j.due);
       }
     }
     // keep the last 60 finished jobs
