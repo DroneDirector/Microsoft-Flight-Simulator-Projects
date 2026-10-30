@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.7 (2026-10-30)
+
+- Voice: per-sentence time limits grow with the sentence's place in the queue; late rejections handled; no error report once speech has started
+- Flight trace: AI touchdown recognised from the Landing phase and from landings between samples; NO TOUCHDOWN only when the app was watching at touchdown time
+
 ## 0.9.6 (2026-10-30)
 
 - Real-world weather always on (METAR, TAF, international and US SIGMETs); per-type weather limits (crosswind, tailwind, minima, IFR, icing) and airport minima by size; AI waits, holds, reroutes, diverts to an alternate and continues, or cancels
