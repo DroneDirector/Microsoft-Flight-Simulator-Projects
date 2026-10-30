@@ -13,6 +13,8 @@ import { VERSION } from './version';
 import { openLog, writeLog, fatal, catchEverything, logFile } from './errors';
 import { Desktop } from './desktop';
 import { installedAircraft, saveFlightPlan } from './installed';
+import { Recorder } from './recorder';
+import { ReplaySim, loadRecording } from './replay';
 export { VERSION };
 
 export function dataDir(): string {
@@ -116,7 +118,10 @@ function banner(server: LinkServer, status: string, phones: number, lines: strin
   process.stdout.write('\x1b[2J\x1b[H' + out.join('\n') + '\n');
 }
 
-export async function main() {
+/** Where flights are recorded (Documents, so they survive reinstalling and are easy to find). */
+export function recordingsDir(): string { return path.join(os.homedir(), 'Documents', 'Airline Manager Pro', 'Recordings'); }
+
+export async function main(replay?: { file: string; speed: number }) {
   const dir = dataDir();
   fs.mkdirSync(dir, { recursive: true });
   openLog(dir);
@@ -130,14 +135,29 @@ export async function main() {
   const log = (s: string) => { writeLog(s); lines.push(new Date().toTimeString().slice(0, 8) + '  ' + s); if (lines.length > 200) lines.shift(); redraw(); };
   try { await server.start(); }
   catch (e) { fatal(`Port ${LINK_PORT} is in use. Is the PC app already running?`, e); return; }
-  let lib: any;
-  try { lib = loadSimConnect(); } catch (e) { fatal('The SimConnect library is missing or damaged. Unzip the PC app again, keeping the lib folder next to the .exe.', e); return; }
-  const source = new SimConnectSource(lib);
+  let source: SimSource;
+  if (replay) {
+    try { source = new ReplaySim(loadRecording(replay.file), replay.speed); } catch (e) { fatal('That flight recording can\'t be read: ' + replay.file, e); return; }
+  } else {
+    let lib: any;
+    try { lib = loadSimConnect(); } catch (e) { fatal('The SimConnect library is missing or damaged. Unzip the PC app again, keeping the lib folder next to the .exe.', e); return; }
+    source = new SimConnectSource(lib);
+  }
   source.on('status', (ok: boolean, text: string) => { if (text !== status) writeLog('Flight Simulator: ' + text); status = text; redraw(); });
   source.on('note', (t: string) => writeLog(t));
   server.on('clients', (n: number) => { phones = n; redraw(); });
   server.on('code', redraw);
-  run(source, server, log);
+  const tracker = run(source, server, log);
+  // every real flight is recorded, so it can be played back exactly as the simulator sent it
+  if (!replay && process.argv.indexOf('--no-record') < 0) {
+    const rec = new Recorder(recordingsDir(), VERSION);
+    let lastFile = '';
+    source.on('snapshot', (s: any) => { rec.snapshot(s); if (rec.file && rec.file !== lastFile) { lastFile = rec.file; log('Recording this flight: ' + path.basename(rec.file)); } });
+    source.on('airports', (l: Airport[]) => rec.airports(l));
+    source.on('crash', () => rec.crash());
+    tracker.on('event', (e: any) => rec.event(e));
+    process.on('exit', () => rec.close());
+  }
   source.start();
   redraw();
   // the app on this PC
@@ -147,7 +167,7 @@ export async function main() {
 }
 
 /** node-simconnect is shipped next to the .exe as its own unmodified library (LGPL-3.0). */
-function loadSimConnect(): any {
+export function loadSimConnect(): any {
   const { createRequire } = require('module');
   const here = path.dirname(process.execPath);
   for (const p of [path.join(here, 'lib', 'node_modules', 'node-simconnect'), path.join(__dirname, '..', 'node_modules', 'node-simconnect')]) {

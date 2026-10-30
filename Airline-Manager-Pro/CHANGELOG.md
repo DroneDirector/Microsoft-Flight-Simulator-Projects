@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.3 (2026-10-30)
+
+- PC app: sim check ("Check Flight Simulator.cmd" or --check) reads everything the app uses from the running simulator and the loaded aircraft, and saves a report in Documents\Airline Manager Pro\Diagnostics
+- PC app: every flight is recorded as the simulator sent it (Documents\Airline Manager Pro\Recordings, newest 30 kept); play one back to the phone with "Play back a flight.cmd" or --replay
+- PC app: variables a simulator or aircraft refuses are named in the log
+- PC app: add-on aircraft in the MSFS 2024 Community2024 folder are found too
+- Tests play recorded flights back through the flight tracker
+
 ## 0.8.2 (2026-10-30)
 
 - Voice pack downloads on the start-up screen with its progress on the same bar

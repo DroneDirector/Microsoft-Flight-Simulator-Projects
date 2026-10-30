@@ -22,6 +22,8 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | Link over the internet (phone on mobile data, PC on its own connection anywhere) | Planned |
 | Pairing a PC with a code | Built |
 | PC app log file; errors keep the window open with the details | Built |
+| Sim check: reads everything the app uses from the running simulator and the loaded aircraft and saves a report of anything missing or refused | Built |
+| Flight recordings: every flight saved as the simulator sent it, played back to the phone or through the tests | Built |
 | Detect which aircraft is loaded in the sim and match it to the aircraft you're flying | Built |
 | Detect installed aircraft (default and add-ons such as PMDG, Fenix, iniBuilds, Aerosoft) | Planned; market shows demo list |
 | Passenger numbers from GSX Pro (and the sim's payload stations without GSX) | Built |
