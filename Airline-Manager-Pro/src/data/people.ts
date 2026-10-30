@@ -82,7 +82,9 @@ function makePerson(seed: string, role: CrewRole, companyId: string, base: strin
   const sex: 'm' | 'f' = sexIn || (r() < (role === 'fa' ? 0.65 : role === 'mech' ? 0.25 : role === 'ground' ? 0.3 : 0.3) ? 'f' : 'm');
   const nat = natIn || pick(NAT_FOR_HUB[base] || Object.keys(NAMES));
   const pool = NAMES[nat] || NAMES.GB;
-  const name = pick(sex === 'f' ? pool.f : pool.m) + ' ' + pick(pool.last);
+  // patronymic surnames follow the person: -son/-sson for men, -dóttir for women (Iceland, the Faroes)
+  const lasts = pool.last.filter(l => sex === 'f' ? !/sson$|son$/.test(l) || !pool.last.some(x => /dóttir$/.test(x)) : !/dóttir$/.test(l));
+  const name = pick(sex === 'f' ? pool.f : pool.m) + ' ' + pick(lasts.length ? lasts : pool.last);
   const look = randomLook(seed, sex, role);
   if (role === 'ground') look.uniform = 6 + Math.floor(r() * 2);   // hi-vis yellow or orange
   const range = NAT_SKIN[nat] || [0, 4];
