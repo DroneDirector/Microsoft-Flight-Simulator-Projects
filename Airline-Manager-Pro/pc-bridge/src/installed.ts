@@ -12,7 +12,7 @@ import * as path from 'path';
 export interface SimPackage { name: string; title: string; creator: string }
 
 /** Where UserCfg.opt can be: MSFS 2024 and 2020, Microsoft Store and Steam. */
-function userCfgFiles(): string[] {
+export function userCfgFiles(): string[] {
   const ad = process.env.APPDATA || '', la = process.env.LOCALAPPDATA || '';
   return [
     path.join(la, 'Packages', 'Microsoft.Limitless_8wekyb3d8bbwe', 'LocalCache', 'UserCfg.opt'),
@@ -53,12 +53,14 @@ export async function installedAircraft(): Promise<SimPackage[]> {
   const found: SimPackage[] = [], seen: { [k: string]: boolean } = {};
   let checked = 0;
   for (const root of roots) {
-    // root\Community\<package>, root\Official\OneStore\<package>, root\Official2024\Steam\<package> …
+    // root\Community\<package>, root\Community2024\<package> (MSFS 2024 only), root\Official\OneStore\<package>,
+    // root\Official2024\Steam\<package> …
     for (const top of await subdirs(root)) {
       const name = path.basename(top).toLowerCase();
-      if (name !== 'community' && name.indexOf('official') !== 0) continue;
+      const community = name.indexOf('community') === 0;
+      if (!community && name.indexOf('official') !== 0) continue;
       const level1 = await subdirs(top);
-      const dirs = name === 'community' ? level1 : (await Promise.all(level1.map(subdirs))).reduce((a, b) => a.concat(b), level1);
+      const dirs = community ? level1 : (await Promise.all(level1.map(subdirs))).reduce((a, b) => a.concat(b), level1);
       for (const d of dirs) {
         if (++checked > 20000) break;
         const p = await readManifest(d);

@@ -58,10 +58,22 @@ writeFileSync(join(pkg, 'README.txt'), [
   '  limit that in its Data settings.', '',
   'Keep the window open while you fly. Your flights, landings, fuel, weights and damage are sent to the phone.',
   'To try the link without Flight Simulator, run:  AirlineManagerPro-PC.exe --demo 30', '',
+  'Sim check',
+  '  With a flight loaded in Flight Simulator, double-click "Check Flight Simulator.cmd". It reads everything the app',
+  '  uses from the simulator and the loaded aircraft and saves a report in Documents\\Airline Manager Pro\\Diagnostics.', '',
+  'Flight recordings',
+  '  Every flight is recorded to Documents\\Airline Manager Pro\\Recordings (the newest 30 are kept, about 1 MB an hour).',
+  '  To play one back to the phone as if Flight Simulator were flying it, drag the recording onto "Play back a flight.cmd".',
+  '  To fly without recording, run:  AirlineManagerPro-PC.exe --no-record', '',
   'If something goes wrong, the window stays open with the error, and the details are saved in',
   '%APPDATA%\\Airline Manager Pro\\pc-app.log. Send that file so the problem can be looked at.', '',
   'Licences',
   '  node-simconnect (lib/node_modules/node-simconnect) is used unmodified under the GNU LGPL v3.',
   '  Its licence text is in that folder. You may replace that folder with another version of the library.', '',
 ].join('\r\n'));
+// double-click shortcuts for the sim check and playing back a recording
+writeFileSync(join(pkg, 'Check Flight Simulator.cmd'), ['@echo off', 'cd /d "%~dp0"', 'AirlineManagerPro-PC.exe --check', ''].join('\r\n'));
+writeFileSync(join(pkg, 'Play back a flight.cmd'), ['@echo off', 'cd /d "%~dp0"',
+  'if "%~1"=="" (echo Drag a recording from Documents\\Airline Manager Pro\\Recordings onto this file. & pause & exit /b)',
+  'AirlineManagerPro-PC.exe --replay "%~1" 1', ''].join('\r\n'));
 console.log('Packaged', pkg);
