@@ -21,3 +21,10 @@
 - Always build and release the phone app and the PC app together.
 - Work goes to branch `amp-0.5.1-work`; merging to `main` releases (the build runs on `Airline-Manager-Pro/**` changes on main).
 - Never put registration keys or reactivation codes in this (public) repository: only their fingerprints.
+
+## Before the final release (1.0)
+Remind the owner of this when the app is made final (version 1.0 or the release called final), before publishing:
+- **VATSIM**: its user agreement forbids using its data in a paid app without written permission.
+- **IVAO, SimBrief's flight plan import and Hoppie ACARS**: none of them publish terms for paid apps, and SimBrief issues access keys on request.
+All four are built but switched off in `app.config.json` → `services`. Turn one on only once its permission is in writing.
+The build prints this reminder for any version 1.0 or later while one of them is still off.

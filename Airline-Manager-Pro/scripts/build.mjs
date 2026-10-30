@@ -102,4 +102,8 @@ if (process.argv.includes('--preview')) {
   writeFileSync(join(root, 'dist/preview.html'), html);
   console.log('Preview written to dist/preview.html');
 }
+{
+  const sv = cfg.services || {}, off = ['vatsim', 'ivao', 'simbriefApi', 'hoppie'].filter(k => sv[k] !== true);
+  if (parseInt(String(cfg.version).split('.')[0], 10) >= 1 && off.length) console.log(`\nREMINDER before the final release: ${off.join(', ')} still switched off. VATSIM: its user agreement forbids using its data in a paid app without written permission. IVAO, SimBrief's flight plan import and Hoppie ACARS: none of them publish terms for paid apps, and SimBrief issues access keys on request. See CLAUDE.md.\n`);
+}
 console.log(`Built ${cfg.appName} ${cfg.version}`);
