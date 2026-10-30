@@ -50,7 +50,7 @@ SCREENS.maint = {
             <div class="ic-top">${statusChip(i.severity)}<b>${esc(i.reg)}</b><small>${esc(t.model)}, ${esc(i.date)}</small></div>
             <h4>${esc(i.title)}</h4><p>${esc(i.detail)}</p>
             <small class="src">${icon('sliders')}${esc(i.source)}</small>
-            <div class="ic-foot"><span><b>${money(i.cost)}</b><small>${repairTotal(i.reg).n > 1 ? `${repairTotal(i.reg).n} reports on ${esc(i.reg)}, ${money(repairTotal(i.reg).cost)} for all` : ((State.settings as any).repairTime === 'instant' ? 'Ready to fly once paid' : `About ${i.severity === 'grounding' ? '50-90' : i.severity === 'major' ? '20-40' : '5-15'} min in the hangar`)}</small></span>
+            <div class="ic-foot"><span><b>${money(i.cost)}</b><small>${repairTotal(i.reg).n > 1 ? `${repairTotal(i.reg).n} reports on ${esc(i.reg)}, ${money(repairTotal(i.reg).cost)} for all` : ((State.settings as any).repairTime === 'instant' ? 'Ready to fly once paid' : `${repairTimeText(repairPlanMin(i.reg))} in the hangar`)}</small></span>
               <button class="btn ghost sm" data-act="open-issue" data-id="${i.id}">${icon('volume')}Mechanic</button>
               <button class="btn ghost sm" data-act="fix-later" data-id="${i.id}">Later</button>
               <button class="btn primary sm" data-act="fix-now" data-id="${i.id}">${repairTotal(i.reg).n > 1 ? 'Pay and fix all' : 'Pay and fix now'}</button></div>

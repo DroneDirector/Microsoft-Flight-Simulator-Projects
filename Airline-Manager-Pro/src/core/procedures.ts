@@ -65,6 +65,32 @@ function activeRunway(icao: string): RunwayEnd {
 }
 
 /** Round off the corners of a polyline (two passes of corner cutting), keeping the end points. */
+/** Round every corner of a route with a circular arc of the given radius (nm; 0 keeps the corner), the way an
+ *  aircraft flies by a waypoint. Returns the new points and, for each old point, the index of its new point. */
+function flyByArcs(p: number[][], radiusNm: (i: number) => number): { pts: number[][]; map: number[] } {
+  const out: number[][] = [p[0]], map = [0];
+  for (let i = 1; i < p.length - 1; i++) {
+    const R = radiusNm(i), a = p[i - 1], b = p[i], c = p[i + 1];
+    const l1 = gcDistanceNm(a, b), l2 = gcDistanceNm(b, c);
+    const h1 = geoBrg(a, b), h2 = geoBrg(b, c);
+    let turn = ((h2 - h1 + 540) % 360) - 180;
+    if (!R || l1 < 0.05 || l2 < 0.05 || Math.abs(turn) < 2) { map.push(out.length); out.push(b); continue; }
+    // the arc starts and ends where it meets each leg: R·tan(turn/2) before and after the waypoint, at most
+    // 45% of each leg (a tighter turn when the legs are short)
+    const th = Math.abs(turn) * Math.PI / 180;
+    let t = R * Math.tan(th / 2); const tMax = Math.min(l1, l2) * 0.45;
+    let r = R; if (t > tMax) { t = tMax; r = t / Math.tan(th / 2); }
+    const p0 = geoDest(b, (h1 + 180) % 360, t), side = turn > 0 ? 1 : -1;
+    const ctr = geoDest(p0, (h1 + 90 * side + 360) % 360, r);
+    const steps = Math.max(2, Math.ceil(Math.abs(turn) / 6));
+    const start = (h1 - 90 * side + 360) % 360;   // from the centre to the start of the arc
+    map.push(out.length + Math.floor(steps / 2));
+    for (let k = 0; k <= steps; k++) out.push(geoDest(ctr, (start + turn * k / steps + 360) % 360, r));
+  }
+  map.push(out.length); out.push(p[p.length - 1]);
+  return { pts: out, map };
+}
+
 function smoothPath(p: number[][], passes = 2): number[][] {
   let q = p;
   for (let k = 0; k < passes; k++) {
@@ -229,10 +255,16 @@ function flightPathFor(from: string, to: string): FlightPath {
   const a0 = sidEnd, b0 = starPts[0], legNm = gcDistanceNm(a0, b0), n = Math.max(2, Math.min(64, Math.round(legNm / 40)));
   for (let i = 1; i < n; i++) enroute.push(gcInterpolate(a0, b0, i / n));
   const sid = sd ? [dep.thr, dep.end].concat(sidPts) : smoothPath([dep.thr, dep.end].concat(sidPts), 1);
-  const pts = sid.concat(enroute, starPts, appPts);
+  const raw = sid.concat(enroute, starPts, appPts);
+  // turns are flown as round fly-by arcs, as a real aircraft turns: a rate-one-ish turn at the speed of
+  // each part (about 1.5 nm radius in the departure and arrival, up to 4 nm at cruise), never wider than
+  // the legs allow, so it still follows the route. The runway and the final stay straight.
+  const iS = sid.length - 1, iR = iS + enroute.length + 1, iA = iR + starPts.length;
+  const radius = (i: number) => i <= 1 || i >= raw.length - 2 ? 0 : i <= iS ? 1.4 : i < iR ? 4 : i < iA ? 1.8 : 1.2;
+  const sm = flyByArcs(raw, radius), pts = sm.pts, map = sm.map;
   const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + gcDistanceNm(pts[i - 1], pts[i]));
   const idx = (k: number) => cum[Math.min(cum.length - 1, k)];
-  const iSidEnd = sid.length - 1, iStar = iSidEnd + enroute.length + 1, iApp = iStar + starPts.length;
+  const iSidEnd = map[sid.length - 1], iStar = map[sid.length - 1 + enroute.length + 1], iApp = map[sid.length + enroute.length + starPts.length];
   const parts: ProcPart[] = [
     { kind: 'sid', name: sidName, from: 0, to: idx(iSidEnd) },
     { kind: 'route', name: '', from: idx(iSidEnd), to: idx(iStar) },

@@ -23,6 +23,8 @@
     "src/data/demo.ts",
     "src/core/store.ts",
     "src/graphics/aircraft-art.ts",
+    "src/data/aircraft-shapes.ts",
+    "src/graphics/aircraft-model.ts",
     "src/graphics/avatar.ts",
     "src/graphics/human.ts",
     "src/graphics/avatar3d-view.ts",
@@ -84,6 +86,8 @@
     "src/screens/maintenance.ts",
     "src/screens/finance.ts",
     "src/screens/settings.ts",
+    "src/screens/livery.ts",
+    "src/core/flight-trace.ts",
     "src/main.ts"
   ]
 }

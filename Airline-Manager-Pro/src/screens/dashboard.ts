@@ -24,12 +24,10 @@ function weatherChip(f: LiveFlight): string {
 function flightCard(f: LiveFlight): string {
   const a = plane(f.reg), t = acType(a.typeId), A = apt(f.from), B = apt(f.to);
   const dist = gcDistanceNm(A.pos, B.pos);
-  const F: any = f, ai = aiOn(f) && F.depAt;
+  const F: any = f, ai = !f.real && F.depAt;
   // hired pilots: miles along the planned route and time to the gate from the real-world flight profile
   const left = ai ? F.leftNm : f.real ? (f.noDest ? 0 : gcDistanceNm(f.pos, B.pos)) : dist * (1 - f.t);
-  const spd = f.real && f.gs > 60 ? f.gs : t.cruiseKt;
-  const eta = Math.round(left / spd * 60);
-  const etaTxt = ai ? countdown(F.toGoS) : hours(eta);
+  const mo = flightMotion(f);
   const altTxt = f.alt < 50 ? 'Ground' : f.alt < 18000 ? num(Math.round(f.alt / 100) * 100) + ' ft' : 'FL' + Math.round(f.alt / 100);
   const fuelOk = (State as any).myLoad.fuelKg >= (State as any).myLoad.tripFuelKg + (State as any).myLoad.reserveKg;
   return `
@@ -44,7 +42,10 @@ function flightCard(f: LiveFlight): string {
       <div><small>Phase</small><b>${esc(f.phase)}</b></div>
       <div><small>Altitude</small><b>${altTxt}</b></div>
       <div><small>Remaining</small><b>${f.noDest ? '—' : num(left) + ' nm'}</b></div>
-      <div><small>Arrives in</small><b>${f.noDest ? '—' : etaTxt}</b></div>
+      <div><small>Arrives in</small><b>${arrivesIn(f)}</b></div>
+      <div><small>Heading</small><b>${String(mo.hdg % 360).padStart(3, '0')}°</b></div>
+      <div><small>Vertical speed</small><b>${mo.vs > 0 ? '+' : mo.vs < 0 ? '−' : ''}${num(Math.abs(mo.vs))} ft/min</b></div>
+      <div><small>Ground speed</small><b>${f.gs ? num(f.gs) + ' kt' : '—'}</b></div>
     </div>
     ${f.you ? `<div class="fc-sync">
       <div class="sync-item">${icon('pax')}<span><small>Passengers from ${(State as any).myLoad.source === 'gsx' ? 'GSX' : 'the sim'}</small><b>${f.pax} / ${f.paxMax}</b></span></div>
@@ -153,12 +154,12 @@ SCREENS.ops = {
     const host = $('#ops-map', root);
     // tapping a flight (yours, a hired pilot's or a co-op pilot's) follows it
     // tapping a flight (yours, a hired pilot's or a co-op pilot's) opens its bubble: follow, favourite, details
-    _opsMap = new WorldMap(host, { interactive: true, onSelect: id => { if (!id) showSel(null); } });
+    _opsMap = new WorldMap(host, { interactive: true, memoKey: 'ops', onSelect: id => { if (!id) showSel(null); } });
     const pts: number[][] = [];
     liveOf().forEach(f => { pts.push(apt(f.from).pos); if (!f.noDest) pts.push(apt(f.to).pos); if (f.pos) pts.push(f.pos); });
     if (!pts.length) pts.push(apt(company().hub).pos, [apt(company().hub).pos[0] + 8, apt(company().hub).pos[1] + 4]);
-    _opsMap.fit(pts, 40);
-    const mine = yourFlight(); if (mine) _opsMap.selected = mine.id;
+    if (!_opsMap.resumeFollow()) _opsMap.fit(pts, 40);
+    const mine = yourFlight(); if (mine && !_opsMap.following) _opsMap.selected = mine.id;
     (window as any).__opsShowSel = showSel;
     function showSel(id: string) {
       const box = $('#ops-sel', root); if (!box) return;

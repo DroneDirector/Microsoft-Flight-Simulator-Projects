@@ -127,6 +127,8 @@ const SETTINGS: SetSection[] = [
         ${ErrorLog.list.slice(0, 12).map(e => `<button class="err-row" data-act="err-open" data-id="${e.id}"><b>${esc(e.title)}</b><span>${esc(e.message)}</span><small>${esc(e.time)}</small></button>`).join('')}
         ${n ? `<div class="btn-row"><button class="btn ghost sm" data-act="err-show-all">Show all</button><button class="btn ghost sm" data-act="err-copy">${icon('copy')}Copy</button><button class="btn ghost sm" data-act="err-share">${icon('share')}Share</button><button class="btn ghost sm danger-txt" data-act="err-clear">${icon('trash')}Clear</button></div>` : ''}</div>`;
     } },
+    { type: 'html', html: () => `<div class="set-card col"><div class="sc-h">${icon('route')}<span><b>Flight trace</b><small>How every aircraft flies: phase, altitude, speed, heading, position and runway, every 30 seconds while the app is open. ${FlightTrace.problems ? FlightTrace.problems + ' problem' + (FlightTrace.problems === 1 ? '' : 's') + ' marked (jumps, too fast, off the runway, no touchdown).' : 'No problems marked.'} ${num(FlightTrace.lines.length)} lines.</small></span></div>
+        <div class="btn-row"><button class="btn ghost sm" data-act="trace-save">${icon('download')}Save the log file</button><button class="btn ghost sm danger-txt" data-act="trace-clear">${icon('trash')}Clear</button></div></div>` },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}The error log stays on this device. Nothing is sent anywhere unless you copy or share it yourself.</p>` },
   ] },
   { id: 'about', title: 'About', icon: 'info', items: [
@@ -350,6 +352,7 @@ ACTIONS['edit-company'] = el => {
         <div class="le-group"><b>Callsign</b><input class="le-in" data-co-cs value="${esc(c.callsign)}" maxlength="16" autocomplete="off"></div></div>
       <div class="le-group"><b>Home base</b><select class="le-in" data-co-hub>${Object.keys(AIRPORTS).filter(k => k !== 'DEP').sort().map(k => `<option value="${k}" ${k === c.hub ? 'selected' : ''}>${k}, ${esc(AIRPORTS[k].name)}</option>`).join('')}</select></div>
       <div class="le-group"><b>Colour</b><div class="le-sw">${CO_COLORS.map(col => `<button class="sw ${col === c.color ? 'on' : ''}" style="--c:${col}" data-act="co-color" data-c="${col}" aria-label="Colour ${col}"></button>`).join('')}</div></div>
+      <div class="le-group"><b>Livery</b><button class="btn ghost" data-act="livery-open" data-co="${c.id}">${icon('fleet')}Design the livery</button></div>
       <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="co-save">${icon('check')}Save</button></div>
     </div>`, { cls: 'narrow' });
 };

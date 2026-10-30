@@ -3,7 +3,8 @@
 
 let _artSeq = 0;
 
-function aircraftArt(typeId: string, o?: { color?: string; color2?: string; reg?: string; w?: number; ground?: boolean }): string {
+/** The drawn side view, used where 3D drawing isn't available. */
+function aircraftArtSvg(typeId: string, o?: { color?: string; color2?: string; reg?: string; w?: number; ground?: boolean }): string {
   const t = acType(typeId); if (!t) return '';
   const s = t.art; o = o || {};
   const color = o.color || '#2C8CFF', color2 = o.color2 || '#0B2A55';

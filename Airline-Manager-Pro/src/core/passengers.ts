@@ -41,7 +41,7 @@ function paxDrunkAtGate() {
   const paxWho = `pax|${paxSex(PaxLeg.name)}|drunk|${PaxLeg.name}`;
   Voice.prepare(line, 'gate'); Voice.prepare(pax, paxWho);
   const wrap = openLayer('modal', `<div class="modal-head"><div><small>Gate agent</small><h2>Drunk passenger at the gate</h2></div></div>
-    <div class="say-row">${voiceButton(line, 'gate', "Play the gate agent's message")}<small class="voice-note">${esc(voiceNote())}</small></div>
+    <div class="say-row">${voiceButton(line, 'gate', "Play the gate agent's message")}${voiceNoteEl()}</div>
     <p class="speech">${esc(line)}</p>
     <div class="say-row pax-say">${voiceButton(pax, paxWho, 'Play what the passenger says')}<small class="voice-note">${esc(PaxLeg.name)}, at the desk</small></div>
     <p class="speech pax-speech">“${esc(pax)}”</p>

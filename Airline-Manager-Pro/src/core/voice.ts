@@ -10,6 +10,10 @@ const SPEAKERS: { [k: string]: Speaker } = {
   mechanic: { voice: 'bm_george', accent: 'b', speed: 1.0, pitch: 0.92, title: 'Mechanic' },
   gate: { voice: 'bf_emma', accent: 'b', speed: 1.02, pitch: 1.05, title: 'Gate agent' },
   ops: { voice: 'af_heart', accent: 'a', speed: 1.0, pitch: 1.0, title: 'Head of operations' },
+  pilot: { voice: 'bm_lewis', accent: 'b', speed: 1.0, pitch: 0.97, title: 'Pilot' },
+  authority: { voice: 'bm_daniel', accent: 'b', speed: 0.97, pitch: 0.95, title: 'Aviation authority' },
+  legal: { voice: 'bf_isabella', accent: 'b', speed: 0.98, pitch: 1.0, title: 'Company lawyer' },
+  finance: { voice: 'af_bella', accent: 'a', speed: 1.0, pitch: 1.02, title: 'Finance' },
 };
 // people who only speak now and then (passengers): their voice follows who they are
 const OTHER_SPEAKERS: { [k: string]: Speaker } = { pax: { voice: 'bm_lewis', accent: 'b', speed: 1.0, pitch: 1.0, title: 'Passenger' } };
@@ -224,9 +228,10 @@ const Voice = {
     (async () => {
       let ctx: AudioContext;
       try {
-        await VoiceEngine.ready();
+        // the voice model loads once (a few seconds); if it doesn't answer, the device's own voice speaks
+        await Promise.race([VoiceEngine.ready(), new Promise((ok, bad) => setTimeout(() => bad(new Error('the voice model took too long to load')), 25000))]);
         ctx = audio(true); if (!ctx) { this.finish(); return; } if (ctx.state !== 'running') await ctx.resume();
-        const parts = this.sentences(text, sp).map(s => voiceSentence(s, sp));
+        const parts = this.sentences(text, sp).map(s => Promise.race([voiceSentence(s, sp), new Promise<Float32Array>((ok, bad) => setTimeout(() => bad(new Error('the voice took too long')), 30000))]));
         let at = 0;
         for (let i = 0; i < parts.length; i++) {
           const pcm = await parts[i];
@@ -298,11 +303,16 @@ function voiceUiChanged() {
     const ic = b.querySelector('.vb-ic'); if (ic) ic.innerHTML = icon(on ? 'stop' : 'play');
     if (!on) b.setAttribute('data-playing', '0');
   }
+  for (const n of Array.from(document.querySelectorAll('.voice-note[data-vn]')) as HTMLElement[]) { const h = voiceNoteInner(n.getAttribute('data-vn')); if (n.innerHTML !== h) n.innerHTML = h; }
   try { if (typeof _setSection !== 'undefined' && _setSection === 'voice' && document.querySelector('.settings')) rerenderSettingsBody(); } catch (e) { /* not open */ }
   try { splashVoice(); } catch (e) { /* no start-up screen */ }
 }
 
 /** A play button for someone's words; data-say holds the line, data-who the speaker. */
+/** Who is speaking, for a person of the airline: "role|sex|mood|name". */
+function personWho(role: string, p: any, mood?: string): string {
+  return role + '|' + ((p && (p.sex || (p.look && p.look.sex))) || '') + '|' + (mood || '') + '|' + ((p && p.name) || role);
+}
 function voiceButton(text: string, who: string, label: string): string {
   if (!State.settings.mechanicVoice) return '';
   return `<button class="voice-btn" data-act="say" data-who="${esc(who)}" data-say="${esc(text)}" aria-label="${esc(label)}">
@@ -316,8 +326,18 @@ function voiceNote(): string {
   if (VoicePack.state === 'downloading') return `Downloading the voices… ${VoicePack.total ? Math.round(VoicePack.done / VoicePack.total * 100) : 0}%`;
   return 'Device voice. Natural voices: Settings → Voices';
 }
+/** The line under a play button: how the voice will sound, kept up to date, with a way to turn sounds on. */
+function voiceNoteEl(extra?: string): string {
+  return `<small class="voice-note" data-vn="${esc(extra || '')}">${voiceNoteInner(extra)}</small>`;
+}
+function voiceNoteInner(extra?: string): string {
+  if (State.settings.muteAll) return `All sounds are muted <button class="link-btn" data-act="unmute">Turn sounds on</button>`;
+  const t = voiceNote();
+  return esc(t + (t && extra ? ' · ' : '') + (extra || ''));
+}
 ACTIONS.say = el => {
   if (Voice.speaking && el.getAttribute('data-playing') === '1') { Voice.stop(); return; }
+  if (State.settings.muteAll) { toast('All sounds are muted', 'warn', { label: 'Turn on', act: 'unmute' }); voiceUiChanged(); return; }
   Voice.stop();
   el.setAttribute('data-playing', '1');
   Voice.speak(el.getAttribute('data-say') || '', () => { el.setAttribute('data-playing', '0'); voiceUiChanged(); }, el.getAttribute('data-who') || 'mechanic');

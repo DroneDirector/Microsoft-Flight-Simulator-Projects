@@ -197,7 +197,7 @@ function raiseIssue(code: string, severity: 'minor' | 'major' | 'grounding', det
   a.condition = Math.max(5, a.condition - (k + 1) * 4);
   LEG_ISSUES.push(issue.id);
   _legNotes.push(d.title);
-  State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${a.reg}: ${d.title}`, body: severity === 'grounding' ? 'Grounded until it\'s repaired.' : 'The mechanic will look at it after landing.', time: 'Now', read: false, ref: issue.id });
+  State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${a.reg}: ${d.title}`, body: (severity === 'grounding' ? 'Grounded until it\'s repaired. ' : 'The mechanic will look at it after landing. ') + (repairPlanMin(a.reg) ? `Repair time: ${repairTimeText(repairPlanMin(a.reg))}.` : 'Ready to fly once paid.'), time: 'Now', read: false, ref: issue.id });
   return issue;
 }
 function issueText(code: string, sev: string): string {

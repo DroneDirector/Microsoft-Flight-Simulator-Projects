@@ -79,7 +79,10 @@ const MAP_R_MAX = 1.6e7;
 const AIRPORT_DEG_PX = 1800;
 const MY_MAX = millerY(MAP_LAT_MAX), MY_MIN = millerY(MAP_LAT_MIN);
 
-interface MapOpts { interactive?: boolean; labels?: boolean; onSelect?: (id: string) => void; compact?: boolean; insetRight?: number }
+interface MapOpts { interactive?: boolean; labels?: boolean; onSelect?: (id: string) => void; compact?: boolean; insetRight?: number; memoKey?: string }
+
+/** The aircraft each map is following and its zoom, kept while you visit other screens. */
+const _followMemo: { [key: string]: { id: string; z: number } } = {};
 
 /** Where a flight is now: its real position when it comes from the simulator, otherwise along its route. */
 function flightPos(f: LiveFlight): number[] {
@@ -98,7 +101,7 @@ class WorldMap {
   ptrs: { [id: number]: { x: number; y: number } } = {}; pinch0 = 0; R0 = 0; moved = false;
   anim: any = null; colors: any; lastFit: any = null; userMoved = false;
   ro: any; ml: any = null; mlHost: HTMLElement = null;
-  following: string = null; followT = 0;
+  following: string = null; followT = 0;   // see _followMemo
   /** Airports drawn with their real layout when zoomed in to airport level. */
   scenes: { [icao: string]: AirportView } = {}; scenesT = 0; inScene: { [flightId: string]: number[] } = {}; sceneDraws = false;
 
@@ -141,7 +144,7 @@ class WorldMap {
       });
       this.ml.touchZoomRotate.disableRotation();
       this.ml.on('move', () => { this.baseDirty = true; });
-      this.ml.on('dragstart', () => { this.userMoved = true; this.following = null; });
+      this.ml.on('dragstart', () => { this.userMoved = true; this.followT = performance.now() + 2500; });
       this.ml.on('zoomstart', (e: any) => { if (e.originalEvent) this.userMoved = true; });
       this.ml.on('click', (e: any) => this.tapAt(e.point.x, e.point.y));
       // tiles failing (offline): the dotted world is drawn instead until tiles load again
@@ -254,6 +257,18 @@ class WorldMap {
     this.userMoved = false;
   }
 
+  /** Back on the map: carry on following the aircraft you were following, at the same zoom. */
+  resumeFollow(): boolean {
+    const m = this.opts.memoKey && _followMemo[this.opts.memoKey];
+    const f = m && State.live.filter(x => x.id === m.id)[0];
+    if (!f) return false;
+    const p = this.inScene[f.id] || flightPos(f);
+    this.following = f.id; this.selected = f.id; this.mark = null;
+    if (this.ml) this.ml.jumpTo({ center: p, zoom: m.z });
+    else { this.R = m.z; this.cx = p[0] * D2R; this.cy = millerY(p[1]); this.clampView(); this.baseDirty = true; }
+    return true;
+  }
+
   zoomBy(f: number, ax?: number, ay?: number) {
     if (this.ml) { this.userMoved = true; this.ml.easeTo({ zoom: this.ml.getZoom() + Math.log(f) / Math.LN2, duration: 300 }); return; }
     ax = ax == null ? this.w / 2 : ax; ay = ay == null ? this.h / 2 : ay;
@@ -277,7 +292,7 @@ class WorldMap {
       const ids = Object.keys(this.ptrs);
       if (ids.length === 1) {
         const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
-        if (Math.abs(dx) + Math.abs(dy) > 3) { this.moved = true; this.userMoved = true; this.following = null; }
+        if (Math.abs(dx) + Math.abs(dy) > 3) { this.moved = true; this.userMoved = true; this.followT = performance.now() + 2500; }
         this.cx -= dx / this.R; this.cy += dy / (this.R * this.yq()); this.clampView(); this.baseDirty = true;
       }
       p.x = e.offsetX; p.y = e.offsetY;
@@ -394,7 +409,11 @@ class WorldMap {
       if (k >= 1) this.anim = null;
     }
     if (!this.w) return;
-    if (this.following && !this.anim && now - this.followT > 250) {
+    // a followed aircraft stays followed (at the zoom you chose) until its Follow button is tapped again;
+    // a drag looks around for a moment, then the map comes back to it
+    const mk = this.opts.memoKey;
+    if (mk) { if (this.following) _followMemo[mk] = { id: this.following, z: this.ml ? this.ml.getZoom() : this.R }; else delete _followMemo[mk]; }
+    if (this.following && !this.anim && now - this.followT > 250 && !Object.keys(this.ptrs).length) {
       this.followT = now;
       const ff = State.live.filter(x => x.id === this.following)[0];
       if (ff) {
@@ -429,7 +448,7 @@ class WorldMap {
     }
     try { if (typeof Network !== 'undefined') Network.drawOnMap(c, this, degPx); } catch (e) { /* never stop the map */ }
     for (const f of liveOf()) {
-      if (!f.real && !aiOn(f)) { f.t = f.t + f.rate * dt * (State.settings.reduceMotion ? 0 : 1); if (f.t > 1) f.t = 0.02; }
+      // (your demo flight moves on the real clock along its profile: demoUpdate in ai-sim.ts)
       const a = apt(f.from).pos, b = apt(f.to).pos;
       const N = 48;
       let pts: number[][] = [], cut = -1;

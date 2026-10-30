@@ -34,7 +34,7 @@ SCREENS.fleet = {
     return `
     <div class="screen-head">
       <div><h1>Fleet</h1><p class="sub">${all.length} aircraft, ${all.filter(a => a.status === 'flying').length} in the air, ${all.filter(a => a.status === 'grounded').length} grounded</p></div>
-      <div class="btn-row nowrap"><button class="btn primary" data-act="go-market">${icon('plus')}Buy aircraft</button><button class="btn ghost" data-act="go-used">${icon('clock')}Used</button><button class="btn ghost" data-act="go-lease">${icon('key')}Lease</button></div>
+      <div class="btn-row nowrap"><button class="btn primary" data-act="go-market">${icon('plus')}Buy aircraft</button><button class="btn ghost" data-act="go-used">${icon('clock')}Used</button><button class="btn ghost" data-act="go-lease">${icon('key')}Lease</button><button class="btn ghost" data-act="livery-open">${icon('sliders')}Livery</button></div>
     </div>
     ${noStandBannerHtml()}
     <div class="filter-row">${classes.map(c => `<button class="fchip ${_fleetFilter === c[0] || (c[0] === 'types' && acType(_fleetFilter)) ? 'on' : ''}" data-act="fleet-filter" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>

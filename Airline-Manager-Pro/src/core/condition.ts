@@ -45,13 +45,33 @@ function repairMinutes(i: Issue, skill: number): number {
 
 /** Repair everything reported on an aircraft in one go: it goes into the hangar for the real repair
  *  time (the longest job, plus a little for each extra one) and the condition climbs while the work goes on. */
+/** The repair time of one report (real minutes), worked out once and kept, so the time the mechanic
+ *  quotes is the time the repair really takes. */
+function issueMinutes(i: Issue): number {
+  const I: any = i;
+  if (!I.estMin) { const a: any = plane(i.reg); I.estMin = repairMinutes(i, (a && maintQuality(a.companyId).skill) || 0.3); }
+  return I.estMin;
+}
+/** How long the hangar needs for all of an aircraft's open reports together (real minutes; 0 when repairs are instant). */
+function repairPlanMin(reg: string, issues?: Issue[]): number {
+  if ((State.settings as any).repairTime === 'instant') return 0;
+  const jobs = issues || State.issues.filter(i => i.reg === reg && i.status === 'open');
+  if (!jobs.length) return 0;
+  const mins = jobs.map(issueMinutes).sort((x, y) => y - x);
+  return repairStep(Math.min(90, mins[0] + mins.slice(1).reduce((t, m) => t + Math.round(m * 0.3), 0)));
+}
+/** "about 45 minutes", "1 h 20 min", or "ready at once". */
+function repairTimeText(min: number): string {
+  if (!min) return 'ready straight away';
+  return min < 60 ? `${min} minutes` : `${Math.floor(min / 60)} h${min % 60 ? ' ' + (min % 60) + ' min' : ''}`;
+}
+
 function repairAll(reg: string): Issue[] {
   const a: any = plane(reg); if (!a) return [];
-  const mq = maintQuality(a.companyId), skill = mq.skill || 0.3;
   const jobs = State.issues.filter(i => i.reg === reg && i.status !== 'fixed') as any[];
   if (!jobs.length) return [];
-  const mins = jobs.map(i => i.durMin || repairMinutes(i, skill)).sort((x, y) => y - x);
-  const dur = repairStep(Math.min(90, mins[0] + mins.slice(1).reduce((t, m) => t + Math.round(m * 0.3), 0)));
+  const skill = maintQuality(a.companyId).skill || 0.3;
+  const dur = repairPlanMin(reg, jobs) || repairStep(Math.min(90, Math.max.apply(null, jobs.map(issueMinutes))));
   const gain = jobs.reduce((t, i) => t + (i.severity === 'grounding' ? 40 : i.severity === 'major' ? 22 : 8), 0) * (0.6 + 0.4 * skill);
   const now = Date.now(), from = a.condition, to = Math.min(condCap(a), a.condition + gain);
   const instant = (State.settings as any).repairTime === 'instant';

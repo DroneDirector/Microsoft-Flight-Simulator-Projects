@@ -2039,3 +2039,25 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .flog .kv-row b { font-size: 14px; }
 .flog-iss small { display: block; margin-bottom: 4px; }
 .mini-row.on { border-color: var(--cyan); }
+
+/* "Turn sounds on" inside the line under a play button */
+.link-btn { background: none; border: 0; padding: 0 0 0 4px; color: var(--cyan, #3FD0E8); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.modal-body .say-row { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; flex-wrap: wrap; }
+.paid-note { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: rgba(46, 204, 113, .1); border: 1px solid rgba(46, 204, 113, .35); }
+.paid-note > .ic { color: #2ECC71; flex: none; }
+.paid-note > span { display: flex; flex-direction: column; flex: 1; }
+.paid-note small { opacity: .8; }
+
+/* Livery designer */
+.livery-pop .lv-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.lv-preview { position: sticky; top: 0; }
+.lv-stage { background: linear-gradient(180deg, #DCE5EE, #F3F6F9); border-radius: 14px; padding: 6px 4px 0; }
+.lv-stage .ac-art { width: 100%; height: auto; display: block; }
+.lv-types, .lv-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.lv-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.lv-style { text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line, rgba(255,255,255,.12)); background: rgba(255,255,255,.03); color: inherit; display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.lv-style small { opacity: .7; font-size: 11px; }
+.lv-style.on { border-color: var(--cyan, #3FD0E8); background: rgba(63,208,232,.1); }
+.sw.custom { position: relative; overflow: hidden; background: conic-gradient(#f33, #ff3, #3f3, #3ff, #33f, #f3f, #f33); }
+.sw.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+@media (max-width: 760px) { .livery-pop .lv-body { grid-template-columns: 1fr; } .lv-preview { position: static; } }

@@ -26,8 +26,8 @@ SCREENS.map = {
     </div>`;
   },
   mount(root) {
-    _bigMap = new WorldMap($('#big-map', root), { interactive: true, insetRight: 270, onSelect: id => { const list = $('#mf-list'); if (list) list.innerHTML = mapListHtml(id); if (!id) { const d = $('#map-detail'); if (d) d.innerHTML = ''; } } });
-    fitAll(false);
+    _bigMap = new WorldMap($('#big-map', root), { interactive: true, insetRight: 270, memoKey: 'big', onSelect: id => { const list = $('#mf-list'); if (list) list.innerHTML = mapListHtml(id); if (!id) { const d = $('#map-detail'); if (d) d.innerHTML = ''; } } });
+    if (!_bigMap.resumeFollow()) fitAll(false);
   },
 };
 
@@ -112,7 +112,7 @@ function setMapStyle(style: 'classic' | 'street' | 'satellite') {
   State.settings.mapStyle = style;
   Haptics.pulse(10);
   refresh();
-  if (State.screen === 'map' && (fol || sel)) setTimeout(() => { if (sel) selectFlight(sel); if (fol && _bigMap) _bigMap.follow(fol); }, 60);
+  if (State.screen === 'map' && (fol || sel)) setTimeout(() => { if (sel) selectFlight(sel); }, 60);
   toast(style === 'classic' ? 'Classic map' : style === 'street' ? 'Street map' : 'Satellite map', 'ok');
 }
 

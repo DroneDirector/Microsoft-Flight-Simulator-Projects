@@ -38,7 +38,7 @@ interface Txn {
 }
 interface Division { id: string; name: string; color: string }
 interface Company {
-  id: string; profileId: string; name: string; icao: string; callsign: string; hub: string; color: string; color2: string;
+  id: string; profileId: string; name: string; icao: string; callsign: string; hub: string; color: string; color2: string; livery?: Partial<Livery>;
   balance: number; reputation: number; founded: string; kind: 'major' | 'bush' | 'regional'; divisions: Division[];
 }
 interface Profile { id: string; pilotId: string; label: string }
@@ -217,7 +217,12 @@ function liveOf(cid?: string): LiveFlight[] {
 function flightTypeId(f: LiveFlight): string { const a = plane(f.reg); return a ? a.typeId : (f as any).typeId || 'a320-fenix'; }
 function profileOfCompany(cid: string): Profile { const c = company(cid); for (const p of State.profiles) if (p.id === c.profileId) return p; return State.profiles[0]; }
 function myPilot(): Pilot { const pr = profileOfCompany(State.companyId); return pilot(pr.pilotId); }
-function unreadCount(): number { return State.notices.filter(n => !n.read).length; }
+function unreadCount(): number { pruneNotices(); return State.notices.filter(n => !n.read).length; }
+/** Mechanic's reports that are paid for leave the notifications (the repair carries on under Maintenance). */
+function pruneNotices() {
+  if (State.notices.some(n => n.kind === 'mechanic' && n.ref && State.issues.some(i => i.id === n.ref && i.status !== 'open')))
+    State.notices = State.notices.filter(n => !(n.kind === 'mechanic' && n.ref && State.issues.some(i => i.id === n.ref && i.status !== 'open')));
+}
 
 // Profit history per period (dollars). Generated once so numbers stay stable while browsing.
 interface ProfitPoint { label: string; rev: number; cost: number }

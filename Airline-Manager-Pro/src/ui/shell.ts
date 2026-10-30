@@ -153,7 +153,7 @@ function subHead(parent: string, title: string, sub: string, right?: string): st
     <h1>${esc(title)}</h1><p class="sub">${esc(sub)}</p></div>${right || ''}</div>`;
 }
 
-ACTIONS.unmute = () => { State.settings.muteAll = false; renderTopbar(); Sound.tick(); toast('Sounds on', 'ok'); };
+ACTIONS.unmute = () => { State.settings.muteAll = false; renderTopbar(); Sound.tick(); voiceUiChanged(); toast('Sounds on', 'ok'); };
 ACTIONS['sound-toggle'] = () => {
   const mute = !State.settings.muteAll;
   if (mute) { Voice.stop(); State.settings.muteAll = true; } else { State.settings.muteAll = false; Sound.tick(); }
