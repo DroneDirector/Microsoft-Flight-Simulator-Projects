@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1 (2026-10-30)
+
+- Voices start at once: lines on screen, open reports and unread messages are synthesised in the background; spoken lines are kept on the device (IndexedDB, newest 300 sentences); a tapped line jumps the queue; a short first piece
+- One voice per message (no switch to the device voice once the natural voice has started)
+- Playback always ends when the last sentence has played
+
 ## 0.9.0 (2026-10-30)
 
 - 3D view from the map controls: the followed aircraft over real terrain heights (Terrain Tiles on AWS) painted like the world map, the airport layout and every aircraft nearby; follows the aircraft, drag to look around, pinch/scroll to zoom; Behind, Around and Tower views; tap an aircraft for its details; flaps and gear move by phase (yours from the simulator)
