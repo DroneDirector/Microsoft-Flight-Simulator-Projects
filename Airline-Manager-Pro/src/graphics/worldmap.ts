@@ -221,7 +221,8 @@ class WorldMap {
     let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
     for (const p of points) { const x = p[0] * D2R, y = millerY(p[1]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
     const ins = this.w > 600 ? (this.opts.insetRight || 0) : 0;
-    const R = Math.min((this.w - ins - pad * 2) / Math.max(x1 - x0, 0.02), (this.h - pad * 2) / Math.max(y1 - y0, 0.02));
+    const minSpan = deep ? 2e-5 : 0.02;
+    const R = Math.min((this.w - ins - pad * 2) / Math.max(x1 - x0, minSpan), (this.h - pad * 2) / Math.max(y1 - y0, minSpan));
     const Rc = clamp(R, this.minR(), deep ? MAP_R_MAX : 2600);
     const target = { cx: (x0 + x1) / 2 + ins / 2 / Rc, cy: (y0 + y1) / 2, R: Rc };
     if (animate && !reducedMotion()) this.anim = { from: { cx: this.cx, cy: this.cy, R: this.R }, to: target, t0: performance.now(), dur: 900 };
