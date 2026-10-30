@@ -102,6 +102,8 @@
     "src/core/ground.ts",
     "src/core/pax-experience.ts",
     "src/core/weather.ts",
+    "src/core/news.ts",
+    "src/core/court-plus.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/main.ts"
