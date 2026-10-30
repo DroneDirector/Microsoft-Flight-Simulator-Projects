@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.7 (2026-10-30)
+
+- Slightly wider side menu so every label fits; 100% availability fits inside its ring
+
 ## 0.7.6 (2026-10-29)
 
 - Much faster zoomed in on airports: route lines clipped to the screen, indexed airport and background lookups, map canvas at up to 2x resolution

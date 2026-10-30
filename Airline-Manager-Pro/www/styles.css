@@ -34,7 +34,7 @@
   --map-dot: #24486F;
   --map-dot-hi: #2E5480;
   --map-grid: rgba(63, 208, 232, .055);
-  --rail: 72px;
+  --rail: 78px;
   --top: 52px;
   --r-lg: 18px;
   --r-md: 12px;
@@ -1058,7 +1058,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 /* ---------- Size adaptations ---------- */
 /* Tablets and larger: roomier rail with labels */
 @media (min-width: 1100px) and (min-height: 640px) {
-  :root { --rail: 86px; --top: 60px; }
+  :root { --rail: 92px; --top: 60px; }
   .screen { padding: 20px 24px 32px; }
   .rail-btn span { font-size: 11px; }
   h1 { font-size: 30px; }
@@ -1067,7 +1067,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 }
 /* Phones in landscape: short screens */
 @media (max-height: 480px) {
-  :root { --rail: 64px; --top: 46px; --g-label: 120px; }
+  :root { --rail: 70px; --top: 46px; --g-label: 120px; }
   .rail { padding: 4px 4px; }
   .rail-brand, .rail-set { display: none; }
   .brand-svg { width: 22px; height: 22px; }
@@ -1777,7 +1777,7 @@ button.coop-e:hover { border-color: var(--line-2); }
 
 /* ---------- Narrow windows (split screen on a phone, pop-up windows) ---------- */
 @media (max-width: 560px) {
-  :root { --rail: 62px; --top: 48px; }
+  :root { --rail: 66px; --top: 48px; }
   .rail-btn span { font-size: 8.5px; letter-spacing: -.01em; }
   .w-seg { transform: scale(.82); transform-origin: right center; }
   .w-seg span { padding-left: 6px; padding-right: 6px; }
@@ -1838,3 +1838,10 @@ button.coop-e:hover { border-color: var(--line-2); }
 /* The map (base map, airports, aircraft) stays in its own layer, below every panel and button on it */
 .map-host { z-index: 0; isolation: isolate; }
 .bigmap > .mf-panel, .bigmap > .map-zoom, .bigmap > .back-btn.on-map, .bigmap > .map-detail, .ops-map > .map-sel, .ops-map > .map-tools, .ops-map .map-label, .ops-map > :not(.map-host) { z-index: 3; }
+
+/* Side menu labels always fit ("Maintenance"); the availability ring's number always sits inside the ring */
+.rail-btn span { max-width: 100%; white-space: nowrap; letter-spacing: -.01em; }
+.w-ring b { white-space: nowrap; }
+.w-ring b.w3 { font-size: 16px; letter-spacing: -.03em; }
+.w-ring b.w3 small { font-size: 9px; }
+@media (max-height: 480px) { .w-ring, .ring { width: 56px; height: 56px; } .w-ring b.w3 { font-size: 13.5px; } .w-ring b.w3 small { font-size: 8px; } }
