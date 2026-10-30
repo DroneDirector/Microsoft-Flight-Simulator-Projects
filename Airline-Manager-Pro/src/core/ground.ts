@@ -36,7 +36,7 @@ function groundBlock(cid: string, icao: string, typeId: string): { why: string; 
   const S: any = State, now = Date.now();
   const busy = ((S.aiNext || []) as any[]).filter(x => x.from === icao && plane(x.reg) && plane(x.reg).companyId === cid && x.depAt > now && x.depAt - now < AI_TURN_MIN * 60e3)
     .reduce((s2, x) => s2 + (GROUND_NEED[acType(plane(x.reg).typeId).cls] || 0), 0);
-  const all = groundCrewFree(cid, icao).length, free = Math.max(Math.min(all, 1), all - Math.max(0, busy - need));
+  const all = groundCrewFree(cid, icao).length, free = Math.max(Math.min(all, 1), all - busy);   // a busy base still has someone, just slower
   if (!free) {
     const hired = staffOf(cid, 'ground').filter((p: any) => p.base === icao).length;
     const why = `No ground crew at ${icao}${hired ? (staffOf(cid, 'ground').some((p: any) => p.base === icao && p.onStrike) ? ' (on strike)' : ' (all off sick or on leave)') : ''}: nobody to unload, load, fuel or push back`;
