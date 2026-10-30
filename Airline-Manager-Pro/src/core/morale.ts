@@ -65,6 +65,7 @@ function moraleAdvance() {
     try { unionAdvance(); } catch (e) { /* ignore */ }
     const people = ((S.staff || []) as any[]).concat((State.pilots as any[]).filter(x => x.id !== 'you' && !x.you)).filter(x => x.companyId || (typeof pilotCompany === 'function' && pilotCompany(x)));
     for (const p of people) {
+      try { sicknessDaily(p); } catch (e) { /* ignore */ }
       if (p.onStrike) continue;
       const s = moodState(p);
       // small drifts: rosters, weather, life

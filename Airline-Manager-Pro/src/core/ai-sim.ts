@@ -282,7 +282,10 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       // a repair you paid for comes first: the leg waits until the aircraft is out of the hangar
       const rep = a ? (State.issues as any[]).filter(i => i.reg === a.reg && i.status === 'scheduled') : [];
       if (a && p && p.status !== 'off' && rep.length) { const end = Math.max.apply(null, rep.map(i => (i.startedAt || n.depAt) + (i.durMin || 30) * 60000)); wait(Math.max(n.depAt, end) + 10 * 60e3, 'Repair in the hangar'); continue; }
-      if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || p.status === 'off') continue;
+      // off sick: the leg waits for cover (a stand-in or a contract pilot), cabin crew and mechanics likewise
+      if (a && p) { const sk = sickBlock(n, a); if (sk) { wait(now + 60 * 60e3, sk); continue; } }
+      const sickCovered = p && isSick(p) && p.coverAgency > now;
+      if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || (p.status === 'off' && !sickCovered)) continue;
       // away on a type rating course: the leg waits until the pilot is back
       if (p.status === 'training') { wait(Math.max(now, p.trainingUntil || now) + 60e3, 'Pilot away on a course'); continue; }
       // no stand at its base: refused take-off until it gets a base with a free stand
@@ -302,7 +305,8 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
         sched: n.sched || depAt, waitWhy: n.why || '', retry: !!n.retry };
       f.schedEnd = f.sched + prof.totalS * 1000 / (n.spd || 1);
       if (!test) assignDelays(f, prof);
-      a.status = 'flying'; p.status = 'flying';
+      a.status = 'flying'; if (!isSick(p)) p.status = 'flying';
+      if (sickCovered) f.coverBy = 'Contract pilot (covering ' + p.name + ')';
       State.live.push(f);
     }
   }
