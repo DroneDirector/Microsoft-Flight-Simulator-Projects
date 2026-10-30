@@ -116,22 +116,4 @@ const Haptics = {
   },
 };
 
-// Mechanic voice. The finished app ships recorded lines plus an offline neural voice pack;
-// this mockup uses the device's own speech engine as a stand-in so the flow can be tried.
-const Voice = {
-  speaking: false,
-  speak(text: string, onEnd?: () => void) {
-    const s = (window as any).speechSynthesis;
-    if (!s || State.settings.muteAll) { if (onEnd) onEnd(); return false; }
-    s.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate = 1.0; u.pitch = 0.92;
-    const v = s.getVoices().filter((x: SpeechSynthesisVoice) => /en[-_](GB|IE|US)/i.test(x.lang));
-    if (v.length) u.voice = v[0];
-    u.onend = () => { this.speaking = false; if (onEnd) onEnd(); };
-    this.speaking = true;
-    s.speak(u);
-    return true;
-  },
-  stop() { const s = (window as any).speechSynthesis; if (s) s.cancel(); this.speaking = false; },
-};
+// The people's voices are in voice.ts.

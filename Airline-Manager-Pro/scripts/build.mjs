@@ -68,6 +68,13 @@ if (existsSync(three)) {
   copyFileSync(three, join(root, 'www/vendor/three.min.js'));
 }
 
+// Runs the voice model in the app (ONNX Runtime Web, MIT License): the WebAssembly build only
+const ort = join(root, 'node_modules/onnxruntime-web/dist');
+if (existsSync(ort)) {
+  mkdirSync(join(root, 'www/vendor/ort'), { recursive: true });
+  for (const f of ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs']) copyFileSync(join(ort, f), join(root, 'www/vendor/ort', f));
+}
+
 // Crew body data (made from the CC0 MakeHuman model, see tools/human-data)
 const humans = join(root, 'assets/humans.bin');
 copyFileSync(humans, join(root, 'www/humans.bin'));

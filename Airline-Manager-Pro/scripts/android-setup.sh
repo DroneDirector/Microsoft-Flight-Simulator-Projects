@@ -21,7 +21,7 @@ APPID=$(node -p "require('./app.config.json').appId")
 JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
 mkdir -p "$JDIR"
 sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
-for J in LanLinkPlugin AppToolsPlugin; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
+for J in LanLinkPlugin AppToolsPlugin VoicePlugin; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
 # permissions for the Wi-Fi link (network name needs location), notifications and installing updates
 for P in ACCESS_WIFI_STATE ACCESS_NETWORK_STATE CHANGE_WIFI_MULTICAST_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS REQUEST_INSTALL_PACKAGES; do
   grep -q "android.permission.$P\"" "$MAN" || sed -i "s|</manifest>|    <uses-permission android:name=\"android.permission.$P\" />\n</manifest>|" "$MAN"
@@ -31,6 +31,11 @@ GR=android/app/build.gradle
 if ! grep -q 'airlinemanagerpro-test' "$GR"; then
   PW=$(cat signing/test-signing.password)
   sed -i "0,/^android {/s||android {\n    signingConfigs {\n        debug {\n            storeFile file('../../signing/test-signing.jks')\n            storePassword '${PW}'\n            keyAlias 'airlinemanagerpro-test'\n            keyPassword '${PW}'\n        }\n    }|" "$GR"
+fi
+# the voice model runs with ONNX Runtime (MIT License); only the phone processor types are packed
+if ! grep -q 'onnxruntime-android' "$GR"; then
+  sed -i "0,/^dependencies {/s||dependencies {\n    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0'|" "$GR"
+  sed -i "0,/defaultConfig {/s||defaultConfig {\n        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }|" "$GR"
 fi
 sed -i "s/versionCode [0-9]*/versionCode ${CODE}/; s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/" "$GR"
 sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">${NAME}</string>|; s|<string name=\"title_activity_main\">.*</string>|<string name=\"title_activity_main\">${NAME}</string>|" android/app/src/main/res/values/strings.xml

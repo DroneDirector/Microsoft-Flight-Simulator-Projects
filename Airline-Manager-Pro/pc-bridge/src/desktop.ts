@@ -18,7 +18,7 @@ import { LINK_PORT } from './protocol';
 
 const TYPES: { [ext: string]: string } = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json',
-  '.bin': 'application/octet-stream', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.png': 'image/png', '.svg': 'image/svg+xml', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
+  '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.mjs': 'text/javascript; charset=utf-8', '.onnx': 'application/octet-stream', '.gz': 'application/gzip', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.png': 'image/png', '.svg': 'image/svg+xml', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
 };
 
 export interface DesktopPrefs { open: boolean; mode: 'window' | 'borderless' | 'fullscreen'; gpu: 'auto' | 'high' | 'low'; width: number; height: number }
@@ -52,12 +52,19 @@ export class Desktop {
     if (url === '/api/device') { machineId().then(id => json(res, { id, name: os.hostname() })); return true; }
     if (url === '/api/licence') return this.licence(req, res), true;
     if (url === '/api/fetch') return relay(req, res), true;
+    if (url === '/api/voicepack') return this.voicePack(req, res), true;
+    if (url.indexOf('/voicepack/') === 0) {
+      const f = path.join(this.voiceDir(), path.basename(decodeURIComponent(url.slice(11))));
+      if (!fs.existsSync(f) || /\.part$/.test(f)) { res.writeHead(404); res.end(); return true; }
+      res.writeHead(200, isolate({ 'Content-Type': 'application/octet-stream', 'Content-Length': String(fs.statSync(f).size), 'Cache-Control': 'no-cache' }));
+      fs.createReadStream(f).pipe(res); return true;
+    }
     if (url === '/api/flightplan') return readBody(req, b => { try { const p = JSON.parse(b); json(res, { ok: true, path: saveFlightPlan(p.name, p.text) }); } catch (e: any) { json(res, { ok: false, error: String(e && e.message || e) }); } }), true;
     const dir = this.appDir(); if (!dir) return false;
     let rel = decodeURIComponent(url === '/' ? '/index.html' : url);
     const file = path.normalize(path.join(dir, rel));
     if (!file.startsWith(dir) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return false;
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.writeHead(200, isolate({ 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' }));
     fs.createReadStream(file).pipe(res);
     return true;
   }
@@ -89,6 +96,40 @@ export class Desktop {
     json(res, { data: fs.readFileSync(f, 'utf8'), at: fs.statSync(f).mtimeMs, dir });
   }
 
+  /* ---------- Voices: the voice pack, downloaded once into the PC app's data folder ---------- */
+  voiceDir(): string { const d = path.join(this.dataDir, 'voice'); fs.mkdirSync(d, { recursive: true }); return d; }
+  private vp = { busy: false, done: 0, total: 0, file: '', error: '', cancel: false };
+  private voicePack(req: http.IncomingMessage, res: http.ServerResponse) {
+    const dir = this.voiceDir();
+    const files = () => { const o: any = {}; for (const f of fs.readdirSync(dir)) if (!/\.part$/.test(f)) o[f] = fs.statSync(path.join(dir, f)).size; return o; };
+    if (req.method === 'DELETE') { this.vp.cancel = true; for (const f of fs.readdirSync(dir)) try { fs.unlinkSync(path.join(dir, f)); } catch (e) { /* in use */ } return json(res, { ok: true }); }
+    if (req.method === 'POST') return readBody(req, b => {
+      let o: any; try { o = JSON.parse(b); } catch (e) { res.writeHead(400); res.end(); return; }
+      const base = String(o.base || ''), list: [string, number][] = (o.files || []).filter((x: any) => Array.isArray(x) && typeof x[0] === 'string' && !/[\\/]|\.\./.test(x[0]));
+      if (!/^https:\/\/github\.com\/DroneDirector\//.test(base)) { res.writeHead(403); res.end('Address not allowed'); return; }
+      if (!this.vp.busy) this.downloadVoices(base, list);
+      json(res, { ok: true });
+    });
+    json(res, Object.assign({ files: files() }, this.vp));
+  }
+  private async downloadVoices(base: string, list: [string, number][]) {
+    const dir = this.voiceDir(), vp = this.vp;
+    Object.assign(vp, { busy: true, done: 0, total: list.reduce((t, x) => t + (+x[1] || 0), 0), error: '', cancel: false });
+    try {
+      for (const [name, size] of list) {
+        if (vp.cancel) break;
+        const f = path.join(dir, name);
+        if (fs.existsSync(f) && fs.statSync(f).size === size) { vp.done += size; continue; }
+        vp.file = name;
+        await getFile(base + name, f + '.part', n => { vp.done += n; }, () => vp.cancel);
+        if (vp.cancel) { try { fs.unlinkSync(f + '.part'); } catch (e) { /* gone */ } break; }
+        if (fs.statSync(f + '.part').size !== size) throw new Error(name + ' was cut off');
+        fs.renameSync(f + '.part', f);
+      }
+    } catch (e: any) { vp.error = String(e && e.message || e); }
+    vp.busy = false; vp.file = '';
+  }
+
   /** Open the app window (Microsoft Edge in app mode, falling back to Chrome or the default browser). */
   openWindow() {
     const url = `http://127.0.0.1:${LINK_PORT}/`;
@@ -109,6 +150,22 @@ export class Desktop {
       return !!exe;
     } catch (e) { return false; }
   }
+}
+
+/** The app window may use several processor cores for the voices (cross-origin isolation). */
+function isolate(h: any) { return Object.assign(h, { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'credentialless' }); }
+
+/** Download a file over HTTPS, following redirects (GitHub hands downloads on to its file servers). */
+function getFile(url: string, to: string, onData: (n: number) => void, stop: () => boolean, hops = 0): Promise<void> {
+  return new Promise((ok, bad) => {
+    https.get(url, { headers: { 'User-Agent': 'AirlineManagerPro' }, timeout: 60000 }, r => {
+      if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && hops < 5) { r.resume(); getFile(new URL(r.headers.location, url).toString(), to, onData, stop, hops + 1).then(ok, bad); return; }
+      if (r.statusCode !== 200) { r.resume(); bad(new Error('the server answered ' + r.statusCode)); return; }
+      const out = fs.createWriteStream(to);
+      r.on('data', (d: Buffer) => { onData(d.length); if (stop()) { r.destroy(); out.end(); ok(); } });
+      r.pipe(out); out.on('finish', () => ok()); out.on('error', bad); r.on('error', bad);
+    }).on('error', bad).on('timeout', function (this: any) { this.destroy(new Error('timeout')); });
+  });
 }
 
 function json(res: http.ServerResponse, o: any) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); }

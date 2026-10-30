@@ -71,11 +71,11 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'crashPrompt', label: 'Ask me before registering a crash', hint: 'Choose to register or disregard each crash.' },
     { type: 'choice', key: 'repairTime', label: 'Repair time', hint: 'Instant: the aircraft is ready to fly as soon as you pay. Decided by the app: it stays in the hangar for 5, 10, 15, 20, 25, 30, 40, 50, 60 or 90 minutes, depending on the job and how good your mechanics are.', options: [['instant', 'Instant'], ['auto', 'Decided by the app']] },
   ] },
-  { id: 'voice', title: 'Mechanic voice', icon: 'volume', items: [
-    { type: 'toggle', key: 'mechanicVoice', label: 'Mechanic speaks his messages', hint: 'Runs fully on this device, no internet needed.' },
-    { type: 'choice', key: 'voiceEngine', label: 'Voice', options: [['clips', 'Recorded lines'], ['neural', 'Neural voice pack'], ['device', 'Device voice']], when: () => State.settings.mechanicVoice },
-    { type: 'html', html: () => State.settings.mechanicVoice && State.settings.voiceEngine === 'neural' ? `<div class="set-card"><span class="pc-ic">${icon('volume')}</span><span><b>Neural voice pack</b><small>${State.settings.voicePack ? 'Installed' : 'About 180 MB, downloaded once'}</small></span><button class="btn ${State.settings.voicePack ? 'ghost' : 'primary'} sm" data-act="voicepack">${State.settings.voicePack ? 'Remove' : 'Download'}</button></div>` : '' },
-    { type: 'html', html: () => `<button class="btn ghost" data-act="voice-test">${icon('play')}Hear a sample</button>` },
+  { id: 'voice', title: 'Voices', icon: 'volume', items: [
+    { type: 'toggle', key: 'mechanicVoice', label: 'People speak their messages', hint: 'The mechanic, the gate agent and the head of operations read their messages aloud, word for word, with a play button to hear them again. Everything runs on this device.' },
+    { type: 'choice', key: 'voiceEngine', label: 'Voice', hint: 'Natural voices sound like real people. Until they are downloaded, the device\'s own voice reads the messages.', options: [['neural', 'Natural voices'], ['device', 'Device voice']], when: () => State.settings.mechanicVoice },
+    { type: 'html', html: () => State.settings.mechanicVoice && (State.settings as any).voiceEngine !== 'device' ? voicePackCard() : '' },
+    { type: 'html', html: () => State.settings.mechanicVoice ? `<div class="btn-row">${Object.keys(SPEAKERS).map(k => `<button class="btn ghost sm" data-act="voice-test" data-who="${k}">${icon('play')}${esc(SPEAKERS[k].title)}</button>`).join('')}</div>` : '' },
   ] },
   { id: 'sound', title: 'Sound and feel', icon: 'volume', items: [
     { type: 'toggle', key: 'muteAll', label: 'Mute all sounds', hint: 'Silences every sound in the app, including the mechanic’s voice.' },
@@ -130,7 +130,7 @@ const SETTINGS: SetSection[] = [
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>
-      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>three.js by the three.js authors, MIT License.</p><p>Human body model and shape targets from MakeHuman, CC0 1.0 (public domain).</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p><p>Airport layouts © OpenStreetMap contributors, available under the Open Database License (ODbL). Airport and runway list from OurAirports (public domain).</p><p>Weather reports from aviationweather.gov, the US National Weather Service's Aviation Weather Center (public domain). SimBrief is a service of Navigraph; Discord is a trademark of Discord Inc. Names are used only to identify the services.</p></div>` },
+      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>Voices: Kokoro-82M by hexgrad, Apache License 2.0; pronunciation dictionaries from misaki by hexgrad, Apache License 2.0; ONNX Runtime by Microsoft, MIT License.</p><p>three.js by the three.js authors, MIT License.</p><p>Human body model and shape targets from MakeHuman, CC0 1.0 (public domain).</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p><p>Airport layouts © OpenStreetMap contributors, available under the Open Database License (ODbL). Airport and runway list from OurAirports (public domain).</p><p>Weather reports from aviationweather.gov, the US National Weather Service's Aviation Weather Center (public domain). SimBrief is a service of Navigraph; Discord is a trademark of Discord Inc. Names are used only to identify the services.</p></div>` },
   ] },
 ];
 
@@ -258,8 +258,20 @@ ACTIONS.toggle = el => {
 
 ACTIONS['sound-test'] = () => { const was = State.settings.purchaseSound; State.settings.purchaseSound = true; Sound.purchase(); Haptics.success(); State.settings.purchaseSound = was; };
 ACTIONS['pay-test'] = () => { const was = State.settings.paySound; State.settings.paySound = true; Sound.payOut(); Haptics.pulse(30); State.settings.paySound = was; };
-ACTIONS['voice-test'] = () => { Voice.speak('Morning, captain. I had a look at your aircraft after that last flight. Everything is in good shape.'); };
-ACTIONS.voicepack = () => { State.settings.voicePack = !State.settings.voicePack; rerenderSettingsBody(); toast(State.settings.voicePack ? 'Voice pack installed' : 'Voice pack removed', 'ok'); };
+const VOICE_SAMPLES: { [k: string]: string } = {
+  mechanic: 'Morning, captain. I had a look at OY-ANA after that last flight. Everything is in good shape, and she is ready to go.',
+  gate: 'Captain, boarding is complete. One hundred and sixty-eight passengers on board, and the doors are closing.',
+  ops: 'Good afternoon. A short report from operations: all flights left on time today. Well done, everyone.',
+};
+ACTIONS['voice-test'] = el => { const k = (el && el.getAttribute('data-who')) || 'mechanic'; Voice.speak(VOICE_SAMPLES[k] || VOICE_SAMPLES.mechanic, undefined, k); };
+function voicePackCard(): string {
+  const v = VoicePack, pct = v.total ? Math.round(v.done / v.total * 100) : 0;
+  if (v.state === 'ready') return `<div class="set-card ok"><span class="pc-ic">${icon('volume')}</span><span><b>Natural voices are installed</b><small>On this ${DESKTOP ? 'PC' : 'device'}. They work without the internet.</small></span><button class="btn ghost sm" data-act="voicepack-remove">Remove</button></div>`;
+  if (v.state === 'downloading') return `<div class="set-card"><span class="pc-ic">${icon('download')}</span><span><b>Downloading the voices… ${pct}%</b><small>${Math.round(v.done / 1e6)} of ${Math.round((v.total || 1) / 1e6)} MB. You can keep using the app.</small><span class="cab-bar"><i style="width:${pct}%"></i></span></span></div>`;
+  return `<div class="set-card"><span class="pc-ic">${icon('volume')}</span><span><b>Natural voices</b><small>${v.state === 'error' ? 'The download stopped: ' + esc(v.error) + '. ' : ''}About ${v.sizeText()}, downloaded once over Wi-Fi or mobile data${v.state === 'partial' ? ' (part of it is already here)' : ''}. Kokoro voices, Apache License 2.0.</small></span><button class="btn primary sm" data-act="voicepack-get">${v.state === 'error' || v.state === 'partial' ? 'Continue' : 'Download'}</button></div>`;
+}
+ACTIONS['voicepack-get'] = () => { VoicePack.download(); rerenderSettingsBody(); };
+ACTIONS['voicepack-remove'] = () => { confirmChange('Remove the natural voices?', 'They can be downloaded again at any time. Until then the device\'s own voice reads the messages.', 'Remove', 'Keep', () => { closeTop(); VoicePack.remove(); }, () => closeTop()); };
 ACTIONS['link-forget'] = () => { Link.forget(); rerenderSettingsBody(); toast('PC unpaired', 'info'); };
 ACTIONS['new-division'] = () => {
   const c = company();

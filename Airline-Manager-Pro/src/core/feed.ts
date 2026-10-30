@@ -192,6 +192,8 @@ function raiseIssue(code: string, severity: 'minor' | 'major' | 'grounding', det
   const cost = Math.round(d.cost[k] * (CLASS_COST[acType(a.typeId).cls] || 1) / 100) * 100;
   const issue: Issue = { id: uid(), reg: a.reg, title: d.title, detail: issueText(code, severity), source: detail, severity, cost, days: d.days[k], status: 'open', date: dateStr(new Date()).slice(0, 10) };
   State.issues.unshift(issue);
+  // the mechanic's words get ready while you fly, so he speaks straight away after landing
+  try { Voice.prepare(mechanicLines(issue), 'mechanic'); } catch (e) { /* not ready */ }
   a.condition = Math.max(5, a.condition - (k + 1) * 4);
   LEG_ISSUES.push(issue.id);
   _legNotes.push(d.title);
