@@ -31,6 +31,8 @@ function angDiff(a: number, b: number): number { return ((b - a + 540) % 360) - 
 function airportWind(icao: string, pos: number[]): { dir: number; kt: number; real: boolean } {
   const s: any = Link.sim;
   if (s && s.wx && s.lat && gcDistanceNm([s.lon, s.lat], pos) < 60) return { dir: s.wx.windDir, kt: Math.round(s.wx.windKt), real: true };
+  // the real weather report (METAR) for the airport, when live weather is on
+  try { const m = typeof LiveWx !== 'undefined' ? LiveWx.get(icao) : null; if (m && m.dir >= 0) return { dir: m.dir, kt: Math.round(m.kt), real: true }; } catch (e) { /* not loaded */ }
   return { dir: _hashStr(icao + new Date().toDateString()) % 360, kt: 6 + (_hashStr(icao) % 12), real: false };
 }
 

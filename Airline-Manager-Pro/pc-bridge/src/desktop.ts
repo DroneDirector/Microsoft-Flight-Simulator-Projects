@@ -12,6 +12,8 @@ import * as os from 'os';
 import * as path from 'path';
 import * as http from 'http';
 import { spawn, execFile } from 'child_process';
+import * as https from 'https';
+import { saveFlightPlan } from './installed';
 import { LINK_PORT } from './protocol';
 
 const TYPES: { [ext: string]: string } = {
@@ -49,6 +51,8 @@ export class Desktop {
     if (url === '/api/gpus') { listGpus().then(g => json(res, { gpus: g })); return true; }
     if (url === '/api/device') { machineId().then(id => json(res, { id, name: os.hostname() })); return true; }
     if (url === '/api/licence') return this.licence(req, res), true;
+    if (url === '/api/fetch') return relay(req, res), true;
+    if (url === '/api/flightplan') return readBody(req, b => { try { const p = JSON.parse(b); json(res, { ok: true, path: saveFlightPlan(p.name, p.text) }); } catch (e: any) { json(res, { ok: false, error: String(e && e.message || e) }); } }), true;
     const dir = this.appDir(); if (!dir) return false;
     let rel = decodeURIComponent(url === '/' ? '/index.html' : url);
     const file = path.normalize(path.join(dir, rel));
@@ -109,6 +113,33 @@ export class Desktop {
 
 function json(res: http.ServerResponse, o: any) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); }
 function readBody(req: http.IncomingMessage, cb: (b: string) => void) { const parts: Buffer[] = []; let n = 0; req.on('data', d => { n += d.length; if (n < 50e6) parts.push(d); }); req.on('end', () => cb(Buffer.concat(parts).toString('utf8'))); }
+
+/** The online services the app works with (SimBrief, weather, VATSIM, IVAO, Hoppie ACARS, Discord),
+ *  requested by the PC app for the app window. Only these addresses, only over HTTPS. */
+const RELAY_HOSTS = ['www.simbrief.com', 'simbrief.com', 'aviationweather.gov', 'data.vatsim.net', 'api.ivao.aero', 'www.hoppie.nl', 'discord.com', 'discordapp.com'];
+function relay(req: http.IncomingMessage, res: http.ServerResponse) {
+  readBody(req, b => {
+    let o: any; try { o = JSON.parse(b); } catch (e) { res.writeHead(400); res.end('Bad request'); return; }
+    const go = (u: string, hops: number) => {
+      let url: URL; try { url = new URL(u); } catch (e) { res.writeHead(400); res.end('Bad address'); return; }
+      if (url.protocol !== 'https:' || RELAY_HOSTS.indexOf(url.hostname) < 0) { res.writeHead(403); res.end('Address not allowed'); return; }
+      const method = String(o.method || 'GET').toUpperCase() === 'POST' ? 'POST' : 'GET';
+      const headers: any = { 'User-Agent': 'AirlineManagerPro', Accept: '*/*' };
+      if (o.headers && o.headers['Content-Type']) headers['Content-Type'] = String(o.headers['Content-Type']);
+      const r = https.request(url, { method, headers, timeout: 20000 }, up => {
+        if (up.statusCode >= 300 && up.statusCode < 400 && up.headers.location && hops < 3) { up.resume(); go(new URL(up.headers.location, url).toString(), hops + 1); return; }
+        const parts: Buffer[] = []; let n = 0;
+        up.on('data', (d: Buffer) => { n += d.length; if (n < 40e6) parts.push(d); });
+        up.on('end', () => { res.writeHead(up.statusCode || 502, { 'Content-Type': String(up.headers['content-type'] || 'text/plain'), 'Cache-Control': 'no-store' }); res.end(Buffer.concat(parts)); });
+      });
+      r.on('timeout', () => r.destroy(new Error('timeout')));
+      r.on('error', (e: any) => { if (!res.headersSent) { res.writeHead(502); res.end(String(e && e.message || e)); } });
+      if (method === 'POST' && o.body) r.write(String(o.body));
+      r.end();
+    };
+    go(String(o.url || ''), 0);
+  });
+}
 
 /** Graphics cards in this PC, from Windows. */
 let _gpus: any[] = null;

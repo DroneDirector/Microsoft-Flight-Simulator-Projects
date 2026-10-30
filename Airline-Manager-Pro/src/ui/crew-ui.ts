@@ -240,7 +240,7 @@ ACTIONS['hire-do'] = el => {
   S.staffCandidates = S.staffCandidates.filter((x: Staff) => x.id !== id);
   p.companyId = c.id; p.base = c.hub; p.hired = dateStr(new Date()).slice(0, 10); p.status = 'on duty';
   chargeHiring(p);
-  if (p.role === 'fo') State.pilots.push({ id: p.id, name: p.name, rank: 'First officer', hoursMin: 1500 * 60, landings: 900, base: c.hub, salary: p.salary, rating: p.rating, status: 'standby', types: [], sex: p.sex, nat: p.nat, dob: p.dob, look: p.look, companyId: c.id, warnings: 0, rules: { maxDutyHrs: 10, maxLandingFpm: 500, ifrOnly: true, homeBaseReturn: true } } as any);
+  if (p.role === 'fo') State.pilots.push({ id: p.id, name: p.name, rank: 'First officer', hoursMin: 1500 * 60, landings: 900, base: c.hub, salary: p.salary, rating: p.rating, status: 'standby', types: (() => { const ft = State.fleet.filter(a => a.companyId === c.id && multiCrew(acType(a.typeId))).map(a => a.typeId); return ft.length ? [ft[_hashStr(p.id) % ft.length]] : []; })(), sex: p.sex, nat: p.nat, dob: p.dob, look: p.look, companyId: c.id, warnings: 0, rules: { maxDutyHrs: 10, maxLandingFpm: 500, ifrOnly: true, homeBaseReturn: true } } as any);
   else S.staff.push(p);
   // the hiring list refills over time (staffing.ts)
   closeAll(); Haptics.success(); Store.save(); refresh();

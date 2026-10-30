@@ -127,16 +127,19 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
   const m = f.from === f.to
     ? (() => { const fuel = Math.round(burnKg * 0.95), crew = Math.round(t.costPerHr * blockMin / 60 * 0.35); return { net: -(fuel + crew), revenue: 0, costs: fuel + crew, lines: [['Test flight fuel', -fuel], ['Aircraft and crew time', -crew]] } as any; })()
-    : legEconomics(a.typeId, f.from, f.to, f.pax, 0, blockMin, burnKg);
+    : legEconomics(a.typeId, f.from, f.to, f.pax, F.cargoKg || 0, blockMin, burnKg, false, { reg: a.reg, paxJ: F.paxJ, paxF: F.paxF, ferry: !!F.ferry, job: F.job ? jobPayFor(F.job) : undefined });
   const net = m.net, d = new Date(at), ds = dateStr(d);
   const txId = uid(); (summary.tx = summary.tx || []).push(txId);
-  State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.from === f.to ? 'Test flight ' + f.reg + ' at ' + f.from : f.callsign + ' ' + f.from + ' to ' + f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
+  State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.from === f.to ? 'Test flight ' + f.reg + ' at ' + f.from : (F.ferry ? 'Ferry ' : F.job ? 'Charter ' : '') + f.callsign + ' ' + f.from + ' to ' + f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
     amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: m.lines, byPilot: f.pilotId } as any);
   c.balance += net;
   // keep the day's flown legs for the schedule (the last two days)
   const S: any = State; S.aiDay = (S.aiDay || []).filter((x: any) => x.end > Date.now() - 2 * 864e5);
   S.aiDay.push({ reg: a.reg, from: f.from, to: f.to, start: F.depAt, end: at });
   summary.legs++; summary.net += net; if (p && summary.names.indexOf(p.name) < 0) summary.names.push(p.name);
+  try { Ratings.aiLanding(f, at); } catch (e) { /* ignore */ }
+  try { if (F.job) Jobs.delivered(F.job, at, net, txId); } catch (e) { /* ignore */ }
+  try { if (f.from !== f.to && !F.ferry) Online.discordAiLanding(f, net); } catch (e) { /* ignore */ }
 }
 
 /** Move every hired pilot on to `now`: land flights that have arrived, start the next legs that are due. */
@@ -167,6 +170,9 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       // a test flight you set up is done once it is back at the gate
       if (f.from === f.to) { const tr = aiTestRoute(f.pilotId, f.from); if (tr) tr.flownAt = at;
         State.notices.unshift({ id: uid(), kind: 'pilot', title: `Test flight completed: ${f.reg}`, body: `${p ? p.name : 'The pilot'} took ${f.reg} up from ${f.from} and back. ${f.reg} is at the gate.`, time: 'Now', read: false } as any); }
+      // a charter: after the ferry to its airport comes the job itself; after the job, back to the route
+      const jn = Jobs.afterAiLanding(f, at, spd);
+      if (jn) { if (p) p.status = 'flying'; S.aiNext.push(jn); continue; }
       const next = aiNextLeg(f.pilotId, f.from, f.to), a = plane(f.reg);
       // no route of yours to fly next: the pilot waits on the ground until you assign one
       if (!next) { if (p) p.status = 'standby'; continue; }
@@ -180,6 +186,8 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       S.aiNext = S.aiNext.filter((x: any) => x !== n);
       // an aircraft that went to maintenance, was sold or lost its pilot stays on the ground
       if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || p.status === 'off') continue;
+      // away on a type rating course: the leg waits until the pilot is back
+      if (p.status === 'training') { S.aiNext.push(Object.assign({}, n, { depAt: Math.max(now, p.trainingUntil || now) + 60e3 })); continue; }
       // no stand at its base: refused take-off until it gets a base with a free stand
       if ((a as any).noBase) { p.status = 'standby'; S.aiNext.push(Object.assign({}, n, { depAt: now + 15 * 60e3 })); continue; }
       // operating certificate suspended by a court: the airline's aircraft stay on the ground
@@ -187,10 +195,11 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       // never off and back onto the same airport, except a test flight you set up
       const test = n.from === n.to;
       if (!n.to || (test && !aiTestRoute(n.pilotId, n.from))) { p.status = 'standby'; continue; }
-      const load = test ? 0 : 0.68 + (_hashStr(n.reg + n.leg) % 28) / 100;
+      // passengers and cargo from demand on the route (none on a test or ferry flight; a charter's own load)
+      const ld = test || n.ferry ? { pax: 0, paxJ: 0, paxF: 0, cargoKg: 0 } : n.job ? Jobs.loadFor(n.job) : aiLoad(n.reg, n.from, n.to, n.leg || 0);
       const depAt = Math.max(n.depAt, earliest), prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
-      const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: Math.round(n.paxMax * load), paxMax: n.paxMax, test,
-        alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg };
+      const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF, cargoKg: ld.cargoKg, paxMax: cabinSeats(acType(a.typeId), a) || n.paxMax, test,
+        alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg, ferry: !!n.ferry, job: n.job || undefined, jobNext: n.jobNext || undefined };
       if (!test) assignDelays(f, prof);
       a.status = 'flying'; p.status = 'flying';
       State.live.push(f);
@@ -301,6 +310,8 @@ function aiStartRoute(pilotId: string, r: RouteDef): string {
   if (State.live.some(f => f.pilotId === pilotId) || (S.aiNext || []).some((n: any) => n.pilotId === pilotId)) return 'flying';
   const busy = (reg: string) => State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg);
   const c = company(r.companyId), mine = S.myReg[r.companyId];
+  if (!Ratings.rated(p, r.typeId)) return 'not-rated';
+  if (p.status === 'training') return 'training';
   const free = fleetOf(r.companyId).filter(a => a.typeId === r.typeId && a.reg !== mine && !busy(a.reg) && a.status === 'parked');
   const a = free.filter(x => r.legs.indexOf(x.location) >= 0)[0] || free[0];
   if (!a) return 'no-aircraft';

@@ -235,6 +235,7 @@ ACTIONS['fix-now'] = el => {
   repairAll(i.reg);
   if (cost) State.txns.unshift({ id: uid(), companyId: a.companyId, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Repair: ${open.map(x => x.title).join(', ')} (${i.reg})`, amount: -cost, kind: 'maint', reg: i.reg,
     lines: [['Labour', -Math.round(cost * 0.45)], ['Parts', -Math.round(cost * 0.55)]], note: open.map(x => x.detail).join(' '), link: { kind: 'aircraft', id: i.reg } } as any);
+  try { Bank.claim(i.reg, open); } catch (e) { /* ignore */ }
   Voice.stop(); closeAll(); Sound.payOut(); Haptics.pulse(30); Store.save(); refresh(); animateBalance(from, c.balance);
   toast(a.status === 'flying' ? `${i.reg} goes into the hangar when it lands` : a.status !== 'maintenance' ? `${i.reg} is repaired and ready for its next flight` : `${i.reg} is in the hangar: ${(i as any).durMin} minutes of work${open.length > 1 ? ' on ' + open.length + ' reports' : ''}`, 'ok');
 };

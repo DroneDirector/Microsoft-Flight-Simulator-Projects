@@ -156,8 +156,10 @@ function focusAirport(icao: string, stay?: boolean) {
     <div class="apt-name">${esc(a.name)}</div><small class="muted">${esc([a.city !== a.name ? a.city : '', a.country].filter(Boolean).join(', '))}${a.elev != null ? ` · ${num(a.elev)} ft` : ''}</small>
     <div class="apt-rwy" id="apt-rwy"></div>
     <small class="muted">${onRoutes.length ? 'On your routes: ' + onRoutes.join(', ') : 'Not on any of your routes yet'}</small>
+    <div class="apt-wx" id="apt-wx">${aptWxHtml(icao)}</div>
     ${AIRPORT_VIEW ? `<button class="btn primary sm apt-view-btn" data-act="apt-view" data-icao="${esc(icao)}">${icon('land')}Airport view</button>` : ''}
   </div></div>`;
+  if (LiveWx.on() && !LiveWx.cache[icao]) LiveWx.fetch([icao]).then(() => { const w = $('#apt-wx'); if (w) w.innerHTML = aptWxHtml(icao); });
   World.loadRunways().then(rw => {
     const el = $('#apt-rwy'); if (!el) return;
     const list = (rw[icao] || []) as any[];
@@ -213,3 +215,9 @@ ACTIONS['fb-details'] = el => {
   if (State.screen === 'map') selectFlight(id);
   else { const s = (window as any).__opsShowSel; if (s) s(id); }
 };
+
+/** The airport's weather report, fuel price and size, for its card on the map. */
+function aptWxHtml(icao: string): string {
+  const m = LiveWx.on() ? LiveWx.cache[icao] : null, at = Network.which() !== 'off' ? Network.atcAt(icao) : [];
+  return `${m && m.raw ? `<code class="metar">${esc(m.raw)}</code>` : ''}<small class="muted">${esc(SIZE_NAMES[aptSize(icao)])} · fuel $${fuelPrice(icao).toFixed(2)}/kg${m && m.cat ? ' · ' + esc(m.cat) : ''}</small>${at.length ? `<div class="wx-atc">${at.map(x => `<span class="chip">${esc(x.callsign)} ${esc(x.freq)}</span>`).join('')}</div>` : ''}`;
+}

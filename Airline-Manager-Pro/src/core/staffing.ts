@@ -96,7 +96,7 @@ function setConduct(on: boolean) {
 }
 
 function startStaffing() {
-  payrollAdvance(true); poolAdvance(); leaseAdvance(true);
-  setInterval(() => { payrollAdvance(); poolAdvance(); leaseAdvance(); }, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { payrollAdvance(); poolAdvance(); leaseAdvance(); } });
+  payrollAdvance(true); poolAdvance(); leaseAdvance(true); try { Bank.advance(true); Jobs.advance(true); } catch (e) { /* ignore */ }
+  setInterval(() => { payrollAdvance(); poolAdvance(); leaseAdvance(); try { Bank.advance(); Jobs.advance(); Ratings.advance(); } catch (e) { /* ignore */ } }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { payrollAdvance(); poolAdvance(); leaseAdvance(); try { Bank.advance(); Jobs.advance(); Ratings.advance(); } catch (e) { /* ignore */ } } });
 }

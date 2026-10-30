@@ -125,6 +125,8 @@ const Link = {
         else if (m.type === 'airports') onAirports(m.list);
         else if (m.type === 'layout') { try { AirportLayouts.received(m.icao, m.layout, m.error); } catch (e) { /* ignore */ } }
         else if (m.type === 'procs') { try { SimProcedures.received(m.icao, m.procs, m.error); } catch (e) { /* ignore */ } }
+        else if (m.type === 'flightplan-saved') { try { plnSaved(m.path, m.error); } catch (e) { /* ignore */ } }
+        else if (m.type === 'aircraft-list') { try { InstalledAircraft.received(m.list || [], m.error); } catch (e) { /* ignore */ } }
         else if (m.type === 'all-airports') { try { onSimAirportList(m); } catch (e) { /* ignore */ } }
         else if (m.type === 'pong') this.latency = Date.now() - m.t;
       };

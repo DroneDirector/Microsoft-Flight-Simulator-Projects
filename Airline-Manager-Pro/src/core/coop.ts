@@ -13,11 +13,11 @@ interface CoopMember {
   id: string; name: string; role: 'owner' | 'pilot'; you?: boolean; sex: 'm' | 'f'; nat: string; base: string;
   flights: number; hoursMin: number; revenue: number; rating: number; joined: number; lastSeen: number; look?: any;
 }
-interface CoopEvent { id: string; at: number; by: string; type: 'start' | 'join' | 'flight' | 'buy' | 'leave' | 'rule'; text: string; amount?: number; tx?: string }
+interface CoopEvent { id: string; at: number; by: string; type: 'start' | 'join' | 'flight' | 'buy' | 'leave' | 'rule' | 'pirep' | 'sell'; text: string; amount?: number; tx?: string }
 interface CoopState {
   on: boolean; backend: 'demo' | 'supabase'; code: string; companyId: string; started: number;
   members: CoopMember[]; feed: CoopEvent[]; applied: { [id: string]: 1 };
-  rules: { ownerBuys: boolean }; next: { [memberId: string]: number };
+  rules: { ownerBuys: boolean; reviewPireps?: boolean }; next: { [memberId: string]: number }; pireps?: CoopPirep[];
 }
 
 /** The online service (Supabase) plugs in here; until then the demo backend is used. */
@@ -123,32 +123,63 @@ function coopUpdate(f: LiveFlight, now: number) {
   F.leftNm = q.left; F.toGoS = q.toGoS; F.routeNm = p.routeNm;
 }
 
-/** A co-op pilot reached the gate: the flight is booked to the shared airline. */
+/** A co-op pilot reached the gate: the flight report (PIREP) goes to the owner for review when that rule
+ *  is on, otherwise it is booked to the shared airline straight away. */
 function coopLand(f: any, at: number) {
   const c = coopState(), co = company(), m = coopMember(f.pilotId);
   State.live = State.live.filter(x => x !== f);
   const blockMin = Math.round(f.durMs / 60000);
-  const money0 = legEconomics(f.typeId, f.from, f.to, f.pax, 0, blockMin);
-  const d = new Date(at), day = dateStr(d).slice(0, 10), time = dateStr(d).slice(11);
-  const txId = uid();
-  State.txns.unshift({ id: txId, companyId: co.id, date: day, time, label: `${f.callsign} ${f.from} to ${f.to} (${m ? m.name : 'co-op'})`, amount: money0.net, kind: money0.net >= 0 ? 'revenue' : 'fees',
-    reg: f.reg || undefined, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: money0.lines, coopBy: f.pilotId } as any);
-  const before = co.balance; co.balance += money0.net;
   const fpm = Math.round(-(90 + Math.random() * 260));
-  State.logbook.unshift({ id: uid(), date: dateStr(d), from: f.from, to: f.to, reg: f.reg || '—', blockMin, landingFpm: fpm, g: Math.round((1.08 + Math.random() * .35) * 100) / 100, pax: f.pax,
-    result: fpm < -500 ? 'hard' : 'ok', atc: 'Co-op', notes: `Flown by ${m ? m.name : 'a co-op pilot'}`, typeId: f.typeId, coopBy: f.pilotId } as any);
+  const pr: CoopPirep = { id: 'pr-' + f.id, at, by: f.pilotId, name: m ? m.name : 'A co-op pilot', callsign: f.callsign, from: f.from, to: f.to, reg: f.reg || '', typeId: f.typeId,
+    blockMin, fpm, g: Math.round((1.08 + Math.random() * .35) * 100) / 100, pax: f.pax, cargoKg: f.cargoKg || 0, fuelKg: Math.round(blockMin / 60 * (BURN_KG_H[(acType(f.typeId) || AIRCRAFT[0]).cls] || 2000) * (0.88 + Math.random() * 0.1)), status: 'pending' };
+  // the aircraft and the pilot are back on the ground either way
   const a = f.reg ? plane(f.reg) : null;
-  if (a) { a.status = 'parked'; a.location = f.to; a.hoursMin += blockMin; a.cycles += 1; try { conditionAfterFlight(a, blockMin); } catch (e) { /* ignore */ } }
-  const p = pilot(f.pilotId); if (p) { p.status = 'standby'; p.hoursMin += blockMin; p.landings += 1; }
-  try { crewAfterLeg(co.id, { typeId: f.typeId, from: f.from, to: f.to, blockMin }); } catch (e) { /* ignore */ }
-  if (m) { m.flights++; m.hoursMin += blockMin; m.revenue += money0.net; m.lastSeen = at; m.base = f.to; }
-  try { Progress.popularity(fpm > -250 ? 0.2 : 0, 'A good co-op flight'); } catch (e) { /* ignore */ }
-  coopRecord({ id: 'fl-' + f.id, at, by: f.pilotId, type: 'flight', text: `${m ? m.name : 'A co-op pilot'} landed at ${f.to} from ${f.from}`, amount: money0.net, tx: txId });
-  State.notices.unshift({ id: uid(), kind: 'flight', title: `${m ? m.name : 'Co-op pilot'} landed at ${f.to}`, body: `Co-op flight ${f.callsign} from ${f.from}, ${hours(blockMin)} block, ${f.pax} passengers. ${money(money0.net, { sign: true })} for the airline. Tap for the money in and out.`,
-    time: at > Date.now() - 120e3 ? 'Now' : time, read: false, tx: txId } as any);
+  if (a) { a.status = 'parked'; a.location = f.to; }
+  const p = pilot(f.pilotId); if (p) p.status = 'standby';
+  if (m) { m.lastSeen = at; m.base = f.to; }
+  c.pireps = c.pireps || [];
+  if (c.rules.reviewPireps && !(m && m.role === 'owner')) {
+    c.pireps.unshift(pr); c.pireps = c.pireps.slice(0, 200);
+    coopRecord({ id: 'pr-' + f.id, at, by: f.pilotId, type: 'pirep', text: `${pr.name} filed a flight report: ${f.from} to ${f.to}, ${Math.abs(fpm)} fpm. Waiting for your review.` });
+    State.notices.unshift({ id: uid(), kind: 'pilot', title: `Flight report to review: ${pr.name}`, body: `${f.callsign} ${f.from} to ${f.to}, ${hours(blockMin)} block, landing ${Math.abs(fpm)} fpm, ${f.pax} passengers. Accept or reject it under Co-op.`, time: at > Date.now() - 120e3 ? 'Now' : dateStr(new Date(at)).slice(11), read: false } as any);
+  } else { pr.status = 'accepted'; c.pireps.unshift(pr); c.pireps = c.pireps.slice(0, 200); coopBook(pr, at > Date.now() - 120e3); }
   // the next flight after a turnaround, or a rest
   c.next[f.pilotId] = at + (Math.random() < 0.3 ? 8 * 3600e3 : (45 + Math.random() * 75) * 60e3);
-  if (Date.now() - at < 120e3) try { animateBalance(before, co.balance); } catch (e) { /* not ready */ }
+}
+
+interface CoopPirep { id: string; at: number; by: string; name: string; callsign: string; from: string; to: string; reg: string; typeId: string; blockMin: number; fpm: number; g: number; pax: number; cargoKg: number; fuelKg: number; status: 'pending' | 'accepted' | 'rejected'; why?: string; tx?: string }
+
+/** Book an accepted flight report: money, logbook, hours, the pilot's record. */
+function coopBook(pr: CoopPirep, live: boolean) {
+  const co = company(), m = coopMember(pr.by);
+  const money0 = legEconomics(pr.typeId, pr.from, pr.to, pr.pax, pr.cargoKg, pr.blockMin, pr.fuelKg, false, { reg: pr.reg || undefined });
+  const d = new Date(pr.at), day = dateStr(d).slice(0, 10), time = dateStr(d).slice(11);
+  const txId = uid(); pr.tx = txId;
+  State.txns.unshift({ id: txId, companyId: co.id, date: day, time, label: `${pr.callsign} ${pr.from} to ${pr.to} (${pr.name})`, amount: money0.net, kind: money0.net >= 0 ? 'revenue' : 'fees',
+    reg: pr.reg || undefined, flight: pr.callsign, route: `${pr.from} → ${pr.to}`, lines: money0.lines, coopBy: pr.by } as any);
+  const before = co.balance; co.balance += money0.net;
+  State.logbook.unshift({ id: uid(), date: dateStr(d), from: pr.from, to: pr.to, reg: pr.reg || '—', blockMin: pr.blockMin, landingFpm: pr.fpm, g: pr.g, pax: pr.pax,
+    result: pr.fpm < -500 ? 'hard' : 'ok', atc: 'Co-op', notes: `Flown by ${pr.name}`, typeId: pr.typeId, coopBy: pr.by } as any);
+  const a = pr.reg ? plane(pr.reg) : null;
+  if (a) { a.hoursMin += pr.blockMin; a.cycles += 1; try { conditionAfterFlight(a, pr.blockMin); } catch (e) { /* ignore */ } }
+  const p = pilot(pr.by); if (p) { p.hoursMin += pr.blockMin; p.landings += 1; }
+  try { crewAfterLeg(co.id, { typeId: pr.typeId, from: pr.from, to: pr.to, blockMin: pr.blockMin }); } catch (e) { /* ignore */ }
+  if (m) { m.flights++; m.hoursMin += pr.blockMin; m.revenue += money0.net; }
+  try { Progress.popularity(pr.fpm > -250 ? 0.2 : 0, 'A good co-op flight'); } catch (e) { /* ignore */ }
+  try { Ratings.record({ who: pr.by, name: pr.name, fpm: Math.abs(pr.fpm), g: pr.g, at: pr.at, from: pr.from, to: pr.to, typeId: pr.typeId, kind: 'coop' }); } catch (e) { /* ignore */ }
+  coopRecord({ id: 'fl-' + pr.id, at: pr.at, by: pr.by, type: 'flight', text: `${pr.name} landed at ${pr.to} from ${pr.from}`, amount: money0.net, tx: txId });
+  State.notices.unshift({ id: uid(), kind: 'flight', title: `${pr.name} landed at ${pr.to}`, body: `Co-op flight ${pr.callsign} from ${pr.from}, ${hours(pr.blockMin)} block, ${pr.pax} passengers. ${money(money0.net, { sign: true })} for the airline. Tap for the money in and out.`,
+    time: live ? 'Now' : time, read: false, tx: txId } as any);
+  if (live) try { animateBalance(before, co.balance); } catch (e) { /* not ready */ }
+}
+
+/** The owner's decision on a flight report. */
+function coopReview(id: string, ok: boolean, why?: string) {
+  const c = coopState(); if (!c) return;
+  const pr = (c.pireps || []).filter(x => x.id === id)[0]; if (!pr || pr.status !== 'pending') return;
+  pr.status = ok ? 'accepted' : 'rejected'; pr.why = why;
+  if (ok) coopBook(pr, true);
+  else coopRecord({ id: 'rj-' + pr.id, at: Date.now(), by: 'coop-you', type: 'pirep', text: `Flight report rejected: ${pr.name}, ${pr.from} to ${pr.to}${why ? ' (' + why + ')' : ''}` });
 }
 
 /** Your own flights count for the co-op too (called after a leg is booked). */
@@ -160,11 +191,11 @@ function coopAfterMyLeg(from: string, to: string, blockMin: number, net: number,
   coopRecord(ev); coopBackend().publish(ev);
 }
 
-/** Buying aircraft: with "only the owner buys aircraft" on, other members can't. */
+/** Buying, selling and leasing aircraft: in a co-op only the owner does that. Hired pilots never do. */
 function coopCanBuy(): boolean {
   if (!coopOn()) return true;
-  const c = coopState(), me = coopMe();
-  return !c.rules.ownerBuys || (me && me.role === 'owner');
+  const me = coopMe();
+  return !!(me && me.role === 'owner');
 }
 function coopAfterBuy(text: string, amount: number) {
   if (!coopOn()) return;
@@ -178,7 +209,7 @@ function coopBackend(): CoopBackend { return CoopDemo; }
 function coopStart() {
   const co = company(), me: any = myPilot(), now = Date.now();
   const S: any = State;
-  S.coop = { on: true, backend: 'demo', code: '', companyId: co.id, started: now, members: [], feed: [], applied: {}, rules: { ownerBuys: true }, next: {} } as CoopState;
+  S.coop = { on: true, backend: 'demo', code: '', companyId: co.id, started: now, members: [], feed: [], applied: {}, rules: { ownerBuys: true, reviewPireps: true }, next: {}, pireps: [] } as CoopState;
   const mine: CoopMember = { id: 'coop-you', name: me ? me.name : 'You', role: 'owner', you: true, sex: me && me.sex || 'm', nat: me && me.nat || '', base: co.hub,
     flights: 0, hoursMin: 0, revenue: 0, rating: me && me.rating || 4.5, joined: now, lastSeen: now };
   S.coop.members.push(mine);

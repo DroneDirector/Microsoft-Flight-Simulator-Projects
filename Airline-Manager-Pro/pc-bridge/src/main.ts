@@ -12,6 +12,7 @@ import type { Airport } from './protocol';
 import { VERSION } from './version';
 import { openLog, writeLog, fatal, catchEverything, logFile } from './errors';
 import { Desktop } from './desktop';
+import { installedAircraft, saveFlightPlan } from './installed';
 export { VERSION };
 
 export function dataDir(): string {
@@ -53,6 +54,12 @@ export function run(source: SimSource, server: LinkServer, log: (s: string) => v
     else if (m.type === 'layout' && source.getLayout) {
       const icao = String(m.icao || '').toUpperCase().slice(0, 8);
       source.getLayout(icao).then(l => c.send({ type: 'layout', icao, layout: l }), (e: any) => c.send({ type: 'layout', icao, error: String(e && e.message || e) }));
+    } else if (m.type === 'flightplan') {
+      try { const p = saveFlightPlan(m.name, m.text); c.send({ type: 'flightplan-saved', path: p }); log(`Flight plan saved: ${p}`); }
+      catch (e: any) { c.send({ type: 'flightplan-saved', error: String(e && e.message || e) }); }
+    } else if (m.type === 'aircraft-list') {
+      installedAircraft().then(list => { c.send({ type: 'aircraft-list', list }); log(`${list.length} aircraft packages found in the simulator`); },
+        (e: any) => c.send({ type: 'aircraft-list', list: [], error: String(e && e.message || e) }));
     } else if (m.type === 'all-airports' && source.allAirports) {
       source.allAirports().then(list => {
         const rows: [string, number, number][] = list.map(a => [a.icao, Math.round(a.lat * 1e5) / 1e5, Math.round(a.lon * 1e5) / 1e5]);

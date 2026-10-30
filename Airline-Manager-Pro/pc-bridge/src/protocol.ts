@@ -78,6 +78,10 @@ export type ToPhone =
   | { type: 'procs'; icao: string; procs?: any; error?: string }
   /** every airport the simulator has, as [ident, latitude, longitude], in parts */
   | { type: 'all-airports'; list: [string, number, number][]; part: number; parts: number; total: number }
+  /** a flight plan saved for the simulator, or why not */
+  | { type: 'flightplan-saved'; path?: string; error?: string }
+  /** the aircraft packages installed in the simulator */
+  | { type: 'aircraft-list'; list: { name: string; title: string; creator: string }[]; error?: string }
   | { type: 'pong'; t: number };
 
 export type ToPc =
@@ -87,4 +91,6 @@ export type ToPc =
   | { type: 'plan'; from?: string; to?: string; reg?: string }
   | { type: 'layout'; icao: string }
   | { type: 'procs'; icao: string }
-  | { type: 'all-airports' };
+  | { type: 'all-airports' }
+  | { type: 'flightplan'; name: string; text: string }
+  | { type: 'aircraft-list' };

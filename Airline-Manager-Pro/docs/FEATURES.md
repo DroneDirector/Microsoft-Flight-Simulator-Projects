@@ -63,9 +63,13 @@ Each widget opens its own page.
 |---|---|
 | Detailed fleet cards with an original illustration per aircraft type in company colours | Built |
 | Buy aircraft from brands installed in the sim (Airbus, Boeing, Bombardier CRJ, ATR, de Havilland Canada, Cessna, Daher, Pilatus …) | Built |
-| Add-on aircraft (PMDG, Fenix, iniBuilds, Aerosoft, SimWorks Studios …) | Built (demo list) |
+| Add-on aircraft (PMDG, Fenix, iniBuilds, Aerosoft, SimWorks Studios …) | Built (found by the PC app in the simulator's package folders) |
 | Buy several aircraft, including several identical ones | Built |
 | Purchase sound, vibration and delivery animation | Built |
+| Sell aircraft to a broker at market value (age, condition) less a 6% fee | Built |
+| Used-aircraft market, new every Monday: age, hours, cycles, condition, ferry flight | Built |
+| Cabin layouts (first, business, economy) and freighter conversions | Built |
+| Only the owner buys, sells and leases aircraft; hired pilots never do | Built |
 
 ## Routes and schedule
 
@@ -74,6 +78,12 @@ Each widget opens its own page.
 | Routes to any country, departure and destination | Built |
 | Multi-stop routes (3, 4, 5 or more stops a day) | Built |
 | Your day's legs and a timeline of every aircraft | Built |
+| Your own fares per route for economy, business and first class | Built |
+| Demand by airport size, distance, season, fares, popularity and marketing | Built |
+| Competing airlines on routes, with their own fares and quality | Built |
+| Fuel prices per airport and day; tankering | Built |
+| Job board: charters and cargo jobs, flown by you or a hired pilot | Built |
+| Tours and a weekly challenge | Built |
 
 ## Flight logs
 
@@ -116,6 +126,10 @@ Only damage the simulator can actually detect.
 | GSX Pro ground services charged at real-world rates as GSX completes them (setting); standard charges without GSX | Built |
 | Real-world years or simulated years at a chosen speed | Built (setting) |
 | Transactions list | Built |
+| Loans with monthly instalments and early payoff | Built |
+| Fleet insurance (basic or full) paying back accident repairs | Built |
+| Marketing campaigns for the airline or a route | Built |
+| Landing, parking and gate fees by airport; monthly hangar rent at bases | Built |
 
 ## Interface
 
@@ -131,6 +145,7 @@ Only damage the simulator can actually detect.
 | About 49,000 world airports, plus every airport in your simulator; search by name, city or code | Built |
 | Flight menu on the map: follow, favourite and details | Built |
 | Co-op: run an airline together with other pilots, online through Supabase | Coming soon |
+| Co-op flight reports (PIREPs) reviewed by the owner | Built |
 | Airport view: runways, taxiways and stands with aircraft taxiing, taking off and landing | Built |
 | Real airport layouts from OpenStreetMap: taxiways, aprons, terminals and numbered stands | Built |
 | Repair time: instant, or 5 to 90 minutes depending on the job | Built |
@@ -163,6 +178,8 @@ Only damage the simulator can actually detect.
 
 | Feature | Status |
 |---|---|
+| Type ratings: hired pilots fly only rated types; courses with a check ride; your first flight on a new type is your check ride | Built |
+| Landing leaderboard: you, hired pilots and co-op pilots, softest and best average | Built |
 | Hired pilots and crew gain levels and a better rating from their work | Built |
 | Hired pilots fly only the routes you assign; test flights only by you | Built |
 | 3D full-body avatars (breathing, sway, blinking, look-around, turn with a finger) for all pilots, co-pilots, flight attendants and mechanics, male and female; drawn avatars where 3D isn't available | Built |
@@ -202,5 +219,12 @@ Only damage the simulator can actually detect.
 | Leg logged at blocks on: landing rate, G, block time, passengers, hours, landings, aircraft hours and cycles | Built |
 | Ticket revenue, fuel and fees booked per leg | Built |
 | Mechanic reports damage found on the leg after landing | Built |
-| Installed aircraft list from the sim (MSFS 2024 aircraft and livery list) | Planned |
+| Installed aircraft list from the sim (aircraft packages in Community and the bought add-ons) | Built |
+| Plan on SimBrief with the leg filled in; flight plans (.PLN) saved for the simulator | Built |
+| SimBrief flight plan import (route, fuel, weights) | Built, off until SimBrief's permission |
+| Live METAR and TAF; the real wind sets the runway in use | Built |
+| VATSIM and IVAO: controllers, your airline online, traffic on the map | Built, off until VATSIM's and IVAO's permission |
+| Hoppie ACARS: load sheet and arrival information to your aircraft; messages back | Built, off until Hoppie's permission |
+| Discord posts through a webhook | Built |
+| Public airline page to save and share | Built |
 | Built-in ATC clearance tracking | Planned (the sim doesn't expose clearances directly) |

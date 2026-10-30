@@ -407,6 +407,7 @@ class WorldMap {
       this.sceneDraws = fade > 0;
       if (fade > 0) for (const icao of Object.keys(this.scenes)) { const sc = this.scenes[icao]; if (sc.L && sc.graph) sc.drawAircraftTo(c, now); }
     }
+    try { if (typeof Network !== 'undefined') Network.drawOnMap(c, this, degPx); } catch (e) { /* never stop the map */ }
     for (const f of liveOf()) {
       if (!f.real && !aiOn(f)) { f.t = f.t + f.rate * dt * (State.settings.reduceMotion ? 0 : 1); if (f.t > 1) f.t = 0.02; }
       const a = apt(f.from).pos, b = apt(f.to).pos;

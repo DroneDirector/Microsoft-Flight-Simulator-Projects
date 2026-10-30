@@ -96,6 +96,7 @@ function leaseSheetHtml(): string {
 function rerenderLease() { const p = $('.lease-pop .panel'); if (p) p.innerHTML = leaseSheetHtml(); }
 
 ACTIONS.lease = el => {
+  if (!canTrade()) return;
   Sound.tick();
   const c = company();
   _lease = { id: el.getAttribute('data-id'), qty: 1, years: 3, base: company().hub, div: c.divisions.length ? (State.divisionId !== 'all' ? State.divisionId : c.divisions[0].id) : '' };
@@ -107,7 +108,7 @@ ACTIONS['lease-div'] = el => { _lease.div = el.getAttribute('data-div'); Sound.t
 
 ACTIONS['lease-confirm'] = () => {
   if (noStandsFor(_lease.base || company().hub, _lease.qty)) { toast('Not enough free stands there: choose another base', 'warn'); return; }
-  if (!coopCanBuy()) { toast('In this co-op only the owner takes on aircraft', 'warn'); return; }
+  if (!canTrade()) return;
   const t = acType(_lease.id), c = company();
   const monthly = leaseMonthly(t.price, _lease.years), deposit = monthly * 2, now = Date.now();
   const regs = nextRegs(c, _lease.qty), from = c.balance;
@@ -159,12 +160,14 @@ function leasePanelHtml(a: Aircraft): string {
 }
 
 ACTIONS['lease-extend'] = el => {
+  if (!canTrade()) return;
   const a = plane(el.getAttribute('data-reg')), L = a && leaseOf(a); if (!L) return;
   confirmChange(`Extend the lease of ${a.reg}?`, `One more year with ${L.lessor} at ${money(L.monthly)} a month. The lease then runs until ${dateStr(new Date(L.endAt + 12 * LEASE_MONTH)).slice(0, 10)}.`, 'Yes, extend', 'No',
     () => { L.endAt += 12 * LEASE_MONTH; L.months += 12; Store.save(); closeAll(); Sound.tick(); toast(`${a.reg}: lease extended by a year`, 'ok'); },
     () => closeTop());
 };
 ACTIONS['lease-buyout'] = el => {
+  if (!canTrade()) return;
   const a = plane(el.getAttribute('data-reg')), L = a && leaseOf(a); if (!L) return;
   const c = company(a.companyId), price = leaseBuyout(a), net = price - L.deposit;
   if (c.balance < net) { toast('Not enough money to buy it out', 'warn'); return; }
@@ -178,6 +181,7 @@ ACTIONS['lease-buyout'] = el => {
     }, () => closeTop());
 };
 ACTIONS['lease-return'] = el => {
+  if (!canTrade()) return;
   const a = plane(el.getAttribute('data-reg')), L = a && leaseOf(a); if (!L) return;
   const fee = L.monthly * 3;
   confirmChange(`Return ${a.reg} early?`, `It goes back to ${L.lessor} now. The early return fee is three months' rent (${money(fee)}), taken from the ${money(L.deposit)} deposit; ${L.deposit - fee >= 0 ? money(L.deposit - fee) + ' comes back' : money(fee - L.deposit) + ' more to pay'}.`, 'Yes, return it', 'Keep it',
