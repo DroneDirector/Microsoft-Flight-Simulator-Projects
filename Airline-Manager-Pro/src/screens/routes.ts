@@ -100,6 +100,11 @@ ACTIONS['nr-save'] = () => {
     closeAll(); refresh(); toast(`Test flight ${code} created. Assign a pilot under Pilots.`, 'ok'); return;
   }
   if (t && _nr.stops.slice(1).some((x, i) => gcDistanceNm(apt(_nr.stops[i]).pos, apt(x).pos) > usableRange(t))) { toast('A leg is too far for this aircraft', 'warn'); return; }
+  // runways: long enough, wide enough and the right surface at every airport on the route
+  const rwy = t ? routeRunwayProblem(t.id, _nr.stops) : '';
+  if (rwy) { toast(rwy, 'warn'); return; }
+  const lim = t ? _nr.stops.map((x, i) => i ? legRunwayCheck(t.id, _nr.stops[i - 1], x) : null).filter(x => x && !x.full)[0] : null;
+  if (lim) toast(lim.why, 'info');
   const c = company();
   const code = c.icao + (700 + State.routes.length);
   State.routes.push({ id: uid(), companyId: c.id, code, legs: _nr.stops.slice(), days: 'Daily', typeId: _nr.typeId, demand: 60 + Math.round(Math.random() * 30), yieldPerPax: 140 + Math.round(Math.random() * 200) });

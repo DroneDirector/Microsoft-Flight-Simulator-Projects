@@ -55,6 +55,7 @@ function usedMarketHtml(): string {
       <div class="mk-stage">${aircraftArt(t.id, { color: '#C9D2DE', color2: '#5D6B7E', reg: u.was })}</div>
       <div class="mk-body">
         <div class="mk-name"><b>${esc(t.maker)} ${esc(t.model)}</b><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span></div>
+        <div class="mk-cap">${icon('pax')}<span>${esc(capacityText(t.id))}</span></div>
         <div class="mk-specs"><span><small>Age</small>${u.ageY} yrs</span><span><small>Hours</small>${num(u.hoursMin / 60)}</span><span><small>Cycles</small>${num(u.cycles)}</span><span><small>Condition</small>${u.condition}%</span></div>
         <small class="muted">${esc(u.was)} at ${esc(u.location)}, sold by ${esc(u.seller)}. New: ${money(t.price, { compact: true })}</small>
         <div class="mk-foot"><b class="mk-price">${money(u.price, { compact: true })}</b><button class="btn primary" data-act="buy-used" data-id="${u.id}">Buy</button></div>

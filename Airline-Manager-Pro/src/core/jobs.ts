@@ -54,6 +54,8 @@ function jobFits(j: Job, a: Aircraft): string {
   if (j.kind === 'pax' && cabinSeats(t, a) < j.pax) return `${cabinSeats(t, a)} seats, needs ${j.pax}`;
   if (j.kind === 'cargo' && cargoCapacity(a) < j.kg) return `${num(cargoCapacity(a))} kg of cargo room, needs ${num(j.kg)} kg`;
   if (j.nm > usableRange(t)) return `range ${num(usableRange(t))} nm, the job is ${num(j.nm)} nm`;
+  const rc = legRunwayCheck(t.id, j.from, j.to, j.kind === 'pax' ? j.pax : 0);
+  if (!rc.ok || (j.kind === 'pax' && rc.maxPax < j.pax)) return rc.why || 'the runways are too short for this load';
   return '';
 }
 

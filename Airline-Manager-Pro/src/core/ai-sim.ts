@@ -380,6 +380,7 @@ function aiStartRoute(pilotId: string, r: RouteDef): string {
   const busy = (reg: string) => State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg);
   const c = company(r.companyId), mine = S.myReg[r.companyId];
   if (!Ratings.rated(p, r.typeId)) return 'not-rated';
+  if (!r.test && routeRunwayProblem(r.typeId, r.legs)) return 'runway';
   if (p.status === 'training') return 'training';
   const free = fleetOf(r.companyId).filter(a => a.typeId === r.typeId && a.reg !== mine && !busy(a.reg) && a.status === 'parked');
   const a = free.filter(x => r.legs.indexOf(x.location) >= 0)[0] || free[0];
