@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.8 (2026-10-30)
+
+- Courts: choices (lawyer, stance, suspension, plea, settlement, recommendations, appeal), jury/lay/judges by country, investigation reports, airline cases with your record, civil claims, sentence card with time served and release, second chances, whistleblowers, case types after real prosecutions
+- News articles (fictional papers) for charges, verdicts, appeals and new routes, with a spin-in animation
+- Ground crew required at bases (team per turnaround by size, simultaneous turnarounds, staff per based aircraft); three-day grace for existing airlines
+- Engine options per type with fuel, maintenance, reliability and price effects
+- Home base required (airport picker) for new airlines and companies
+- 3D view: smooth per-frame height, climb, heading and bank; camera fixed to the aircraft
+- Flight card passenger line shows seats and load factor
+
 ## 0.9.7 (2026-10-30)
 
 - Voice: per-sentence time limits grow with the sentence's place in the queue; late rejections handled; no error report once speech has started
