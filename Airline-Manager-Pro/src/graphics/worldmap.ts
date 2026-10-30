@@ -7,9 +7,9 @@ const MAP_LAT_MAX = 84, MAP_LAT_MIN = -58;
 // Classic dot map stays the default and the offline fallback.
 const EOX_ATTRIB = 'Sentinel-2 cloudless 2016 by <a href="https://cloudless.eox.at">EOX IT Services GmbH</a> (contains modified Copernicus Sentinel data 2016)';
 const OFM_ATTRIB = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, <a href="https://openmaptiles.org">OpenMapTiles</a>, <a href="https://openfreemap.org">OpenFreeMap</a>';
-/** The classic look with real geography underneath: zoomed out it is the dotted world (drawn on the
- *  overlay); zooming in, the dots give way to coastlines, water, borders and main roads in the same
- *  dark colours, from OpenStreetMap vector tiles (OpenFreeMap, free to use with credit). */
+/** The classic look with real geography at every zoom: coastlines, water and country borders (and,
+ *  zoomed in, regional borders and main roads) in the same dark colours, from OpenStreetMap vector
+ *  tiles (OpenFreeMap, free to use with credit). The dotted world is only the offline fallback. */
 function classicVectorStyle(): any {
   // zoom-dependent values must be a top-level interpolate, so each fade carries its own end value
   const fade = (a: number, b: number, to = 1) => ['interpolate', ['linear'], ['zoom'], a, 0, b, to];
@@ -17,13 +17,13 @@ function classicVectorStyle(): any {
     version: 8,
     sources: { omt: { type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: OFM_ATTRIB } },
     layers: [
-      { id: 'land', type: 'background', paint: { 'background-color': ['interpolate', ['linear'], ['zoom'], 4.2, '#050F1C', 5.6, '#0B1D33'] } },
-      { id: 'water', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': '#040B16', 'fill-opacity': fade(4.2, 5.6) } },
-      { id: 'coast', type: 'line', source: 'omt', 'source-layer': 'water', paint: { 'line-color': '#3FD0E8', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 4.2, 0, 5.6, 0.45, 12, 0.3], 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 12, 1.2] } },
+      { id: 'land', type: 'background', paint: { 'background-color': '#0B1D33' } },
+      { id: 'water', type: 'fill', source: 'omt', 'source-layer': 'water', paint: { 'fill-color': '#040B16' } },
+      { id: 'coast', type: 'line', source: 'omt', 'source-layer': 'water', paint: { 'line-color': '#3FD0E8', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 0, 0.6, 6, 0.5, 12, 0.32], 'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.7, 5, 0.8, 12, 1.2] } },
       { id: 'rivers', type: 'line', source: 'omt', 'source-layer': 'waterway', minzoom: 8, paint: { 'line-color': '#1E4A73', 'line-opacity': 0.5, 'line-width': 0.8 } },
       { id: 'roads', type: 'line', source: 'omt', 'source-layer': 'transportation', minzoom: 7, filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary']]], paint: { 'line-color': '#24486F', 'line-opacity': fade(7, 9), 'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.5, 14, 2] } },
-      { id: 'borders-region', type: 'line', source: 'omt', 'source-layer': 'boundary', minzoom: 5, filter: ['all', ['>=', ['get', 'admin_level'], 3], ['<=', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': fade(5, 6.5, 0.18), 'line-width': 0.7, 'line-dasharray': [3, 3] } },
-      { id: 'borders', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['all', ['<=', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': fade(3.5, 5.2, 0.45), 'line-width': 1, 'line-dasharray': [4, 3] } },
+      { id: 'borders-region', type: 'line', source: 'omt', 'source-layer': 'boundary', minzoom: 4, filter: ['all', ['>=', ['get', 'admin_level'], 3], ['<=', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': fade(4, 6, 0.18), 'line-width': 0.7, 'line-dasharray': [3, 3] } },
+      { id: 'borders', type: 'line', source: 'omt', 'source-layer': 'boundary', filter: ['all', ['<=', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]], paint: { 'line-color': '#93A9C1', 'line-opacity': 0.5, 'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.7, 6, 1], 'line-dasharray': [4, 3] } },
     ],
   };
 }
@@ -126,6 +126,7 @@ class WorldMap {
 
   destroy() { this.alive = false; cancelAnimationFrame(this.raf); if (this.ro) this.ro.disconnect(); if (this.ml) { try { this.ml.remove(); } catch (e) { /* already gone */ } this.ml = null; } }
 
+  mlFail = false;
   initBaseMap() {
     const ML = (window as any).maplibregl;
     this.mlHost = document.createElement('div');
@@ -143,7 +144,9 @@ class WorldMap {
       this.ml.on('dragstart', () => { this.userMoved = true; this.following = null; });
       this.ml.on('zoomstart', (e: any) => { if (e.originalEvent) this.userMoved = true; });
       this.ml.on('click', (e: any) => this.tapAt(e.point.x, e.point.y));
-      this.ml.on('error', () => { /* tiles failing (offline): the overlay keeps working */ });
+      // tiles failing (offline): the dotted world is drawn instead until tiles load again
+      this.ml.on('error', () => { if (!this.mlFail) { this.mlFail = true; this.baseDirty = true; } });
+      this.ml.on('sourcedata', (e: any) => { if (this.mlFail && e.tile && e.sourceId !== undefined) { this.mlFail = false; this.baseDirty = true; } });
       if (State.settings.mapStyle === 'street') this.ml.on('style.load', () => streetLook(this.ml));
     } catch (e) {
       this.ml = null; this.mlHost.remove(); this.cv.classList.remove('overlay');
@@ -301,8 +304,8 @@ class WorldMap {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.clearRect(0, 0, this.w, this.h);
     if (!this.ml) { c.fillStyle = col.bg; c.fillRect(0, 0, this.w, this.h); }
-    // the dotted world: always offline; online in the classic look only zoomed out, giving way to real coastlines
-    const dz = this.degPx(), dots = !this.ml ? 1 : State.settings.mapStyle === 'classic' ? clamp((34 - dz) / 18, 0, 1) : 0;
+    // the dotted world: only offline, when the real coastlines and borders can't be shown
+    const dots = !this.ml || this.mlFail ? 1 : 0;
     if (dots > 0) {
       c.globalAlpha = dots;
       // graticule every 15°
