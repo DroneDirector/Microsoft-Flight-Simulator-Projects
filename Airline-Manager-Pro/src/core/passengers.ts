@@ -6,6 +6,8 @@
 
 const PAX_FIRST = ['Mark', 'Lisa', 'Jonas', 'Emma', 'Ryan', 'Sara', 'Tom', 'Nina', 'Kevin', 'Julia', 'Lars', 'Anna', 'Paul', 'Maria', 'Dean', 'Heidi'];
 const PAX_LAST = ['Walker', 'Jensen', 'Becker', 'Moreau', 'Novak', 'Hansen', 'Collins', 'Berg', 'Fischer', 'Ricci', 'Kowalski', 'Larsen', 'Murphy', 'Svensson'];
+const PAX_WOMEN = ['Lisa', 'Emma', 'Sara', 'Nina', 'Julia', 'Anna', 'Maria', 'Heidi'];
+function paxSex(name: string): 'm' | 'f' { return PAX_WOMEN.indexOf(String(name).split(' ')[0]) >= 0 ? 'f' : 'm'; }
 function paxName(): string { return PAX_FIRST[Math.floor(Math.random() * PAX_FIRST.length)] + ' ' + PAX_LAST[Math.floor(Math.random() * PAX_LAST.length)]; }
 
 const PaxLeg = { parkedSince: 0, asked: false, allowed: false, name: '', incident: false, cruiseSeen: false };
@@ -35,10 +37,14 @@ function paxDrunkAtGate() {
   PaxLeg.name = paxName();
   try { Sound.chime(); } catch (e) { /* muted */ }
   const line = `Captain, a passenger for your flight, ${PaxLeg.name}, is severely drunk. They can hardly stand and are getting loud with the staff. Do you want them on board?`;
-  Voice.prepare(line, 'gate');
+  const pax = `I'm fine. I'm totally fine! Just let me on the plane, I paid for my ticket!`;
+  const paxWho = `pax|${paxSex(PaxLeg.name)}|drunk|${PaxLeg.name}`;
+  Voice.prepare(line, 'gate'); Voice.prepare(pax, paxWho);
   const wrap = openLayer('modal', `<div class="modal-head"><div><small>Gate agent</small><h2>Drunk passenger at the gate</h2></div></div>
     <div class="say-row">${voiceButton(line, 'gate', "Play the gate agent's message")}<small class="voice-note">${esc(voiceNote())}</small></div>
     <p class="speech">${esc(line)}</p>
+    <div class="say-row pax-say">${voiceButton(pax, paxWho, 'Play what the passenger says')}<small class="voice-note">${esc(PaxLeg.name)}, at the desk</small></div>
+    <p class="speech pax-speech">“${esc(pax)}”</p>
     <div class="decide">
       <button class="decide-card" data-act="pax-deny"><b>Deny boarding</b><small>Their bags are taken off. About ten minutes' delay, and a calm cabin.</small></button>
       <button class="decide-card bad" data-act="pax-allow"><b>Let them board</b><small>A bad atmosphere in the cabin, and it may get much worse in flight.</small></button>

@@ -1,7 +1,8 @@
 // All sounds are synthesised in code (Web Audio), so there are no third-party audio files to license.
 let _ctx: AudioContext = null;
-function audio(): AudioContext {
-  if (State.settings.muteAll) return null;
+/** The sound output. Voices ask with voice = true: "only the voices" keeps them while every other sound is off. */
+function audio(voice?: boolean): AudioContext {
+  if (State.settings.muteAll || (!voice && (State.settings as any).onlyVoices)) return null;
   if (!_ctx) {
     const C = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!C) return null;

@@ -5,12 +5,58 @@
 // Each line is spoken exactly as it is written on screen. Lines are prepared in the background as soon as
 // they are known, sentence by sentence, so the first words play quickly and later ones follow on.
 
-interface Speaker { voice: string; accent: 'a' | 'b'; speed: number; pitch: number; title: string }
+interface Speaker { voice: string; accent: 'a' | 'b'; speed: number; pitch: number; title: string; mood?: string; cents?: number; wobble?: number; gain?: number; slur?: boolean; exclaim?: boolean }
 const SPEAKERS: { [k: string]: Speaker } = {
   mechanic: { voice: 'bm_george', accent: 'b', speed: 1.0, pitch: 0.92, title: 'Mechanic' },
   gate: { voice: 'bf_emma', accent: 'b', speed: 1.02, pitch: 1.05, title: 'Gate agent' },
   ops: { voice: 'af_heart', accent: 'a', speed: 1.0, pitch: 1.0, title: 'Head of operations' },
 };
+// people who only speak now and then (passengers): their voice follows who they are
+const OTHER_SPEAKERS: { [k: string]: Speaker } = { pax: { voice: 'bm_lewis', accent: 'b', speed: 1.0, pitch: 1.0, title: 'Passenger' } };
+// voices of each sex, for people with a name and a sex of their own (British first, then American)
+const VOICE_POOL: { [sex: string]: string[] } = { m: ['bm_george', 'bm_lewis', 'bm_daniel', 'am_michael', 'am_fenrir', 'am_puck'], f: ['bf_emma', 'bf_isabella', 'af_heart', 'af_bella'] };
+// how a mood sounds: pace, pitch (cents), a wobble in the pitch, loudness, slurred words, exclamations
+const MOODS: { [m: string]: { speed: number; cents: number; wobble: number; gain: number; slur?: boolean; exclaim?: boolean } } = {
+  neutral: { speed: 1, cents: 0, wobble: 0, gain: 1 },
+  angry: { speed: 1.1, cents: 90, wobble: 0, gain: 1.3, exclaim: true },
+  sorry: { speed: 0.9, cents: -70, wobble: 0, gain: 0.85 },
+  drunk: { speed: 0.8, cents: -60, wobble: 70, gain: 1.15, slur: true, exclaim: true },
+};
+/** How a line sounds when it isn't said: an apology is apologetic, shouting is angry. */
+function detectMood(text: string): string {
+  if (/\b(sorry|apologi[sz]e|apologies|forgive me|my fault|regret)\b/i.test(text)) return 'sorry';
+  if (/!.*!|\b(unacceptable|ridiculous|outrageous|furious|how dare|disgrace|get your hands off|shut up)\b/i.test(text)) return 'angry';
+  return 'neutral';
+}
+/** The speaker for a line: "role", or "role|sex|mood|name" for a person with their own voice and mood. */
+function resolveSpeaker(who: string, text: string): Speaker {
+  const [role, sex, mood0, name] = String(who || 'mechanic').split('|');
+  const base = SPEAKERS[role] || OTHER_SPEAKERS[role] || SPEAKERS.mechanic, sp: Speaker = Object.assign({}, base);
+  if ((sex === 'm' || sex === 'f') && sp.voice[1] !== sex) {
+    const pool = VOICE_POOL[sex];
+    sp.voice = pool[_hashStr(name || role) % pool.length];
+    sp.accent = sp.voice[0] === 'b' ? 'b' : 'a';
+    sp.pitch = sex === 'f' ? 1.05 : 0.95;
+  }
+  const mood = mood0 || detectMood(text), m = MOODS[mood] || MOODS.neutral;
+  sp.mood = mood; sp.cents = m.cents; sp.wobble = m.wobble; sp.gain = m.gain; sp.slur = m.slur; sp.exclaim = m.exclaim;
+  // the pitch change also speeds playback up or down, so the model speaks at the pace that comes out right
+  sp.speed = Math.round(base.speed * m.speed / Math.pow(2, m.cents / 1200) * 100) / 100;
+  return sp;
+}
+/** The words in a mood: slurred and with pauses when drunk, exclamations when angry. */
+function moodPhonemes(ps: string, sp: Speaker): string {
+  let out = ps;
+  if (sp.exclaim) out = out.replace(/\.$/, '!');
+  if (sp.slur) {
+    let n = 0;
+    out = out.replace(/s(?=[ˈˌ]?[aeiouæɑɒɔəɛɜɪʊʌAIOQWY ])/g, () => (n++ % 2 === 0 ? 'ʃ' : 's')).replace(/z\b/g, 'ʒ').replace(/t(?=[aeiouæɑɒɔəɛɜɪʊʌ])/g, 'ɾ');
+    let w = 0;
+    out = out.replace(/ /g, () => (++w % 4 === 0 ? '… ' : ' '));
+  }
+  return out;
+}
+
 const VOICE_PACK_BASE = 'https://github.com/DroneDirector/Microsoft-Flight-Simulator-Projects/releases/download/amp-voice-pack-1/';
 const VOICE_MODEL = 'kokoro-v1.0-q8.onnx';
 // the model's sound numbers (its vocabulary), from the model's config
@@ -36,11 +82,13 @@ const VoicePack = {
     const need = [VOICE_MODEL, 'lexicon-gb.json.gz', 'lexicon-us.json.gz'].concat(Object.keys(SPEAKERS).map(k => 'voice-' + SPEAKERS[k].voice + '.bin'));
     const have = need.filter(f => this.files[f] > 0).length;
     this.state = have === need.length ? 'ready' : have ? 'partial' : 'none';
+    try { if (this.state === 'ready') localStorage.setItem('amp-voices-ready', '1'); else localStorage.removeItem('amp-voices-ready'); } catch (e) { /* no storage */ }
     return this.state;
   },
   /** Download the pack (or the rest of it). */
-  async download(): Promise<void> {
+  async download(auto?: boolean): Promise<void> {
     if (this.state === 'downloading') return;
+    if (!this.native() && !DESKTOP) return;   // a plain browser has nowhere to keep it
     this.state = 'downloading'; this.error = ''; this.done = 0; this.total = 0; voiceUiChanged();
     try {
       // the list of files and their sizes
@@ -66,7 +114,8 @@ const VoicePack = {
       try { Sound.chime(); toast('The voices are ready', 'ok'); } catch (e) { /* ignore */ }
     } catch (e: any) {
       this.state = 'error'; this.error = (e && e.message) || String(e);
-      try { ErrorLog.add('voice', 'The voices couldn\'t be downloaded', this.error); } catch (er) { /* ignore */ }
+      // tried again at the next start; only noted (no pop-up) when it started by itself
+      try { ErrorLog.add('voice', 'The voices couldn\'t be downloaded', this.error, '', !auto); } catch (er) { /* ignore */ }
     }
     voiceUiChanged();
   },
@@ -157,18 +206,18 @@ function voiceSentence(ps: string, sp: Speaker): Promise<Float32Array> {
 const Voice = {
   speaking: false, preparing: false, token: 0, sources: [] as AudioBufferSourceNode[], onEnd: null as () => void,
   natural(): boolean { return (State.settings as any).voiceEngine !== 'device' && VoicePack.state === 'ready'; },
-  sentences(text: string, sp: Speaker): string[] { return G2P.phonemize(text, sp.accent); },
+  sentences(text: string, sp: Speaker): string[] { return G2P.phonemize(text, sp.accent).map(p => moodPhonemes(p, sp)); },
   /** Get a line ready in the background, so it plays at once when it's needed. */
   prepare(text: string, who?: string) {
-    if (!this.natural() || !text) return;
-    const sp = SPEAKERS[who || 'mechanic'] || SPEAKERS.mechanic;
+    if (!this.natural() || !text || !State.settings.mechanicVoice) return;
+    const sp = resolveSpeaker(who, text);
     VoiceEngine.ready().then(() => { for (const s of this.sentences(text, sp)) voiceSentence(s, sp).catch(() => { /* tried again when played */ }); }).catch(() => { /* not ready */ });
   },
   /** Speak a line. Returns false when nothing can be played (muted). */
   speak(text: string, onEnd?: () => void, who?: string): boolean {
     this.stop();
-    if (State.settings.muteAll || !text) { if (onEnd) onEnd(); return false; }
-    const sp = SPEAKERS[who || 'mechanic'] || SPEAKERS.mechanic, tok = ++this.token;
+    if (State.settings.muteAll || !State.settings.mechanicVoice || !text) { if (onEnd) onEnd(); return false; }
+    const sp = resolveSpeaker(who, text), tok = ++this.token;
     this.onEnd = onEnd || null; this.speaking = true;
     if (!this.natural()) { this.device(text, sp, tok); return true; }
     this.preparing = true; voiceUiChanged();
@@ -176,7 +225,7 @@ const Voice = {
       let ctx: AudioContext;
       try {
         await VoiceEngine.ready();
-        ctx = audio(); if (ctx.state !== 'running') await ctx.resume();
+        ctx = audio(true); if (!ctx) { this.finish(); return; } if (ctx.state !== 'running') await ctx.resume();
         const parts = this.sentences(text, sp).map(s => voiceSentence(s, sp));
         let at = 0;
         for (let i = 0; i < parts.length; i++) {
@@ -186,9 +235,16 @@ const Voice = {
           if (!pcm.length) continue;
           const buf = ctx.createBuffer(1, pcm.length, 24000); buf.copyToChannel(pcm as any, 0);
           const src = ctx.createBufferSource(); src.buffer = buf;
-          const g = ctx.createGain(); g.gain.value = 1.15; src.connect(g); g.connect(ctx.destination);
+          const g = ctx.createGain(); g.gain.value = 1.15 * (sp.gain || 1); src.connect(g); g.connect(ctx.destination);
           at = Math.max(at, ctx.currentTime + 0.05);
-          src.start(at); at += buf.duration + 0.18;
+          const rate = Math.pow(2, (sp.cents || 0) / 1200), dur = buf.duration / rate;
+          if (sp.wobble) {
+            // drunk: the pitch drifts up and down
+            const curve = new Float32Array(64);
+            for (let j = 0; j < 64; j++) curve[j] = (sp.cents || 0) + Math.sin(j / 63 * Math.PI * 2 * Math.max(1, dur / 1.6) + i) * sp.wobble;
+            src.detune.setValueCurveAtTime(curve, at, Math.max(0.05, dur));
+          } else src.detune.value = sp.cents || 0;
+          src.start(at); at += dur + (sp.mood === 'sorry' ? 0.3 : sp.mood === 'angry' ? 0.08 : 0.18);
           this.sources.push(src);
           if (i === parts.length - 1) src.onended = () => { if (tok === this.token) this.finish(); };
         }
@@ -207,14 +263,15 @@ const Voice = {
     const N = VoicePack.native();
     if (N && N.speakDevice) {
       const h = N.addListener('deviceDone', () => { Promise.resolve(h).then((x: any) => x && x.remove()); if (tok === this.token) this.finish(); });
-      N.speakDevice({ text, pitch: sp.pitch, rate: sp.speed, lang: sp.accent === 'b' ? 'en-GB' : 'en-US' }).catch(() => { if (tok === this.token) this.finish(); });
+      N.speakDevice({ text, pitch: sp.pitch * Math.pow(2, (sp.cents || 0) / 1200), rate: sp.speed * Math.pow(2, (sp.cents || 0) / 1200), lang: sp.accent === 'b' ? 'en-GB' : 'en-US' }).catch(() => { if (tok === this.token) this.finish(); });
       return;
     }
     const s = (window as any).speechSynthesis;
     if (!s) { this.finish(); return; }
     s.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.rate = sp.speed; u.pitch = sp.pitch; u.lang = sp.accent === 'b' ? 'en-GB' : 'en-US';
+    const k = Math.pow(2, (sp.cents || 0) / 1200);
+    u.rate = sp.speed * k; u.pitch = sp.pitch * k; u.lang = sp.accent === 'b' ? 'en-GB' : 'en-US';
     const v = s.getVoices().filter((x: SpeechSynthesisVoice) => x.lang.replace('_', '-').indexOf(u.lang) === 0);
     if (v.length) u.voice = v[0];
     u.onend = () => { if (tok === this.token) this.finish(); };
@@ -242,16 +299,18 @@ function voiceUiChanged() {
     if (!on) b.setAttribute('data-playing', '0');
   }
   try { if (typeof _setSection !== 'undefined' && _setSection === 'voice' && document.querySelector('.settings')) rerenderSettingsBody(); } catch (e) { /* not open */ }
+  try { splashVoice(); } catch (e) { /* no start-up screen */ }
 }
 
 /** A play button for someone's words; data-say holds the line, data-who the speaker. */
 function voiceButton(text: string, who: string, label: string): string {
+  if (!State.settings.mechanicVoice) return '';
   return `<button class="voice-btn" data-act="say" data-who="${esc(who)}" data-say="${esc(text)}" aria-label="${esc(label)}">
     <span class="vb-ic">${icon('play')}</span><span class="wave">${'<i></i>'.repeat(14)}</span></button>`;
 }
 function voiceNote(): string {
   if (State.settings.muteAll) return 'All sounds are muted';
-  if (!State.settings.mechanicVoice) return 'Voices are off in Settings';
+  if (!State.settings.mechanicVoice) return '';
   if ((State.settings as any).voiceEngine === 'device') return 'Voice: this device\'s own voice';
   if (VoicePack.state === 'ready') return 'Natural voice';
   if (VoicePack.state === 'downloading') return `Downloading the voices… ${VoicePack.total ? Math.round(VoicePack.done / VoicePack.total * 100) : 0}%`;
@@ -265,9 +324,21 @@ ACTIONS.say = el => {
   voiceUiChanged();
 };
 
+/** Natural voices are switched on but not downloaded here yet (known before the pack is checked). */
+function voicesWanted(): boolean {
+  const S: any = State.settings;
+  if (!S.mechanicVoice || S.voiceEngine === 'device' || (!VoicePack.native() && !DESKTOP)) return false;
+  try { return localStorage.getItem('amp-voices-ready') !== '1'; } catch (e) { return true; }
+}
+
 function startVoices() {
   // older saves: "recorded lines" and "neural voice pack" both mean the natural voices now
   const S: any = State.settings;
   if (S.voiceEngine !== 'device') S.voiceEngine = 'neural';
-  VoicePack.check().then(st => { voiceUiChanged(); if (st === 'ready') setTimeout(() => VoiceEngine.ready().catch(() => { /* loads on first use */ }), 4000); });
+  VoicePack.check().then(st => {
+    voiceUiChanged();
+    if (st === 'ready') setTimeout(() => VoiceEngine.ready().catch(() => { /* loads on first use */ }), 4000);
+    // not downloaded yet: it starts right away, on the start-up screen, and carries on in the background
+    else if (S.mechanicVoice && S.voiceEngine !== 'device' && st !== 'downloading') VoicePack.download(true);
+  });
 }

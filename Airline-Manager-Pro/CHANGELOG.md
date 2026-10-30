@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.2 (2026-10-30)
+
+- Voice pack downloads on the start-up screen with its progress on the same bar
+- Voices match each person's sex; moods (angry, apologetic, drunk) by pace, pitch, wobble, pauses and slurring
+- The drunk passenger speaks after the gate agent; dialogues speak in turn
+- Settings: only the voices (all other sounds off), and voices in dialogues on or off
+
 ## 0.8.1 (2026-10-30)
 
 - Working voices for the mechanic, gate agent and head of operations: natural neural voices (Kokoro-82M, Apache 2.0) run on the device, natively on Android and in the PC app window; downloaded once as a voice pack; device voice until then

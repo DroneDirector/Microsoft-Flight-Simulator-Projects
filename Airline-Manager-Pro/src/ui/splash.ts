@@ -82,25 +82,64 @@ function showSplash(done: () => void) {
     s.style.setProperty('--h', Math.random() < .5 ? '#3FD0E8' : '#E04BD6');
     bar.appendChild(s); setTimeout(() => s.remove(), 700);
   };
+  let tv = 0, voiceMode = false, voiceEnd = 0, closing = false;
+  // a new message fades in; the same message with new numbers just updates
+  let stepKey = '';
+  const setStep = (t: string, key?: string) => {
+    if (step.textContent === t) return;
+    const k = key || t;
+    if (k === stepKey) { step.textContent = t; return; }
+    stepKey = k; step.classList.remove('in'); void step.offsetWidth; step.textContent = t; step.classList.add('in');
+  };
+  const close = () => {
+    if (closing) return; closing = true;
+    done();
+    sp.classList.add('out');
+    setTimeout(() => sp.remove(), 700);
+  };
   const frame = (now: number) => {
+    // the voices download (the first time): the same bar, the same aircraft, showing the download
+    if (splashWaitsForVoices() || (voiceMode && (!voiceEnd || now - voiceEnd < (VoicePack.state === 'error' ? 3000 : 900)))) {
+      if (!voiceMode) { voiceMode = true; tv = now; last = 0; sp.classList.remove('ready'); }
+      const v = VoicePack, dl = v.state === 'downloading' && v.total ? v.done / v.total : v.state === 'ready' ? 1 : 0;
+      const p = Math.max(last, Math.min(1, dl)); last = p;
+      if (v.state !== 'downloading' && v.state !== 'unknown' && !voiceEnd) voiceEnd = now;
+      fill.style.width = (p * 100).toFixed(2) + '%';
+      tip.style.left = (p * 100).toFixed(2) + '%';
+      pct.textContent = Math.floor(p * 100) + '%';
+      setStep(v.state === 'ready' ? 'The voices are ready'
+        : v.state === 'error' ? 'The voices couldn\'t be downloaded. The app tries again next time.'
+        : v.state === 'unknown' || !v.total ? 'Getting the voices ready'
+        : `Downloading the voices, ${Math.round(v.done / 1e6)} of ${Math.round(v.total / 1e6)} MB (only this once)`, 'dl-' + v.state + (v.total ? '1' : '0'));
+      if (!calm && now - lastSpark > 55 && p > 0.01 && p < 1) { lastSpark = now; spark(bar.clientWidth * p); }
+      requestAnimationFrame(frame); return;
+    }
+    if (voiceMode && !finished) { finished = true; sp.classList.add('ready'); setTimeout(close, 700); return; }
     const k = Math.max(0, Math.min(1, (now - t0) / FILL)), p = Math.max(last, curve(k));
     last = p;
     fill.style.width = (p * 100).toFixed(2) + '%';
     tip.style.left = (p * 100).toFixed(2) + '%';
     pct.textContent = Math.round(p * 100) + '%';
     let si = 0; for (let i = 0; i < SPLASH_STEPS.length; i++) if (p >= SPLASH_STEPS[i][0]) si = i;
-    if (si !== shownStep) { shownStep = si; step.classList.remove('in'); void step.offsetWidth; step.textContent = SPLASH_STEPS[si][1]; step.classList.add('in'); }
+    if (si !== shownStep) { shownStep = si; setStep(SPLASH_STEPS[si][1]); }
     if (!calm && now - lastSpark > 55 && p > 0.01 && p < 1) { lastSpark = now; spark(bar.clientWidth * p); }
     if (k < 1) { requestAnimationFrame(frame); return; }
+    // loaded: the voices may still be downloading, then the bar shows that
+    if (splashWaitsForVoices()) { requestAnimationFrame(frame); return; }
     if (finished) return; finished = true;
     sp.classList.add('ready');
+    setTimeout(close, Math.max(0, SPLASH_MS - (now - t0)));
   };
   requestAnimationFrame(frame);
-  setTimeout(() => {
-    done();
-    sp.classList.add('out');
-    setTimeout(() => sp.remove(), 700);
-  }, SPLASH_MS);
 }
 
 function splashShowing(): boolean { return !!document.querySelector('.splash:not(.out)'); }
+
+/** Redrawn by the voice download (the start-up screen reads the progress itself on every frame). */
+function splashVoice() { /* nothing extra to draw */ }
+
+/** The voices still have to be downloaded: the start-up screen stays until they are all in. */
+function splashWaitsForVoices(): boolean {
+  const v = VoicePack;
+  return v.state === 'downloading' || (v.state === 'unknown' && voicesWanted());
+}
