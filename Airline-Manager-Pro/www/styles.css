@@ -2027,3 +2027,15 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .voice-btn.prep .vb-ic { animation: pulse-ring 1.2s infinite; border-radius: 50%; }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(242, 179, 61, .5); } 100% { box-shadow: 0 0 0 10px rgba(242, 179, 61, 0); } }
 .set-card .cab-bar { display: block; margin-top: 6px; }
+/* the flight logs: a row opens the aircraft with that flight's log */
+.lt-row[data-act] { cursor: pointer; transition: background .2s; }
+.lt-row[data-act]:hover { background: var(--panel-2); }
+.flog { padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(63, 208, 232, .45); background: var(--panel-2); margin-bottom: 12px; animation: rise .35s var(--ease) both; }
+.flog.crash, .flog.incident { border-color: rgba(255, 90, 95, .5); }
+.flog.hard { border-color: rgba(242, 179, 61, .5); }
+.flog-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.flog-h small { color: var(--ink-2); }
+.flog-v { margin: 6px 0 0; color: var(--ink-2); }
+.flog .kv-row b { font-size: 14px; }
+.flog-iss small { display: block; margin-bottom: 4px; }
+.mini-row.on { border-color: var(--cyan); }

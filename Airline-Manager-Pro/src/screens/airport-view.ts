@@ -745,7 +745,7 @@ ACTIONS['apv-retry'] = () => {
 /** An airport drawn inside the world map: its layout loads in the background (runways first). */
 function makeAirportScene(icao: string, map: WorldMap): AirportView {
   const v: AirportView = Object.create(AirportView.prototype);
-  Object.assign(v, { embedded: true, map, icao, alive: true, track: null, planes: [], routes: {}, ptrs: {}, s: 1, w: 0, h: 0, cx: 0, cy: 0, fetching: true,
+  Object.assign(v, { embedded: true, map, icao, alive: true, track: null, planes: [], routes: {}, reachCache: {}, joins: null, ptrs: {}, s: 1, w: 0, h: 0, cx: 0, cy: 0, fetching: true,
     col: { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') } });
   AirportLayouts.get(icao, L => { if (L && v.alive) v.setLayout(L, true); v.fetching = false; }).then(L => { if (v.alive && L && (!v.L || v.L.source === 'runways' || L.source !== 'runways')) v.setLayout(L); });
   return v;

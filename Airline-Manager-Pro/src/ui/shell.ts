@@ -131,7 +131,7 @@ function statusChip(s: string): string {
     resting: ['Resting', 'dim'], standby: ['Standby', 'cyan'], off: ['Available', 'green'], training: ['On a course', 'amber'],
     ok: ['Normal', 'green'], hard: ['Hard landing', 'amber'], crash: ['Crash', 'red'], incident: ['Incident', 'amber'],
     open: ['Open', 'amber'], scheduled: ['Scheduled', 'cyan'], fixed: ['Fixed', 'green'],
-    minor: ['Minor', 'dim'], major: ['Major', 'amber'], grounding: ['Grounding', 'red'],
+    minor: ['Minor', 'dim'], major: ['Major', 'amber'], grounding: ['Grounding', 'red'], voided: ['Disregarded', 'dim'],
   };
   const m = map[s] || [s, 'dim'];
   return `<span class="chip chip-${m[1]}">${esc(m[0])}</span>`;

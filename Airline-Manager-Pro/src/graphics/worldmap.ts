@@ -163,7 +163,7 @@ class WorldMap {
     this.cv.style.width = this.w + 'px'; this.cv.style.height = this.h + 'px';
     this.baseDirty = true;
     if (this.ml) this.ml.resize();
-    if (this.lastFit && !this.userMoved) this.fit(this.lastFit.points, this.lastFit.pad, false, true);
+    if (this.lastFit && !this.userMoved) this.fit(this.lastFit.points, this.lastFit.pad, false, true, this.lastFit.deep);
   }
 
   // lon/lat -> screen
@@ -205,8 +205,9 @@ class WorldMap {
   }
 
   /** Frame a set of points with padding. */
-  fit(points: number[][], pad?: number, animate?: boolean, keep?: boolean) {
-    if (!keep) { this.lastFit = { points, pad }; this.userMoved = false; }
+  /** Show these points. deep: allow zooming in further than the usual overview (down to airport level). */
+  fit(points: number[][], pad?: number, animate?: boolean, keep?: boolean, deep?: boolean) {
+    if (!keep) { this.lastFit = { points, pad, deep }; this.userMoved = false; }
     if (!this.w) return;
     pad = pad == null ? 60 : pad;
     if (this.ml) {
@@ -214,14 +215,14 @@ class WorldMap {
       for (const p of points) { a = Math.min(a, p[0]); b = Math.min(b, p[1]); c = Math.max(c, p[0]); d = Math.max(d, p[1]); }
       const insR = this.w > 600 ? (this.opts.insetRight || 0) : 0;
       this.ml.resize();
-      this.ml.fitBounds([[a, b], [c, d]], { padding: { top: pad, bottom: pad, left: pad, right: pad + insR }, duration: animate && !reducedMotion() ? 900 : 0, maxZoom: 7 });
+      this.ml.fitBounds([[a, b], [c, d]], { padding: { top: pad, bottom: pad, left: pad, right: pad + insR }, duration: animate && !reducedMotion() ? 1200 : 0, maxZoom: deep ? 17 : 7 });
       return;
     }
     let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
     for (const p of points) { const x = p[0] * D2R, y = millerY(p[1]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
     const ins = this.w > 600 ? (this.opts.insetRight || 0) : 0;
     const R = Math.min((this.w - ins - pad * 2) / Math.max(x1 - x0, 0.02), (this.h - pad * 2) / Math.max(y1 - y0, 0.02));
-    const Rc = clamp(R, this.minR(), 2600);
+    const Rc = clamp(R, this.minR(), deep ? MAP_R_MAX : 2600);
     const target = { cx: (x0 + x1) / 2 + ins / 2 / Rc, cy: (y0 + y1) / 2, R: Rc };
     if (animate && !reducedMotion()) this.anim = { from: { cx: this.cx, cy: this.cy, R: this.R }, to: target, t0: performance.now(), dur: 900 };
     else { this.cx = target.cx; this.cy = target.cy; this.R = target.R; this.clampView(); this.baseDirty = true; }
@@ -231,9 +232,24 @@ class WorldMap {
   follow(id: string) {
     const f = State.live.filter(x => x.id === id)[0]; if (!f) return;
     this.following = id; this.selected = id;
-    const p = flightPos(f);
-    const span = 3.2;
-    this.fit([[p[0] - span * 1.6, p[1] - span], [p[0] + span * 1.6, p[1] + span]], 40, true);
+    const p = this.inScene[id] || flightPos(f), ph = String(f.phase || '');
+    const A = apt(f.from), B = !f.noDest ? apt(f.to) : null;
+    const dTo = B ? gcDistanceNm(p, B.pos) : 1e9, dFrom = A ? gcDistanceNm(p, A.pos) : 1e9;
+    const near = dTo <= dFrom ? B : A, dNear = Math.min(dTo, dFrom);
+    const onGround = /taxi|pushback|gate|boarding|take-?off roll|lift-off|touchdown|landing roll|holding short|parked|deplaning/i.test(ph) || ((f.alt || 0) < 80 && dNear < 3);
+    const half = (deg: number) => { const k = Math.cos(p[1] * D2R) || 1; return [[p[0] - deg / k, p[1] - deg * 0.6], [p[0] + deg / k, p[1] + deg * 0.6]]; };
+    if (onGround) {
+      // on the runway or the taxiways: right in at the airport
+      const w = Math.max(320, this.w) / (AIRPORT_DEG_PX * 2.4);
+      this.fit([[p[0] - w / 2, p[1] - w * 0.3], [p[0] + w / 2, p[1] + w * 0.3]], 0, true, false, true);
+    } else if (near && dNear < 40) {
+      // on final or just after take-off: the aircraft and the airport together, close in
+      const pad = Math.max(0.02, dNear / 60 * 0.25);
+      this.fit([[Math.min(p[0], near.pos[0]) - pad, Math.min(p[1], near.pos[1]) - pad * 0.6], [Math.max(p[0], near.pos[0]) + pad, Math.max(p[1], near.pos[1]) + pad * 0.6]], 50, true, false, true);
+    } else {
+      // en route: the region around it on the world map, not the whole world
+      this.fit(half(4.5), 40, true);
+    }
     this.userMoved = false;
   }
 

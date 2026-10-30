@@ -69,8 +69,10 @@ ACTIONS['go-market'] = () => { _mkMode = 'buy'; go('market'); };
 ACTIONS['go-lease'] = () => { _mkMode = 'lease'; go('market'); };
 ACTIONS['go-used'] = () => { _mkMode = 'used'; go('market'); };
 
+let _acLog = '';   // a flight to show at the top of the aircraft's page (from the flight logs)
 ACTIONS['ac-detail'] = el => {
   const a = plane(el.getAttribute('data-reg')); if (!a) return;
+  const focus = _acLog ? State.logbook.filter(x => x.id === _acLog && x.reg === a.reg)[0] : null; _acLog = '';
   Sound.tick();
   const t = acType(a.typeId), c = company(a.companyId);
   const div = c.divisions.filter(d => d.id === a.divisionId)[0];
@@ -81,6 +83,7 @@ ACTIONS['ac-detail'] = el => {
     <div class="modal-head"><div><h2>${esc(a.reg)}</h2><small>${esc(t.maker)} ${esc(t.variant)}, ${esc(t.dev)}</small></div>${statusChip(a.status)}
       <button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body ac-detail">
+      ${focus ? flightLogHtml(focus) : ''}
       <div class="acd-hero">${aircraftArt(a.typeId, { color: div ? div.color : c.color, color2: c.color2, reg: a.reg })}</div>
       <div class="kv-row">
         <div><small>Airframe hours</small><b>${num(a.hoursMin / 60)}</b></div>
@@ -102,7 +105,7 @@ ACTIONS['ac-detail'] = el => {
       ${f ? `<p class="lede">${icon('fleet')}Flying ${esc(f.callsign)} from ${esc(apt(f.from).city)} to ${esc(apt(f.to).city)}${f.you ? ' with you at the controls' : ', ' + esc(pilot(f.pilotId).name)}.</p>` : ''}
       <div class="two-col">
         <div><h3>Maintenance</h3>${issues.length ? issues.map(i => `<button class="mini-row" data-act="open-issue" data-id="${i.id}">${statusChip(i.status)}<span>${esc(i.title)}</span><small>${esc(i.date)}</small></button>`).join('') : '<p class="muted">No damage on record.</p>'}</div>
-        <div><h3>Recent flights</h3>${log.length ? log.map(l => `<div class="mini-row"><span>${esc(l.from)} to ${esc(l.to)}</span><small>${num(l.landingFpm)} fpm</small></div>`).join('') : '<p class="muted">No flights logged yet.</p>'}</div>
+        <div><h3>Recent flights</h3>${log.length ? log.map(l => `<button class="mini-row ${focus && focus.id === l.id ? 'on' : ''}" data-act="log-open" data-id="${l.id}">${statusChip(l.result)}<span>${esc(l.from)} to ${esc(l.to)}</span><small>${num(l.landingFpm)} fpm</small></button>`).join('') : '<p class="muted">No flights logged yet.</p>'}</div>
       </div>
     </div>`, { cls: 'wide' });
 };
