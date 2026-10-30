@@ -7,7 +7,10 @@
 // the list only puts names to the number the simulator (or GSX) reports.
 
 interface PaxRecord { key: string; name: string; nat: string; sex: 'm' | 'f'; notes: { date: string; title: string; text: string; sev: 'warning' | 'ban' }[]; banned?: boolean; bannedBy?: string }
-interface PaxSeat { key: string; name: string; nat: string; sex: 'm' | 'f'; age: number; seat: string; cls: 'F' | 'J' | 'Y'; look: any; record: PaxRecord }
+interface PaxSeat { key: string; name: string; nat: string; sex: 'm' | 'f'; age: number; seat: string; cls: 'F' | 'J' | 'Y'; look: any; record: PaxRecord; famous?: string }
+
+// now and then (about one flight in 20) someone well known is on board; all made-up people
+const CELEB_JOBS = ['Film actor', 'Pop singer', 'Football star', 'Racing driver', 'TV chef', 'Best-selling author', 'Tennis champion', 'Stand-up comedian', 'News presenter', 'Olympic swimmer', 'Rock guitarist', 'Fashion designer', 'Film director', 'Opera singer', 'Video creator'];
 
 // some passengers come with a record from before (other airlines, the authorities)
 const PAX_PAST: [string, string, 'warning' | 'ban'][] = [
@@ -60,6 +63,12 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
     if (noFly()[pkey] && rec) { rec.banned = true; rec.bannedBy = 'your airline'; }
     out.push({ key: pkey, name: p.name, nat: p.nat, sex: p.sex, age: clamp(age, 2, 92), seat, cls, look: p.look, record: rec });
   }
+  // a celebrity on about one flight in 20: in first or business if there is one, otherwise up front in economy
+  if (out.length >= 2 && seeded(f.id + 'celeb')() < 0.05) {
+    const r = seeded(f.id + 'celeb2'), prem = out.filter(p => p.cls !== 'Y'), pool = prem.length ? prem : out.slice(0, Math.min(12, out.length));
+    const who = pool[Math.floor(r() * pool.length)];
+    who.famous = CELEB_JOBS[Math.floor(r() * CELEB_JOBS.length)]; who.age = clamp(who.age, 22, 78); who.record = null;
+  }
   _manifests.set(key, out);
   if (_manifests.size > 40) _manifests.delete(_manifests.keys().next().value);
   return out;
@@ -69,18 +78,18 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
 ACTIONS['pax-list'] = el => {
   const f = State.live.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!f) return;
   Sound.tick();
-  const list = manifestOf(f), flagged = list.filter(p => p.record).length;
+  const list = manifestOf(f), flagged = list.filter(p => p.record).length, star = list.filter(p => p.famous)[0];
   const clsName: { [k: string]: string } = { F: 'First', J: 'Business', Y: 'Economy' };
   const groups = (['F', 'J', 'Y'] as const).map(c => [c, list.filter(p => p.cls === c)] as [string, PaxSeat[]]).filter(g => g[1].length);
-  openLayer('modal', `<div class="modal-head"><div><h2>Passengers: ${esc(f.callsign)}</h2><small>${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)} · ${list.length} on board${flagged ? ` · ${flagged} with a conduct record` : ''}${f.you ? ' · numbers from the simulator' : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+  openLayer('modal', `<div class="modal-head"><div><h2>Passengers: ${esc(f.callsign)}</h2><small>${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)} · ${list.length} on board${flagged ? ` · ${flagged} with a conduct record` : ''}${star ? ` · ${esc(star.famous.toLowerCase())} on board` : ''}${f.you ? ' · numbers from the simulator' : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body pax-list">${groups.map(([c, ps]) => `<h4>${clsName[c]} · ${ps.length}</h4>${ps.map((p, i) => paxRowHtml(f.id, p, i)).join('')}`).join('') || emptyState('Nobody on board', 'The passengers show here once they have boarded.')}</div>`, { cls: 'wide pax-pop' });
   paxFacesLazy();
 };
 function paxRowHtml(fid: string, p: PaxSeat, i: number): string {
   const rec = p.record, banned = rec && rec.banned;
-  return `<div class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''}">
+  return `<div class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''} ${p.famous ? 'famous' : ''}">
     <span class="pax-face" data-face="${esc(fid)}|${esc(p.key)}" data-i="${i}"></span>
-    <span class="pax-who"><b>${esc(p.name)}</b><small>${natLabel(p.nat)} · ${p.age}</small></span>
+    <span class="pax-who"><b>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small></span>
     <span class="pax-seat">${esc(p.seat)}</span>
     ${rec ? `<button class="pax-rec ${banned ? 'ban' : ''}" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}${banned ? 'Banned' : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</button>` : '<span class="pax-clean">Clean</span>'}
   </div>`;
@@ -121,7 +130,16 @@ ACTIONS['pax-unban'] = el => { const k = el.getAttribute('data-key'), rec = paxS
 const _scanned: { [flightId: string]: boolean } = {};
 /** During boarding: anyone with a ban is flagged by the scan, and the gate asks you (it refuses them by
  *  itself if you don't answer within ten minutes). */
+/** A well-known passenger boarding: a note for you, and a little good publicity once they land happy. */
+function celebOnBoard(f: LiveFlight) {
+  const F: any = f; if (F.celebNoted) return;
+  const star = manifestOf(f).filter(p => p.famous)[0]; if (!star) return;
+  F.celebNoted = true;
+  State.notices.unshift({ id: uid(), kind: 'flight', title: `${star.famous} on board ${f.callsign}`, body: `${star.name}, ${star.famous.toLowerCase()} from ${natLabel(star.nat)}, boarded at ${f.from} for ${f.to}, seat ${star.seat}. The crew are taking good care of them; photos with your aircraft are already online.`, time: 'Now', read: false, ref: f.id } as any);
+  try { Progress.popularity(1, `${star.famous} flew with you`); } catch (e) { /* ignore */ }
+}
 function boardingScan(f: LiveFlight) {
+  try { celebOnBoard(f); } catch (e) { /* ignore */ }
   if (_scanned[f.id] || f.you) return;
   _scanned[f.id] = true;
   const banned = manifestOf(f).filter(p => p.record && p.record.banned)[0]; if (!banned) return;

@@ -2217,3 +2217,13 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .rk-staff .lb-who { flex: 1; min-width: 0; }
 .rk-staff .lvl-bar { display: block; height: 4px; margin-top: 4px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; max-width: 260px; }
 .rk-staff .lvl-bar i { display: block; height: 100%; background: #3FD0E8; }
+
+/* Schedule: late and cancelled legs */
+.g-blk.late { background: rgba(242, 193, 78, .2); border-color: rgba(242, 193, 78, .7); color: #F8E2A8; }
+.g-blk.cxl { background: repeating-linear-gradient(135deg, rgba(255, 90, 95, .18) 0 5px, transparent 5px 10px); border: 1px dashed rgba(255, 90, 95, .7); color: #FFC9CB; text-decoration: line-through; }
+.g-ghost { position: absolute; top: 9px; bottom: 9px; border-radius: 7px; border: 1px dashed rgba(255, 255, 255, .28); pointer-events: none; }
+.dl-late { display: block; font-style: normal; font-size: 11px; color: #F2C14E; margin-top: 2px; }
+.dl-late.cxl { color: #FF8A8E; }
+.day-leg.cancelled { opacity: .75; } .day-leg.cancelled .dl-r b { text-decoration: line-through; }
+.pax-row.famous { border-color: rgba(242, 193, 78, .55); background: rgba(242, 193, 78, .07); }
+.pax-star { display: inline-flex; color: #F2C14E; vertical-align: -2px; } .pax-star svg { width: 13px; height: 13px; }
