@@ -2255,3 +2255,4 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .rv-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .rv-cols p { margin: 4px 0; font-size: 13px; }
 .rv-q { display: block; font-style: italic; color: var(--ink-3); margin-top: 2px; }
 .rv-row { align-items: flex-start; }
+.ob-of { font-style: normal; font-weight: 500; font-size: .82em; color: var(--ink-3); }

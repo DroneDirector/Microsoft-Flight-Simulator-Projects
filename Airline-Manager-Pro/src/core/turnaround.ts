@@ -75,7 +75,9 @@ function onBoardParked(a: Aircraft, now?: number): OnBoard {
 function onBoardHtml(o: OnBoard): string {
   if (!o) return '';
   const pct = (x: number) => Math.round(x * 100) + '%';
-  return `<div class="sync-item ob">${icon('pax')}<span><small>Passengers · ${esc(o.stage)}</small><b>${num(o.pax)} / ${num(o.paxMax)}</b></span></div>
+  // passengers on board out of the seats in the aircraft (the tickets sold for this flight), and how full that is
+  const lf = o.paxMax ? Math.round(o.pax / o.paxMax * 100) : 0;
+  return `<div class="sync-item ob">${icon('pax')}<span><small>Passengers on board · ${esc(o.stage)}</small><b>${num(o.pax)} <em class="ob-of">of ${num(o.paxMax)} seats${/boarding|deboarding/i.test(o.stage) ? '' : ` · ${lf}% full`}</em></b></span></div>
     <div class="sync-item ob">${icon('fuel')}<span><small>Fuel${o.fuelNote ? ' · ' + esc(o.fuelNote) : ''}</small><b>${num(o.fuelKg)} kg</b></span></div>
     <div class="sync-item ob">${icon('jobs')}<span><small>Catering and bags</small><b>${o.catering >= 1 && o.bags >= 1 ? 'Loaded' : `${pct(o.catering)} · ${pct(o.bags)}`}</b></span></div>
     ${o.next ? `<div class="sync-item ob">${icon('clock')}<span><small>Next flight</small><b>${esc(o.next)}</b></span></div>` : ''}`;
