@@ -36,6 +36,14 @@
     "n": ""
    },
    {
+    "t": "Sim check: reads everything the app uses from the running simulator and the loaded aircraft and saves a report of anything missing or refused",
+    "n": ""
+   },
+   {
+    "t": "Flight recordings: every flight saved as the simulator sent it, played back to the phone or through the tests",
+    "n": ""
+   },
+   {
     "t": "Detect which aircraft is loaded in the sim and match it to the aircraft you're flying",
     "n": ""
    },
