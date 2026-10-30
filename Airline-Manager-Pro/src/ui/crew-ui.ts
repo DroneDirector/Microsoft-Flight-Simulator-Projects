@@ -12,7 +12,7 @@ function staffCard(p: any, i: number, opts?: { hire?: boolean }): string {
   const role = personRole(p);
   return `<button class="staff-card ${opts && opts.hire ? 'hire' : ''}" data-act="${opts && opts.hire ? 'hire-staff' : 'staff-detail'}" data-id="${p.id}" style="--i:${i}">
     <span class="sc-av">${avatarSvg(p.look, role, { view: 'bust', accent: company().color })}</span>
-    <span class="sc-txt"><b>${esc(p.name)}</b><small>${opts && opts.hire ? '' : levelChip(p) + ' '}${opts && opts.hire ? ROLE_NAMES[role] : esc(levelTitle(p))}, ${flag(p.nat || 'GB')} ${ageOf(p.dob)}</small>
+    <span class="sc-txt"><b>${esc(p.name)}</b><small>${levelChip(p) + ' '}${opts && opts.hire ? ROLE_NAMES[role] : esc(levelTitle(p))}, ${flag(p.nat || 'GB')} ${ageOf(p.dob)}</small>
       <small>${opts && opts.hire ? `${esc(apt(p.base) ? apt(p.base).city : p.base)}, ${money(p.salary)}/wk` : `${esc(p.base)}, ${money(p.salary)}/wk`}</small></span>
     ${p.warnings ? `<i class="warn-dot" title="${p.warnings} warning${p.warnings > 1 ? 's' : ''}">${p.warnings}</i>` : ''}
     ${opts && opts.hire ? `<span class="sc-hire">${icon('plus')}Hire</span>` : ''}
@@ -37,7 +37,7 @@ function openStaff(id: string) {
           <div><small>Base</small><b>${esc(p.base)}</b></div>
           <div><small>Salary</small><b>${money(p.salary)}/wk</b></div>
           <div><small>Rating</small><b>${(p.rating || 4).toFixed(1)} ★</b></div>
-          ${p.you ? '' : (l => `<div class="kv-lvl"><small>Level ${l.level} of ${LEVEL_XP.length}</small><b>${esc(levelTitle(p))}</b><span class="lvl-bar"><i style="width:${(l.p * 100).toFixed(0)}%"></i></span><small>${num(p.xp || 0)} XP${l.to > l.from ? ` · ${num(l.to - (p.xp || 0))} to level ${l.level + 1}` : ' · highest level'}</small></div>`)(levelOf(p.xp))}
+          ${p.you ? '' : (l => `<div class="kv-lvl"><small>Level ${l.level} of ${LEVEL_MAX}</small><b>${esc(levelTitle(p))}</b><span class="lvl-bar"><i style="width:${(l.p * 100).toFixed(0)}%"></i></span><small>${num(p.xp || 0)} XP${l.to > l.from ? ` · ${num(l.to - (p.xp || 0))} to level ${l.level + 1}` : ' · highest level'}</small></div>`)(levelOf(p.xp))}
           ${p.warnings ? `<button class="kv-btn" data-act="warn-open" data-id="${esc(p.id)}"><small>Conduct</small><b class="amber">${p.warnings} warning${p.warnings > 1 ? 's' : ''}${icon('chevron')}</b></button>` : `<div><small>Conduct</small><b class="green">Clean record</b></div>`}
         </div>
         ${warnHistory(p)}
@@ -175,6 +175,8 @@ ACTIONS.discipline = el => {
   const p = staffById(inc.staffId);
   if (p) {
     p.warnings = (p.warnings || 0) + 1;
+    // a warning costs experience: light 2 levels' worth early on, severe much more; it can go below zero
+    p.xp = Math.round((p.xp || 0) - ({ light: 400, moderate: 1500, severe: 5000 } as any)[inc.sev || 'moderate']);
     p.warnLog = (p.warnLog || []).concat([{ date: inc.date, title: inc.title, sev: inc.sev || 'moderate', text: inc.text, inc: inc.id, given: Date.now() }]);
     p.rating = clamp(Math.round(((p.rating || 3.5) - (inc.sev === 'severe' ? 0.4 : inc.sev === 'light' ? 0.1 : 0.25)) * 100) / 100, 1, 5);
     // most people take a warning to heart and become more careful; some don't, and it gets less likely with each warning

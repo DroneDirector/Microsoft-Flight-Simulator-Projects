@@ -44,7 +44,8 @@ function makePilotCandidate(seed: string): any {
   const t1 = types[Math.floor(r() * types.length)], t2 = types[Math.floor(r() * types.length)];
   const hrs = Math.round(3000 + r() * 14000);
   return { id: 'c-' + uid(), name: st.name, rank: 'Captain', hoursMin: hrs * 60, landings: Math.round(hrs * (0.4 + r() * 0.5)), base: st.base, salary: Math.round(3600 + r() * 1600), rating: Math.round((3.6 + r() * 1.4) * 10) / 10,
-    status: 'standby', types: t1 === t2 ? [t1] : [t1, t2], sex: st.sex, nat: st.nat, dob: st.dob, look: randomLook('pilot-' + st.id, st.sex, 'captain') };
+    status: 'standby', types: t1 === t2 ? [t1] : [t1, t2], sex: st.sex, nat: st.nat, dob: st.dob, look: randomLook('pilot-' + st.id, st.sex, 'captain'),
+    xp: startingXp(seed, 'captain', 2026 - parseInt(st.dob, 10), hrs * 60) };
 }
 
 /** The job market moves: candidates leave, new ones arrive (some days more, some days fewer). */

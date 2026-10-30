@@ -2131,3 +2131,4 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .wi-h time { margin-left: auto; font-size: 12px; color: var(--ink-3); }
 .wi-sev { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #F2C14E; }
 .sev-light .wi-sev { color: #8FB4D9; } .sev-severe .wi-sev { color: #F0566B; }
+.lvl.neg b { color: #F0566B; }

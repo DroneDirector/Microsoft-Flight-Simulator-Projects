@@ -2,7 +2,7 @@
 
 interface Staff {
   id: string; name: string; role: CrewRole; sex: 'm' | 'f'; look: Look; dob: string; nat: string;
-  companyId: string; base: string; salary: number; hired: string; warnings: number; rating: number;
+  companyId: string; base: string; salary: number; hired: string; warnings: number; rating: number; xp?: number;
   status: 'on duty' | 'off' | 'resting';
 }
 interface Incident { id: string; staffId: string; title: string; text: string; date: string; status: 'open' | 'disciplined' | 'dismissed'; sev?: 'light' | 'moderate' | 'severe' }
@@ -95,6 +95,7 @@ function makePerson(seed: string, role: CrewRole, companyId: string, base: strin
     id: role + '-' + _hash(seed).toString(36), name, role, sex, look, dob: `${y}-${m < 10 ? '0' : ''}${m}-${d < 10 ? '0' : ''}${d}`, nat,
     companyId, base, salary: Math.round(salary / 10) * 10, hired: '2026-09-' + (10 + Math.floor(r() * 18)), warnings: 0, rating: 3.6 + r() * 1.4,
     status: pick(['on duty', 'on duty', 'off', 'resting'] as any),
+    xp: startingXp(seed, role, age),
   };
 }
 
