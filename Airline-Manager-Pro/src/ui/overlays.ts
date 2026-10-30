@@ -128,7 +128,7 @@ const NOTICE_META: { [k: string]: { label: string; icon: string } } = {
 let _inboxTab = 'all';
 
 function inboxHtml(): string {
-  pruneNotices();
+  pruneNotices(); stampNotices();
   const tabs = ['all', 'mechanic', 'staff', 'authority', 'flight', 'pilot', 'finance'];
   const list = State.notices.filter(n => _inboxTab === 'all' || n.kind === _inboxTab);
   return `
@@ -143,11 +143,19 @@ function inboxHtml(): string {
       <button class="notice ${n.read ? '' : 'unread'} k-${n.kind}" data-act="open-notice" data-id="${n.id}">
         <span class="n-ic">${icon(NOTICE_META[n.kind].icon)}</span>
         <span class="n-t"><b>${esc(n.title)}</b><small>${esc(n.body)}</small></span>
-        <span class="n-time">${esc(n.time)}${n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref) ? `<i class="n-map">${icon('pin')}Map</i>` : ''}</span>
+        <span class="n-time" data-at="${(n as any).at || ''}" title="${(n as any).at ? esc(receivedText((n as any).at)) : ''}">${esc((n as any).at ? agoText((n as any).at) : n.time)}${n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref) ? `<i class="n-map">${icon('pin')}Map</i>` : ''}</span>
       </button>`).join('') : emptyState('Nothing here', 'New messages from your mechanic, pilots and the authorities show up here.')}</div>`;
 }
 
 ACTIONS.inbox = () => { Sound.tick(); openLayer('drawer', inboxHtml(), { cls: 'inbox' }); };
+// the times keep up while you look ("Now" becomes "1 min ago")
+setInterval(() => {
+  for (const el of Array.from(document.querySelectorAll('.n-time[data-at], .n-received[data-at]')) as HTMLElement[]) {
+    const at = +el.getAttribute('data-at'); if (!at) continue;
+    const t = el.classList.contains('n-received') ? `Received ${receivedText(at)} · ${agoText(at)}` : agoText(at);
+    const first = el.firstChild; if (first && first.nodeType === 3 && first.nodeValue !== t) first.nodeValue = t;
+  }
+}, 20000);
 ACTIONS['inbox-tab'] = el => { _inboxTab = el.getAttribute('data-tab'); Sound.tick(); rerenderInbox(); };
 ACTIONS['mark-read'] = () => { State.notices.forEach(n => n.read = true); rerenderInbox(); renderTopbar(); };
 function rerenderInbox() { const p = $('.layer-drawer.inbox .panel'); if (p) p.innerHTML = inboxHtml(); }
@@ -168,7 +176,8 @@ ACTIONS['open-notice'] = el => {
   else {
     // the message, read out by whoever sent it
     const who = noticeSpeaker(n);
-    const wrap = openLayer('modal', `<div class="modal-head"><h2>${esc(n.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div><div class="modal-body"><p class="lede">${esc(n.body)}</p>
+    const at = (n as any).at;
+    const wrap = openLayer('modal', `<div class="modal-head"><div><h2>${esc(n.title)}</h2>${at ? `<small class="n-received" data-at="${at}">Received ${esc(receivedText(at))} · ${esc(agoText(at))}</small>` : ''}</div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div><div class="modal-body"><p class="lede">${esc(n.body)}</p>
       ${who ? `<div class="say-row">${voiceButton(n.body, who[0], 'Play the message')}${voiceNoteEl(who[1])}</div>` : ''}</div>`, { cls: 'narrow', onClose: () => Voice.stop() });
     if (who) autoSpeak(wrap);
   }

@@ -217,7 +217,39 @@ function liveOf(cid?: string): LiveFlight[] {
 function flightTypeId(f: LiveFlight): string { const a = plane(f.reg); return a ? a.typeId : (f as any).typeId || 'a320-fenix'; }
 function profileOfCompany(cid: string): Profile { const c = company(cid); for (const p of State.profiles) if (p.id === c.profileId) return p; return State.profiles[0]; }
 function myPilot(): Pilot { const pr = profileOfCompany(State.companyId); return pilot(pr.pilotId); }
-function unreadCount(): number { pruneNotices(); return State.notices.filter(n => !n.read).length; }
+function unreadCount(): number { pruneNotices(); stampNotices(); return State.notices.filter(n => !n.read).length; }
+
+/** Every notification gets the moment it arrived (older saves: worked out from the time they show). */
+function stampNotices() {
+  const now = Date.now();
+  for (const n of State.notices as any[]) {
+    if (n.at) continue;
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(n.time || ''));
+    if (m) { const d = new Date(); d.setHours(+m[1], +m[2], 0, 0); n.at = d.getTime() > now ? d.getTime() - 864e5 : d.getTime(); }
+    else if (/yesterday/i.test(n.time || '')) n.at = now - 864e5;
+    else n.at = now;
+  }
+}
+
+/** How long ago something arrived, as a phone shows it: "Now", "5 min ago", "2 h ago", "Yesterday 14:05", "Mon 14:05", "28 Oct". */
+function agoText(at: number, now?: number): string {
+  now = now || Date.now();
+  const s = Math.max(0, (now - at) / 1000), d = new Date(at), hm = d.toTimeString().slice(0, 5);
+  if (s < 45) return 'Now';
+  if (s < 3600) return Math.round(s / 60) + ' min ago';
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  if (at >= today.getTime()) return Math.floor(s / 3600) + ' h ago';
+  if (at >= today.getTime() - 864e5) return 'Yesterday ' + hm;
+  if (at >= today.getTime() - 6 * 864e5) return d.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + hm;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (d.getFullYear() !== today.getFullYear() ? ' ' + d.getFullYear() : '');
+}
+/** The full time something arrived: "Today 14:05", "Yesterday 09:12", "Wed 28 Oct, 14:05". */
+function receivedText(at: number): string {
+  const d = new Date(at), hm = d.toTimeString().slice(0, 5), today = new Date(); today.setHours(0, 0, 0, 0);
+  if (at >= today.getTime()) return 'Today ' + hm;
+  if (at >= today.getTime() - 864e5) return 'Yesterday ' + hm;
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + hm;
+}
 /** Mechanic's reports that are paid for leave the notifications (the repair carries on under Maintenance). */
 function pruneNotices() {
   if (State.notices.some(n => n.kind === 'mechanic' && n.ref && State.issues.some(i => i.id === n.ref && i.status !== 'open')))

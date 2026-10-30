@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.2 (2026-10-30)
+
+- Notifications show their age ("Now", "5 min ago", "Yesterday 14:05") and, when opened, the time they arrived; times update while shown
+
 ## 0.9.1 (2026-10-30)
 
 - Voices start at once: lines on screen, open reports and unread messages are synthesised in the background; spoken lines are kept on the device (IndexedDB, newest 300 sentences); a tapped line jumps the queue; a short first piece
