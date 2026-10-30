@@ -323,7 +323,12 @@ const Voice = {
         // the voice model loads once (a few seconds); if it doesn't answer, the device's own voice speaks
         await Promise.race([VoiceEngine.ready(), new Promise((ok, bad) => setTimeout(() => bad(new Error('the voice model took too long to load')), 25000))]);
         ctx = audio(true); if (!ctx) { this.finish(); return; } if (ctx.state !== 'running') await ctx.resume();
-        const parts = this.sentences(text, sp).map(s => Promise.race([voiceSentence(s, sp, true), new Promise<Float32Array>((ok, bad) => setTimeout(() => bad(new Error('the voice took too long')), 30000))]));
+        // each sentence is made after the one before, so each gets its own time: 30 s for the first, then 25 s more per sentence
+        const parts = this.sentences(text, sp).map((s, i) => {
+          const p = Promise.race([voiceSentence(s, sp, true), new Promise<Float32Array>((ok, bad) => setTimeout(() => bad(new Error('the voice took too long')), 30000 + i * 25000))]);
+          p.catch(() => { /* handled where it is played; never an unhandled error */ });
+          return p;
+        });
         let at = 0, last: AudioBufferSourceNode = null;
         for (let i = 0; i < parts.length; i++) {
           const pcm = await parts[i];
@@ -351,7 +356,8 @@ const Voice = {
         setTimeout(() => { if (tok === this.token && this.speaking) this.finish(); }, left);
       } catch (e: any) {
         if (tok !== this.token) return;
-        try { ErrorLog.add('voice', 'The voice couldn\'t speak', (e && e.message) || String(e)); } catch (er) { /* ignore */ }
+        // a slow sentence after the voice had started is not worth a report: it simply stops there
+        if (!started) { try { ErrorLog.add('voice', 'The voice couldn\'t speak', (e && e.message) || String(e)); } catch (er) { /* ignore */ } }
         // one voice for the whole message: once the natural voice has started, it is never swapped for another
         if (started) { this.finish(); return; }
         this.device(text, sp, tok);   // nothing played yet: the device's own voice says it all

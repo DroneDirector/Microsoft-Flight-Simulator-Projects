@@ -74,11 +74,13 @@ const FlightTrace = {
         else if (actual > maxGs) problem = 'FAST';
       }
       // touchdown: on the runway it was cleared to?
-      if (L && !L.td && /touchdown|landing roll/i.test(ph)) {
+      // (on the runway now, or it already landed between two looks: then it is taxiing in or at the gate)
+      const onRwyNow = /touchdown|landing roll/i.test(ph) || (/^landing$/i.test(ph) && alt < 30);
+      const landedBetween = L && /taxi in|arrived|at the gate/i.test(ph) && /final|landing|touchdown|roll/i.test(L.ph);
+      if (L && !L.td && (onRwyNow || landedBetween)) {
         L.td = true;
-        const chk = this.onRunway(f, w.pos, plan);
-        L.tdRwy = chk.rwy;
-        this.add(now, f, `touchdown · ${chk.text}`, chk.ok ? '' : chk.problem);
+        if (onRwyNow) { const chk = this.onRunway(f, w.pos, plan); L.tdRwy = chk.rwy; this.add(now, f, `touchdown · ${chk.text}`, chk.ok ? '' : chk.problem); }
+        else { L.tdRwy = plan && plan.arr ? plan.arr.name : ''; this.add(now, f, `landed between two looks${L.tdRwy ? ' on runway ' + L.tdRwy : ''}, now ${ph.toLowerCase()}`); }
       }
       const phaseChanged = !L || L.ph !== ph;
       if (problem || phaseChanged || !L || now - L.logged >= 30000) {
@@ -103,7 +105,10 @@ const FlightTrace = {
   /** A flight reached the gate (called when it is closed). */
   arrived(f: LiveFlight, at: number) {
     const L = this.last.get(f.id);
-    if (L && !L.td && L.t > at - 15 * 60000) this.add(at, f, 'arrived at the gate without being seen to touch down', 'NO TOUCHDOWN');
+    // only a problem if the app was watching at the moment it should have touched down
+    const F: any = f, tdAt = F.planTdAt || 0, watched = L && tdAt && L.t >= tdAt && L.t > at - 15 * 60000 && !/hold|go-?around|delayed/i.test(L.ph);
+    if (L && !L.td && watched) this.add(at, f, 'arrived at the gate without being seen to touch down', 'NO TOUCHDOWN');
+    else if (L && !L.td) this.add(at, f, 'arrived at the gate (the app was not watching during the landing)');
     else this.add(at, f, `arrived at the gate${L && L.tdRwy ? ' after landing on runway ' + L.tdRwy : ' (the app was closed during the landing)'}`);
   },
 
