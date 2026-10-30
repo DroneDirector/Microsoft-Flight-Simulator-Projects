@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.3 (2026-10-30)
+
+- 3D terrain in rings of detail (z12 near, then z10/z8/z7… out to the view distance), earth curvature
+- Water from the OpenStreetMap water and waterway layers (rendered off screen by the map engine) for exact coastlines, lakes and rivers; sea at sea level
+- Satellite imagery option (EOX Sentinel-2 cloudless 2016) in the 3D view and Settings
+- Settings → 3D view: view distance slider 20–800 km with performance notes
+- 3D loading screen in the style of the start-up screen; the view grows from the overview's small map
+
 ## 0.9.2 (2026-10-30)
 
 - Notifications show their age ("Now", "5 min ago", "Yesterday 14:05") and, when opened, the time they arrived; times update while shown

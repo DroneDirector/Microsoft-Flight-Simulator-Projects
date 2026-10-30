@@ -22,6 +22,17 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'aiSpeed', label: 'Virtual pilot speed', hint: 'Real time is how long the flight takes in the real world. Faster speeds also shorten turnarounds and rest. Only your hired pilots are affected, never your own flights.', options: [['1', 'Real time'], ['2', '2×'], ['4', '4×'], ['10', '10×'], ['30', '30×']] },
     { type: 'toggle', key: 'aiNotify', label: 'Notify me when my pilots land', hint: 'A phone notification when a hired pilot reaches the gate, even when the app is closed.' },
   ] },
+  { id: 'view3d', title: '3D view', icon: 'map', items: [
+    { type: 'html', html: () => {
+      const km = v3dKm();
+      const note = km >= 400 ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: more ground to load and draw, a warmer device and more battery use.</p>`
+        : km <= 60 ? `<p class="v3d-note ok">${icon('info')}Low settings might improve performance on slower phones and PCs.</p>` : '';
+      return `<div class="set-card col"><div class="sc-h">${icon('map')}<span><b>View distance: ${km} km</b><small>How far you see in the 3D view. Further shows more mountains, coastlines and sea towards the horizon.</small></span></div>
+        <input type="range" class="v3d-range" min="20" max="800" step="10" value="${km}" aria-label="View distance in kilometres">
+        <div class="v3d-scale"><span>20 km</span><span>150</span><span>400</span><span>800 km</span></div>${note}</div>`;
+    } },
+    { type: 'toggle', key: 'v3dSat', label: 'Satellite imagery', hint: 'Shows the real ground from space (Sentinel-2 cloudless by EOX) instead of the map look. Can also be switched in the 3D view.' },
+  ] },
   { id: 'time', title: 'Time and years', icon: 'clock', items: [
     { type: 'choice', key: 'timeMode', label: 'Company calendar', hint: 'Real-world years follow today’s date. Simulated years run faster, so your airline can build up several years of history.', options: [['real', 'Real-world years'], ['sim', 'Simulated years']] },
     { type: 'choice', key: 'simRate', label: 'Simulation speed', hint: 'How much company time passes for each real day.', options: [['week', '1 day = 1 week'], ['month', '1 day = 1 month'], ['quarter', '1 day = 3 months']], when: () => State.settings.timeMode === 'sim' },
@@ -134,7 +145,7 @@ const SETTINGS: SetSection[] = [
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>
-      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>3D terrain heights: Terrain Tiles on AWS (Mapzen / Tilezen). ArcticDEM terrain data DEM(s) were created from DigitalGlobe, Inc., imagery and funded under National Science Foundation awards 1043681, 1559691, and 1542736; Australia terrain data © Commonwealth of Australia (Geoscience Australia) 2017; Austria terrain data © offene Daten Österreichs – Digitales Geländemodell (DGM) Österreich; Canada terrain data contains information licensed under the Open Government Licence – Canada; Europe terrain data produced using Copernicus data and information funded by the European Union - EU-DEM layers; Global ETOPO1 terrain data U.S. National Oceanic and Atmospheric Administration; Mexico terrain data source: INEGI, Continental relief, 2016; New Zealand terrain data Copyright 2011 Crown copyright (c) Land Information New Zealand and the New Zealand Government (All rights reserved); Norway terrain data © Kartverket; United Kingdom terrain data © Environment Agency copyright and/or database right 2015. All rights reserved; United States 3DEP (formerly NED) and global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological Survey.</p><p>Voices: Kokoro-82M by hexgrad, Apache License 2.0; pronunciation dictionaries from misaki by hexgrad, Apache License 2.0; ONNX Runtime by Microsoft, MIT License.</p><p>three.js by the three.js authors, MIT License.</p><p>Human body model and shape targets from MakeHuman, CC0 1.0 (public domain).</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p><p>Airport layouts © OpenStreetMap contributors, available under the Open Database License (ODbL). Airport and runway list from OurAirports (public domain).</p><p>Weather reports from aviationweather.gov, the US National Weather Service's Aviation Weather Center (public domain). SimBrief is a service of Navigraph; Discord is a trademark of Discord Inc. Names are used only to identify the services.</p></div>` },
+      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>3D view water outlines: © OpenStreetMap contributors (OpenMapTiles, OpenFreeMap). Satellite imagery: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p><p>3D terrain heights: Terrain Tiles on AWS (Mapzen / Tilezen). ArcticDEM terrain data DEM(s) were created from DigitalGlobe, Inc., imagery and funded under National Science Foundation awards 1043681, 1559691, and 1542736; Australia terrain data © Commonwealth of Australia (Geoscience Australia) 2017; Austria terrain data © offene Daten Österreichs – Digitales Geländemodell (DGM) Österreich; Canada terrain data contains information licensed under the Open Government Licence – Canada; Europe terrain data produced using Copernicus data and information funded by the European Union - EU-DEM layers; Global ETOPO1 terrain data U.S. National Oceanic and Atmospheric Administration; Mexico terrain data source: INEGI, Continental relief, 2016; New Zealand terrain data Copyright 2011 Crown copyright (c) Land Information New Zealand and the New Zealand Government (All rights reserved); Norway terrain data © Kartverket; United Kingdom terrain data © Environment Agency copyright and/or database right 2015. All rights reserved; United States 3DEP (formerly NED) and global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological Survey.</p><p>Voices: Kokoro-82M by hexgrad, Apache License 2.0; pronunciation dictionaries from misaki by hexgrad, Apache License 2.0; ONNX Runtime by Microsoft, MIT License.</p><p>three.js by the three.js authors, MIT License.</p><p>Human body model and shape targets from MakeHuman, CC0 1.0 (public domain).</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p><p>Airport layouts © OpenStreetMap contributors, available under the Open Database License (ODbL). Airport and runway list from OurAirports (public domain).</p><p>Weather reports from aviationweather.gov, the US National Weather Service's Aviation Weather Center (public domain). SimBrief is a service of Navigraph; Discord is a trademark of Discord Inc. Names are used only to identify the services.</p></div>` },
   ] },
 ];
 
@@ -383,3 +394,14 @@ document.addEventListener('change', e => {
   toast('Saved', 'ok'); rerenderSettingsBody();
 });
 ACTIONS['discord-test'] = () => { Online.test().then(() => toast('Test message sent to Discord', 'ok'), (e: any) => toast((e && e.message) || 'Not sent', 'warn')); };
+
+// the 3D view distance slider: the value shows while dragging, it's kept when let go
+document.addEventListener('input', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-range')) return;
+  (State.settings as any).v3dKm = +el.value;
+  const h = el.parentElement && el.parentElement.querySelector('.sc-h b'); if (h) h.textContent = `View distance: ${el.value} km`;
+});
+document.addEventListener('change', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-range')) return;
+  (State.settings as any).v3dKm = +el.value; Store.save(); rerenderSettingsBody();
+});

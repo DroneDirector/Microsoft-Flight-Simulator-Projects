@@ -31,12 +31,13 @@ ACTIONS['v3d-open'] = () => {
   const m = _curMap();
   const id = (m && (m.following || m.selected)) || (liveOf().filter(f => f.you)[0] || liveOf()[0] || {} as any).id;
   if (!id) { toast('No aircraft in the air to show in 3D', 'info'); return; }
-  v3dOpen(id, m);
+  v3dOpen(id, m, m ? m.el : null);
 };
 
-function v3dOpen(id: string, map: WorldMap) {
+function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
+  V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false;
   V3d.open = true; V3d.target = id; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0;
   const root = document.createElement('div'); root.className = 'v3d';
@@ -46,20 +47,31 @@ function v3dOpen(id: string, map: WorldMap) {
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
     <div class="v3d-info"></div>
     <div class="v3d-status"></div>
-    <small class="v3d-credit">Terrain: Terrain Tiles on AWS (SRTM, GMTED2010, ETOPO1 and others, see Settings → About)</small>`;
+    <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
+    <small class="v3d-credit">Terrain: Terrain Tiles on AWS · water: © OpenStreetMap contributors · imagery: Sentinel-2 cloudless 2016 by EOX (see Settings → About)</small>
+    ${v3dLoaderHtml()}`;
+  // opened from the small map on the overview: it grows from that window to the whole screen
+  const rc = from && from.getBoundingClientRect();
+  if (rc && rc.width && (rc.width < innerWidth - 40 || rc.height < innerHeight - 40) && !State.settings.reduceMotion) {
+    root.classList.add('v3d-from');
+    root.style.cssText = `left:${rc.left}px;top:${rc.top}px;width:${rc.width}px;height:${rc.height}px;border-radius:14px`;
+    requestAnimationFrame(() => requestAnimationFrame(() => { root.classList.add('v3d-grow'); root.style.cssText = ''; }));
+    setTimeout(() => root.classList.remove('v3d-from', 'v3d-grow'), 900);
+  }
   document.body.appendChild(root);
   V3d.root = root; V3d.cv = root.querySelector('.v3d-cv');
   const phone = Math.min(innerWidth, innerHeight) < 600;
-  const r = new T.WebGLRenderer({ canvas: V3d.cv, antialias: !phone, powerPreference: 'low-power' });
+  const rg = v3dRange(map && (map as any).cy != null ? undefined : undefined);
+  const r = new T.WebGLRenderer({ canvas: V3d.cv, antialias: !phone, powerPreference: v3dKm() > 300 ? 'high-performance' : 'low-power', logarithmicDepthBuffer: v3dKm() > 60 });
   r.setPixelRatio(Math.min(window.devicePixelRatio || 1, phone ? 1 : 1.5));
   r.outputColorSpace = T.SRGBColorSpace;
   V3d.r = r;
   const sc = new T.Scene(); V3d.scene = sc;
   sc.background = new T.Color(0x0A1A2E);
-  sc.fog = new T.Fog(0x0A1A2E, 12000, 60000);
+  sc.fog = new T.Fog(0x0A1A2E, rg.fog[0], rg.fog[1]);
   sc.add(new T.HemisphereLight(0xDDE8FF, 0x223348, 1.6));
   const sun = new T.DirectionalLight(0xFFFFFF, 1.9); sun.position.set(-4000, 9000, 3000); sc.add(sun);
-  V3d.cam = new T.PerspectiveCamera(50, 1, 2, 90000);
+  V3d.cam = new T.PerspectiveCamera(50, 1, 2, rg.far);
   v3dSize();
   v3dBind();
   v3dShowInfo();
@@ -76,6 +88,7 @@ function v3dClose() {
     V3d.r.dispose(); V3d.r.forceContextLoss && V3d.r.forceContextLoss();
   } catch (e) { /* gone */ }
   if (V3d.root) V3d.root.remove();
+  try { V3dTerrain.clear(); V3dTerrain.gen++; } catch (e) { /* none */ }
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
 ACTIONS['v3d-close'] = () => v3dClose();
@@ -179,86 +192,8 @@ function v3dWhere(f: LiveFlight): { lon: number; lat: number; hdg: number; altM:
   return { lon: pos[0], lat: pos[1], hdg, altM: (f.alt || 0) * 0.3048, onGround: (f.alt || 0) < 50, phase: String(f.phase || '') };
 }
 
-/* ---------- the ground ---------- */
-
-function v3dLoadTerrain(centre: number[]) {
-  const T = THREE, z = 10, n = 1 << z;
-  const tx = (lon: number) => (lon + 180) / 360 * n, ty = (lat: number) => (1 - Math.log(Math.tan(lat * D2R) + 1 / Math.cos(lat * D2R)) / Math.PI) / 2 * n;
-  const cx = Math.floor(tx(centre[0])), cy = Math.floor(ty(centre[1])), N = 5, size = 256 * N;
-  const id = ++V3d.loading;
-  const cv = document.createElement('canvas'); cv.width = cv.height = size; const c = cv.getContext('2d');
-  let left = N * N, failed = 0;
-  const done = () => {
-    if (id !== V3d.loading || !V3d.open) return;
-    let data: Uint8ClampedArray = null;
-    try { data = failed < N * N ? c.getImageData(0, 0, size, size).data : null; } catch (e) { data = null; }
-    v3dBuildTerrain(data, size, cx - 2, cy - 2, z);
-  };
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const im = new Image(); im.crossOrigin = 'anonymous';
-    im.onload = () => { c.drawImage(im, i * 256, j * 256); if (--left === 0) done(); };
-    im.onerror = () => { failed++; c.fillStyle = 'rgb(128,0,0)'; c.fillRect(i * 256, j * 256, 256, 256); if (--left === 0) done(); };
-    im.src = `${TERRAIN_URL}${z}/${(cx - 2 + i + n) % n}/${cy - 2 + j}.png`;
-  }
-  void T;
-}
-
-/** One mesh for the ground, painted like the world map: dark blue land shaded by its slopes, the sea darker,
- *  cyan along the coast; the airport's surroundings levelled to its height. */
-function v3dBuildTerrain(data: Uint8ClampedArray, size: number, x0: number, y0: number, z: number) {
-  const T = THREE, n = 1 << z;
-  const lonOf = (px: number) => (x0 + px / 256) / n * 360 - 180;
-  const latOf = (py: number) => { const k = Math.PI - 2 * Math.PI * (y0 + py / 256) / n; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
-  const H = new Float32Array(size * size);
-  if (data) for (let i = 0; i < size * size; i++) H[i] = data[i * 4] * 256 + data[i * 4 + 1] + data[i * 4 + 2] / 256 - 32768;
-  // the airport: level ground at its height around it
-  const aptLL = V3d.icao ? apt(V3d.icao).pos : null, aElev = V3d.elev;
-  const cv = document.createElement('canvas'); cv.width = cv.height = size; const c = cv.getContext('2d'), img = c.createImageData(size, size);
-  const mPerPx = 40075016 * Math.cos(V3d.origin[1] * D2R) / (n * 256);
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const i = y * size + x, h = H[i];
-    const sea = data ? h <= 0.5 : false;
-    let r = 11, g = 29, b = 51;
-    if (!data) { r = 11; g = 29; b = 51; }
-    else if (sea) { r = 4; g = 11; b = 22; }
-    else {
-      const hx = H[i + (x < size - 1 ? 1 : 0)] - H[i - (x > 0 ? 1 : 0)], hy = H[i + (y < size - 1 ? size : 0)] - H[i - (y > 0 ? size : 0)];
-      const shade = clamp(1 + (-hx - hy) / (mPerPx * 2) * 0.9, 0.55, 1.6);
-      const lift = clamp(h / 2500, 0, 1);
-      r = 11 * shade + 14 * lift; g = 29 * shade + 22 * lift; b = 51 * shade + 26 * lift;
-      // the coast, in cyan as on the map
-      const nb = [i - 1, i + 1, i - size, i + size, i - size - 1, i + size + 1];
-      if (nb.some(k => k >= 0 && k < size * size && H[k] <= 0.5)) { r = 63; g = 208; b = 232; }
-    }
-    img.data[i * 4] = r; img.data[i * 4 + 1] = g; img.data[i * 4 + 2] = b; img.data[i * 4 + 3] = 255;
-  }
-  c.putImageData(img, 0, 0);
-  const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
-  // the mesh: 200 × 200 points over the 5 × 5 tiles (about 200 m apart)
-  const G = 200, pos = new Float32Array((G + 1) * (G + 1) * 3), uv = new Float32Array((G + 1) * (G + 1) * 2), idx: number[] = [];
-  for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
-    const px = i / G * (size - 1), py = j / G * (size - 1), lon = lonOf(px), lat = latOf(py);
-    let h = data ? Math.max(0, H[Math.round(py) * size + Math.round(px)]) : aElev;
-    if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
-    const p = v3dXY(lon, lat), o = (j * (G + 1) + i);
-    pos[o * 3] = p[0]; pos[o * 3 + 1] = h - (aptLL ? 1.5 : 0); pos[o * 3 + 2] = p[1];
-    uv[o * 2] = i / G; uv[o * 2 + 1] = 1 - j / G;
-  }
-  for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { const a = j * (G + 1) + i, b = a + 1, d = a + G + 1, e = d + 1; idx.push(a, d, b, b, d, e); }
-  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx);
-  if (V3d.terrain) { V3d.scene.remove(V3d.terrain); V3d.terrain.geometry.dispose(); V3d.terrain.material.map.dispose(); }
-  V3d.terrain = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex }));
-  V3d.scene.add(V3d.terrain);
-  V3d.heights = { H: data ? H : null, size, lonOf, latOf, x0, y0, n };
-}
-
-/** Ground height (m) under a point, from the loaded terrain. */
-function v3dGround(lon: number, lat: number): number {
-  const t = V3d.heights; if (!t || !t.H) return V3d.elev || 0;
-  const px = Math.round(((lon + 180) / 360 * t.n - t.x0) * 256), py = Math.round(((1 - Math.log(Math.tan(lat * D2R) + 1 / Math.cos(lat * D2R)) / Math.PI) / 2 * t.n - t.y0) * 256);
-  if (px < 0 || py < 0 || px >= t.size || py >= t.size) return 0;
-  return Math.max(0, t.H[py * t.size + px]);
-}
+/* ---------- the ground: see v3d-terrain.ts ---------- */
+function v3dGround(lon: number, lat: number): number { return V3dTerrain.ground(lon, lat); }
 
 /* ---------- the airport ---------- */
 
@@ -325,9 +260,9 @@ function v3dRecentre(f: LiveFlight, w: { lon: number; lat: number }) {
     const m = V3d.map || _curMap();
     try { V3d.aptScene = m ? (m.scenes[ctr.icao] || (m.scenes[ctr.icao] = makeAirportScene(ctr.icao, m))) : null; } catch (e) { V3d.aptScene = null; }
     AirportLayouts.get(ctr.icao, (better: AirportLayout) => { if (better && V3d.open && V3d.icao === ctr.icao) { V3d.elev = better.alt || 0; v3dBuildAirport(better); } })
-      .then((L: AirportLayout) => { if (L && V3d.open && V3d.icao === ctr.icao) { V3d.elev = L.alt || 0; v3dBuildAirport(L); v3dLoadTerrain(V3d.origin); } })
-      .catch(() => v3dLoadTerrain(V3d.origin));
-  } else v3dLoadTerrain(V3d.origin);
+      .then((L: AirportLayout) => { if (L && V3d.open && V3d.icao === ctr.icao) { V3d.elev = L.alt || 0; v3dBuildAirport(L); V3d.aptReady = true; V3dTerrain.prog.got++; V3dTerrain.load(V3d.origin); } })
+      .catch(() => V3dTerrain.load(V3d.origin));
+  } else V3dTerrain.load(V3d.origin);
   // every aircraft moves to the new centre
   for (const id in V3d.planes) V3d.planes[id].pos = null;
 }
@@ -346,6 +281,7 @@ function v3dLoop(now: number) {
   const ctr = v3dCentre(f, [w0.lon, w0.lat]);
   if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && gcDistanceNm(V3d.origin, [w0.lon, w0.lat]) > 14)) v3dRecentre(f, w0);
   if (V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
+  v3dLoaderTick(now);
 
   // aircraft within about 40 km
   const seen: { [id: string]: boolean } = {};
@@ -368,7 +304,7 @@ function v3dLoop(now: number) {
     // never below the ground (or the runway), wheels on it when rolling
     const ground = V3d.icao && Math.hypot(q[0], q[1]) < 3500 ? V3d.elev : v3dGround(w.lon, w.lat);
     const y = w.onGround ? ground : Math.max(ground + 2, w.altM);
-    P.tgt.set(q[0], y, q[1]);
+    P.tgt.set(q[0], y - v3dCurve(q[0], q[1]), q[1]);
     if (!P.pos) P.pos = P.tgt.clone();
     // glide to the new position (positions update a few times a second)
     const k = Math.min(1, dt * 4);
@@ -413,7 +349,7 @@ function v3dLoop(now: number) {
       const d = v3dDist(), base = V3d.mode === 'chase' ? Math.atan2(fwd.x, fwd.z) + Math.PI : Math.atan2(fwd.x, fwd.z) + Math.PI / 2;
       const a = base + V3d.yaw, el = V3d.pitch;
       const want = centre.clone().add(new T.Vector3(Math.sin(a) * Math.cos(el) * d, Math.sin(el) * d, Math.cos(a) * Math.cos(el) * d));
-      const ll = v3dLonLat(want.x, want.z), gr = v3dGround(ll[0], ll[1]) + 3;
+      const ll = v3dLonLat(want.x, want.z), gr = v3dGround(ll[0], ll[1]) + 3 - v3dCurve(want.x, want.z);
       if (want.y < gr) want.y = gr;
       V3d.cam.position.lerp(want, Math.min(1, dt * 5));
       V3d.cam.lookAt(centre);
@@ -474,3 +410,33 @@ function v3dRefreshInfo(f: LiveFlight) {
   const end = () => { if (drag) { drag.box.classList.remove('dragging'); drag = null; } };
   document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
 })();
+
+/* ---------- loading: the start-up screen, livelier, until the ground and the airport are there ---------- */
+function v3dLoaderHtml(): string {
+  return `<div class="v3d-load splash">
+    <div class="spl-glow"></div>
+    <svg class="v3l-hills" viewBox="0 0 1200 220" preserveAspectRatio="none" aria-hidden="true"><path d="M0 220 L0 150 L90 95 L160 130 L260 40 L340 110 L420 70 L520 140 L610 60 L700 120 L790 30 L880 115 L960 80 L1060 140 L1140 90 L1200 120 L1200 220 Z"/><path class="far" d="M0 220 L0 170 L120 120 L230 160 L330 100 L470 165 L560 115 L680 170 L800 105 L930 160 L1050 110 L1200 150 L1200 220 Z"/></svg>
+    <div class="v3l-orbit"><i></i><i></i><i></i></div>
+    <div class="spl-mark">${splashLogo()}</div>
+    <div class="spl-name"><b>3D view</b></div>
+    <div class="spl-load">
+      <div class="spl-info"><span class="spl-step">Loading the mountains and the sea…</span><b class="spl-pct">0%</b></div>
+      <div class="spl-bar"><i class="spl-fill"><span class="spl-sheen"></span></i><span class="spl-tip"><svg viewBox="0 0 24 24"><path d="M21 15.5v-1.8l-8-5V3.6a1.5 1.5 0 0 0-3 0v5.1l-8 5v1.8l8-2.5v5l-2 1.5V21l3.5-1 3.5 1v-1.5L13 18v-5z"/></svg></span></div>
+    </div></div>`;
+}
+function v3dLoaderTick(now: number) {
+  const L = V3d.root && V3d.root.querySelector('.v3d-load') as HTMLElement; if (!L || V3d.loaded) return;
+  const pr = V3dTerrain.prog, k = clamp(pr.got / Math.max(1, pr.want), 0, 1);
+  // shown at least a moment; done when the near ground (and the airport) are built, or after 20 s
+  const near = V3dTerrain.rings.length > 0 && (!V3d.icao || V3d.aptReady), t = now - V3d.loadT0;
+  const shown = near ? 1 : Math.min(0.97, k * 0.9 + Math.min(0.08, t / 40000));
+  V3d.shown = Math.max(V3d.shown || 0, shown);
+  const fill = L.querySelector('.spl-fill') as HTMLElement, tip = L.querySelector('.spl-tip') as HTMLElement, pct = L.querySelector('.spl-pct') as HTMLElement, step = L.querySelector('.spl-step') as HTMLElement;
+  if (fill) fill.style.width = (V3d.shown * 100).toFixed(1) + '%';
+  if (tip) tip.style.left = (V3d.shown * 100).toFixed(1) + '%';
+  if (pct) pct.textContent = Math.round(V3d.shown * 100) + '%';
+  if (step) step.textContent = V3d.shown < 0.5 ? 'Loading the mountains and the sea…' : V3d.shown < 0.9 ? (V3d.icao ? `Building ${V3d.icao}…` : 'Painting the coastlines…') : 'Ready';
+  if ((near && t > 900) || t > 20000) {
+    V3d.loaded = true; L.classList.add('out'); setTimeout(() => L.remove(), 800);
+  }
+}
