@@ -128,7 +128,7 @@ SCREENS.ops = {
           <div class="map-host" id="ops-map"></div>
           <div class="map-legend"><b>Live operations</b><span>${live.length} airborne</span></div>
           <div class="map-sel" id="ops-sel"></div>
-          <div class="map-tools">${mapSearchBtn()}${layerBtn()}${view3dBtn()}</div>
+          <div class="map-tools">${mapSearchBtn()}${layerBtn()}${wxBtn()}${view3dBtn()}</div>
           <button class="map-expand" data-act="go" data-screen="map" aria-label="Open the full map">${icon('map')}Full map</button>
         </div>
         <aside class="ops-side">

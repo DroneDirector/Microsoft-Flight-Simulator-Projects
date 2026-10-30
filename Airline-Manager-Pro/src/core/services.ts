@@ -77,6 +77,7 @@ function serviceEffects(cid: string, cls: string, nm: number, intl: boolean, pY:
   let bags = 0;
   if (s.bags === 'paid') bags += pY * (long ? 6.5 : 5);
   if (s.seats === 'paid') bags += pY * (long ? 2.5 : 2);
+  bags += pax * petFeePerPax(s.pets);   // pet tickets
   // catering cost: buy-on-board stock is cheap, included food costs more, a chef menu more again up front
   const cateringMul = (food === 'bob' ? (long ? 0.7 : 0.45) : food === 'snack' ? 1 : (long ? 1.15 : 2.2)) * (drinks === 'all' ? 1.25 : drinks === 'soft' ? 1.1 : 1);
   const cateringPrem = food === 'chef' ? 1.6 : 1;

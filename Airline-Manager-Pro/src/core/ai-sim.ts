@@ -44,6 +44,8 @@ function aiUpdate(f: LiveFlight, now: number) {
   F.leftNm = q.left; F.toGoS = (q.toGoS + extra) / (F.spd || 1); F.routeNm = p.routeNm;
   // the boarding scan, while the flight is still at the gate (only while you are watching)
   if (!F.scanned && el < 600 && now - F.depAt < 15 * 60000) { F.scanned = true; try { boardingScan(f); } catch (e) { /* ignore */ } }
+  if (F.medical && !F.medical.noted && el > 1200) { try { medicalNote(F); } catch (e) { /* ignore */ } }
+  if (F.wxDivert && !F.wxDivert.noted && F.toGoS < 1800) { try { wxDivertNote(F); } catch (e) { /* ignore */ } }
   const td = p.pts.filter(x => x.ph === 'Landing')[0];
   F.toTdS = td ? (Math.max(0, td.s - el) + extra) / (F.spd || 1) : F.toGoS;
   // the arrival countdown runs from take-off to touchdown on the planned air time; holds after take-off
@@ -251,6 +253,9 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       const f: LiveFlight = ev.f, F: any = f, at = Math.max(ev.at, earliest), spd = F.spd || 1;
       aiLand(f, at, summary);
       try { const pa: any = plane(f.reg); if (pa) { conditionAfterFlight(pa, F.durMs / 60000); conditionRisk(pa, f); } } catch (e) { /* ignore */ }
+      try { rateAiFlight(f, at); } catch (e) { /* ignore */ }
+      if (F.medical && !F.medical.noted) { try { medicalNote(F); } catch (e) { /* ignore */ } }
+      if (F.wxDivert && !F.wxDivert.noted) { try { wxDivertNote(F); } catch (e) { /* ignore */ } }
       try { paxOnAiLanding(f); Progress.afterAiLeg(f.pax, (plane(f.reg) || {} as any).typeId, f.to); } catch (e) { /* ignore */ }
       try { const pa: any = plane(f.reg); if (pa) crewAfterLeg(pa.companyId, { pilotId: f.pilotId, typeId: pa.typeId, from: f.from, to: f.to, blockMin: F.durMs / 60000 }); } catch (e) { /* ignore */ }
       State.live = State.live.filter(x => x !== f);
@@ -263,7 +268,9 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       // a charter: after the ferry to its airport comes the job itself; after the job, back to the route
       const jn = Jobs.afterAiLanding(f, at, spd);
       if (jn) { if (p) p.status = 'flying'; S.aiNext.push(jn); continue; }
-      const next = aiNextLeg(f.pilotId, f.from, f.to), a = plane(f.reg);
+      // after a diversion (medical or weather) the same flight carries on to where it was going
+      const dv = F.medical || F.wxDivert;
+      const next = dv ? dv.orig : aiNextLeg(f.pilotId, F.routeFrom || f.from, f.to), a = plane(f.reg);
       // no route of yours to fly next: the pilot waits on the ground until you assign one
       if (!next) { if (p) p.status = 'standby'; continue; }
       const nextBlock = aiProfile({ reg: f.reg, from: f.to, to: next, depAt: at }).totalS / 60;
@@ -271,7 +278,8 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       if (p) p.status = rest ? 'resting' : 'flying';
       const plan = at + (rest ? AI_REST_H * 3600e3 : AI_TURN_MIN * 60e3) / spd;
       S.aiNext.push({ reg: f.reg, pilotId: f.pilotId, from: f.to, to: next, spd, depAt: plan, sched: plan, schedEnd: plan + nextBlock * 60e3 / spd,
-        dutyMin: rest ? 0 : dutyMin, leg: (F.leg || 0) + 1, callsign: f.callsign, paxMax: f.paxMax });
+        dutyMin: rest ? 0 : dutyMin, leg: (F.leg || 0) + 1, callsign: f.callsign, paxMax: f.paxMax,
+        ...(dv ? { medicalDone: true, routeFrom: dv.from, carry: { pax: Math.max(0, f.pax - (F.medical ? 1 : 0)), paxJ: F.paxJ, paxF: F.paxF, cargoKg: F.cargoKg || 0 }, why: F.medical ? `Medical diversion to ${f.to}` : `Weather diversion to ${f.to}` } : {}) });
     } else {
       const n: any = ev.n, a = plane(n.reg), p: any = pilot(n.pilotId);
       S.aiNext = S.aiNext.filter((x: any) => x !== n);
@@ -282,6 +290,8 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       // a repair you paid for comes first: the leg waits until the aircraft is out of the hangar
       const rep = a ? (State.issues as any[]).filter(i => i.reg === a.reg && i.status === 'scheduled') : [];
       if (a && p && p.status !== 'off' && rep.length) { const end = Math.max.apply(null, rep.map(i => (i.startedAt || n.depAt) + (i.durMin || 30) * 60000)); wait(Math.max(n.depAt, end) + 10 * 60e3, 'Repair in the hangar'); continue; }
+      // the weather, when it is happening now (catching up on hours the app was closed, today's weather says nothing)
+      if (a && ev.at > now - 30 * 60e3) { const wv = wxDepartureBlock(n, a); if (!wv.ok) { wait(wv.kind === 'cancel' ? n.sched + (AI_CANCEL_AFTER_H + 1) * 3600e3 : now + 30 * 60e3, wv.why); continue; } }
       // off sick: the leg waits for cover (a stand-in or a contract pilot), cabin crew and mechanics likewise
       if (a && p) { const sk = sickBlock(n, a); if (sk) { wait(now + 60 * 60e3, sk); continue; } }
       const sickCovered = p && isSick(p) && p.coverAgency > now;
@@ -298,13 +308,29 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       const test = n.from === n.to;
       if (!n.to || (test && !aiTestRoute(n.pilotId, n.from))) { p.status = 'standby'; continue; }
       // passengers and cargo from demand on the route (none on a test or ferry flight; a charter's own load)
-      const ld = aiPlannedLoad(n);
-      const depAt = Math.max(n.depAt, earliest), prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
+      const ld = n.carry || aiPlannedLoad(n);
+      const depAt = Math.max(n.depAt, earliest); let prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
       const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF, cargoKg: ld.cargoKg, paxMax: cabinSeats(acType(a.typeId), a) || n.paxMax, test,
         alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg, ferry: !!n.ferry, job: n.job || undefined, jobNext: n.jobNext || undefined,
         sched: n.sched || depAt, waitWhy: n.why || '', retry: !!n.retry };
       f.schedEnd = f.sched + prof.totalS * 1000 / (n.spd || 1);
+      if (n.medicalDone) { f.medicalDone = true; f.routeFrom = n.routeFrom; }
+      // rarely, a passenger falls ill on the way: the flight will divert (planned now, told when it happens)
+      if (!test && maybeMedical(f, a)) { f.medical.from = n.from; prof = aiProfile({ reg: n.reg, from: n.from, to: f.to, depAt }); f.durMs = prof.totalS * 1000; }
       if (!test) assignDelays(f, prof);
+      // real weather on the way: reroutes, holding, or a diversion to an alternate
+      if (!test && ev.at > now - 30 * 60e3) {
+        try {
+          const before = (f.holds || []).reduce((s2: number, h: Hold) => s2 + h.s, 0);
+          const dvWhy = wxEnroute(f, a, prof);
+          if (dvWhy) {
+            const alt = wxAlternate(a.typeId, f.from, f.to, f.pax);
+            if (alt) { f.wxDivert = { orig: f.to, from: n.routeFrom || n.from, why: dvWhy === 'fog' ? 'fog' : 'thunderstorms' }; f.to = alt; prof = aiProfile({ reg: n.reg, from: n.from, to: alt, depAt }); }
+          }
+          const after = (f.holds || []).reduce((s2: number, h: Hold) => s2 + h.s, 0);
+          f.delayS = after; f.durMs = prof.totalS * 1000 + after * 1000;
+        } catch (e) { /* the weather never stops the simulation */ }
+      }
       a.status = 'flying'; if (!isSick(p)) p.status = 'flying';
       if (sickCovered) f.coverBy = 'Contract pilot (covering ' + p.name + ')';
       State.live.push(f);

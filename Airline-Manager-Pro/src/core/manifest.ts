@@ -7,7 +7,7 @@
 // the list only puts names to the number the simulator (or GSX) reports.
 
 interface PaxRecord { key: string; name: string; nat: string; sex: 'm' | 'f'; notes: { date: string; title: string; text: string; sev: 'warning' | 'ban' }[]; banned?: boolean; bannedBy?: string }
-interface PaxSeat { key: string; name: string; nat: string; sex: 'm' | 'f'; age: number; seat: string; cls: 'F' | 'J' | 'Y'; look: any; record: PaxRecord; famous?: string }
+interface PaxSeat { key: string; name: string; nat: string; sex: 'm' | 'f'; age: number; seat: string; cls: 'F' | 'J' | 'Y'; look: any; record: PaxRecord; famous?: string; pet?: PaxPet }
 
 // now and then (about one flight in 20) someone well known is on board; all made-up people
 const CELEB_JOBS = ['Film actor', 'Pop singer', 'Football star', 'Racing driver', 'TV chef', 'Best-selling author', 'Tennis champion', 'Stand-up comedian', 'News presenter', 'Olympic swimmer', 'Rock guitarist', 'Fashion designer', 'Film director', 'Opera singer', 'Video creator'];
@@ -61,7 +61,7 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
       }
     }
     if (noFly()[pkey] && rec) { rec.banned = true; rec.bannedBy = 'your airline'; }
-    out.push({ key: pkey, name: p.name, nat: p.nat, sex: p.sex, age: clamp(age, 2, 92), seat, cls, look: p.look, record: rec });
+    out.push({ key: pkey, name: p.name, nat: p.nat, sex: p.sex, age: clamp(age, 2, 92), seat, cls, look: p.look, record: rec, pet: age >= 18 ? paxPet(pkey, f) : null });
   }
   // a celebrity on about one flight in 20: in first or business if there is one, otherwise up front in economy
   if (out.length >= 2 && seeded(f.id + 'celeb')() < 0.05) {
@@ -81,7 +81,7 @@ ACTIONS['pax-list'] = el => {
   const list = manifestOf(f), flagged = list.filter(p => p.record).length, star = list.filter(p => p.famous)[0];
   const clsName: { [k: string]: string } = { F: 'First', J: 'Business', Y: 'Economy' };
   const groups = (['F', 'J', 'Y'] as const).map(c => [c, list.filter(p => p.cls === c)] as [string, PaxSeat[]]).filter(g => g[1].length);
-  openLayer('modal', `<div class="modal-head"><div><h2>Passengers: ${esc(f.callsign)}</h2><small>${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)} · ${list.length} on board${flagged ? ` · ${flagged} with a conduct record` : ''}${star ? ` · ${esc(star.famous.toLowerCase())} on board` : ''}${f.you ? ' · numbers from the simulator' : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+  openLayer('modal', `<div class="modal-head"><div><h2>Passengers: ${esc(f.callsign)}</h2><small>${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)} · ${list.length} on board${flagged ? ` · ${flagged} with a conduct record` : ''}${star ? ` · ${esc(star.famous.toLowerCase())} on board` : ''}${list.some(p => p.pet) ? ` · ${list.filter(p => p.pet && !p.pet.left).length} ${list.filter(p => p.pet && !p.pet.left).length === 1 ? 'pet' : 'pets'}` : ''}${f.you ? ' · numbers from the simulator' : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body pax-list">${groups.map(([c, ps]) => `<h4>${clsName[c]} · ${ps.length}</h4>${ps.map((p, i) => paxRowHtml(f.id, p, i)).join('')}`).join('') || emptyState('Nobody on board', 'The passengers show here once they have boarded.')}</div>`, { cls: 'wide pax-pop' });
   paxFacesLazy();
 };
@@ -89,7 +89,7 @@ function paxRowHtml(fid: string, p: PaxSeat, i: number): string {
   const rec = p.record, banned = rec && rec.banned;
   return `<div class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''} ${p.famous ? 'famous' : ''}">
     <span class="pax-face" data-face="${esc(fid)}|${esc(p.key)}" data-i="${i}"></span>
-    <span class="pax-who"><b>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small></span>
+    <span class="pax-who"><b>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small>${p.pet ? `<span class="pax-pet ${p.pet.left ? 'left' : ''}" title="${esc(p.pet.left || '')}">${petSvg(p.pet)}<small>${esc(p.pet.name)}, ${p.pet.kind}, ${p.pet.left ? 'stayed behind' : p.pet.where === 'cabin' ? 'under the seat' : 'in the hold'}</small></span>` : ''}</span>
     <span class="pax-seat">${esc(p.seat)}</span>
     ${rec ? `<button class="pax-rec ${banned ? 'ban' : ''}" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}${banned ? 'Banned' : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</button>` : '<span class="pax-clean">Clean</span>'}
   </div>`;
@@ -135,11 +135,12 @@ function celebOnBoard(f: LiveFlight) {
   const F: any = f; if (F.celebNoted) return;
   const star = manifestOf(f).filter(p => p.famous)[0]; if (!star) return;
   F.celebNoted = true;
-  State.notices.unshift({ id: uid(), kind: 'flight', title: `${star.famous} on board ${f.callsign}`, body: `${star.name}, ${star.famous.toLowerCase()} from ${natLabel(star.nat)}, boarded at ${f.from} for ${f.to}, seat ${star.seat}. The crew are taking good care of them; photos with your aircraft are already online.`, time: 'Now', read: false, ref: f.id } as any);
+  State.notices.unshift({ id: uid(), kind: 'pilot', title: `${star.famous} on board ${f.callsign}`, body: `${star.name}, ${star.famous.toLowerCase()} from ${natLabel(star.nat)}, boarded at ${f.from} for ${f.to}, seat ${star.seat}. The crew are taking good care of them; photos with your aircraft are already online.`, time: 'Now', read: false, ref: f.id } as any);
   try { Progress.popularity(1, `${star.famous} flew with you`); } catch (e) { /* ignore */ }
 }
 function boardingScan(f: LiveFlight) {
   try { celebOnBoard(f); } catch (e) { /* ignore */ }
+  try { petsOnBoard(f); } catch (e) { /* ignore */ }
   if (_scanned[f.id] || f.you) return;
   _scanned[f.id] = true;
   const banned = manifestOf(f).filter(p => p.record && p.record.banned)[0]; if (!banned) return;

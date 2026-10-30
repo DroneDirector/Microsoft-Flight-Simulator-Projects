@@ -106,7 +106,7 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
     lines.push([`${pY} ${pJ || pF ? 'economy' : 'passengers'} × ${money(cf.y)}${route && routeFares(route).y !== 1 ? ' (your fare)' : ' average fare'}`, pY * cf.y]);
   }
   if (onboard) lines.push(['Food, drinks and duty-free on board', onboard]);
-  if (bags) lines.push(['Bag fees and paid seat selection', bags]);
+  if (bags) lines.push(['Bags, paid seats and pet tickets', bags]);
   if (cargo) lines.push([`Cargo ${num(cargoKg)} kg × ${money(cargoRate(from, to, cls))}`, cargo]);
   // with GSX, handling and catering are charged per service as GSX does them (see gsxOnState)
   // apron crew: your own at this airport costs only materials (their pay is in the payroll); otherwise the local handling company's fee

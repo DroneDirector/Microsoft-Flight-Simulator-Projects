@@ -168,10 +168,10 @@ function sendPlnToPc(from: string, to: string): Promise<string> {
 function plnSaved(path: string, error?: string) { const w = (window as any).__plnWait; (window as any).__plnWait = null; if (!w) return; if (error) w.bad(new Error(error)); else w.ok(path); }
 
 /* ---------- Live weather: METAR and TAF ---------- */
-interface Metar { icao: string; raw: string; taf: string; dir: number; kt: number; gust: number; vis: string; temp: number; qnh: number; cat: string; at: number; obs: string }
+interface Metar { icao: string; raw: string; taf: string; dir: number; kt: number; gust: number; vis: string; temp: number; qnh: number; cat: string; at: number; obs: string; wx?: string; ceil?: number }
 const LiveWx = {
   cache: {} as { [icao: string]: Metar }, pending: {} as { [icao: string]: boolean }, failed: 0,
-  on(): boolean { return onlineSet().liveWx !== false; },
+  on(): boolean { return true; },   // real-world weather is always used
   /** The latest report, if fetched (asks for it in the background otherwise). */
   get(icao: string): Metar {
     if (!this.on() || !icao || icao.length !== 4) return null;
@@ -184,6 +184,13 @@ const LiveWx = {
     return m || null;
   },
   queue: [] as string[], qTimer: 0 as any,
+  /** One report from the Aviation Weather Center (also used by the map's weather layer). */
+  store(m: any, taf: string) {
+    const k = m.icaoId, old = this.cache[k];
+    const ceil = (m.clouds || []).filter((c: any) => /BKN|OVC|VV/.test(c.cover)).map((c: any) => +c.base).sort((a: number, b: number) => a - b)[0];
+    this.cache[k] = { icao: k, raw: m.rawOb || '', taf: taf || (old ? old.taf : ''), dir: typeof m.wdir === 'number' ? m.wdir : -1, kt: +m.wspd || 0, gust: +m.wgst || 0, vis: String(m.visib == null ? '' : m.visib),
+      temp: +m.temp, qnh: Math.round(+m.altim || 0), cat: m.fltCat || metarCat(m), at: Date.now(), obs: m.reportTime || '', wx: m.wxString || '', ceil: ceil == null ? 0 : ceil };
+  },
   fetch(ids: string[]): Promise<void> {
     ids = ids.filter(k => k && k.length === 4 && !this.pending[k]); if (!ids.length) return Promise.resolve();
     ids.forEach(k => this.pending[k] = true);
@@ -192,8 +199,7 @@ const LiveWx = {
       for (const k of ids) {
         const m = (ms || []).filter((x: any) => x.icaoId === k)[0], t = (ts || []).filter((x: any) => x.icaoId === k)[0];
         if (!m) { this.cache[k] = this.cache[k] || ({ icao: k, raw: '', taf: '', dir: -1, kt: 0, gust: 0, vis: '', temp: NaN, qnh: 0, cat: '', at: Date.now(), obs: '' } as Metar); continue; }
-        this.cache[k] = { icao: k, raw: m.rawOb || '', taf: t ? t.rawTAF || '' : '', dir: typeof m.wdir === 'number' ? m.wdir : -1, kt: +m.wspd || 0, gust: +m.wgst || 0, vis: String(m.visib == null ? '' : m.visib),
-          temp: +m.temp, qnh: Math.round(+m.altim || 0), cat: m.fltCat || metarCat(m), at: Date.now(), obs: m.reportTime || '' };
+        this.store(m, t ? t.rawTAF || '' : '');
       }
       try { if (/ops|map|dispatch/.test(State.screen)) refreshSoft(); } catch (e) { /* ignore */ }
     }).catch(() => { this.failed = Date.now(); }).then(() => { ids.forEach(k => delete this.pending[k]); });
