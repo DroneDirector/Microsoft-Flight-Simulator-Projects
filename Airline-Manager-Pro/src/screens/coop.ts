@@ -34,7 +34,7 @@ SCREENS.coop = {
     </div>
     <div class="coop-grid">
       <div class="card">
-        <div class="card-h"><b>Pilots</b><small>${c.rules.ownerBuys ? 'Only the owner buys aircraft' : 'Everyone can buy aircraft'}</small></div>
+        <div class="card-h"><b>Pilots</b><small>Only the owner buys, sells and leases aircraft</small></div>
         <div class="coop-members">${members.map((m, i) => {
           const f: any = flying(m.id), p: any = m.you ? myPilot() : pilot(m.id);
           const share = Math.max(0, m.revenue) / total;
@@ -57,10 +57,12 @@ SCREENS.coop = {
           <span><b>${esc(e.text)}</b><small>${ago(e.at)}</small></span>${e.amount != null ? `<em class="${e.amount >= 0 ? 'green' : 'red'}">${money(e.amount, { sign: true })}</em>` : ''}</${e.tx ? 'button' : 'div'}>`).join('') || '<p class="fine-print">Nothing yet.</p>'}</div>
       </div>
     </div>
+    ${coopPirepsHtml(c)}
     <div class="card coop-rules">
       <div class="card-h"><b>Rules</b><small>Set by the owner</small></div>
-      <div class="ch-row"><span><b>Only the owner buys aircraft</b><small>Other pilots fly the fleet but can't spend the airline's money on aircraft.</small></span>
-        <button class="tg ${c.rules.ownerBuys ? 'on' : ''}" data-act="coop-rule" role="switch" aria-checked="${c.rules.ownerBuys}" ${(coopMe() || {} as any).role !== 'owner' ? 'disabled' : ''}><i></i></button></div>
+      <div class="ch-row"><span><b>Only the owner buys, sells and leases aircraft</b><small>Other pilots fly the fleet but can't buy, sell or lease aircraft with the airline's money. Hired (AI) pilots never do.</small></span><span class="chip owner">Always on</span></div>
+      <div class="ch-row"><span><b>Review flight reports (PIREPs)</b><small>Every co-op flight waits for the owner to accept it before its money, hours and landing count for the airline. Off: they count straight away.</small></span>
+        <button class="tg ${c.rules.reviewPireps ? 'on' : ''}" data-act="coop-rule" data-r="reviewPireps" role="switch" aria-checked="${!!c.rules.reviewPireps}" ${(coopMe() || {} as any).role !== 'owner' ? 'disabled' : ''}><i></i></button></div>
       <div class="ch-row"><span><b>${c.backend === 'supabase' ? 'Online, powered by Supabase' : 'Online play is being set up'}</b><small>${c.backend === 'supabase' ? 'The airline is shared live with every pilot in it.' : 'Co-op runs as a demo with sample pilots for now. When the online service (Supabase) is connected, real pilots join with the invite code.'}</small></span><span></span></div>
       <div class="ch-row"><span><b>Leave co-op</b><small>The co-op pilots leave. Everything the airline earned and logged stays.</small></span><button class="btn ghost sm danger" data-act="coop-leave">Leave</button></div>
     </div>`;
@@ -75,7 +77,7 @@ function coopIntroHtml(co: Company): string {
       <div class="coop-hero-t">
         <h2>One airline, many pilots</h2>
         <p>Every pilot flies in their own simulator, and every flight counts for the same airline: one balance, one fleet, one logbook, one popularity. See who is in the air, who earned what, and what happened while you were away.</p>
-        <ul class="coop-list"><li>${icon('check')}For your own airline or a real-world one</li><li>${icon('check')}Invite pilots with a code</li><li>${icon('check')}The owner decides who can buy aircraft</li><li>${icon('check')}Works on the phone and on Windows</li></ul>
+        <ul class="coop-list"><li>${icon('check')}For your own airline or a real-world one</li><li>${icon('check')}Invite pilots with a code</li><li>${icon('check')}Only the owner buys, sells and leases aircraft</li><li>${icon('check')}The owner reviews every flight report</li><li>${icon('check')}Works on the phone and on Windows</li></ul>
       </div>
     </div>
     <div class="coop-choose">
@@ -113,6 +115,42 @@ ACTIONS['coop-share'] = () => {
   const T = Store.native();
   if (T && T.share) T.share({ text, title: APP.name }); else if ((navigator as any).share) (navigator as any).share({ text }).catch(() => { /* closed */ }); else ACTIONS['coop-copy'](null, null);
 };
-ACTIONS['coop-rule'] = () => { const c = coopState(); if (!c) return; c.rules.ownerBuys = !c.rules.ownerBuys; coopRecord({ id: uid(), at: Date.now(), by: 'coop-you', type: 'rule', text: c.rules.ownerBuys ? 'Only the owner can buy aircraft now' : 'Every pilot can buy aircraft now' }); Store.save(); Sound.tick(); refresh(); };
+ACTIONS['coop-rule'] = () => { const c = coopState(); if (!c) return; c.rules.reviewPireps = !c.rules.reviewPireps; coopRecord({ id: uid(), at: Date.now(), by: 'coop-you', type: 'rule', text: c.rules.reviewPireps ? 'Flight reports are reviewed by the owner now' : 'Flight reports count straight away now' }); Store.save(); Sound.tick(); refresh(); };
+
+/* ---------- Flight reports (PIREPs) ---------- */
+let _prShow: 'pending' | 'done' = 'pending';
+function coopPirepsHtml(c: CoopState): string {
+  const all = c.pireps || [], pend = all.filter(p => p.status === 'pending'), done = all.filter(p => p.status !== 'pending').slice(0, 30);
+  const owner = (coopMe() || {} as any).role === 'owner', list = _prShow === 'pending' ? pend : done;
+  const row = (p: CoopPirep) => {
+    const t = acType(p.typeId), fpm = Math.abs(p.fpm), cls = fpm > 500 ? 'red' : fpm > 300 ? 'amber' : fpm < 150 ? 'green' : '';
+    return `<div class="pirep">
+      <span class="pr-main"><b>${esc(p.name)} · ${esc(p.callsign)}</b><small>${esc(p.from)} → ${esc(p.to)} · ${t ? esc(t.model) : ''}${p.reg ? ' ' + esc(p.reg) : ''} · ${esc(dateStr(new Date(p.at)).slice(0, 16))}</small></span>
+      <span class="pr-k"><small>Block</small><b>${hours(p.blockMin)}</b></span>
+      <span class="pr-k"><small>Landing</small><b class="${cls}">${fpm} fpm</b></span>
+      <span class="pr-k"><small>G</small><b>${p.g.toFixed(2)}</b></span>
+      <span class="pr-k"><small>Passengers</small><b>${num(p.pax)}</b></span>
+      <span class="pr-k"><small>Fuel</small><b>${num(p.fuelKg)} kg</b></span>
+      ${p.status === 'pending' ? (owner ? `<span class="pr-btns"><button class="btn ghost sm" data-act="pr-reject" data-id="${p.id}">${icon('close')}Reject</button><button class="btn primary sm" data-act="pr-accept" data-id="${p.id}">${icon('check')}Accept</button></span>` : '<span class="chip">Waiting for the owner</span>')
+        : `<span class="chip ${p.status === 'accepted' ? 'ok' : 'bad'}">${p.status === 'accepted' ? 'Accepted' : 'Rejected' + (p.why ? ': ' + esc(p.why) : '')}</span>${p.tx ? `<button class="text-btn" data-act="tx-detail" data-id="${p.tx}">Money</button>` : ''}`}
+    </div>`;
+  };
+  return `<div class="card coop-pireps">
+    <div class="card-h"><b>Flight reports</b><span class="seg"><button class="${_prShow === 'pending' ? 'on' : ''}" data-act="pr-show" data-s="pending">To review <i>${pend.length}</i></button><button class="${_prShow === 'done' ? 'on' : ''}" data-act="pr-show" data-s="done">Reviewed</button></span>
+      ${owner && _prShow === 'pending' && pend.length > 1 ? `<button class="text-btn" data-act="pr-accept-all">Accept all ${pend.length}</button>` : ''}</div>
+    <div class="pirep-list">${list.map(row).join('') || `<p class="fine-print">${icon('info')}${_prShow === 'pending' ? (c.rules.reviewPireps ? 'No flight reports waiting. Co-op flights show up here when they reach the gate.' : 'Reviewing is off: co-op flights count straight away.') : 'Nothing reviewed yet.'}</p>`}</div>
+  </div>`;
+}
+ACTIONS['pr-show'] = el => { _prShow = el.getAttribute('data-s') as any; Sound.tick(); refresh(); };
+ACTIONS['pr-accept'] = el => { coopReview(el.getAttribute('data-id'), true); Store.save(); Sound.tick(); refresh(); toast('Flight report accepted and booked', 'ok'); };
+ACTIONS['pr-accept-all'] = () => { const c = coopState(); (c.pireps || []).filter(p => p.status === 'pending').forEach(p => coopReview(p.id, true)); Store.save(); refresh(); toast('All flight reports accepted', 'ok'); };
+ACTIONS['pr-reject'] = el => {
+  const id = el.getAttribute('data-id');
+  openLayer('modal', `<div class="modal-head"><div><h2>Reject this flight report?</h2><small>The flight doesn't count: no money, hours or landing for the airline.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body"><div class="seg wrap pr-why">${['Landing too hard', 'Wrong aircraft', 'Route not flown', 'Flight not finished', 'Other'].map((w, i) => `<button class="${i === 0 ? 'on' : ''}" data-act="pr-why" data-w="${esc(w)}">${esc(w)}</button>`).join('')}</div>
+    <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="pr-reject-go" data-id="${esc(id)}">Reject</button></div></div>`, { cls: 'narrow' });
+};
+ACTIONS['pr-why'] = el => { $all('.pr-why button').forEach(b => b.classList.remove('on')); el.classList.add('on'); Sound.tick(); };
+ACTIONS['pr-reject-go'] = el => { const w = $('.pr-why button.on'); coopReview(el.getAttribute('data-id'), false, w ? w.getAttribute('data-w') : ''); closeAll(); Store.save(); refresh(); toast('Flight report rejected', 'info'); };
 ACTIONS['coop-leave'] = () => { confirmChange('Leave co-op?', 'The co-op pilots leave this airline. Everything it earned and logged stays.', 'Leave', 'Stay', () => { closeTop(); coopLeave(); toast('You left co-op', 'info'); refresh(); }, () => closeTop()); };
 ACTIONS['coop-switch'] = el => { const id = el.getAttribute('data-id'); State.companyId = id; State.divisionId = 'all'; Store.save(); try { applyCompanyTheme(true); renderTopbar(); } catch (e) { /* ignore */ } refresh(); };

@@ -4,7 +4,7 @@ interface AppScreen { title: string; icon: string; render: () => string; mount?:
 const SCREENS: { [k: string]: AppScreen } = {};
 const ACTIONS: { [k: string]: (el: HTMLElement, ev: Event) => void } = {};
 
-const NAV_ORDER = ['ops', 'fleet', 'routes', 'schedule', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'coop'];
+const NAV_ORDER = ['ops', 'fleet', 'routes', 'jobs', 'schedule', 'dispatch', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'coop'];
 // Pages opened from inside other pages, shown under their parent in the rail
 const SUB_PAGES: { [k: string]: string } = { map: 'ops', market: 'fleet' };
 
@@ -128,7 +128,7 @@ function animateBalance(from: number, to: number) {
 function statusChip(s: string): string {
   const map: { [k: string]: string[] } = {
     flying: ['In flight', 'flight'], parked: ['Available', 'avail'], grounded: ['Maintenance', 'maint'], maintenance: ['Maintenance', 'maint'],
-    resting: ['Resting', 'dim'], standby: ['Standby', 'cyan'], off: ['Available', 'green'],
+    resting: ['Resting', 'dim'], standby: ['Standby', 'cyan'], off: ['Available', 'green'], training: ['On a course', 'amber'],
     ok: ['Normal', 'green'], hard: ['Hard landing', 'amber'], crash: ['Crash', 'red'], incident: ['Incident', 'amber'],
     open: ['Open', 'amber'], scheduled: ['Scheduled', 'cyan'], fixed: ['Fixed', 'green'],
     minor: ['Minor', 'dim'], major: ['Major', 'amber'], grounding: ['Grounding', 'red'],

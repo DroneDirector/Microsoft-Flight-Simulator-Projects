@@ -34,7 +34,7 @@ SCREENS.fleet = {
     return `
     <div class="screen-head">
       <div><h1>Fleet</h1><p class="sub">${all.length} aircraft, ${all.filter(a => a.status === 'flying').length} in the air, ${all.filter(a => a.status === 'grounded').length} grounded</p></div>
-      <div class="btn-row nowrap"><button class="btn primary" data-act="go-market">${icon('plus')}Buy aircraft</button><button class="btn ghost" data-act="go-lease">${icon('key')}Lease aircraft</button></div>
+      <div class="btn-row nowrap"><button class="btn primary" data-act="go-market">${icon('plus')}Buy aircraft</button><button class="btn ghost" data-act="go-used">${icon('clock')}Used</button><button class="btn ghost" data-act="go-lease">${icon('key')}Lease</button></div>
     </div>
     ${noStandBannerHtml()}
     <div class="filter-row">${classes.map(c => `<button class="fchip ${_fleetFilter === c[0] || (c[0] === 'types' && acType(_fleetFilter)) ? 'on' : ''}" data-act="fleet-filter" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>
@@ -67,6 +67,7 @@ function fleetTypesHtml(all: Aircraft[]): string {
 ACTIONS['fleet-filter'] = el => { _fleetFilter = el.getAttribute('data-f'); Sound.tick(); refresh(); };
 ACTIONS['go-market'] = () => { _mkMode = 'buy'; go('market'); };
 ACTIONS['go-lease'] = () => { _mkMode = 'lease'; go('market'); };
+ACTIONS['go-used'] = () => { _mkMode = 'used'; go('market'); };
 
 ACTIONS['ac-detail'] = el => {
   const a = plane(el.getAttribute('data-reg')); if (!a) return;
@@ -85,9 +86,16 @@ ACTIONS['ac-detail'] = el => {
         <div><small>Airframe hours</small><b>${num(a.hoursMin / 60)}</b></div>
         <div><small>Cycles</small><b>${num(a.cycles)}</b></div>
         <div><small>Condition</small><b>${Math.round(a.condition)}%</b></div>
-        <div><small>Seats</small><b>${t.seats}</b></div>
+        <div><small>${cabinOf(a).freighter ? 'Cargo' : 'Seats'}</small><b>${cabinOf(a).freighter ? num(cargoCapacity(a)) + ' kg' : cabinSeats(t, a)}</b></div>
         <div><small>Range</small><b>${num(t.rangeNm)} nm</b></div>
         <div><small>Base</small><b>${esc(a.base)}</b></div>
+        <div><small>Age</small><b>${(Math.round(aircraftAge(a) * 10) / 10)} yrs</b></div>
+        <div><small>${(a as any).lease ? 'Value (lessor\'s)' : 'Worth today'}</small><b>${money(aircraftValue(a), { compact: true })}</b></div>
+      </div>
+      <div class="acd-trade">
+        <span>${icon('pax')}<b>${esc(cabinText(cabinOf(a)))}</b><small>${cabinOf(a).freighter ? 'Main deck cargo' : `Belly cargo ${num(cargoCapacity(a))} kg`}</small></span>
+        <button class="btn ghost sm" data-act="ac-cabin" data-reg="${esc(a.reg)}">${icon('sliders')}Cabin</button>
+        ${(a as any).lease ? '' : `<button class="btn ghost sm" data-act="ac-sell" data-reg="${esc(a.reg)}">${icon('market')}Sell for ${money(sellPrice(a), { compact: true })}</button>`}
       </div>
       <div class="base-row ${(a as any).noBase ? 'warn' : ''}">${icon((a as any).noBase ? 'alert' : 'pin')}<span><b>${(a as any).noBase ? `No stand at ${esc(a.base)}` : `Based at ${esc(apt(a.base) ? apt(a.base).name : a.base)} (${esc(a.base)})`}</b><small>${(a as any).noBase ? 'All stands there are taken by your aircraft. Refused take-off and no passengers until it has a base with a free stand.' : esc(Bases.standLabel(a.base))}</small></span><button class="btn ${(a as any).noBase ? 'primary' : 'ghost'} sm" data-act="ac-rebase" data-reg="${esc(a.reg)}">${icon('pin')}Change base</button></div>
       ${leasePanelHtml(a)}

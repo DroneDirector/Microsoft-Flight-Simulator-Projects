@@ -48,6 +48,8 @@ const ICON_PATHS: { [k: string]: string } = {
   download: '<path d="M12 3.5v11.5M7 10.5l5 5 5-5"/><path d="M4.5 16.5v2.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-2.5"/>',
   copy: '<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2"/><path d="M15.5 8.5V5.5a1.5 1.5 0 0 0-1.5-1.5H5.5A1.5 1.5 0 0 0 4 5.5V14a1.5 1.5 0 0 0 1.5 1.5h3"/>',
   share: '<circle cx="17.5" cy="5.5" r="2.3"/><circle cx="6.5" cy="12" r="2.3"/><circle cx="17.5" cy="18.5" r="2.3"/><path d="M8.5 10.8l7-4.1M8.5 13.2l7 4.1"/>',
+  jobs: '<rect x="3.5" y="7.5" width="17" height="12" rx="1.6"/><path d="M9 7.5V5.6c0-.9.7-1.6 1.6-1.6h2.8c.9 0 1.6.7 1.6 1.6v1.9M3.5 12.5h17M11 12.5v2h2v-2"/>',
+  dispatch: '<rect x="5" y="4.5" width="14" height="16" rx="1.6"/><path d="M9.5 4.5V3.5h5v1M8.5 10h7M8.5 13.5h7M8.5 17h4"/>',
   pc: '<rect x="3" y="4.5" width="18" height="12" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/>',
 };
 

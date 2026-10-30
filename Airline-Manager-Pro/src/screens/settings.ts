@@ -37,6 +37,21 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}The app links to the ${esc(APP.shortName)} PC app over your local network: put the phone and the PC with Flight Simulator on the same Wi-Fi, or connect the PC to your phone's hotspot to use mobile data.</p>` },
     { type: 'toggle', key: 'gsx', label: 'I use GSX Pro', hint: 'Boarded passengers and the ground services you actually use in GSX (boarding, deboarding, catering, fuelling, pushback, de-icing) are taken from GSX and charged at real-world ground handling rates in Finance. Off, or without GSX: the app’s own passenger numbers and a standard handling and catering charge per flight.' },
   ] },
+  { id: 'online', title: 'Online services', icon: 'wifi', items: [
+    { type: 'html', html: () => `<p class="fine-print">${icon('info')}All optional. Your names, codes and the Discord address stay on this device and are only sent to the service they belong to.</p>` },
+    { type: 'html', html: () => svcOk('simbriefApi') ? setText('sbUser', 'SimBrief username or pilot ID', 'Your latest SimBrief flight plan in Dispatch: route, fuel, weights, and a flight plan for the simulator.', 'username or 123456') : '' },
+    { type: 'toggle', key: 'liveWx', label: 'Live weather (METAR and TAF)', hint: 'Real weather reports from aviationweather.gov. The real wind decides the runway in use at every airport, and the weather delays of your hired pilots.' },
+    { type: 'html', html: () => netChoices().length > 1 ? `<div class="ch-row"><span><b>Online networks</b><small>Controllers online at your airports, your airline's flights online, and their traffic on the map. Updated every minute.</small></span><div class="seg">${netChoices().map(o => `<button class="${Network.which() === o[0] ? 'on' : ''}" data-act="set-choice" data-key="network" data-v="${o[0]}">${esc(o[1])}</button>`).join('')}</div></div>` : '' },
+    { type: 'toggle', key: 'netOnMap', label: 'Network traffic on the map', when: () => Network.which() !== 'off' },
+    { type: 'html', html: () => Network.which() !== 'off' ? (svcOk('vatsim') ? setText('vatsimId', 'Your VATSIM member ID', 'Shows when you are online yourself.', 'CID', true) : '') + (svcOk('ivao') ? setText('ivaoId', 'Your IVAO VID', '', 'VID', true) : '') : '' },
+    { type: 'html', html: () => svcOk('hoppie') ? setText('hoppieCode', 'Hoppie ACARS logon code', 'Free from hoppie.nl. Your load sheet and arrival information go to your aircraft\'s ACARS, and your messages from the aircraft show up in the app.', 'logon code') : '' },
+    { type: 'toggle', key: 'hoppieAuto', label: 'Send the load sheet and arrival information automatically', when: () => !!Acars.code() },
+    { type: 'html', html: () => setText('discordUrl', 'Discord webhook', 'In your Discord server: Server settings → Integrations → Webhooks → New webhook → Copy webhook URL.', 'https://discord.com/api/webhooks/…') + ((State.settings as any).discordUrl ? `<div class="btn-row"><button class="btn ghost sm" data-act="discord-test">Send a test message</button></div>` : '') },
+    { type: 'toggle', key: 'discordMine', label: 'Post my flights', when: () => !!(State.settings as any).discordUrl },
+    { type: 'toggle', key: 'discordAi', label: 'Post my hired pilots\' landings', hint: 'At most one post a minute.', when: () => !!(State.settings as any).discordUrl },
+    { type: 'toggle', key: 'discordFleet', label: 'Post new and sold aircraft, and loans', when: () => !!(State.settings as any).discordUrl },
+    { type: 'toggle', key: 'discordJobs', label: 'Post finished jobs and tours', when: () => !!(State.settings as any).discordUrl },
+  ] },
   { id: 'atc', title: 'ATC', icon: 'radio', items: [
     { type: 'choice', key: 'atcSource', label: 'ATC source', options: [['builtin', 'Built-in ATC'], ['beyondatc', 'BeyondATC']] },
     { type: 'toggle', key: 'atcListen', label: 'Listen to BeyondATC audio', hint: 'The PC bridge transcribes BeyondATC offline to detect your clearances.', when: () => State.settings.atcSource === 'beyondatc' },
@@ -115,7 +130,7 @@ const SETTINGS: SetSection[] = [
   { id: 'about', title: 'About', icon: 'info', items: [
     { type: 'html', html: () => `<div class="about"><p><b>${esc(APP.name)}</b> ${esc(APP.version)}, early preview. Screens show demo data until your simulator is linked.</p>
       <p>Aircraft and company names are used only to identify the products installed in your simulator. Aircraft illustrations are original artwork.</p>
-      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>three.js by the three.js authors, MIT License.</p><p>Human body model and shape targets from MakeHuman, CC0 1.0 (public domain).</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p><p>Airport layouts © OpenStreetMap contributors, available under the Open Database License (ODbL). Airport and runway list from OurAirports (public domain).</p></div>` },
+      <h4>Credits</h4><p>Inter typeface by The Inter Project Authors, SIL Open Font License 1.1.</p><p>three.js by the three.js authors, MIT License.</p><p>Human body model and shape targets from MakeHuman, CC0 1.0 (public domain).</p><p>MapLibre GL JS, BSD 3-Clause License. Street map © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap. Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.</p><p>Airport layouts © OpenStreetMap contributors, available under the Open Database License (ODbL). Airport and runway list from OurAirports (public domain).</p><p>Weather reports from aviationweather.gov, the US National Weather Service's Aviation Weather Center (public domain). SimBrief is a service of Navigraph; Discord is a trademark of Discord Inc. Names are used only to identify the services.</p></div>` },
   ] },
 ];
 
@@ -222,6 +237,7 @@ ACTIONS['set-section'] = el => {
 ACTIONS['set-choice'] = el => {
   if (el.getAttribute('data-key') === 'aiSpeed') aiSetSpeed(+el.getAttribute('data-v') || 1);
   (State.settings as any)[el.getAttribute('data-key')] = el.getAttribute('data-v');
+  if (el.getAttribute('data-key') === 'network') { Network.pilots = []; Network.atc = []; Network.at = 0; Network.start(); }
   Store.save();
   Sound.tick(); rerenderSettingsBody();
   refresh();
@@ -329,3 +345,19 @@ ACTIONS['co-save'] = () => {
     () => { Object.assign(c, next); closeAll(); applyCompanyTheme(true); Store.save(); renderTopbar(); refresh(); toast(`${c.name} updated`, 'ok'); },
     () => { closeAll(); toast('Nothing changed', 'info'); });
 };
+
+/* ---------- Text settings (online services) ---------- */
+function setText(key: string, label: string, hint: string, ph: string, short?: boolean): string {
+  const v = String((State.settings as any)[key] || ''), secret = key === 'hoppieCode' || key === 'discordUrl';
+  return `<div class="ch-row txt"><span><b>${esc(label)}</b>${hint ? `<small>${esc(hint)}</small>` : ''}</span><input class="inp set-text ${short ? 'short' : ''}" data-key="${key}" ${secret ? 'type="password"' : ''} value="${esc(v)}" placeholder="${esc(ph)}" autocomplete="off" spellcheck="false"></div>`;
+}
+document.addEventListener('change', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('set-text')) return;
+  const key = el.getAttribute('data-key'), v = el.value.trim();
+  if (key === 'discordUrl' && v && !/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(v)) { toast('That isn\'t a Discord webhook address', 'warn'); return; }
+  (State.settings as any)[key] = v; Store.save();
+  if (key === 'hoppieCode') Acars.start();
+  if (key === 'sbUser') SimBrief.error = '';
+  toast('Saved', 'ok'); rerenderSettingsBody();
+});
+ACTIONS['discord-test'] = () => { Online.test().then(() => toast('Test message sent to Discord', 'ok'), (e: any) => toast((e && e.message) || 'Not sent', 'warn')); };

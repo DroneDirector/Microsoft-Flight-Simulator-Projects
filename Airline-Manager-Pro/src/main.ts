@@ -10,6 +10,7 @@
   World.loadRunways();   // runways in use, for departures and approaches
   ensurePeople();
   ensurePayroll();
+  try { InstalledAircraft.restore(); Ratings.grandfather(); } catch (e) { /* ignore */ }
   Store.bind();
   if (reducedMotion()) State.settings.reduceMotion = true;
   document.documentElement.classList.toggle('calm', State.settings.reduceMotion);
@@ -48,6 +49,7 @@
   startCoopClock();
   startBases();
   Battery.init();
+  try { Jobs.advance(true); Ratings.advance(); Network.start(); Acars.start(); } catch (e) { /* ignore */ }
   Backup.offerRestoreOnFirstStart();
   whatsNewOnStart();
   if ((State as any).linkedOnce) State.live = State.live.filter(f => !(f.you && !f.real));

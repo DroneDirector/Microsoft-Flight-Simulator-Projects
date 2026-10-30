@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.0 (2026-10-30)
+
+- Sell aircraft; used-aircraft market; cabin layouts and freighter conversions; owner-only aircraft trading
+- Your own fares per class; demand by season, price, popularity, marketing and competing airlines
+- Fuel prices per airport and tankering; landing, parking and gate fees; monthly hangar rent; belly and freighter cargo
+- Loans, fleet insurance, marketing campaigns
+- Job board (charters and cargo), tours, weekly challenge
+- Type ratings with courses and check rides; landing leaderboard
+- Dispatch: SimBrief planner link, .PLN flight plans to the simulator, live METAR/TAF, Discord, public airline page
+- Built but switched off until the providers give permission for a paid app (app.config.json → services): SimBrief flight plan import, VATSIM, IVAO, Hoppie ACARS
+- Co-op flight report (PIREP) review
+- PC app: installed aircraft scan, flight plan saving, relay for the online services
+
 ## 0.7.7 (2026-10-30)
 
 - Slightly wider side menu so every label fits; 100% availability fits inside its ring

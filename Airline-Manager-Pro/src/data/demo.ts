@@ -32,7 +32,7 @@ interface Notice {
   title: string; body: string; time: string; read: boolean; ref?: string;
 }
 interface Txn {
-  id: string; date: string; label: string; amount: number; kind: 'revenue' | 'fuel' | 'crew' | 'maint' | 'fine' | 'purchase' | 'lease' | 'fees' | 'salary';
+  id: string; date: string; label: string; amount: number; kind: 'revenue' | 'fuel' | 'crew' | 'maint' | 'fine' | 'purchase' | 'lease' | 'fees' | 'salary' | 'sale' | 'loan' | 'insurance' | 'marketing' | 'charter' | 'training';
   companyId?: string; time?: string; reg?: string; flight?: string; route?: string; personId?: string;
   lines?: [string, number][]; note?: string; link?: { kind: 'log' | 'issue' | 'staff' | 'aircraft'; id: string };
 }
@@ -64,6 +64,9 @@ const State = {
     units: 'imperial' as 'imperial' | 'metric', clock24: true,
     timeMode: 'real' as 'real' | 'sim', simRate: 'month' as 'week' | 'month' | 'quarter',
     aiSpeed: '1', aiNotify: true, conduct: true,
+    // online services (Settings → Online services)
+    liveWx: true, network: 'off' as 'off' | 'vatsim' | 'ivao' | 'both', netOnMap: true, vatsimId: '', ivaoId: '', sbUser: '',
+    hoppieCode: '', hoppieAuto: true, discordUrl: '', discordMine: true, discordAi: false, discordFleet: true, discordJobs: true,
   },
   profiles: [
     { id: 'p1', pilotId: 'you', label: 'Main profile' },

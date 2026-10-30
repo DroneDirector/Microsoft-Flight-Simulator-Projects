@@ -62,6 +62,8 @@ function onLinked() {
   Sound.chime(); toast(`Linked to ${Link.pc.name}`, 'ok');
   // the simulator's own airports, once per link (MSFS 2024)
   setTimeout(() => linkSend({ type: 'all-airports' }), 3000);
+  // the aircraft installed in the simulator (default and add-ons), for the market
+  setTimeout(() => linkSend({ type: 'aircraft-list' }), 1500);
   refresh();
 }
 
@@ -94,6 +96,7 @@ function onSimState(s: SimSnapshot) {
     return;
   }
   b.sim = s.sim; b.simRunning = true; b.gsx = s.gsx.running;
+  try { myPhaseNews(s.phase, s.approachAirport || ''); } catch (e) { /* never stop the feed */ }
   if (s.title) S.simAircraft = { title: s.title, typeId: guessType(s.title, s.atcModel), reg: s.atcId };
   const myReg = S.myReg[State.companyId], a = plane(myReg);
   // weights and fuel
@@ -212,6 +215,14 @@ function dateStr(d: Date): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+let _myCallsign: { callsign: string; from: string; to: string; descent: boolean } = null;
+/** Top of descent on your own flight: the arrival information to the aircraft's ACARS. */
+function myPhaseNews(phase: string, to: string) {
+  if (!_myCallsign || _myCallsign.descent || phase !== 'descent') return;
+  _myCallsign.descent = true; if (to) _myCallsign.to = to;
+  try { Acars.onMyEvent('descent', _myCallsign); } catch (e) { /* ignore */ }
+}
+
 function onSimEvent(e: FlightEvent) {
   const S: any = State;
   const a = plane(S.myReg[State.companyId]);
@@ -232,6 +243,13 @@ function onSimEvent(e: FlightEvent) {
       { const me = plane(S.myReg[company().id]) as any;
         if (me && me.noBase) { toast(`${me.reg} has no stand at its base: not cleared for take-off and no passengers on board`, 'warn'); State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${me.reg}: take-off refused`, body: `${me.reg} has no stand at ${me.base}. Choose another base for it on its page in Fleet. Flights without a base carry no passengers.`, time: 'Now', read: false } as any); }
         else toast(`Blocks off${e.airport ? ' at ' + e.airport : ''}`, 'info'); }
+      // the load sheet to the aircraft's ACARS, and the news to the airline's Discord
+      try {
+        const cs = company().icao + (100 + (_hashStr(a ? a.reg : '') % 800)), to = leg ? leg.to : '';
+        _myCallsign = { callsign: cs, from: e.airport || '', to, descent: false };
+        Acars.onMyEvent('blocks-off', _myCallsign);
+        Online.discord('mine', `${cs} off blocks at ${e.airport || '—'}`, `${myPilot().name} is departing ${e.airport || ''}${to ? ' for ' + to : ''}${a ? ' in ' + a.reg : ''}.`);
+      } catch (er) { /* ignore */ }
       break;
     }
     case 'takeoff': toast(`Airborne${e.airport ? ' from ' + e.airport : ''}`, 'info'); break;
@@ -282,7 +300,8 @@ function finishLeg(e: FlightEvent) {
   try { conditionAfterFlight(a, sm.blockMin); } catch (er) { /* ignore */ }
   // money
   // real-world fares, on-board sales and costs (economics.ts), with the fuel actually burned in the sim
-  const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg, gsxTakeLegFlag() && !!(State.settings as any).gsx);
+  const job = Jobs.forMyLeg(from, to, a.reg);
+  const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg, gsxTakeLegFlag() && !!(State.settings as any).gsx, { reg: a.reg, job: job ? jobPayFor(job.id) : undefined });
   const now = new Date(), day = dateStr(now).slice(0, 10), time = dateStr(now).slice(11);
   const flight = c.icao + (100 + (_hashStr(a.reg) % 800));
   const rev = m.revenue, fuel = m.costs, fees = 0;
@@ -298,6 +317,12 @@ function finishLeg(e: FlightEvent) {
   try { Progress.afterMyLeg(sm.landingFpm, grounded ? 'incident' : hard ? 'hard' : 'ok'); } catch (er) { /* ignore */ }
   try { coopAfterMyLeg(from, to, sm.blockMin, m.net, txId); } catch (er) { /* ignore */ }
   try { crewAfterLeg(c.id, { coPilot: true, typeId: a.typeId, from, to, blockMin: sm.blockMin }); } catch (er) { /* ignore */ }
+  // a charter you flew, the tours, the weekly challenge, a check ride on a new type, and the news
+  try { if (job) Jobs.delivered(job.id, Date.now(), m.net, txId); } catch (er) { /* ignore */ }
+  try { Jobs.afterMyLeg(from, to, sm.landingFpm); Jobs.checkWeekly(); } catch (er) { /* ignore */ }
+  try { Ratings.myCheckRide(a.typeId, sm.landingFpm, sm.landingG, grounded || LEG_ISSUES.length > 0); } catch (er) { /* ignore */ }
+  try { Online.discord('mine', `${flight} landed at ${to}`, `${me.name} flew ${from} → ${to} in ${a.reg}.`, [['Landing', `${Math.abs(sm.landingFpm)} fpm, ${sm.landingG} g`], ['Block', hours(sm.blockMin)], ['Passengers', String(sm.pax)], ['Result', money(m.net, { sign: true })]]); } catch (er) { /* ignore */ }
+  _myCallsign = null;
   Store.save(); refresh(); animateBalance(before, c.balance);
   toast(`Flight logged: ${from} to ${to}, ${money(rev - fuel - fees, { sign: true })}`, 'ok');
   // the mechanic gets back to you about anything found on this leg

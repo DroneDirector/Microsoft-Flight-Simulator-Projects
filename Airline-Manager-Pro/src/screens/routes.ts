@@ -22,13 +22,14 @@ SCREENS.routes = {
     <div class="route-list">${rs.map((r, i) => {
       const t = acType(r.typeId), p = r.pilotId ? pilot(r.pilotId) : null;
       const dist = routeDistance(r.legs);
-      return `<div class="route-row" style="--i:${i}">
+      const dem = routeDemandPct(r), fa = r.legs.length > 1 && !r.test ? classFares(r.typeId, r.legs[0], r.legs[1], r).y : 0, comp = r.test ? 0 : competitorsOn(r.legs[0], r.legs[1]).length;
+      return `<button class="route-row" data-act="route-detail" data-id="${r.id}" style="--i:${i}">
         <span class="rr-code">${esc(r.code)}</span>
         <span class="rr-chain">${r.test ? `<span class="chain"><b>${esc(r.legs[0])}</b></span><small>Test flight${r.flownAt ? ', flown ' + esc(dateStr(new Date(r.flownAt)).slice(0, 16)) : ', not flown yet'}</small>` : `${legChain(r.legs)}<small>${r.legs.length - 1} leg${r.legs.length > 2 ? 's' : ''}, ${num(dist)} nm, ${esc(r.days)}</small>`}</span>
         <span class="rr-ac">${esc(t.model)}<small>${p ? (p.you ? 'You fly this' : esc(p.name)) : 'No pilot yet'}</small></span>
-        <span class="rr-demand"><small>Demand</small><span class="cond cond-${r.demand > 80 ? 'good' : r.demand > 65 ? 'fair' : 'poor'}"><i style="width:${r.demand}%"></i></span></span>
-        <span class="rr-yield"><small>Per seat</small><b>${money(r.yieldPerPax)}</b></span>
-      </div>`;
+        <span class="rr-demand"><small>${r.test ? 'Demand' : `Load ${dem}%${comp ? ' · ' + comp + ' rival' + (comp > 1 ? 's' : '') : ''}`}</small><span class="cond cond-${dem > 80 ? 'good' : dem > 60 ? 'fair' : 'poor'}"><i style="width:${Math.min(100, dem)}%"></i></span></span>
+        <span class="rr-yield"><small>Economy fare</small><b>${r.test ? '—' : money(fa)}</b></span>
+      </button>`;
     }).join('') || emptyState('No routes yet', 'Create your first route from your hub.', 'New route', 'new-route')}</div>`;
   },
 };
@@ -104,3 +105,53 @@ ACTIONS['nr-save'] = () => {
   State.routes.push({ id: uid(), companyId: c.id, code, legs: _nr.stops.slice(), days: 'Daily', typeId: _nr.typeId, demand: 60 + Math.round(Math.random() * 30), yieldPerPax: 140 + Math.round(Math.random() * 200) });
   closeAll(); refresh(); toast(`Route ${code} created`, 'ok');
 };
+
+/* ---------- A route's business: fares, demand, competitors, fuel and fees ---------- */
+let _rdId = '';
+function routeDetailHtml(): string {
+  const r = State.routes.filter(x => x.id === _rdId)[0]; if (!r) return '';
+  const t = acType(r.typeId), f = routeFares(r), spd = seatsPerDay(r), boost = marketingBoost(r.companyId, r.id);
+  const legs = r.legs.slice(1).map((to, i) => ({ from: r.legs[i], to }));
+  const fr = legs.length ? classFares(r.typeId, legs[0].from, legs[0].to, r) : { y: 0, j: 0, f: 0 };
+  const step = (k: 'y' | 'j' | 'f', label: string, val: number) => `<div class="fare-row"><span><b>${label}</b><small>${money(val)} on ${esc(legs[0].from)}–${esc(legs[0].to)}</small></span>
+    <div class="stepper"><button class="icon-btn" data-act="rd-fare" data-k="${k}" data-d="-5" aria-label="Lower">−</button><b class="${f[k] > 1.001 ? 'amber' : f[k] < 0.999 ? 'green' : ''}">${Math.round(f[k] * 100)}%</b><button class="icon-btn" data-act="rd-fare" data-k="${k}" data-d="5" aria-label="Higher">${icon('plus')}</button></div></div>`;
+  const prem = State.fleet.some(a => a.typeId === r.typeId && a.companyId === r.companyId && (cabinOf(a).j || cabinOf(a).f));
+  return `<div class="modal-head"><div><h2>${esc(r.code)} ${legChain(r.legs)}</h2><small>${esc(t.maker)} ${esc(t.model)}, ${esc(r.days)}, about ${num(spd)} seats a day each way</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+  <div class="modal-body rdet">
+    <h3>Your fares</h3>
+    <p class="fine-print">${icon('info')}100% is the usual market fare. Lower fares win passengers from your rivals and bring extra travellers; higher fares earn more per seat but fill fewer.</p>
+    ${step('y', 'Economy', fr.y)}${prem ? step('j', 'Business', fr.j) + step('f', 'First', fr.f) : ''}
+    <h3>Legs</h3>
+    <div class="rd-legs">${legs.map(l => {
+      const o = routeOutlook(r.companyId, l.from, l.to, spd);
+      return `<div class="rd-leg">
+        <div class="rd-lh"><b>${esc(l.from)} → ${esc(l.to)}</b><small>${seasonLabel(o.season)} · ${num(gcDistanceNm(apt(l.from).pos, apt(l.to).pos))} nm</small></div>
+        <div class="kv-row">
+          <div><small>Travellers a day</small><b>${num(o.market)}</b></div>
+          <div><small>Choose you</small><b>${Math.round(o.share * 100)}%</b></div>
+          <div><small>Expected load</small><b class="${o.lf > 0.8 ? 'green' : o.lf < 0.55 ? 'red' : ''}">${Math.round(o.lf * 100)}%</b></div>
+          <div><small>Fuel at ${esc(l.from)}</small><b>$${fuelPrice(l.from).toFixed(2)}/kg</b></div>
+          <div><small>Landing at ${esc(l.to)}</small><b>${money(landingFee(l.to, t))}</b></div>
+          <div><small>Parking at ${esc(l.to)}</small><b>${money(parkingFee(l.to, t))}</b></div>
+        </div>
+        <div class="rd-comp">${o.comp.length ? o.comp.map(c => `<span class="comp"><b>${esc(c.name)}</b><small>${c.daily} a day · fares ${Math.round(c.fare * 100)}% · rated ${(c.quality / 20).toFixed(1)}/5 · since ${esc(c.since)}</small></span>`).join('') : `<span class="comp none">${icon('check')}<b>No other airline on this route</b></span>`}</div>
+      </div>`;
+    }).join('')}</div>
+    <label class="tg-row"><span><b>Tanker fuel</b><small>Where the next stop's fuel costs more, carry the next leg's fuel from here. It costs about 3.5% extra burn per hour to carry the weight, so the app only does it when it saves money.</small></span><button class="tg ${(r as any).tanker ? 'on' : ''}" role="switch" aria-checked="${!!(r as any).tanker}" data-act="rd-tanker"><i></i></button></label>
+    <div class="rd-mk"><span>${icon('star')}<b>${boost ? `Marketing running: about ${Math.round(boost * 100)}% more passengers` : 'No marketing on this route'}</b><small>A route campaign brings extra passengers while it runs.</small></span><button class="btn ghost sm" data-act="mk-campaign" data-route="${r.id}">Promote</button></div>
+    <div class="modal-actions"><button class="btn ghost" data-act="sb-plan" data-from="${esc(r.legs[0])}" data-to="${esc(r.legs[1] || r.legs[0])}">${icon('routes')}Plan on SimBrief</button><button class="btn primary" data-act="close-layer">Done</button></div>
+  </div>`;
+}
+function rerenderRd() { const p = $('.rd-pop .panel'); if (p) p.innerHTML = routeDetailHtml(); }
+ACTIONS['route-detail'] = el => {
+  const r = State.routes.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!r || r.test) return;
+  _rdId = r.id; Sound.tick(); openLayer('modal', routeDetailHtml(), { cls: 'wide rd-pop' });
+};
+ACTIONS['rd-fare'] = el => {
+  const r: any = State.routes.filter(x => x.id === _rdId)[0]; if (!r) return;
+  const k = el.getAttribute('data-k'), d = +el.getAttribute('data-d') / 100;
+  r.fares = r.fares || { y: 1, j: 1, f: 1 };
+  r.fares[k] = Math.round(clamp(r.fares[k] + d, 0.6, 1.6) * 100) / 100;
+  Sound.tick(); Store.soon(); rerenderRd();
+};
+ACTIONS['rd-tanker'] = () => { const r: any = State.routes.filter(x => x.id === _rdId)[0]; if (!r) return; r.tanker = !r.tanker; Sound.tick(); Store.soon(); rerenderRd(); };

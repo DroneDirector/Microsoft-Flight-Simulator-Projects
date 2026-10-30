@@ -22,7 +22,7 @@ SCREENS.ranking = {
       ['Best streak', num(st['p.streak'] || 0)], ['Airports', num(st['p.airports'] || 0)], ['Countries', num(st['p.countries'] || 0)], ['Aircraft types', num(st['p.types'] || 0)],
       ['Distance', num(Math.round(st['p.nm'] || 0)) + ' nm'], ['Passengers', num(st['p.pax'] || 0)]];
     return `
-    <div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your own record as a pilot · ${num(nEarned)} ${nEarned === 1 ? 'badge' : 'badges'} earned</p></div></div>
+    <div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your record, the landing leaderboard · ${num(nEarned)} ${nEarned === 1 ? 'badge' : 'badges'} earned</p></div></div>
     <div class="rk-top">
       <div class="card rk-card">
         <span class="rk-av">${avatarSvg(me.look, 'captain', { view: 'bust', accent: c.color, still: true })}</span>
@@ -32,6 +32,7 @@ SCREENS.ranking = {
       <div class="card rk-rec"><div class="card-h"><b>Your record</b></div>
         <div class="rk-rec-grid">${rec.map(r => `<span><b>${esc(r[1])}</b><small>${esc(r[0])}</small></span>`).join('')}</div></div>
     </div>
+    ${leaderboardHtml()}
     <div class="card rk-badges">
       <div class="card-h"><b>Your badges</b><span class="seg rk-cats">${cats.map(g => `<button class="${_rkGroup === g ? 'on' : ''}" data-act="rk-group" data-g="${esc(g)}">${g === 'all' ? 'All' : esc(g)}</button>`).join('')}</span>
         ${list.length > 120 ? `<button class="text-btn" data-act="rk-all">${_rkShowAll ? 'Show the newest' : 'Show all ' + num(list.length)}</button>` : ''}</div>
@@ -47,3 +48,35 @@ SCREENS.ranking = {
 };
 ACTIONS['rk-group'] = el => { _rkGroup = el.getAttribute('data-g'); Sound.tick(); refresh(); };
 ACTIONS['rk-all'] = () => { _rkShowAll = !_rkShowAll; Sound.tick(); refresh(); };
+
+/* ---------- Landing leaderboard ---------- */
+let _lbWhen: 'week' | 'month' | 'all' = 'week', _lbView: 'best' | 'avg' = 'best';
+function allLandings(): LandRec[] {
+  const me: any = myPilot();
+  const mine: LandRec[] = State.logbook.filter((l: any) => !l.coopBy && l.atc !== 'Co-op' && l.result !== 'crash' && l.decision !== 'disregarded' && l.landingFpm)
+    .map((l: any) => ({ who: me.id, name: me.name, fpm: Math.abs(l.landingFpm), g: l.g || 1, at: Date.parse(String(l.date).replace(' ', 'T')) || 0, from: l.from, to: l.to, typeId: l.typeId || (plane(l.reg) ? plane(l.reg).typeId : ''), kind: 'you' as 'you' }));
+  return mine.concat(Ratings.list());
+}
+function leaderboardHtml(): string {
+  const since = _lbWhen === 'week' ? Date.now() - 7 * 864e5 : _lbWhen === 'month' ? Date.now() - 30 * 864e5 : 0;
+  const all = allLandings().filter(r => r.at >= since && r.fpm > 0);
+  const kindChip = (k: string) => `<span class="chip lb-${k}">${k === 'you' ? 'You' : k === 'coop' ? 'Co-op' : 'Hired'}</span>`;
+  let body = '';
+  if (_lbView === 'best') {
+    const top = all.slice().sort((a, b) => a.fpm - b.fpm || a.g - b.g).slice(0, 15);
+    body = top.map((r, i) => `<div class="lb-row ${r.kind === 'you' ? 'me' : ''}"><b class="lb-n">${i + 1}</b><span class="lb-who"><b>${esc(r.name)}</b>${kindChip(r.kind)}<small>${esc(r.from)} → ${esc(r.to)}${acType(r.typeId) ? ' · ' + esc(acType(r.typeId).model) : ''} · ${esc(dateStr(new Date(r.at)).slice(0, 10))}</small></span><span class="lb-v"><b class="${r.fpm < 100 ? 'green' : ''}">${r.fpm} fpm</b><small>${r.g.toFixed(2)} g</small></span></div>`).join('');
+  } else {
+    const by: { [k: string]: { name: string; kind: string; n: number; sum: number; best: number } } = {};
+    all.forEach(r => { const x = by[r.who] = by[r.who] || { name: r.name, kind: r.kind, n: 0, sum: 0, best: 9999 }; x.n++; x.sum += r.fpm; x.best = Math.min(x.best, r.fpm); });
+    const rows = Object.keys(by).map(k => by[k]).filter(x => x.n >= 2).sort((a, b) => a.sum / a.n - b.sum / b.n).slice(0, 15);
+    body = rows.map((x, i) => `<div class="lb-row ${x.kind === 'you' ? 'me' : ''}"><b class="lb-n">${i + 1}</b><span class="lb-who"><b>${esc(x.name)}</b>${kindChip(x.kind)}<small>${x.n} landings · best ${x.best} fpm</small></span><span class="lb-v"><b>${Math.round(x.sum / x.n)} fpm</b><small>average</small></span></div>`).join('');
+  }
+  return `<div class="card lb">
+    <div class="card-h"><b>Landing leaderboard</b>
+      <span class="seg"><button class="${_lbView === 'best' ? 'on' : ''}" data-act="lb-view" data-v="best">Softest</button><button class="${_lbView === 'avg' ? 'on' : ''}" data-act="lb-view" data-v="avg">Best average</button></span>
+      <span class="seg"><button class="${_lbWhen === 'week' ? 'on' : ''}" data-act="lb-when" data-v="week">7 days</button><button class="${_lbWhen === 'month' ? 'on' : ''}" data-act="lb-when" data-v="month">30 days</button><button class="${_lbWhen === 'all' ? 'on' : ''}" data-act="lb-when" data-v="all">All time</button></span></div>
+    <div class="lb-list">${body || `<p class="fine-print">${icon('info')}No landings in this period yet. Yours, your hired pilots' and your co-op pilots' landings all count.</p>`}</div>
+  </div>`;
+}
+ACTIONS['lb-view'] = el => { _lbView = el.getAttribute('data-v') as any; Sound.tick(); refresh(); };
+ACTIONS['lb-when'] = el => { _lbWhen = el.getAttribute('data-v') as any; Sound.tick(); refresh(); };

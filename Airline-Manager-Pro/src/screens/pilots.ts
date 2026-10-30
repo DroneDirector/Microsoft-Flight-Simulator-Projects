@@ -43,7 +43,7 @@ SCREENS.pilots = {
           <button class="avatar av-btn" data-act="staff-detail" data-id="${p.id}" aria-label="${esc(p.name)}">${avatarSvg(p.look, personRole(p), { view: 'bust', accent: c.color })}</button>
           <span class="cr-name"><b>${esc(p.name)} ${levelChip(p)}</b><small>${esc(levelTitle(p))}, ${flag(p.nat)} ${ageOf(p.dob)}, ${num(p.hoursMin / 60)} h, ${esc(p.base)}</small></span>
           <span class="cr-now">${f ? `${statusChip('flying')}<small>${esc(f.callsign)} ${esc(f.from)} to ${esc(f.to)}, ${Math.round(f.t * 100)}%</small>` : `${statusChip(p.status)}<small>${route ? 'Next: ' + esc(route.code) : 'No route assigned'}</small>`}</span>
-          <span class="cr-rules">${p.rules ? `<i>${p.rules.maxDutyHrs} h duty</i><i>${p.rules.maxLandingFpm} fpm limit</i>${p.rules.ifrOnly ? '<i>IFR only</i>' : '<i>VFR allowed</i>'}` : ''}</span>
+          <span class="cr-rules">${(p.types || []).map((t: string) => acType(t) ? `<i class="rating">${esc(acType(t).model)}</i>` : '').join('')}${p.status === 'training' && p.training ? `<i class="rating training">${esc(acType(p.training.typeId).model)} course until ${esc(dateStr(new Date(p.training.until)).slice(5, 16))}</i>` : ''}${p.rules ? `<i>${p.rules.maxDutyHrs} h duty</i>` : ''}</span>
           <span class="cr-btns">${f ? `<button class="btn ghost sm" data-act="watch-pilot" data-id="${f.id}">${icon('map')}Watch</button>` : ''}<button class="btn sm" data-act="pilot-rules" data-id="${p.id}">Assign</button></span>
         </div>`;
       }).join('') || emptyState('No pilots hired yet', 'Hire pilots to fly your other aircraft while you fly your own trips.', 'Hire staff', 'pilot-hire')}</div>`;
@@ -58,7 +58,7 @@ SCREENS.pilots = {
       <div class="staff-grid">
         ${(_hireRole === 'all' || _hireRole === 'captain') ? State.candidates.map((p: any, i) => `<button class="staff-card hire" data-act="hire" data-id="${p.id}" style="--i:${i}">
           <span class="sc-av">${avatarSvg(p.look, personRole(p), { view: 'bust', accent: c.color })}</span>
-          <span class="sc-txt"><b>${esc(p.name)}</b><small>${esc(p.rank)}, ${flag(p.nat)} ${ageOf(p.dob)}</small><small>${num(p.hoursMin / 60)} h, ${money(p.salary)}/wk</small></span><span class="sc-hire">${icon('plus')}Hire</span></button>`).join('') : ''}
+          <span class="sc-txt"><b>${esc(p.name)}</b><small>${esc(p.rank)}, ${flag(p.nat)} ${ageOf(p.dob)}</small><small>${num(p.hoursMin / 60)} h, ${money(p.salary)}/wk</small><small>Rated: ${(p.types || []).map((t: string) => acType(t) ? esc(acType(t).model) : '').filter(Boolean).join(', ') || 'no types yet'}</small></span><span class="sc-hire">${icon('plus')}Hire</span></button>`).join('') : ''}
         ${cands.map((p: Staff, i: number) => staffCard(p, i + 4, { hire: true })).join('')}
       </div>`;
     return `
@@ -117,8 +117,9 @@ ACTIONS['pilot-rules'] = el => {
     <div class="modal-body">
       <h3>Route</h3>
       <p class="fine-print">${icon('info')}Hired pilots fly only the routes you create and schedule. Without a route they wait on the ground.</p>
-      <div class="route-pick">${routes.filter(rt => !rt.flownAt).map(rt => `<button class="rp ${rt.pilotId === p.id ? 'on' : ''}" data-act="rp-pick" data-id="${rt.id}">${rt.test ? `<span class="chain"><b>${esc(rt.legs[0])}</b></span>` : legChain(rt.legs)}<small>${esc(rt.code)}, ${rt.test ? 'Test flight' : esc(rt.days)}, ${esc(acType(rt.typeId).model)}${rt.pilotId && rt.pilotId !== p.id && pilot(rt.pilotId) ? `, now ${esc(pilot(rt.pilotId).name)}` : ''}</small></button>`).join('')}
+      <div class="route-pick">${routes.filter(rt => !rt.flownAt).map(rt => !Ratings.rated(p, rt.typeId) ? `<button class="rp off" disabled>${rt.test ? `<span class="chain"><b>${esc(rt.legs[0])}</b></span>` : legChain(rt.legs)}<small>${esc(rt.code)}: needs ${aAn(acType(rt.typeId).model)} ${esc(acType(rt.typeId).model)} type rating</small></button>` : `<button class="rp ${rt.pilotId === p.id ? 'on' : ''}" data-act="rp-pick" data-id="${rt.id}">${rt.test ? `<span class="chain"><b>${esc(rt.legs[0])}</b></span>` : legChain(rt.legs)}<small>${esc(rt.code)}, ${rt.test ? 'Test flight' : esc(rt.days)}, ${esc(acType(rt.typeId).model)}${rt.pilotId && rt.pilotId !== p.id && pilot(rt.pilotId) ? `, now ${esc(pilot(rt.pilotId).name)}` : ''}</small></button>`).join('')}
         <button class="rp ${routes.some(rt => rt.pilotId === p.id && !rt.flownAt) ? '' : 'on'}" data-act="rp-pick" data-id=""><span class="chain"><b>No route</b></span><small>Stays on the ground</small></button></div>
+      ${typeRatingsHtml(p)}
       <h3>Rules</h3>
       <div class="rules">
         <div class="range-row"><span><b>Max duty per day</b><small>Pilot rests once this is reached</small></span><input type="range" min="6" max="14" value="${r.maxDutyHrs}" oninput="this.nextElementSibling.textContent=this.value+' h'"><output>${r.maxDutyHrs} h</output></div>
@@ -147,7 +148,27 @@ ACTIONS['rules-save'] = () => {
     if (before) msg = `${p.name} takes over ${r.code} from ${before.name}`;
     const res = aiStartRoute(p.id, r);
     if (res === 'ok') msg = `${p.name} starts ${r.test ? 'the test flight' : r.code} in about ${AI_TURN_MIN} minutes`;
-    else if (res === 'no-aircraft') msg = `Assigned. ${p.name} starts when a ${acType(r.typeId).model} is free`;
+    else if (res === 'no-aircraft') msg = `Assigned. ${p.name} starts when ${aAn(acType(r.typeId).model)} ${acType(r.typeId).model} is free`;
+    else if (res === 'not-rated') { r.pilotId = undefined; msg = `${p.name} isn't rated on the ${acType(r.typeId).model}. Send them on a type rating course first.`; }
+    else if (res === 'training') msg = `Assigned. ${p.name} starts after the type rating course`;
   } else msg = `${p.name} stays on the ground`;
   Store.save(); closeAll(); refresh(); toast(msg, 'ok');
+};
+
+/* ---------- Type ratings ---------- */
+function typeRatingsHtml(p: any): string {
+  const c = company(), types = State.fleet.filter(a => a.companyId === c.id).map(a => a.typeId).filter((t, i, arr) => arr.indexOf(t) === i);
+  const rows = types.map(id => {
+    const t = acType(id), has = Ratings.rated(p, id), now = p.status === 'training' && p.training && p.training.typeId === id, failed = p.failedType === id;
+    return `<div class="tr-row"><span><b>${esc(t.maker)} ${esc(t.model)}</b><small>${has ? 'Rated' : now ? `On the course until ${esc(dateStr(new Date(p.training.until)).slice(0, 16))}` : failed ? 'Check ride not passed yet' : `${Ratings.days(id)} day${Ratings.days(id) > 1 ? 's' : ''} of training and a check ride`}</small></span>
+      ${has ? `<span class="chip ok">${icon('check')}Rated</span>` : now ? '<span class="chip">On the course</span>' : `<button class="btn ${failed ? 'primary' : 'ghost'} sm" data-act="tr-train" data-id="${esc(p.id)}" data-t="${id}" ${p.status === 'training' ? 'disabled' : ''}>${failed ? 'Check ride again' : 'Train'} ${money(Math.round(Ratings.cost(id) * (failed ? 0.34 : 1)), { compact: true })}</button>`}</div>`;
+  }).join('');
+  return `<h3>Type ratings</h3><p class="fine-print">${icon('info')}Pilots fly only the types on their licence. A course is ground school and simulator training ending with a check ride; it runs on the real clock (faster with a faster virtual pilot speed), and the pilot doesn't fly meanwhile.</p><div class="tr-list">${rows}</div>`;
+}
+ACTIONS['tr-train'] = el => {
+  const p: any = pilot(el.getAttribute('data-id')), id = el.getAttribute('data-t'); if (!p) return;
+  const retake = p.failedType === id, cost = Math.round(Ratings.cost(id) * (retake ? 0.34 : 1));
+  if (company().balance < cost) { toast('Not enough money for the course', 'warn'); return; }
+  if (State.live.some(f => f.pilotId === p.id)) { toast(`${p.name} is flying. The course starts after landing: try again then.`, 'warn'); return; }
+  if (Ratings.train(p, id, retake)) { if (retake) delete p.failedType; Store.save(); Sound.payOut(); closeAll(); refresh(); toast(`${p.name} is on the ${acType(id).model} ${retake ? 'check ride' : 'course'}`, 'ok'); }
 };

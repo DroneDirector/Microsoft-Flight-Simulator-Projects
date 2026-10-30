@@ -291,7 +291,7 @@ public class AppToolsPlugin extends Plugin {
     @PluginMethod
     public void backupExport(PluginCall call) {
         Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("application/json");
+        i.addCategory(Intent.CATEGORY_OPENABLE); i.setType(call.getString("mime", "application/json"));
         i.putExtra(Intent.EXTRA_TITLE, call.getString("name", BACKUP_NAME));
         startActivityForResult(call, i, "exportPicked");
     }

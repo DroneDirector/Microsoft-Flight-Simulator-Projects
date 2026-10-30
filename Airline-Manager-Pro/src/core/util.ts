@@ -67,3 +67,6 @@ function gcInterpolate(a: number[], b: number[], t: number): number[] {
   const z = A * Math.sin(p1) + B * Math.sin(p2);
   return [Math.atan2(y, x) / D2R, Math.atan2(z, Math.sqrt(x * x + y * y)) / D2R];
 }
+
+/** "a" or "an" before a word or model name, by how it is said: an A320, an ATR, an 8-seater, a 737. */
+function aAn(w: string): string { return /^([AEIOFHLMNRSX]\d|[AEIOU]|8|11|18)/i.test(String(w || '').trim()) && !/^(U[nst]|Eu|One)/i.test(String(w || '')) ? 'an' : 'a'; }

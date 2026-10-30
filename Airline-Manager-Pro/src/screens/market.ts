@@ -1,6 +1,6 @@
 // Aircraft market: buy or lease one or several aircraft of any type the simulator has installed.
 let _mkMaker = 'All';
-let _mkMode: 'buy' | 'lease' = 'buy';
+let _mkMode: 'buy' | 'lease' | 'used' = 'buy';
 let _mkInstalled = true;
 
 SCREENS.market = {
@@ -10,9 +10,11 @@ SCREENS.market = {
     const makers = ['All'].concat(AIRCRAFT.map(a => a.maker).filter((m, i, arr) => arr.indexOf(m) === i));
     const list = AIRCRAFT.filter(a => (_mkMaker === 'All' || a.maker === _mkMaker) && (!_mkInstalled || a.installed));
     return `
-    ${subHead('fleet', _mkMode === 'lease' ? 'Lease aircraft' : 'Buy aircraft', _mkMode === 'lease' ? 'Pay a monthly rent instead of the full price, for 1, 3 or 6 years' : `${AIRCRAFT.filter(a => a.installed).length} types found in your simulator, including add-ons`,
-      `<label class="tg-inline"><span>Only what I have installed</span>${toggle('mk-installed', _mkInstalled)}</label>`)}
-    <div class="mk-mode seg">${[['buy', 'Buy'], ['lease', 'Lease']].map(m => `<button class="${_mkMode === m[0] ? 'on' : ''}" data-act="mk-mode" data-m="${m[0]}">${icon(m[0] === 'buy' ? 'market' : 'key')}${m[1]}</button>`).join('')}</div>
+    ${subHead('fleet', _mkMode === 'lease' ? 'Lease aircraft' : _mkMode === 'used' ? 'Used aircraft' : 'Buy aircraft', _mkMode === 'lease' ? 'Pay a monthly rent instead of the full price, for 1, 3 or 6 years' : _mkMode === 'used' ? 'Second-hand aircraft for sale this week, of the types you have installed' : `${AIRCRAFT.filter(a => a.installed).length} types ${(State as any).simInstalled ? 'found in your simulator' : 'in your simulator (demo list until your PC is linked)'}, including add-ons`,
+      _mkMode === 'used' ? '' : `<label class="tg-inline"><span>Only what I have installed</span>${toggle('mk-installed', _mkInstalled)}</label>`)}
+    <div class="mk-mode seg">${[['buy', 'Buy new'], ['used', 'Used'], ['lease', 'Lease']].map(m => `<button class="${_mkMode === m[0] ? 'on' : ''}" data-act="mk-mode" data-m="${m[0]}">${icon(m[0] === 'buy' ? 'market' : m[0] === 'used' ? 'clock' : 'key')}${m[1]}</button>`).join('')}</div>
+    ${!coopCanBuy() ? `<p class="fine-print warn">${icon('info')}In this co-op only the owner buys, sells and leases aircraft.</p>` : ''}
+    ${_mkMode === 'used' ? usedMarketHtml() : `
     <div class="filter-row">${makers.map(m => `<button class="fchip ${_mkMaker === m ? 'on' : ''}" data-act="mk-maker" data-m="${esc(m)}">${esc(m)}</button>`).join('')}</div>
     <div class="mk-grid">${list.map((t, i) => {
       const owned = State.fleet.filter(a => a.typeId === t.id && a.companyId === c.id).length;
@@ -28,7 +30,7 @@ SCREENS.market = {
           </div>
         </div>
       </div>`;
-    }).join('')}</div>`;
+    }).join('')}</div>`}`;
   },
 };
 
@@ -78,6 +80,7 @@ function buySheetHtml(): string {
 }
 
 ACTIONS.buy = el => {
+  if (!canTrade()) return;
   Sound.tick();
   const c = company();
   _buy = { id: el.getAttribute('data-id'), qty: 1, base: company().hub, div: c.divisions.length ? (State.divisionId !== 'all' ? State.divisionId : c.divisions[0].id) : '' };
@@ -91,15 +94,15 @@ function baseFieldHtml(base: string, qty: number, kind: string): string {
 }
 ACTIONS['new-base'] = el => {
   const k = el.getAttribute('data-k');
-  openBasePicker('Base for the new aircraft', 'Where it is delivered and parked', icao => { if (k === 'lease') { _lease.base = icao; rerenderLease(); } else { _buy.base = icao; rerenderBuy(); } });
+  openBasePicker('Base for the new aircraft', 'Where it is delivered and parked', icao => { if (k === 'lease') { _lease.base = icao; rerenderLease(); } else if (k === 'used') { _used.base = icao; rerenderUsed(); } else { _buy.base = icao; rerenderBuy(); } });
 };
 function rerenderBuy() { const p = $('.buy-pop .panel'); if (p) p.innerHTML = buySheetHtml(); }
 ACTIONS['buy-qty'] = el => { _buy.qty = clamp(_buy.qty + parseInt(el.getAttribute('data-d'), 10), 1, 12); Sound.tick(); rerenderBuy(); };
 ACTIONS['buy-div'] = el => { _buy.div = el.getAttribute('data-div'); Sound.tick(); rerenderBuy(); };
 
 ACTIONS['buy-confirm'] = () => {
+  if (!canTrade()) return;
   if (noStandsFor(_buy.base || company().hub, _buy.qty)) { toast('Not enough free stands there: choose another base', 'warn'); return; }
-  if (!coopCanBuy()) { toast('In this co-op only the owner buys aircraft', 'warn'); return; }
   const t = acType(_buy.id), c = company();
   try { coopAfterBuy(`${_buy.qty}× ${t.maker} ${t.model}`, t.price * _buy.qty); } catch (e) { /* ignore */ }
   const regs = nextRegs(c, _buy.qty);
@@ -110,6 +113,7 @@ ACTIONS['buy-confirm'] = () => {
     reg: regs.join(', '), lines: regs.map(r => [`${t.maker} ${t.model} ${r}, ${t.dev}`, -t.price] as [string, number]), link: { kind: 'aircraft', id: regs[0] } });
   closeAll();
   Bases.ensure();
+  try { Online.discord('fleet', `New aircraft: ${regs.join(', ')}`, `${c.name} bought ${_buy.qty > 1 ? _buy.qty + ' new ' + t.maker + ' ' + t.model + 's' : 'a new ' + t.maker + ' ' + t.model}, based at ${_buy.base || c.hub}.`); } catch (e) { /* ignore */ }
   Sound.purchase(); Haptics.success();
   animateBalance(from, c.balance);
   // delivery celebration
