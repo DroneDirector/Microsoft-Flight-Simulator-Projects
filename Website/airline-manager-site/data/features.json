@@ -144,7 +144,7 @@
    },
    {
     "t": "Add-on aircraft (PMDG, Fenix, iniBuilds, Aerosoft, SimWorks Studios …)",
-    "n": ""
+    "n": "Found by the pc app in the simulator's package folders"
    },
    {
     "t": "Buy several aircraft, including several identical ones",
@@ -152,6 +152,22 @@
    },
    {
     "t": "Purchase sound, vibration and delivery animation",
+    "n": ""
+   },
+   {
+    "t": "Sell aircraft to a broker at market value (age, condition) less a 6% fee",
+    "n": ""
+   },
+   {
+    "t": "Used-aircraft market, new every Monday: age, hours, cycles, condition, ferry flight",
+    "n": ""
+   },
+   {
+    "t": "Cabin layouts (first, business, economy) and freighter conversions",
+    "n": ""
+   },
+   {
+    "t": "Only the owner buys, sells and leases aircraft; hired pilots never do",
     "n": ""
    }
   ]
@@ -169,6 +185,30 @@
    },
    {
     "t": "Your day's legs and a timeline of every aircraft",
+    "n": ""
+   },
+   {
+    "t": "Your own fares per route for economy, business and first class",
+    "n": ""
+   },
+   {
+    "t": "Demand by airport size, distance, season, fares, popularity and marketing",
+    "n": ""
+   },
+   {
+    "t": "Competing airlines on routes, with their own fares and quality",
+    "n": ""
+   },
+   {
+    "t": "Fuel prices per airport and day; tankering",
+    "n": ""
+   },
+   {
+    "t": "Job board: charters and cargo jobs, flown by you or a hired pilot",
+    "n": ""
+   },
+   {
+    "t": "Tours and a weekly challenge",
     "n": ""
    }
   ]
@@ -254,6 +294,22 @@
    {
     "t": "Transactions list",
     "n": ""
+   },
+   {
+    "t": "Loans with monthly instalments and early payoff",
+    "n": ""
+   },
+   {
+    "t": "Fleet insurance (basic or full) paying back accident repairs",
+    "n": ""
+   },
+   {
+    "t": "Marketing campaigns for the airline or a route",
+    "n": ""
+   },
+   {
+    "t": "Landing, parking and gate fees by airport; monthly hangar rent at bases",
+    "n": ""
    }
   ]
  },
@@ -294,6 +350,10 @@
    },
    {
     "t": "Flight menu on the map: follow, favourite and details",
+    "n": ""
+   },
+   {
+    "t": "Co-op flight reports (PIREPs) reviewed by the owner",
     "n": ""
    },
    {
@@ -401,6 +461,14 @@
  {
   "title": "Crew",
   "items": [
+   {
+    "t": "Type ratings: hired pilots fly only rated types; courses with a check ride; your first flight on a new type is your check ride",
+    "n": ""
+   },
+   {
+    "t": "Landing leaderboard: you, hired pilots and co-op pilots, softest and best average",
+    "n": ""
+   },
    {
     "t": "Hired pilots and crew gain levels and a better rating from their work",
     "n": ""
@@ -521,6 +589,38 @@
    },
    {
     "t": "Mechanic reports damage found on the leg after landing",
+    "n": ""
+   },
+   {
+    "t": "Installed aircraft list from the sim (aircraft packages in Community and the bought add-ons)",
+    "n": ""
+   },
+   {
+    "t": "Plan on SimBrief with the leg filled in; flight plans (.PLN) saved for the simulator",
+    "n": ""
+   },
+   {
+    "t": "SimBrief flight plan import (route, fuel, weights)",
+    "n": ""
+   },
+   {
+    "t": "Live METAR and TAF; the real wind sets the runway in use",
+    "n": ""
+   },
+   {
+    "t": "VATSIM and IVAO: controllers, your airline online, traffic on the map",
+    "n": ""
+   },
+   {
+    "t": "Hoppie ACARS: load sheet and arrival information to your aircraft; messages back",
+    "n": ""
+   },
+   {
+    "t": "Discord posts through a webhook",
+    "n": ""
+   },
+   {
+    "t": "Public airline page to save and share",
     "n": ""
    }
   ]
