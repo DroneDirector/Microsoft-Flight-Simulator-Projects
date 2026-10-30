@@ -7,7 +7,7 @@
 //  - Conduct reports can be switched off in Settings → Staff. Nothing that already happened is
 //    removed, and court cases pause; switched back on, everything carries on where it stopped.
 
-const POOL_ROLES: CrewRole[] = ['fo', 'fa', 'mech'];
+const POOL_ROLES: CrewRole[] = ['fo', 'fa', 'mech', 'ground'];
 const POOL_BASES = ['EKVG', 'EKCH', 'ENGM', 'BIKF', 'EGLL', 'EDDF', 'PALH', 'EKBI', 'KJFK', 'CYYZ'];
 
 /** Pay everyone for every week that has passed. */
@@ -22,9 +22,10 @@ function payrollAdvance(quiet?: boolean) {
       let total = 0;
       for (const p of people) {
         if (!p.salary) continue;
-        total += p.salary;
-        S.txns.unshift({ id: uid(), companyId: c.id, date: day, time: '06:00', kind: 'salary', label: `Salary: ${p.name}`, amount: -p.salary, personId: p.id,
-          lines: [['Weekly salary', -Math.round(p.salary * 0.86)], ['Pension and insurance', -Math.round(p.salary * 0.14)]], link: { kind: 'staff', id: p.id } });
+        const pay = (p as any).apronLeave && (p as any).leavePay ? Math.round(p.salary * 0.6) : p.salary;   // on leave: 60% while they wait
+        total += pay;
+        S.txns.unshift({ id: uid(), companyId: c.id, date: day, time: '06:00', kind: 'salary', label: `Salary: ${p.name}${pay < p.salary ? ' (on leave, 60%)' : ''}`, amount: -pay, personId: p.id,
+          lines: [['Weekly salary', -Math.round(pay * 0.86)], ['Pension and insurance', -Math.round(pay * 0.14)]], link: { kind: 'staff', id: p.id } });
       }
       if (!total) continue;
       const before = c.balance; c.balance -= total;
@@ -44,7 +45,8 @@ function makePilotCandidate(seed: string): any {
   const t1 = types[Math.floor(r() * types.length)], t2 = types[Math.floor(r() * types.length)];
   const hrs = Math.round(3000 + r() * 14000);
   return { id: 'c-' + uid(), name: st.name, rank: 'Captain', hoursMin: hrs * 60, landings: Math.round(hrs * (0.4 + r() * 0.5)), base: st.base, salary: Math.round(3600 + r() * 1600), rating: Math.round((3.6 + r() * 1.4) * 10) / 10,
-    status: 'standby', types: t1 === t2 ? [t1] : [t1, t2], sex: st.sex, nat: st.nat, dob: st.dob, look: randomLook('pilot-' + st.id, st.sex, 'captain') };
+    status: 'standby', types: t1 === t2 ? [t1] : [t1, t2], sex: st.sex, nat: st.nat, dob: st.dob, look: randomLook('pilot-' + st.id, st.sex, 'captain'),
+    xp: startingXp(seed, 'captain', 2026 - parseInt(st.dob, 10), hrs * 60) };
 }
 
 /** The job market moves: candidates leave, new ones arrive (some days more, some days fewer). */
@@ -97,6 +99,7 @@ function setConduct(on: boolean) {
 
 function startStaffing() {
   payrollAdvance(true); poolAdvance(); leaseAdvance(true); try { Bank.advance(true); Jobs.advance(true); } catch (e) { /* ignore */ }
-  setInterval(() => { payrollAdvance(); poolAdvance(); leaseAdvance(); try { Bank.advance(); Jobs.advance(); Ratings.advance(); } catch (e) { /* ignore */ } }, 60000);
+  try { moraleAdvance(); } catch (e) { /* ignore */ }
+  setInterval(() => { payrollAdvance(); poolAdvance(); leaseAdvance(); try { Bank.advance(); Jobs.advance(); Ratings.advance(); moraleAdvance(); } catch (e) { /* ignore */ } }, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { payrollAdvance(); poolAdvance(); leaseAdvance(); try { Bank.advance(); Jobs.advance(); Ratings.advance(); } catch (e) { /* ignore */ } } });
 }

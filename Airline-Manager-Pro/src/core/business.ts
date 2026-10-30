@@ -217,8 +217,10 @@ function aiLoad(reg: string, from: string, to: string, leg: number): { pax: numb
   const cargoLf = clamp(cmk / Math.max(1, cap * 3) + 0.25, 0.2, 0.92) * (0.85 + rnd('c') * 0.3);
   if (cab.freighter) return { pax: 0, paxJ: 0, paxF: 0, cargoKg: Math.round(cap * clamp(cargoLf + 0.15, 0.3, 0.95)) };
   const o = routeOutlook(a.companyId, from, to, r ? seatsPerDay(r) : cabinSeats(t, a) * 3);
-  const lf = clamp(o.lf * (0.9 + rnd('p') * 0.2), 0.1, 1);
   const A = apt(from), B = apt(to), nm = A && B ? gcDistanceNm(A.pos, B.pos) : 500;
+  // the services the airline offers make it a little more or less popular
+  const svcD = typeof serviceEffects === 'function' ? serviceEffects(a.companyId, t.cls, nm, !isDomestic(from, to), 100, 10).demand : 1;
+  const lf = clamp(o.lf * svcD * (0.9 + rnd('p') * 0.2), 0.1, 1);
   // premium travellers: more of them on long flights and between big airports
   const big = (aptSize(from) + aptSize(to)) / 4, fares = routeFares(r);
   const jDemand = (nm > 1500 ? 0.12 : nm > 500 ? 0.07 : 0.04) * (0.7 + big * 0.6) * Math.pow(fares.j, -1.4);

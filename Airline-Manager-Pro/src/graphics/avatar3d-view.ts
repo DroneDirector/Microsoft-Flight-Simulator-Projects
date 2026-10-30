@@ -318,7 +318,9 @@ function av3Tick(now: number) {
     if (sec > L.blinkAt) { L.blinkT = sec; L.blinkAt = sec + 2.4 + Math.random() * 3.6; }
     const bt = (sec - L.blinkT) / 0.16, blink = bt >= 0 && bt <= 1 ? Math.sin(bt * Math.PI) : 0;
     if (sec > L.gazeAt) { L.gaze = [(Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.15]; L.gazeAt = sec + 1.2 + Math.random() * 2.5; }
-    if (!L.drag && sec - L.lastTouch > 3) L.yaw *= 0.94;
+    // a figure stays the way you turned it; a double tap turns it back to face you
+    if ((L as any).back) { L.yaw *= 0.86; if (Math.abs(L.yaw) < 0.005) { L.yaw = 0; (L as any).back = false; } }
+    _av3Yaw[el.getAttribute('data-k') || ''] = L.yaw;
     if (sec - L.drawn < 1 / 30) continue;   // 30 frames a second is plenty for idle motion
     L.drawn = sec;
     av3Draw(L.model, el.getAttribute('data-view'), w, h, { t: sec - L.t0, yaw: L.yaw, blink, gaze: L.gaze });
@@ -355,16 +357,21 @@ function av3PickLive() {
     if (Av3.live.some(l => l.el === el)) continue;
     const model = av3Model(el.getAttribute('data-k')); if (!model) continue;
     const sec = performance.now() / 1000;
-    Av3.live.push({ el, model, t0: sec - Math.random() * 6, yaw: 0, drag: null, blinkAt: sec + 1 + Math.random() * 2, blinkT: -9, gaze: [0, 0], gazeAt: sec + 1, lastTouch: 0, drawn: 0 });
+    Av3.live.push({ el, model, t0: sec - Math.random() * 6, yaw: _av3Yaw[el.getAttribute('data-k') || ''] || 0, drag: null, blinkAt: sec + 1 + Math.random() * 2, blinkT: -9, gaze: [0, 0], gazeAt: sec + 1, lastTouch: 0, drawn: 0 });
   }
 }
+
+/** How far each person has been turned (kept while the app runs, so they stay as you left them). */
+const _av3Yaw: { [key: string]: number } = {};
 
 /** Turn a live figure with a finger. */
 function av3Grab(el: HTMLCanvasElement, ev: PointerEvent) {
   const L = Av3.live.filter(l => l.el === el)[0]; if (!L) return;
   ev.stopPropagation();
-  const x0 = ev.clientX, yaw0 = L.yaw;
-  L.drag = true; L.lastTouch = performance.now() / 1000;
+  const x0 = ev.clientX, yaw0 = L.yaw, now = performance.now() / 1000;
+  if (now - L.lastTouch < 0.32 && !L.drag) { (L as any).back = true; L.lastTouch = 0; av3Loop(); return; }   // double tap
+  (L as any).back = false;
+  L.drag = true; L.lastTouch = now;
   try { el.setPointerCapture(ev.pointerId); } catch (e) { /* older WebView */ }
   const move = (e: PointerEvent) => { L.yaw = yaw0 + (e.clientX - x0) / 90; L.lastTouch = performance.now() / 1000; };
   const up = () => { L.drag = null; L.lastTouch = performance.now() / 1000; el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); };
@@ -449,7 +456,7 @@ function heroTick(now: number) {
   const key = el.getAttribute('data-k');
   if (key !== Hero.key) {
     const m = av3Model(key, 1);
-    if (m) { if (Hero.model) Hero.stage.remove(Hero.model.root); Hero.model = m; Hero.key = key; Hero.stage.add(m.root); el.classList.add('in'); }
+    if (m) { if (Hero.model) Hero.stage.remove(Hero.model.root); Hero.model = m; Hero.key = key; Hero.yaw = _av3Yaw['hero:' + key] || 0; Hero.stage.add(m.root); el.classList.add('in'); }
   }
   const model = Hero.model; if (!model) return;
   const dpr = Math.min((window.devicePixelRatio || 1) * uiScale(), 3), w = Math.round(el.clientWidth * dpr), h = Math.round(el.clientHeight * dpr);
@@ -459,7 +466,8 @@ function heroTick(now: number) {
   if (sec > Hero.blinkAt) { Hero.blinkT = sec; Hero.blinkAt = sec + 2.4 + Math.random() * 3.6; }
   const bt = (sec - Hero.blinkT) / 0.16, blink = bt >= 0 && bt <= 1 ? Math.sin(bt * Math.PI) : 0;
   if (sec > Hero.gazeAt) { Hero.gaze = [(Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.15]; Hero.gazeAt = sec + 1.2 + Math.random() * 2.5; }
-  if (!Hero.drag && sec - Hero.lastTouch > 3) Hero.yaw *= Math.exp(-dt * 3.5);
+  if ((Hero as any).back) { Hero.yaw *= Math.exp(-dt * 7); if (Math.abs(Hero.yaw) < 0.005) { Hero.yaw = 0; (Hero as any).back = false; } }
+  _av3Yaw['hero:' + Hero.key] = Hero.yaw;
   const calm = State && State.settings && State.settings.reduceMotion;
   model.pose({ t: calm ? 0 : sec - Hero.t0, yaw: Hero.yaw, blink: calm ? 0 : blink, gaze: calm ? [0, 0] : Hero.gaze });
   // camera glides to its framing (critically damped, frame-rate independent)
@@ -475,8 +483,10 @@ function heroTick(now: number) {
 function heroGrab(ev: PointerEvent) {
   const el = Hero.el; if (!el) return;
   ev.stopPropagation();
-  const x0 = ev.clientX, yaw0 = Hero.yaw;
-  Hero.drag = true; Hero.lastTouch = performance.now() / 1000;
+  const x0 = ev.clientX, yaw0 = Hero.yaw, now = performance.now() / 1000;
+  if (now - Hero.lastTouch < 0.32 && !Hero.drag) { (Hero as any).back = true; Hero.lastTouch = 0; return; }   // double tap
+  (Hero as any).back = false;
+  Hero.drag = true; Hero.lastTouch = now;
   try { el.setPointerCapture(ev.pointerId); } catch (e) { /* older WebView */ }
   const move = (e: PointerEvent) => { Hero.yaw = yaw0 + (e.clientX - x0) / 90; Hero.lastTouch = performance.now() / 1000; };
   const up = () => { Hero.drag = false; Hero.lastTouch = performance.now() / 1000; el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); };

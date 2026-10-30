@@ -37,6 +37,7 @@ const OFFENCES: { [role: string]: { w: number; title: string; charge: string; te
   ],
 };
 OFFENCES.fo = OFFENCES.pilot;
+if (!OFFENCES.ground) OFFENCES.ground = OFFENCES.mech;   // ground staff: the same kind of cases
 // the airline itself, after an accident that investigators blame on poor maintenance (you are the accountable manager)
 OFFENCES.airline = [
   { w: 1, title: 'Accident caused by poor maintenance, with fatalities', charge: 'Corporate manslaughter and breaching aviation safety law', text: 'The investigation found that the accident was caused by poor maintenance: {why}.', months: [-2, -2], fine: [20000000, 80000000], fatal: true },

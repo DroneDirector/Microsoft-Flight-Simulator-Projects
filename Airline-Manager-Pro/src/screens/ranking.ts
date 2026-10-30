@@ -1,11 +1,17 @@
 // Ranking: your own record as a pilot: your rank and rating, your flying record and your badges, shown
 // as you earn them (badges not yet earned stay hidden). Badges are yours only; hired pilots and crew level up without badges.
 
-let _rkGroup = 'all', _rkShowAll = false;
+let _rkGroup = 'all', _rkShowAll = false, _rkWho = 'you', _rkJob = 'all', _rkAllCos = false;
+const RK_TABS: [string, string][] = [['you', 'You'], ['pilots', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground crew']];
 
 SCREENS.ranking = {
   title: 'Ranking', icon: 'trophy',
   render() {
+    const tabs = `<div class="filter-row rk-who">${RK_TABS.map(t => `<button class="fchip ${_rkWho === t[0] ? 'on' : ''}" data-act="rk-who" data-w="${t[0]}">${t[1]}</button>`).join('')}</div>`;
+    if (_rkWho !== 'you') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your staff by level and experience</p></div></div>${tabs}${staffRankHtml()}`;
+    return this.renderYou(tabs);
+  },
+  renderYou(tabs: string) {
     const S: any = State, c = company(), me: any = myPilot();
     const st = Progress.compute();
     const pxp = Progress.pilotXp(st), pr = Progress.rankOf(pxp, PILOT_RANKS);
@@ -23,6 +29,7 @@ SCREENS.ranking = {
       ['Distance', num(Math.round(st['p.nm'] || 0)) + ' nm'], ['Passengers', num(st['p.pax'] || 0)]];
     return `
     <div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your record, the landing leaderboard · ${num(nEarned)} ${nEarned === 1 ? 'badge' : 'badges'} earned</p></div></div>
+    ${tabs}
     <div class="rk-top">
       <div class="card rk-card">
         <span class="rk-av">${avatarSvg(me.look, 'captain', { view: 'bust', accent: c.color, still: true })}</span>
@@ -45,7 +52,34 @@ SCREENS.ranking = {
 
     </div>`;
   },
-};
+} as any;
+/** Staff rankings: each group in its own list, highest level first. */
+function staffRankHtml(): string {
+  const S: any = State, cid = State.companyId;
+  let list: any[];
+  if (_rkWho === 'pilots') list = State.pilots.filter((p: any) => !p.you).concat((S.staff || []).filter((p: any) => p.role === 'fo'));
+  else list = (S.staff || []).filter((p: any) => p.role === _rkWho && (_rkWho !== 'ground' || _rkJob === 'all' || p.job === _rkJob));
+  if (!_rkAllCos && State.companies.length > 1) list = list.filter((p: any) => (p.companyId || cid) === cid);
+  list = list.slice().sort((a, b) => (b.xp || 0) - (a.xp || 0) || (b.rating || 0) - (a.rating || 0));
+  const jobs = _rkWho === 'ground' ? `<div class="filter-row sub">${[['all', 'All jobs']].concat(GROUND_JOBS as any).map((r: any) => `<button class="fchip ${_rkJob === r[0] ? 'on' : ''}" data-act="rk-job" data-j="${r[0]}">${esc(r[1])}</button>`).join('')}</div>` : '';
+  const cos = State.companies.length > 1 ? `<span class="seg"><button class="${!_rkAllCos ? 'on' : ''}" data-act="rk-cos" data-v="0">${esc(company().name)}</button><button class="${_rkAllCos ? 'on' : ''}" data-act="rk-cos" data-v="1">All your airlines</button></span>` : '';
+  const role = _rkWho === 'pilots' ? 'captain' : _rkWho;
+  const rows = list.slice(0, 200).map((p: any, i: number) => {
+    const l = levelOf(p.xp || 0);
+    return `<button class="lb-row rk-staff" data-act="staff-detail" data-id="${esc(p.id)}"><b class="lb-n">${i + 1}</b>
+      <span class="rk-sav">${p.look ? avatarSvg(p.look, (personRole(p) || role) as any, { view: 'bust', accent: company(p.companyId || cid).color, still: true }) : ''}</span>
+      <span class="lb-who"><b>${esc(p.name)}</b>${levelChip(p)}<small>${esc(levelTitle(p))} · ${esc(p.base || '')}${_rkAllCos ? ' · ' + esc(company(p.companyId || cid).name) : ''}${p.job && typeof groundJobName === 'function' ? ' · ' + esc(groundJobName(p)) : ''}</small>
+        <span class="lvl-bar"><i style="width:${(l.p * 100).toFixed(0)}%"></i></span></span>
+      <span class="lb-v"><b>Level ${l.level}</b><small>${num(p.xp || 0)} XP · ${(p.rating || 4).toFixed(1)} ★</small></span></button>`;
+  }).join('');
+  const name = RK_TABS.filter(t => t[0] === _rkWho)[0][1].toLowerCase();
+  return `<div class="card lb"><div class="card-h"><b>${RK_TABS.filter(t => t[0] === _rkWho)[0][1]}</b>${cos}</div>${jobs}
+    <div class="lb-list">${rows || `<p class="fine-print">${icon('info')}No ${name} yet. Hire them under Crew.</p>`}</div>
+    <p class="fine-print">${icon('info')}Everyone levels up from 1 to ${LEVEL_MAX} with their work: flights for pilots and cabin crew, turnaround checks and repairs for mechanics, turnarounds for ground crew. Higher levels mean better ratings and fewer mistakes.</p></div>`;
+}
+ACTIONS['rk-who'] = el => { _rkWho = el.getAttribute('data-w'); _rkJob = 'all'; Sound.tick(); refresh(); };
+ACTIONS['rk-job'] = el => { _rkJob = el.getAttribute('data-j'); Sound.tick(); refresh(); };
+ACTIONS['rk-cos'] = el => { _rkAllCos = el.getAttribute('data-v') === '1'; Sound.tick(); refresh(); };
 ACTIONS['rk-group'] = el => { _rkGroup = el.getAttribute('data-g'); Sound.tick(); refresh(); };
 ACTIONS['rk-all'] = () => { _rkShowAll = !_rkShowAll; Sound.tick(); refresh(); };
 

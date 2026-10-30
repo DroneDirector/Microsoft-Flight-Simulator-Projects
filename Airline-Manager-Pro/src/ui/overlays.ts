@@ -172,6 +172,7 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref)) showFlightOnMap(n.ref);
   else if (n.kind === 'staff' && n.ref === 'badges') { closeAll(); go('ranking'); }
   else if (n.kind === 'staff' && n.ref && /^case-/.test(n.ref)) courtPopup(n.ref);
+  else if (n.kind === 'staff' && n.ref && /^fb-/.test(n.ref)) moralePopup(n.ref.slice(3));
   else if (n.kind === 'staff' && n.ref) incidentPopup(n.ref);
   else if (n.kind === 'birthday') ACTIONS['bday-preview'](null, null);
   else {

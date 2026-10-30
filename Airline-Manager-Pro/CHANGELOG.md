@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.5 (2026-10-30)
+
+- First-start choice: keep the demo or wipe and found your own airline; start over in Settings
+- Crew screen (pilots, cabin crew, mechanics, ground staff with jobs, hiring)
+- Staff levels 1–500 with career experience and negative levels; warnings cost XP; ground crew earn XP on turnarounds
+- Staff mood (seven areas), requests, quitting; commendations; transfers between airports and airlines
+- Apron crew home-base/everywhere setting with home-base limits and leave/move/dismiss handling; 60% leave pay
+- Passenger services per airline (12 areas) affecting revenue, costs and demand
+- Passenger manifest, bans, boarding scans, loadsheets; cargo-first offloading
+- Staff rankings by group in Ranking
+- 3D figures keep their turn until double-tapped
+
 ## 0.9.4 (2026-10-30)
 
 - Runway requirements per type (field lengths at MTOW/MLW, minimum width, rough strips) checked against real runways; weight and elevation scaling; payload-limited flights; routes, jobs and hired pilots follow them

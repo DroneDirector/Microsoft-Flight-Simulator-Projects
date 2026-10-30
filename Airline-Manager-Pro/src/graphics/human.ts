@@ -1014,7 +1014,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
 
   /* ================= look → outfit ================= */
   function outfit(L, role, accent, I) {
-    const f = L.sex === 'f', pilot = role === 'captain' || role === 'fo', mech = role === 'mech' || L.top === 'overalls';
+    const f = L.sex === 'f', pilot = role === 'captain' || role === 'fo', mech = (role === 'mech' || role === 'ground') || L.top === 'overalls';
     const skin = SKIN_3D[L.skin] || SKIN_3D[2], hair = HAIR_COLORS[L.hairColor] || HAIR_COLORS[1], uni = UNIFORM_COLORS[L.uniform] || UNIFORM_COLORS[0];
     const dark = L.skin > 5;
     const lip = '#' + new THREE.Color(shade(skin, dark ? -0.34 : -0.14)).lerp(new THREE.Color(dark ? '#4a2220' : '#c4645c'), dark ? 0.35 : 0.55).getHexString();
@@ -1082,7 +1082,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     const np = I.neckPivot, headPivot = new THREE.Group(), head = new THREE.Group();
     headPivot.position.set(np[0], np[1], np[2]); head.position.set(-np[0], -np[1], -np[2]); headPivot.add(head); root.add(headPivot);
     const eyes = [eye(I.eyeL, c.eyeR, c.iris), eye(I.eyeR, c.eyeR, c.iris)]; eyes.forEach(e => head.add(e));
-    const hatKind = L.hat === 'none' ? null : role === 'mech' ? 'mech' : L.hat === 'pillbox' ? 'pillbox' : role === 'captain' ? 'captain' : role === 'fa' ? 'fa' : 'fo';
+    const hatKind = L.hat === 'none' ? null : (role === 'mech' || role === 'ground') ? 'mech' : L.hat === 'pillbox' ? 'pillbox' : role === 'captain' ? 'captain' : role === 'fa' ? 'fa' : 'fo';
     const strandHair = ['bald', 'buzz'].indexOf(L.hair) < 0;
     t0 = tick('material', t0);
     if (strandHair) head.add(buildHair(L.hair, geo, b, I, c, q, hatKind && hatKind !== 'pillbox' ? I.headC[1] - 0.006 : 0));

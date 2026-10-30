@@ -35,7 +35,7 @@
   const back = resume && SCREENS[resume.screen] ? resume.screen : null;
   State.screen = back || 'ops';
   renderShell();
-  setTimeout(checkBirthday, back ? 1500 : SPLASH_MS + 400);   // after the start-up screen
+  if (!Store.wasEmpty) setTimeout(checkBirthday, back ? 1500 : SPLASH_MS + 400);   // after the start-up screen (not over the first-start choice)
   scheduleBirthdayNotification();
   startConductClock();
   startCourtClock();

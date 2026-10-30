@@ -55,6 +55,7 @@
     "src/ui/look-editor.ts",
     "src/ui/crew-ui.ts",
     "src/ui/whats-new.ts",
+    "src/ui/first-start.ts",
     "src/ui/splash.ts",
     "src/core/court.ts",
     "src/core/staffing.ts",
@@ -92,6 +93,9 @@
     "src/core/flight-trace.ts",
     "src/core/turnaround.ts",
     "src/core/runway-req.ts",
+    "src/core/manifest.ts",
+    "src/core/morale.ts",
+    "src/core/services.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/main.ts"

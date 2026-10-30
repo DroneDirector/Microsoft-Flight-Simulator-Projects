@@ -21,11 +21,11 @@ interface Look {
   uniform: number;         // index into UNIFORM_COLORS
 }
 
-type CrewRole = 'captain' | 'fo' | 'fa' | 'mech';
+type CrewRole = 'captain' | 'fo' | 'fa' | 'mech' | 'ground';
 
 const SKIN_TONES = ['#FBE3D0', '#F3CFB3', '#E8B894', '#D9A07A', '#C68A62', '#A86F4C', '#8D5A3B', '#71452D', '#583421', '#3F2618'];
 const HAIR_COLORS = ['#1C1714', '#3B2A20', '#5E4330', '#8A6446', '#C9A36A', '#E3D2AE', '#8C3F22', '#B5502A', '#8E9196', '#DCDCDC'];
-const UNIFORM_COLORS = ['#1D2D4F', '#1C1F26', '#3A4049', '#5A1F2E', '#2F5D8C', '#1F4A44'];
+const UNIFORM_COLORS = ['#1D2D4F', '#1C1F26', '#3A4049', '#5A1F2E', '#2F5D8C', '#1F4A44', '#D9A514', '#D9661F'];   // the last two: hi-vis for ground staff
 const UNIFORM_NAMES = ['Navy', 'Black', 'Charcoal', 'Burgundy', 'Sky blue', 'Forest'];
 const HAIR_STYLES: { [k: string]: string } = {
   bald: 'Bald', buzz: 'Buzz cut', crop: 'Short crop', side: 'Side part', curly: 'Short curls', afro: 'Afro',
@@ -43,7 +43,7 @@ function shade(hex: string, f: number): string {
 /** Make sure a look is complete and dressed, whatever was stored. */
 function dressed(l: Look, role: CrewRole): Look {
   const d: Look = Object.assign(defaultLook(l && l.sex || 'm', role), l || {});
-  if (role === 'mech') { d.top = 'overalls'; d.bottom = 'trousers'; if (d.hat === 'pillbox') d.hat = 'none'; }
+  if ((role === 'mech' || role === 'ground')) { d.top = 'overalls'; d.bottom = 'trousers'; if (d.hat === 'pillbox') d.hat = 'none'; }
   if ((role === 'captain' || role === 'fo') && d.hat === 'pillbox') d.hat = 'cap';
   if (d.top === 'overalls') d.bottom = 'trousers';
   if (!d.top) d.top = 'jacket';
@@ -64,7 +64,7 @@ function dressed(l: Look, role: CrewRole): Look {
 
 /** Garment choices that suit a man or a woman in a given role (used by the look editor). */
 function garmentOptions(sex: 'm' | 'f', role: CrewRole) {
-  const f = sex === 'f', fa = role === 'fa', mech = role === 'mech';
+  const f = sex === 'f', fa = role === 'fa', mech = (role === 'mech' || role === 'ground');
   return {
     top: fa ? (f ? [['blouse', 'Blouse'], ['vest', 'Waistcoat'], ['jacket', 'Jacket'], ['pullover', 'Pullover']] : [['vest', 'Waistcoat'], ['jacket', 'Jacket'], ['pullover', 'Pullover']])
       : [['jacket', 'Jacket'], ['shirt', 'Short-sleeve shirt'], ['pullover', 'Pullover']],
@@ -80,9 +80,9 @@ function defaultLook(sex: 'm' | 'f', role: CrewRole): Look {
   return {
     sex, skin: 2, face: 'oval', eyes: 'almond', nose: 'medium', lips: 'medium',
     hair: sex === 'f' ? (fa ? 'bun' : 'bob') : 'crop', hairColor: 1, facial: 'none', glasses: 'none',
-    top: role === 'mech' ? 'overalls' : fa ? (sex === 'f' ? 'blouse' : 'vest') : 'jacket',
-    bottom: fa && sex === 'f' ? 'skirt' : 'trousers', shoes: fa && sex === 'f' ? 'pumps' : role === 'mech' ? 'boots' : 'oxford',
-    neck: fa ? (sex === 'f' ? 'scarf' : 'tie') : role === 'mech' ? 'open' : 'tie', hat: 'none', uniform: 0,
+    top: (role === 'mech' || role === 'ground') ? 'overalls' : fa ? (sex === 'f' ? 'blouse' : 'vest') : 'jacket',
+    bottom: fa && sex === 'f' ? 'skirt' : 'trousers', shoes: fa && sex === 'f' ? 'pumps' : (role === 'mech' || role === 'ground') ? 'boots' : 'oxford',
+    neck: fa ? (sex === 'f' ? 'scarf' : 'tie') : (role === 'mech' || role === 'ground') ? 'open' : 'tie', hat: 'none', uniform: 0,
   };
 }
 

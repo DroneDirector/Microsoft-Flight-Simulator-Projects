@@ -70,10 +70,14 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'atcTranscripts', label: 'Save ATC transcripts to the logbook' },
     { type: 'choice', key: 'sttQuality', label: 'Speech recognition quality', hint: 'Higher quality uses more of your PC while you fly.', options: [['light', 'Light'], ['balanced', 'Balanced'], ['accurate', 'Accurate']], when: () => State.settings.atcSource === 'beyondatc' && State.settings.atcListen },
   ] },
+  { id: 'services', title: 'Passenger services', icon: 'pax', items: [
+    { type: 'html', html: () => servicesHtml() },
+  ] },
   { id: 'staff', title: 'Staff', icon: 'pilots', items: [
+    { type: 'choice', key: 'groundHandling', label: 'Apron crew: mechanics, drivers and baggage handlers', hint: 'Home base only: your own apron crew works at your main base; everywhere else the local handling company services your aircraft (you pay its fee per turnaround and can\'t manage its people). Every airport: you hire your own apron crew for any airport you fly to. Co-pilots and cabin crew are always your own.', options: [['base', 'Home base only'], ['everywhere', 'Every airport']] },
     { type: 'toggle', key: 'conduct', label: 'Conduct reports and behaviour', hint: 'Misconduct, warnings and court cases for your AI crew. Switching off never removes what already happened; court cases pause and carry on when you switch back on.' },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Most of the time your staff behave well. Choose how often someone steps out of line. You'll be asked to discipline or dismiss them when it happens.</p>` },
-    { type: 'html', html: () => [['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['fo', 'Co-pilots']].map(r => `<div class="ch-row"><span><b>${r[1]}</b><small>How often they misbehave</small></span><div class="seg">${[['never', 'Never'], ['rare', 'Rarely'], ['normal', 'Sometimes'], ['often', 'Often']].map(o => `<button class="${(State.settings as any).misconduct[r[0]] === o[0] ? 'on' : ''}" data-act="set-misconduct" data-r="${r[0]}" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>`).join('') },
+    { type: 'html', html: () => [['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['ground', 'Ground staff'], ['fo', 'Co-pilots']].map(r => `<div class="ch-row"><span><b>${r[1]}</b><small>How often they misbehave</small></span><div class="seg">${[['never', 'Never'], ['rare', 'Rarely'], ['normal', 'Sometimes'], ['often', 'Often']].map(o => `<button class="${(State.settings as any).misconduct[r[0]] === o[0] ? 'on' : ''}" data-act="set-misconduct" data-r="${r[0]}" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>`).join('') },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Rarely is about 2% of the time, sometimes about 5–10%, often about 20%.</p>` },
   ] },
   { id: 'realism', title: 'Damage and realism', icon: 'shield', items: [
@@ -125,6 +129,7 @@ const SETTINGS: SetSection[] = [
     } },
     { type: 'html', html: () => `<div class="btn-row"><button class="btn ghost sm" data-act="backup-export">${icon('download')}Save a backup file</button><button class="btn ghost sm" data-act="backup-import">${icon('sync')}Restore from a backup</button></div>` },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Android's own backup (Settings → Google → Backup on the phone) also carries the app's data to a new phone.</p>` },
+    { type: 'html', html: () => `<div class="ch-row"><span><b>Start from scratch</b><small>Wipe every airline, aircraft, staff member, route, flight and log, and found a new airline. Settings are kept. Make a backup first if you may want it back.</small></span><button class="btn danger sm" data-act="fs-scratch">${icon('trash')}Start over</button></div>` },
   ] },
   { id: 'support', title: 'Updates and errors', icon: 'download', items: [
     { type: 'html', html: () => {
@@ -256,6 +261,8 @@ ACTIONS['set-choice'] = el => {
   Store.save();
   Sound.tick(); rerenderSettingsBody();
   refresh();
+  // apron crew back to the home base only: you decide what happens to the people at other airports
+  if (el.getAttribute('data-key') === 'groundHandling') apronCrewChanged();
 };
 
 ACTIONS.toggle = el => {
