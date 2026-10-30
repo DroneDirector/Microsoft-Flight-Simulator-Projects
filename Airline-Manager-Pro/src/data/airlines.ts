@@ -109,7 +109,7 @@ ACTIONS['al-pick'] = el => {
         k2++;
       } while (plane(reg) || regs.indexOf(reg) >= 0);
       regs.push(reg);
-      State.fleet.push({ reg, typeId: tid, companyId: id, base: a.hub, location: a.hub, hoursMin: Math.round((3000 + Math.random() * 20000) * 60), cycles: Math.round(2000 + Math.random() * 12000), condition: Math.round(78 + Math.random() * 18), status: 'parked', delivered: dateStr(new Date()).slice(0, 10), built: new Date().getFullYear() - Math.round(2 + Math.random() * 14) } as any);
+      State.fleet.push({ engine: engineFor(tid, reg) || undefined, reg, typeId: tid, companyId: id, base: a.hub, location: a.hub, hoursMin: Math.round((3000 + Math.random() * 20000) * 60), cycles: Math.round(2000 + Math.random() * 12000), condition: Math.round(78 + Math.random() * 18), status: 'parked', delivered: dateStr(new Date()).slice(0, 10), built: new Date().getFullYear() - Math.round(2 + Math.random() * 14) } as any);
     }
   });
   (State as any).coPilot[id] = { sex: Math.random() < 0.5 ? 'f' : 'm', id: '' };

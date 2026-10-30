@@ -8,6 +8,7 @@ interface Pilot {
   sex?: 'm' | 'f'; nat?: string; dob?: string; look?: any; lookAccepted?: boolean; coPilotFor?: string; warnings?: number; companyId?: string;
 }
 interface Aircraft {
+  engine?: string;   // the engine option (data/engines.ts); the type's first when not set
   reg: string; typeId: string; companyId: string; divisionId?: string; base: string; location: string;
   hoursMin: number; cycles: number; condition: number; status: 'parked' | 'flying' | 'grounded' | 'maintenance';
   delivered: string; name?: string;

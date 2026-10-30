@@ -1,0 +1,23 @@
+Engines per aircraft type (src/data/engines.ts)
+================================================
+
+Type            Engine options (first = default)                         Effects in the app (C = worked out)
+A320 (ceo)      CFM56-5B4 / IAE V2527-A5                                 V2500: fuel -1.5%, maintenance +4% (C)
+A320neo         CFM LEAP-1A26 / Pratt & Whitney PW1127G-JM (GTF)         GTF: fuel -0.5%, maintenance +15%, more engine findings (powder-metal inspections 2023 on) (C)
+A310            GE CF6-80C2A2 / Pratt & Whitney PW4152                   PW4152: fuel +1%, maintenance -3% (C)
+A350-900        Rolls-Royce Trent XWB-84 only
+737-800 / -600  CFM56-7B26 / CFM56-7B22 only (737NG has one engine family)
+777-300ER       GE90-115B only
+787-10          GE GEnx-1B76 / Rolls-Royce Trent 1000 TEN                Trent 1000: fuel +0.5%, maintenance +8%, more engine findings (C)
+747-8           GE GEnx-2B67 only
+CRJ700 / CRJ900 GE CF34-8C5B1 / CF34-8C5 only (the CRJ700/900 are only built with the CF34-8C)
+ATR 72-600      Pratt & Whitney Canada PW127M only
+DHC-6           PT6A-34 only
+DHC-2 Beaver    P&W R-985 Wasp Junior / turbine conversion (PT6A-34)     turbine: fuel +12%, maintenance -20%, far fewer engine problems, price +35% (C)
+Cessna 208      PT6A-114A only
+Kodiak 100      PT6A-34 only
+PC-12           PT6A-67P only
+Cessna 172      Lycoming IO-360-L2A only
+
+New aircraft (bought or leased new): you choose the engine where there is a choice.
+Used aircraft and real-airline fleets come with the engine they have.

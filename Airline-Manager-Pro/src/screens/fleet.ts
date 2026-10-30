@@ -91,6 +91,7 @@ ACTIONS['ac-detail'] = el => {
         <div><small>Cycles</small><b>${num(a.cycles)}</b></div>
         <div><small>Condition</small><b>${Math.round(a.condition)}%</b></div>
         <div><small>${cabinOf(a).freighter ? 'Cargo' : 'Seats in your layout'}</small><b>${cabinOf(a).freighter ? num(cargoCapacity(a)) + ' kg' : cabinSeats(t, a)}</b></div>
+        ${engineOf(a) ? `<div><small>Engines</small><b>${esc(engineOf(a).name)}</b></div>` : ''}
         ${cabinOf(a).freighter ? '' : `<div><small>Passengers this type takes</small><b>${esc(capacityText(a.typeId))}</b></div>`}
         <div><small>Range</small><b>${num(t.rangeNm)} nm</b></div>
         <div><small>Base</small><b>${esc(a.base)}</b></div>

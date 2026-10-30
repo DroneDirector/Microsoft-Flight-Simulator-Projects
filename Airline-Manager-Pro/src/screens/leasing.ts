@@ -65,7 +65,7 @@ let _lease = { id: '', qty: 1, div: '', years: 3, base: '' };
 
 function leaseSheetHtml(): string {
   const t = acType(_lease.id), c = company();
-  const monthly = leaseMonthly(t.price, _lease.years), deposit = monthly * 2;
+  const monthly = leaseMonthly(Math.round(t.price * ((engineOptions(t.id).filter(e => e.id === (_lease as any).eng)[0] || { price: 1 } as any).price)), _lease.years), deposit = monthly * 2;
   const today = (monthly + deposit) * _lease.qty, after = c.balance - today;
   const regs = nextRegs(c, _lease.qty);
   return `
@@ -75,6 +75,7 @@ function leaseSheetHtml(): string {
       <div class="buy-form">
         <div class="field"><small>How many</small>
           <div class="stepper"><button class="icon-btn" data-act="lease-qty" data-d="-1" aria-label="One less"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12h14"/></svg></button><b>${_lease.qty}</b><button class="icon-btn" data-act="lease-qty" data-d="1" aria-label="One more">${icon('plus')}</button></div></div>
+        ${enginePickHtml(t.id, (_lease as any).eng, 'lease-eng')}
         <div class="field"><small>Lease term</small><div class="seg">${LEASE_TERMS.map(x => `<button class="${_lease.years === x.years ? 'on' : ''}" data-act="lease-term" data-y="${x.years}">${x.years} year${x.years > 1 ? 's' : ''}</button>`).join('')}</div></div>
         ${c.divisions.length ? `<div class="field"><small>Division</small><div class="seg">${c.divisions.map(d => `<button class="${_lease.div === d.id ? 'on' : ''}" data-act="lease-div" data-div="${d.id}">${esc(d.name)}</button>`).join('')}</div></div>` : ''}
         <div class="field"><small>Registration${_lease.qty > 1 ? 's' : ''}</small><div class="regs">${regs.map(r => `<span>${esc(r)}</span>`).join('')}</div></div>
@@ -93,6 +94,7 @@ function leaseSheetHtml(): string {
       </div>
     </div>`;
 }
+ACTIONS['lease-eng'] = el => { (_lease as any).eng = el.getAttribute('data-e'); Sound.tick(); rerenderLease(); };
 function rerenderLease() { const p = $('.lease-pop .panel'); if (p) p.innerHTML = leaseSheetHtml(); }
 
 ACTIONS.lease = el => {
@@ -114,7 +116,7 @@ ACTIONS['lease-confirm'] = () => {
   const regs = nextRegs(c, _lease.qty), from = c.balance;
   const lessor = LESSORS[_hashStr(t.id + c.id) % LESSORS.length];
   c.balance -= (monthly + deposit) * _lease.qty;
-  regs.forEach(r => State.fleet.push({ reg: r, typeId: t.id, companyId: c.id, divisionId: _lease.div || undefined, base: _lease.base || c.hub, location: _lease.base || c.hub, hoursMin: 0, cycles: 0, condition: 100, status: 'parked', delivered: dateStr(new Date()).slice(0, 10),
+  regs.forEach(r => State.fleet.push({ engine: (engineOptions(t.id).filter(e => e.id === (_lease as any).eng)[0] || engineOptions(t.id)[0] || {} as any).id, reg: r, typeId: t.id, companyId: c.id, divisionId: _lease.div || undefined, base: _lease.base || c.hub, location: _lease.base || c.hub, hoursMin: 0, cycles: 0, condition: 100, status: 'parked', delivered: dateStr(new Date()).slice(0, 10),
     lease: { since: now, months: _lease.years * 12, monthly, deposit, nextAt: now + LEASE_MONTH, endAt: now + _lease.years * 12 * LEASE_MONTH, lessor } } as any));
   State.txns.unshift({ id: uid(), companyId: c.id, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Lease: ${_lease.qty}× ${t.maker} ${t.model}`, amount: -(monthly + deposit) * _lease.qty, kind: 'lease' as any,
     reg: regs.join(', '), lines: regs.map(r => [`${r}: first month's rent and deposit, ${lessor}`, -(monthly + deposit)] as [string, number]), link: { kind: 'aircraft', id: regs[0] } } as any);

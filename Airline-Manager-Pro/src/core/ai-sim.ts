@@ -186,7 +186,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   (a as any).lastGateAt = at; (a as any).lastPax = f.pax || 0;
   try { (a as any).lastFuelKg = legFuel(a.typeId, f.pax || 0, f.from, f.to).land; } catch (e) { /* ignore */ }
   // real-world fares, on-board sales and costs (economics.ts)
-  const burnH = BURN_KG_H[t.cls] || 2000;
+  const burnH = (BURN_KG_H[t.cls] || 2000) * engineBurn(a.reg);
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
   const m = f.from === f.to
     ? (() => { const fuel = Math.round(burnKg * 0.95), crew = Math.round(t.costPerHr * blockMin / 60 * 0.35); return { net: -(fuel + crew), revenue: 0, costs: fuel + crew, lines: [['Test flight fuel', -fuel], ['Aircraft and crew time', -crew]] } as any; })()

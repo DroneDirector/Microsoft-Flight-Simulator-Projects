@@ -25,6 +25,7 @@
     "src/graphics/aircraft-art.ts",
     "src/data/aircraft-shapes.ts",
     "src/data/capacity.ts",
+    "src/data/engines.ts",
     "src/graphics/aircraft-model.ts",
     "src/data/flight-configs.ts",
     "src/graphics/avatar.ts",
