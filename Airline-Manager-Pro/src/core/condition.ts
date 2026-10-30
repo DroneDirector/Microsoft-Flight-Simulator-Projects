@@ -108,7 +108,9 @@ function conditionAdvance() {
     if (State.issues.some((x: any) => x.reg === reg && x.status === 'scheduled')) continue;
     a.status = State.issues.some((x: any) => x.reg === reg && x.status === 'open' && x.severity === 'grounding') ? 'grounded' : 'parked';
     try { crewAfterRepair(a.companyId, a.location || a.base, jobs[0].durMin); } catch (e) { /* ignore */ }
+    noticesAt(Date.now());
     State.notices.unshift({ id: uid(), kind: 'mechanic', title: `${reg} is ${jobs[0].instant ? 'repaired' : 'out of the hangar'}`, body: `${jobs.map(j => j.title).join(', ')} done${jobs[0].instant ? '' : ' in ' + jobs[0].durMin + ' minutes'}. Condition ${Math.round(a.condition)}%. Ready for its next flight.`, time: 'Now', read: false } as any);
+    noticesAt((jobs[0].startedAt || Date.now()) + (jobs[0].durMin || 0) * 60000);
   }
   if (hrs <= 0) return;
   // daily care: aircraft on the ground at their base slowly recover, more with good mechanics;

@@ -22,6 +22,7 @@ SCREENS.market = {
         <div class="mk-stage">${aircraftArt(t.id, { color: c.color, color2: c.color2 })}</div>
         <div class="mk-body">
           <div class="mk-name"><b>${esc(t.maker)} ${esc(t.model)}</b><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span></div>
+          <div class="mk-cap">${icon('pax')}<span>${esc(capacityText(t.id))}</span></div>
           <div class="mk-specs"><span><small>Seats</small>${t.seats}</span><span><small>Range</small>${num(t.rangeNm)} nm</span><span><small>Cruise</small>${t.cruiseKt} kt</span><span><small>Per hour</small>${money(t.costPerHr)}</span></div>
           <div class="mk-foot">
             ${_mkMode === 'lease' ? `<b class="mk-price"><small>from </small>${money(leaseMonthly(t.price, 6), { compact: true })}<small> /month</small></b>` : `<b class="mk-price">${money(t.price, { compact: true })}</b>`}

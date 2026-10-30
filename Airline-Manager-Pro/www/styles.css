@@ -2117,3 +2117,17 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .v3d-note .ic { flex: none; width: 16px; height: 16px; margin-top: 1px; }
 .v3d-note.warn { background: rgba(242, 193, 78, .12); color: #F2C14E; }
 .v3d-note.ok { background: rgba(63, 208, 232, .1); color: #8FE3F2; }
+.mk-cap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); margin: 2px 0 6px; }
+.mk-cap .ic { width: 15px; height: 15px; color: var(--cyan); flex: none; }
+.kv-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.kv-btn b { display: inline-flex; align-items: center; gap: 4px; text-decoration: underline; text-underline-offset: 3px; }
+.kv-btn b .ic { width: 14px; height: 14px; }
+.warn-list { display: flex; flex-direction: column; gap: 10px; }
+.warn-item { border-radius: 12px; padding: 10px 12px; background: rgba(255,255,255,.03); border-left: 3px solid #F2C14E; }
+.warn-item.sev-light { border-left-color: #8FB4D9; }
+.warn-item.sev-severe { border-left-color: #F0566B; }
+.warn-item p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.45; }
+.wi-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.wi-h time { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+.wi-sev { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #F2C14E; }
+.sev-light .wi-sev { color: #8FB4D9; } .sev-severe .wi-sev { color: #F0566B; }

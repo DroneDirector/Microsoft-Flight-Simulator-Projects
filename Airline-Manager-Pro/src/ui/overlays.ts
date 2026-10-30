@@ -130,7 +130,8 @@ let _inboxTab = 'all';
 function inboxHtml(): string {
   pruneNotices(); stampNotices();
   const tabs = ['all', 'mechanic', 'staff', 'authority', 'flight', 'pilot', 'finance'];
-  const list = State.notices.filter(n => _inboxTab === 'all' || n.kind === _inboxTab);
+  // newest first, by when each one really happened
+  const list = State.notices.filter(n => _inboxTab === 'all' || n.kind === _inboxTab).slice().sort((a: any, b: any) => (b.at || 0) - (a.at || 0));
   return `
     <div class="drawer-head"><h2>Notifications</h2>
       <button class="text-btn" data-act="mark-read">Mark all read</button>

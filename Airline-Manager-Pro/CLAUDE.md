@@ -18,6 +18,9 @@
   dimensions (length, span, height, fuselage, wing position/chords/sweep, engines, tail, nose, wingtips,
   gear). The aircraft pictures and the 3D view are built from it, so a new type looks like itself.
   Our own models only: no downloaded third-party models and no manufacturers' or airlines' logos.
+- **Runways and capacity**: every type also gets its take-off and landing field lengths, minimum runway width
+  and rough-strip ability (`src/core/runway-req.ts`), and its typical/all-economy/maximum seats
+  (`src/data/capacity.ts`), listed in `docs/reference/runway-requirements.txt`.
 - Taxi speeds (all types): tight turns or near obstacles 5–10 kt; normal straight taxiways 15–25 kt;
   long straight taxiways up to about 30 kt; approaching the runway or the stand 5–10 kt; pushback 3–5 kt.
 

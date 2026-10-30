@@ -151,6 +151,7 @@ ACTIONS['rules-save'] = () => {
     else if (res === 'no-aircraft') msg = `Assigned. ${p.name} starts when ${aAn(acType(r.typeId).model)} ${acType(r.typeId).model} is free`;
     else if (res === 'not-rated') { r.pilotId = undefined; msg = `${p.name} isn't rated on the ${acType(r.typeId).model}. Send them on a type rating course first.`; }
     else if (res === 'training') msg = `Assigned. ${p.name} starts after the type rating course`;
+    else if (res === 'runway') { r.pilotId = undefined; msg = routeRunwayProblem(r.typeId, r.legs); }
   } else msg = `${p.name} stays on the ground`;
   Store.save(); closeAll(); refresh(); toast(msg, 'ok');
 };

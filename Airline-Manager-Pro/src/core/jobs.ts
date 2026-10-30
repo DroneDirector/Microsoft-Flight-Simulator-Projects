@@ -54,6 +54,8 @@ function jobFits(j: Job, a: Aircraft): string {
   if (j.kind === 'pax' && cabinSeats(t, a) < j.pax) return `${cabinSeats(t, a)} seats, needs ${j.pax}`;
   if (j.kind === 'cargo' && cargoCapacity(a) < j.kg) return `${num(cargoCapacity(a))} kg of cargo room, needs ${num(j.kg)} kg`;
   if (j.nm > usableRange(t)) return `range ${num(usableRange(t))} nm, the job is ${num(j.nm)} nm`;
+  const rc = legRunwayCheck(t.id, j.from, j.to, j.kind === 'pax' ? j.pax : 0);
+  if (!rc.ok || (j.kind === 'pax' && rc.maxPax < j.pax)) return rc.why || 'the runways are too short for this load';
   return '';
 }
 
@@ -76,7 +78,9 @@ const Jobs = {
         const fee = Math.round(j.pay * 0.2);
         payTxn(j.companyId, `Charter cancelled: ${j.title}`, -fee, 'charter', [[`Not delivered to ${j.to} in time: 20% of ${money(j.pay)}`, -fee]]);
         try { Progress.popularity(-1, 'A charter not delivered'); } catch (e) { /* ignore */ }
+noticesAt(Date.now());
         State.notices.unshift({ id: uid(), kind: 'company', title: `Job not delivered: ${j.title}`, body: `${j.from} to ${j.to} was due ${dateStr(new Date(j.due))}. ${money(fee)} paid to ${j.client}.`, time: 'Now', read: false } as any);
+        noticesAt(j.due);
       }
     }
     // keep the last 60 finished jobs

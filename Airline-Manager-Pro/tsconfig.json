@@ -24,6 +24,7 @@
     "src/core/store.ts",
     "src/graphics/aircraft-art.ts",
     "src/data/aircraft-shapes.ts",
+    "src/data/capacity.ts",
     "src/graphics/aircraft-model.ts",
     "src/data/flight-configs.ts",
     "src/graphics/avatar.ts",
@@ -90,6 +91,7 @@
     "src/screens/livery.ts",
     "src/core/flight-trace.ts",
     "src/core/turnaround.ts",
+    "src/core/runway-req.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/main.ts"

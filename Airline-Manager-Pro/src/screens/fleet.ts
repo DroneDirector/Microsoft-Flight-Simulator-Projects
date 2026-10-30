@@ -90,7 +90,8 @@ ACTIONS['ac-detail'] = el => {
         <div><small>Airframe hours</small><b>${num(a.hoursMin / 60)}</b></div>
         <div><small>Cycles</small><b>${num(a.cycles)}</b></div>
         <div><small>Condition</small><b>${Math.round(a.condition)}%</b></div>
-        <div><small>${cabinOf(a).freighter ? 'Cargo' : 'Seats'}</small><b>${cabinOf(a).freighter ? num(cargoCapacity(a)) + ' kg' : cabinSeats(t, a)}</b></div>
+        <div><small>${cabinOf(a).freighter ? 'Cargo' : 'Seats in your layout'}</small><b>${cabinOf(a).freighter ? num(cargoCapacity(a)) + ' kg' : cabinSeats(t, a)}</b></div>
+        ${cabinOf(a).freighter ? '' : `<div><small>Passengers this type takes</small><b>${esc(capacityText(a.typeId))}</b></div>`}
         <div><small>Range</small><b>${num(t.rangeNm)} nm</b></div>
         <div><small>Base</small><b>${esc(a.base)}</b></div>
         <div><small>Age</small><b>${(Math.round(aircraftAge(a) * 10) / 10)} yrs</b></div>

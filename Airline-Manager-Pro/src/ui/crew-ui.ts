@@ -38,7 +38,7 @@ function openStaff(id: string) {
           <div><small>Salary</small><b>${money(p.salary)}/wk</b></div>
           <div><small>Rating</small><b>${(p.rating || 4).toFixed(1)} ★</b></div>
           ${p.you ? '' : (l => `<div class="kv-lvl"><small>Level ${l.level} of ${LEVEL_XP.length}</small><b>${esc(levelTitle(p))}</b><span class="lvl-bar"><i style="width:${(l.p * 100).toFixed(0)}%"></i></span><small>${num(p.xp || 0)} XP${l.to > l.from ? ` · ${num(l.to - (p.xp || 0))} to level ${l.level + 1}` : ' · highest level'}</small></div>`)(levelOf(p.xp))}
-          <div><small>Conduct</small><b class="${p.warnings ? 'amber' : 'green'}">${p.warnings ? p.warnings + ' warning' + (p.warnings > 1 ? 's' : '') : 'Clean record'}</b></div>
+          ${p.warnings ? `<button class="kv-btn" data-act="warn-open" data-id="${esc(p.id)}"><small>Conduct</small><b class="amber">${p.warnings} warning${p.warnings > 1 ? 's' : ''}${icon('chevron')}</b></button>` : `<div><small>Conduct</small><b class="green">Clean record</b></div>`}
         </div>
         ${warnHistory(p)}
         <div class="modal-actions">
@@ -175,7 +175,7 @@ ACTIONS.discipline = el => {
   const p = staffById(inc.staffId);
   if (p) {
     p.warnings = (p.warnings || 0) + 1;
-    p.warnLog = (p.warnLog || []).concat([{ date: inc.date, title: inc.title, sev: inc.sev || 'moderate' }]);
+    p.warnLog = (p.warnLog || []).concat([{ date: inc.date, title: inc.title, sev: inc.sev || 'moderate', text: inc.text, inc: inc.id, given: Date.now() }]);
     p.rating = clamp(Math.round(((p.rating || 3.5) - (inc.sev === 'severe' ? 0.4 : inc.sev === 'light' ? 0.1 : 0.25)) * 100) / 100, 1, 5);
     // most people take a warning to heart and become more careful; some don't, and it gets less likely with each warning
     if (Math.random() < 0.75 - 0.12 * (p.warnings - 1)) p.learned = (p.learned || 0) + 1; else p.stubborn = (p.stubborn || 0) + 1;
@@ -419,4 +419,26 @@ ACTIONS.weights = () => {
       <div class="wt-fuel ${fuelOk ? 'ok' : 'bad'}">${icon(fuelOk ? 'check' : 'alert')}<span>${fuelOk ? 'Enough fuel' : 'Not enough fuel'}: trip ${kg(L.tripFuelKg)} plus reserves ${kg(L.reserveKg)}</span></div>
       <span class="src-chip">${L.source === 'gsx' ? 'GSX Pro detected' : 'Flight Simulator data'}</span>
     </div>`, { cls: 'narrow' });
+};
+
+/* ---------- A person's warnings: what each was for ---------- */
+ACTIONS['warn-open'] = el => {
+  const p: any = staffById(el.getAttribute('data-id')); if (!p) return;
+  Sound.tick();
+  const incs: Incident[] = (State as any).incidents || [];
+  const log = (p.warnLog || []).slice().reverse().map((w: any) => {
+    // older warnings: the report they came from, found by its title and date
+    const inc = w.inc ? incs.filter(x => x.id === w.inc)[0] : incs.filter(x => x.staffId === p.id && x.title === w.title && x.date === w.date)[0];
+    return Object.assign({}, w, { text: w.text || (inc && inc.text) || '' });
+  });
+  const older = Math.max(0, (p.warnings || 0) - log.length);
+  const sevName: { [k: string]: string } = { light: 'Light', moderate: 'Moderate', severe: 'Severe' };
+  const items = log.map((w: any, i: number) => `
+    <div class="warn-item sev-${esc(w.sev || 'moderate')}">
+      <div class="wi-h"><span class="wi-sev">${esc(sevName[w.sev] || 'Moderate')}</span><b>${esc(w.title)}</b><time>${esc(w.date)}</time></div>
+      ${w.text ? `<p>${esc(w.text)}</p>` : '<p class="muted">The report for this warning is no longer kept.</p>'}
+      ${w.text ? `<div class="say-row">${voiceButton(`Warning ${log.length - i} for ${p.name}: ${w.title}. ${w.text}`, 'ops', 'Play the report')}</div>` : ''}
+    </div>`).join('');
+  openLayer('modal', `<div class="modal-head"><div><h2>Warnings: ${esc(p.name)}</h2><small>${esc(warnSummary(p))}${p.learned ? ` · took ${p.learned} to heart` : ''}${p.stubborn ? ` · ignored ${p.stubborn}` : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body warn-list">${items}${older ? `<p class="fine-print">${icon('info')}${older} earlier warning${older > 1 ? 's' : ''} from before reports were kept with each warning.</p>` : ''}</div>`, { cls: 'narrow', onClose: () => Voice.stop() });
 };

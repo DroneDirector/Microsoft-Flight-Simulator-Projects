@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.4 (2026-10-30)
+
+- Runway requirements per type (field lengths at MTOW/MLW, minimum width, rough strips) checked against real runways; weight and elevation scaling; payload-limited flights; routes, jobs and hired pilots follow them
+- Passenger capacity per type (typical/all-economy/maximum) on market, used, lease and aircraft details
+- Catch-up messages carry the time of their event; notifications sorted by it
+- Employee warnings open with date, severity, the report and a voice
+
 ## 0.9.3 (2026-10-30)
 
 - 3D terrain in rings of detail (z12 near, then z10/z8/z7… out to the view distance), earth curvature

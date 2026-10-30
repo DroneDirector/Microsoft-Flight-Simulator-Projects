@@ -1,0 +1,45 @@
+RUNWAY REQUIREMENTS AND PASSENGER CAPACITY
+Reference guide | Prepared 30 October 2026
+Companion to the speed and weight guides in this folder
+
+SCOPE AND SAFETY NOTE
+For every aircraft in Airline Manager Pro: the runway it needs for take-off at maximum take-off weight
+and for landing at maximum landing weight, the narrowest runway it is cleared for, whether it can use
+grass or gravel, and how many passengers it carries. Broad, approximate figures for the app's
+simulation, not operational data. Never use this guide to operate an aircraft.
+
+HOW TO READ THE LIST
+- Take-off / landing = field length in metres at MTOW / MLW, sea level, standard day, dry, no wind.
+- Width = narrowest runway in metres the type is normally operated from.
+- Rough = can use grass or gravel strips.
+- Seats: typical layout (classes), all-economy, certified maximum (exit limit).
+- How the app scales them: take-off length with the square of the weight, landing length with the
+  weight, plus about 7% (take-off) and 5% (landing) per 1,000 ft of airport elevation. When a full load
+  doesn't fit, the flight is payload limited: the app works out the most passengers that fit both runways.
+- Source: manufacturers' airport-planning documents (Airbus "Aircraft Characteristics - Airport and
+  Maintenance Planning", Boeing "Airplane Characteristics for Airport Planning", Bombardier/ATR airport
+  planning manuals) and the pilot's operating handbooks for the light aircraft; read from the published
+  charts at the stated weights, rounded.
+
+Type                    Take-off  Landing  Width  Rough  Seats (typical / all-economy / maximum)
+Airbus A320ceo           2,100    1,500     30     -     150 (2 cl) / 180 / 186
+Airbus A320neo           2,100    1,480     30     -     165 (2 cl) / 186 / 194
+Airbus A350-900          2,600    2,000     45     -     315 (3 cl) / 440 / 440
+Airbus A310-300          2,400    1,650     45     -     220 (2 cl) / 265 / 280
+Boeing 737-800           2,300    1,630     30     -     162 (2 cl) / 189 / 189
+Boeing 737-600           1,800    1,370     30     -     110 (2 cl) / 130 / 130
+Boeing 777-300ER         3,050    1,900     45     -     365 (3 cl) / 550 / 550
+Boeing 787-10            2,900    1,800     45     -     330 (2 cl) / 440 / 440
+Boeing 747-8             3,100    2,200     45     -     410 (3 cl) / 605 / 605
+Bombardier CRJ900        1,940    1,600     30     -      76 (2 cl) /  90 /  90
+Bombardier CRJ700        1,700    1,500     30     -      66 (2 cl) /  78 /  78
+ATR 72-600               1,330      915     23     -      70 / 72 / 78
+DHC-6 Twin Otter           450      520     10    yes     19 / 19 / 20
+DHC-2 Beaver (floats)      420      360      8    yes      6 / 7 / 7 (water)
+Cessna 208B Grand Caravan  600      530     10    yes      9 / 13 / 13
+Daher Kodiak 100           430      400      8    yes      8 / 9 / 9
+Pilatus PC-12              790      660     12    yes      6 / 9 / 9
+Cessna 172S                500      410      8    yes      3 (with the pilot)
+
+Take-off and landing lengths are over a 50 ft obstacle for the light aircraft (handbook figures), and
+certified field lengths for the airliners.
