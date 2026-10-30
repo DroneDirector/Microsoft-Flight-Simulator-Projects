@@ -49,6 +49,7 @@
   startCoopClock();
   startBases();
   Battery.init();
+  try { startVoices(); } catch (e) { /* ignore */ }
   try { Jobs.advance(true); Ratings.advance(); Network.start(); Acars.start(); } catch (e) { /* ignore */ }
   Backup.offerRestoreOnFirstStart();
   whatsNewOnStart();

@@ -136,6 +136,7 @@ function maybeIncident() {
     const t = INCIDENTS[r === 'pilot' ? 'fo' : r][Math.floor(Math.random() * INCIDENTS[r === 'pilot' ? 'fo' : r].length)];
     const inc: Incident = { id: uid(), staffId: who.id, sev: (t[2] || 'moderate') as any, title: t[0], text: t[1].replace('{n}', who.name).replace('{b}', who.base), date: dateStr(new Date()).slice(0, 10), status: 'open' };
     S.incidents.unshift(inc);
+    try { Voice.prepare(inc.text, 'ops'); } catch (e) { /* not ready */ }
     // being late, skipping work and the like costs rating (and for mechanics, the quality of their work)
     who.rating = clamp(Math.round(((who.rating || 3.5) - 0.15) * 100) / 100, 1, 5);
     State.notices.unshift({ id: 'n-' + inc.id, kind: 'staff' as any, title: `Conduct report: ${who.name}`, body: `${t[0]}. Discipline or dismiss.`, time: 'Now', read: false, ref: inc.id });
@@ -158,6 +159,7 @@ function incidentPopup(id: string) {
       <div class="inc-av">${avatarSvg(p.look, role, { accent: company().color })}</div>
       <div class="inc-main">
         <div class="modal-head"><div><small>Conduct report, ${esc(inc.date)}</small><h2>${esc(inc.title)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+        <div class="say-row">${voiceButton(inc.text, 'ops', 'Play the report')}<small class="voice-note">${esc(voiceNote())} · Head of operations</small></div>
         <p class="speech">${esc(inc.text)}</p>
         <div class="inc-who"><b>${esc(p.name)}</b><small>${ROLE_NAMES[role]}, ${natLabel(p.nat)}, ${ageOf(p.dob)}, base ${esc(p.base)}</small><small class="${p.warnings ? 'amber' : ''}">${p.warnings ? `Already ${p.warnings} warning${p.warnings > 1 ? 's' : ''} on record: ${esc(warnSummary(p))}` : 'No earlier warnings'}</small><small>This report: <b class="sev-${inc.sev || 'moderate'}">${esc(inc.sev || 'moderate')}</b></small></div>
         ${warnHistory(p)}

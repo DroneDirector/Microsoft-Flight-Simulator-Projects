@@ -192,11 +192,8 @@ function mechanicPopup(issueId: string) {
       <div class="mech-side">
         <div class="mech-avatar"><span>JH</span><i class="mech-ring"></i></div>
         <b>Jónas Hansen</b><small>Line maintenance, ${esc(a.base)}</small>
-        <button class="voice-btn" data-act="mech-voice" aria-label="Play the mechanic's message">
-          <span class="vb-ic">${icon('play')}</span>
-          <span class="wave">${'<i></i>'.repeat(14)}</span>
-        </button>
-        <small class="voice-note">${State.settings.muteAll ? 'All sounds are muted' : State.settings.mechanicVoice ? 'Voice: ' + (State.settings.voiceEngine === 'neural' ? 'neural voice pack' : 'recorded lines') : 'Voice is off in Settings'}</small>
+        ${voiceButton(speech, 'mechanic', "Play the mechanic's message")}
+        <small class="voice-note">${esc(voiceNote())}</small>
       </div>
       <div class="mech-main">
         <div class="modal-head"><h2>${esc(issue.reg)}: ${esc(issue.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
@@ -214,17 +211,14 @@ function mechanicPopup(issueId: string) {
         ${issue.severity === 'grounding' ? `<p class="fine-print">${icon('alert')}Grounding damage: ${esc(issue.reg)} can't be flown until this is repaired.</p>` : ''}
       </div>
     </div>`, { cls: 'wide mech-pop', onClose: () => Voice.stop() });
-  (wrap as any)._speech = speech;
-  if (State.settings.mechanicVoice && !State.settings.muteAll) setTimeout(() => { if (wrap.isConnected) ACTIONS['mech-voice']($('.voice-btn', wrap), null); }, 650);
+  autoSpeak(wrap);
 }
 
-ACTIONS['mech-voice'] = el => {
-  const wrap = el.closest('.layer') as any;
-  if (Voice.speaking) { Voice.stop(); el.classList.remove('on'); el.querySelector('.vb-ic').innerHTML = icon('play'); return; }
-  el.classList.add('on'); el.querySelector('.vb-ic').innerHTML = icon('stop');
-  const ok = Voice.speak(wrap._speech, () => { el.classList.remove('on'); el.querySelector('.vb-ic').innerHTML = icon('play'); });
-  if (!ok) { setTimeout(() => { el.classList.remove('on'); el.querySelector('.vb-ic').innerHTML = icon('play'); }, 4000); }
-};
+/** In a dialogue that just opened, the person starts talking (when voices are on). */
+function autoSpeak(wrap: HTMLElement) {
+  if (!State.settings.mechanicVoice || State.settings.muteAll) return;
+  setTimeout(() => { const b = wrap && wrap.isConnected ? $('.voice-btn', wrap) as HTMLElement : null; if (b && !Voice.speaking) ACTIONS.say(b, null); }, 650);
+}
 
 ACTIONS['fix-now'] = el => {
   const i = State.issues.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!i) return;

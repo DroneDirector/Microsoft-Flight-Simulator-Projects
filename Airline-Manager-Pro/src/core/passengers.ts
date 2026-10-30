@@ -34,12 +34,16 @@ function paxOnState(s: any) {
 function paxDrunkAtGate() {
   PaxLeg.name = paxName();
   try { Sound.chime(); } catch (e) { /* muted */ }
-  openLayer('modal', `<div class="modal-head"><div><small>Gate agent</small><h2>Drunk passenger at the gate</h2></div></div>
-    <p class="speech">Captain, a passenger for your flight, ${esc(PaxLeg.name)}, is severely drunk. They can hardly stand and are getting loud with the staff. Do you want them on board?</p>
+  const line = `Captain, a passenger for your flight, ${PaxLeg.name}, is severely drunk. They can hardly stand and are getting loud with the staff. Do you want them on board?`;
+  Voice.prepare(line, 'gate');
+  const wrap = openLayer('modal', `<div class="modal-head"><div><small>Gate agent</small><h2>Drunk passenger at the gate</h2></div></div>
+    <div class="say-row">${voiceButton(line, 'gate', "Play the gate agent's message")}<small class="voice-note">${esc(voiceNote())}</small></div>
+    <p class="speech">${esc(line)}</p>
     <div class="decide">
       <button class="decide-card" data-act="pax-deny"><b>Deny boarding</b><small>Their bags are taken off. About ten minutes' delay, and a calm cabin.</small></button>
       <button class="decide-card bad" data-act="pax-allow"><b>Let them board</b><small>A bad atmosphere in the cabin, and it may get much worse in flight.</small></button>
     </div>`, { cls: 'narrow' });
+  autoSpeak(wrap);
 }
 ACTIONS['pax-deny'] = () => {
   closeAll(); PaxLeg.allowed = false; Sound.tick();

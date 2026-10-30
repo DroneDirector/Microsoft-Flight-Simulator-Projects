@@ -1,0 +1,12 @@
+Voice pack for Airline Manager Pro
+
+kokoro-v1.0-q8.onnx and voice-*.bin
+  Kokoro-82M v1.0 by hexgrad, Apache License 2.0 (LICENSE-Kokoro-Apache-2.0.txt).
+  https://github.com/hexgrad/kokoro
+  Quantised ONNX build from kokoro-onnx by thewh1teagle, MIT License (LICENSE-kokoro-onnx-MIT.txt).
+  The voices are taken unchanged from Kokoro's voice set, stored as raw 32-bit floats (510 x 256).
+
+lexicon-gb.json.gz and lexicon-us.json.gz
+  Pronunciation dictionaries from misaki by hexgrad, Apache License 2.0 (LICENSE-misaki-Apache-2.0.txt).
+  https://github.com/hexgrad/misaki
+  Modified: gold and silver dictionaries merged into one file per accent, default pronunciations only.

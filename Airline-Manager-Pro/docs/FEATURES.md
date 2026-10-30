@@ -102,7 +102,7 @@ Only damage the simulator can actually detect.
 | Severe turbulence damage (extreme only, realistic results: inspection, overstress, cabin damage) | Built |
 | Mechanic reports in the inbox and an animated mechanic pop-up | Built |
 | Fix now or fix later; serious damage grounds the aircraft | Built |
-| Mechanic voice, fully offline: recorded lines plus an optional neural voice pack | Planned; device voice used as stand-in |
+| Voices for the mechanic, gate agent and head of operations, word for word: natural voices run on the device (voice pack downloaded once), device voice until then | Built |
 
 ## ATC
 

@@ -64,6 +64,8 @@
     "src/core/ratings.ts",
     "src/core/jobs.ts",
     "src/core/online.ts",
+    "src/core/g2p.ts",
+    "src/core/voice.ts",
     "src/screens/dashboard.ts",
     "src/screens/map.ts",
     "src/screens/airport-view.ts",

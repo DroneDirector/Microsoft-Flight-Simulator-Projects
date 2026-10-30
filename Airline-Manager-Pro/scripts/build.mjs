@@ -68,6 +68,13 @@ if (existsSync(three)) {
   copyFileSync(three, join(root, 'www/vendor/three.min.js'));
 }
 
+// Runs the voice model in the app (ONNX Runtime Web, MIT License): the WebAssembly build only
+const ort = join(root, 'node_modules/onnxruntime-web/dist');
+if (existsSync(ort)) {
+  mkdirSync(join(root, 'www/vendor/ort'), { recursive: true });
+  for (const f of ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 'ort-wasm-simd-threaded.mjs']) copyFileSync(join(ort, f), join(root, 'www/vendor/ort', f));
+}
+
 // Crew body data (made from the CC0 MakeHuman model, see tools/human-data)
 const humans = join(root, 'assets/humans.bin');
 copyFileSync(humans, join(root, 'www/humans.bin'));
@@ -101,5 +108,9 @@ if (process.argv.includes('--preview')) {
   mkdirSync(join(root, 'dist'), { recursive: true });
   writeFileSync(join(root, 'dist/preview.html'), html);
   console.log('Preview written to dist/preview.html');
+}
+{
+  const sv = cfg.services || {}, off = ['vatsim', 'ivao', 'simbriefApi', 'hoppie'].filter(k => sv[k] !== true);
+  if (parseInt(String(cfg.version).split('.')[0], 10) >= 1 && off.length) console.log(`\nREMINDER before the final release: ${off.join(', ')} still switched off. VATSIM: its user agreement forbids using its data in a paid app without written permission. IVAO, SimBrief's flight plan import and Hoppie ACARS: none of them publish terms for paid apps, and SimBrief issues access keys on request. See CLAUDE.md.\n`);
 }
 console.log(`Built ${cfg.appName} ${cfg.version}`);
