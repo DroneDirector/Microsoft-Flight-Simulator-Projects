@@ -21,13 +21,13 @@ SCREENS.map = {
       <div class="map-host" id="big-map"></div>
       <button class="back-btn on-map" data-act="go" data-screen="ops">${icon('chevron', 'flip')}<span>Overview</span></button>
       <div class="mf-panel"><div class="mf-h"><b>In the air</b><small>${liveOf().length} flights</small></div><div class="mf-list" id="mf-list">${mapListHtml(null)}</div></div>
-      <div class="map-zoom"><button class="icon-btn" data-act="map-zoom" data-f="1.6" aria-label="Zoom in">${icon('plus')}</button><button class="icon-btn" data-act="map-zoom" data-f="0.625" aria-label="Zoom out"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12h14"/></svg></button><button class="icon-btn" data-act="map-fit" aria-label="Show all flights">${icon('focus')}</button>${mapSearchBtn()}${layerBtn()}</div>
+      <div class="map-zoom"><button class="icon-btn" data-act="map-zoom" data-f="1.6" aria-label="Zoom in">${icon('plus')}</button><button class="icon-btn" data-act="map-zoom" data-f="0.625" aria-label="Zoom out"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12h14"/></svg></button><button class="icon-btn" data-act="map-fit" aria-label="Show all flights">${icon('focus')}</button>${mapSearchBtn()}${layerBtn()}${view3dBtn()}</div>
       <div class="map-detail" id="map-detail"></div>
     </div>`;
   },
   mount(root) {
-    _bigMap = new WorldMap($('#big-map', root), { interactive: true, insetRight: 270, onSelect: id => { const list = $('#mf-list'); if (list) list.innerHTML = mapListHtml(id); if (!id) { const d = $('#map-detail'); if (d) d.innerHTML = ''; } } });
-    fitAll(false);
+    _bigMap = new WorldMap($('#big-map', root), { interactive: true, insetRight: 270, memoKey: 'big', onSelect: id => { const list = $('#mf-list'); if (list) list.innerHTML = mapListHtml(id); if (!id) { const d = $('#map-detail'); if (d) d.innerHTML = ''; } } });
+    if (!_bigMap.resumeFollow()) fitAll(false);
   },
 };
 
@@ -112,7 +112,7 @@ function setMapStyle(style: 'classic' | 'street' | 'satellite') {
   State.settings.mapStyle = style;
   Haptics.pulse(10);
   refresh();
-  if (State.screen === 'map' && (fol || sel)) setTimeout(() => { if (sel) selectFlight(sel); if (fol && _bigMap) _bigMap.follow(fol); }, 60);
+  if (State.screen === 'map' && (fol || sel)) setTimeout(() => { if (sel) selectFlight(sel); }, 60);
   toast(style === 'classic' ? 'Classic map' : style === 'street' ? 'Street map' : 'Satellite map', 'ok');
 }
 

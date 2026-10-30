@@ -44,6 +44,59 @@ function aiUpdate(f: LiveFlight, now: number) {
   F.leftNm = q.left; F.toGoS = (q.toGoS + extra) / (F.spd || 1); F.routeNm = p.routeNm;
   const td = p.pts.filter(x => x.ph === 'Landing')[0];
   F.toTdS = td ? (Math.max(0, td.s - el) + extra) / (F.spd || 1) : F.toGoS;
+  // the arrival countdown runs from take-off to touchdown on the planned air time; holds after take-off
+  // (weather, traffic) take it below zero, and it shows zero on the ground
+  const tk = p.pts.filter(x => x.ph === 'Takeoff')[0], spd = F.spd || 1;
+  if (td && tk) {
+    let before = 0; for (const h of (F.holds || []) as Hold[]) if (h.at < tk.s) before += h.s;
+    F.planTdAt = F.depAt + (tk.s + before + (td.s - tk.s)) * 1000 / spd;
+    F.airborne = el >= tk.s && el < td.s;
+  } else { F.planTdAt = 0; F.airborne = f.alt > 50; }
+  // vertical speed (ft/min) along the profile; level while holding
+  F.vs = fe.hold ? 0 : Math.round((profileAt(p, el + 15).alt - profileAt(p, Math.max(0, el - 15)).alt) * 2 / 50) * 50 * (el > 15 ? 1 : 2);
+}
+
+/** Your flight before the simulator is linked (the demo): flown on the real clock along its real profile and
+ *  procedures like every other flight, at the type's real speeds; after landing it waits at the gate and
+ *  then flies the leg again. */
+function demoUpdate(f: LiveFlight, now: number) {
+  const F: any = f;
+  if (f.noDest) return;
+  if (!F.depAt) { const p0 = aiProfile(Object.assign({}, F, { depAt: now })); F.depAt = now - profileTimeAtFrac(p0, clamp(f.t || 0, 0, 0.98)) * 1000; F.spd = 1; }
+  let p = aiProfile(F);
+  if (now - F.depAt > (p.totalS + 20 * 60) * 1000) { F.depAt = now; p = aiProfile(F); }
+  const q = profileAt(p, (now - F.depAt) / 1000);
+  f.t = p.routeNm > 0 ? clamp(q.d / p.routeNm, 0, 1) : 0; f.alt = q.alt; f.gs = q.gs; f.phase = q.ph;
+  F.leftNm = q.left; F.toGoS = q.toGoS; F.routeNm = p.routeNm;
+  const td = p.pts.filter(x => x.ph === 'Landing')[0], tk = p.pts.filter(x => x.ph === 'Takeoff')[0];
+  F.toTdS = td ? Math.max(0, td.s - (now - F.depAt) / 1000) : F.toGoS;
+  if (td && tk) { F.planTdAt = F.depAt + td.s * 1000; const el = (now - F.depAt) / 1000; F.airborne = el >= tk.s && el < td.s; }
+  F.vs = Math.round((profileAt(p, (now - F.depAt) / 1000 + 15).alt - profileAt(p, Math.max(0, (now - F.depAt) / 1000 - 15)).alt) * 2 / 50) * 50;
+}
+
+/** "Arrives in": counts down from take-off to touchdown, below zero when late, zero on the ground. */
+function arrivesIn(f: LiveFlight): string {
+  const F: any = f;
+  if (f.noDest) return '—';
+  if (!f.real && F.depAt) {
+    if (!F.airborne || !F.planTdAt) return '0:00';
+    const s = (F.planTdAt - Date.now()) / 1000;
+    return s >= 0 ? countdown(s) : '−' + countdown(-s);
+  }
+  // your flight and co-op flights: from distance and ground speed once airborne
+  if (f.alt < 50 && !(f.gs > 60)) return '0:00';
+  const B = apt(f.to); if (!B) return '—';
+  const left = f.real && f.pos ? gcDistanceNm(f.pos, B.pos) : gcDistanceNm(apt(f.from).pos, B.pos) * (1 - f.t);
+  return countdown(left / Math.max(60, f.gs || acType(flightTypeId(f)).cruiseKt) * 3600);
+}
+
+/** Heading (°) and vertical speed (ft/min) of a flight right now. */
+function flightMotion(f: LiveFlight): { hdg: number; vs: number } {
+  const F: any = f;
+  if (f.real && f.you && Link.sim && Link.sim.lat) return { hdg: Math.round(Link.sim.hdg), vs: Math.round(Link.sim.vsFpm / 10) * 10 };
+  if (f.real && f.hdg != null) return { hdg: Math.round(f.hdg), vs: F.vs || 0 };
+  const pp = flightPathPos(f);
+  return { hdg: Math.round(pp ? pp.hdg : 0), vs: F.vs || 0 };
 }
 
 // Messages at the real points of each flight: top of descent and established on final. Only phase
@@ -122,6 +175,12 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   const t = acType(a.typeId), c = company(a.companyId), prof = aiProfile(F), blockMin = Math.round(prof.totalS / 60);
   if (p) { p.hoursMin += blockMin; p.landings += 1; }
   a.hoursMin += blockMin; a.cycles += 1; a.location = f.to; a.status = 'parked';
+  // a repair paid for while it flew starts now that it is on the ground
+  for (const i of State.issues as any[]) if (i.reg === a.reg && i.status === 'scheduled') { i.startedAt = at; a.status = 'maintenance'; }
+  try { FlightTrace.arrived(f, at); } catch (e) { /* ignore */ }
+  // for the turnaround at the gate: when it got there, who got off, the fuel left
+  (a as any).lastGateAt = at; (a as any).lastPax = f.pax || 0;
+  try { (a as any).lastFuelKg = legFuel(a.typeId, f.pax || 0, f.from, f.to).land; } catch (e) { /* ignore */ }
   // real-world fares, on-board sales and costs (economics.ts)
   const burnH = BURN_KG_H[t.cls] || 2000;
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
@@ -185,6 +244,9 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       const n: any = ev.n, a = plane(n.reg), p: any = pilot(n.pilotId);
       S.aiNext = S.aiNext.filter((x: any) => x !== n);
       // an aircraft that went to maintenance, was sold or lost its pilot stays on the ground
+      // a repair you paid for comes first: the leg waits until the aircraft is out of the hangar
+      const rep = a ? (State.issues as any[]).filter(i => i.reg === a.reg && i.status === 'scheduled') : [];
+      if (a && p && p.status !== 'off' && rep.length) { const end = Math.max.apply(null, rep.map(i => (i.startedAt || n.depAt) + (i.durMin || 30) * 60000)); S.aiNext.push(Object.assign({}, n, { depAt: Math.max(n.depAt, end) + 10 * 60e3 })); continue; }
       if (!a || a.status === 'grounded' || a.status === 'maintenance' || !p || p.status === 'off') continue;
       // away on a type rating course: the leg waits until the pilot is back
       if (p.status === 'training') { S.aiNext.push(Object.assign({}, n, { depAt: Math.max(now, p.trainingUntil || now) + 60e3 })); continue; }
@@ -196,7 +258,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       const test = n.from === n.to;
       if (!n.to || (test && !aiTestRoute(n.pilotId, n.from))) { p.status = 'standby'; continue; }
       // passengers and cargo from demand on the route (none on a test or ferry flight; a charter's own load)
-      const ld = test || n.ferry ? { pax: 0, paxJ: 0, paxF: 0, cargoKg: 0 } : n.job ? Jobs.loadFor(n.job) : aiLoad(n.reg, n.from, n.to, n.leg || 0);
+      const ld = aiPlannedLoad(n);
       const depAt = Math.max(n.depAt, earliest), prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
       const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF, cargoKg: ld.cargoKg, paxMax: cabinSeats(acType(a.typeId), a) || n.paxMax, test,
         alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg, ferry: !!n.ferry, job: n.job || undefined, jobNext: n.jobNext || undefined };
@@ -242,10 +304,12 @@ function aiRefreshCards() {
   for (const el of $all('[data-fc]')) {
     const f = State.live.filter(x => x.id === el.getAttribute('data-fc'))[0];
     if (!f) { const pop = el.closest('.sel-pop'); if (pop) pop.remove(); continue; }
-    if (!aiOn(f)) continue;
+    if (f.real) continue;
     const tmp = document.createElement('div'); tmp.innerHTML = flightCard(f).trim();
     el.replaceWith(tmp.firstElementChild);
   }
+  // aircraft at the gate: the turnaround counts on
+  for (const el of $all('[data-ob]')) { const a = plane(el.getAttribute('data-ob')), o = a ? onBoardParked(a) : null; if (o) el.innerHTML = onBoardHtml(o); }
 }
 
 function startAiClock() {
@@ -254,7 +318,7 @@ function startAiClock() {
   setInterval(() => {
     if (document.hidden) return;
     const now = Date.now();
-    for (const f of State.live) if (aiOn(f)) { aiUpdate(f, now); aiAnnounce(f); }
+    for (const f of State.live) if (aiOn(f)) { aiUpdate(f, now); aiAnnounce(f); } else if (!f.real) demoUpdate(f, now);
     aiRefreshCards();
   }, 1000);
   document.addEventListener('visibilitychange', () => {

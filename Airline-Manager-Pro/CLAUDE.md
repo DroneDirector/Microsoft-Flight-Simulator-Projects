@@ -10,6 +10,14 @@
   organisations' reviews), add a row to `additional-aircraft-speeds-and-weights.txt` in the same format,
   with sources, and mark values that are worked out rather than published (D: rotation ≈ 1.2 × Vso,
   approach ≈ 1.3 × Vso). Do this in the same change that adds the aircraft.
+- **Flaps, gear and phase speeds**: every type also gets its flap settings with their limit speeds (VFE), gear
+  limits (VLO/VLE), take-off and landing settings, the speeds crews select each flap step at, and its
+  climb, cruise and descent speeds, in `docs/reference/flap-gear-and-phase-speeds.txt` (with sources) and
+  `src/data/flight-configs.ts`. The aircraft in the app configure and fly by these.
+- **Shape and 3D model**: every type gets an entry in `src/data/aircraft-shapes.ts` from its published
+  dimensions (length, span, height, fuselage, wing position/chords/sweep, engines, tail, nose, wingtips,
+  gear). The aircraft pictures and the 3D view are built from it, so a new type looks like itself.
+  Our own models only: no downloaded third-party models and no manufacturers' or airlines' logos.
 - Taxi speeds (all types): tight turns or near obstacles 5–10 kt; normal straight taxiways 15–25 kt;
   long straight taxiways up to about 30 kt; approaching the runway or the stand 5–10 kt; pushback 3–5 kt.
 

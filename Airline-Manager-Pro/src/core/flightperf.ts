@@ -133,7 +133,12 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   const month = new Date(when || Date.now()).getMonth();
   const key = typeId + '|' + from + '|' + to + '|' + month;
   if (_profiles[key]) return _profiles[key];
-  const t = acType(typeId) || AIRCRAFT[0], P = perfFor(t), A = apt(from), B = apt(to);
+  const t = acType(typeId) || AIRCRAFT[0], A = apt(from), B = apt(to);
+  // the type's own climb and descent speeds and flap schedule (flight-configs.ts), over the model defaults
+  const CF: ConfigSpec = typeof FLIGHT_CONFIGS !== 'undefined' ? FLIGHT_CONFIGS[typeId] : null;
+  const P = Object.assign({}, perfFor(t), CF ? { climbIas: CF.climbIas || undefined, descIas: CF.descIas || undefined } : {}) as PerfSpec;
+  if (!P.climbIas) P.climbIas = perfFor(t).climbIas; if (!P.descIas) P.descIas = perfFor(t).descIas;
+  if (CF && CF.climbMach) P.climbMach = CF.climbMach;
   const gc = A && B ? gcDistanceNm(A.pos, B.pos) : 200;
   const routeNm = Math.max(3, gc * P.airway + (gc > 40 ? P.procNm : gc * 0.05));
   const track0 = A && B ? bearingDeg(A.pos, B.pos) : 90;
@@ -151,10 +156,16 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   const SPD = flightSpeeds(typeId, Math.round(t.seats * 0.8), gc), accel = P.jet ? 2.0 : 2.4, decel = P.jet ? 1.9 : 1.6;
   const descPlan = (top: number) => {
     const finalAlt = Math.min(top, P.finalNm * GLIDE), low = Math.min(top, 10000);
-    const nodes: number[][] = [[0, 0, SPD.vthr], [P.finalNm, finalAlt, SPD.vapp + (P.jet ? 25 : 15)]];   // [miles out, altitude, indicated speed]
+    // [miles out, altitude, indicated speed]: on the final in the landing configuration; before it, slowing
+    // through the flap steps from the clean speed (the type's own schedule when known)
+    const landStep = CF && CF.steps.length ? CF.steps[CF.steps.length - 1].at : 0, preStep = CF && CF.steps.length > 1 ? CF.steps[CF.steps.length - 2].at : 0;
+    const nodes: number[][] = [[0, 0, SPD.vthr], [P.finalNm, finalAlt, CF ? Math.max(SPD.vapp + 5, Math.min(preStep || landStep + 15, SPD.vapp + (P.jet ? 25 : 15))) : SPD.vapp + (P.jet ? 25 : 15)]];
+    if (CF && P.jet) nodes.push([P.finalNm + 4, Math.min(top, finalAlt + 1200), Math.min(250, CF.clean)]);
     const lowNm = P.finalNm + Math.max(0, low - finalAlt) / 1000 * P.descK + P.decelNm * Math.min(1, low / 10000);
     nodes.push([lowNm, low, P.jet ? 250 : Math.min(P.descIas, 250)]);
     if (top > low) nodes.push([lowNm + (top - low) / 1000 * P.descK, top, P.descIas]);
+    nodes.sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < nodes.length; i++) if (nodes[i][1] < nodes[i - 1][1]) nodes[i][1] = nodes[i - 1][1];
     const todNm = nodes[nodes.length - 1][0];
     // approach starts at 10,000 ft for airliners and turboprops, about 10 miles out for light aircraft
     const apprNm = P.jet || P.maxAlt > 15000 ? lowNm : Math.min(todNm, P.finalNm + 7);
@@ -177,7 +188,9 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
     let h = 0, d = 0, s = 0;
     while (h < top) {
       const dh = Math.min(250, top - h);
-      const ias = h < 10000 ? Math.min(250, P.climbIas) : P.climbIas;
+      // V2 + 10 to about 1,000 ft, then speeding up while the flaps come in, 250 kt below 10,000 ft
+      const v2 = SPD.v2 + 10, lowIas = Math.min(250, P.climbIas);
+      const ias = h < 1000 ? v2 : h < 3000 ? v2 + (lowIas - v2) * (h - 1000) / 2000 : h < 10000 ? lowIas : P.climbIas;
       let tas = iasToTas(ias, h);
       if (P.jet && P.climbMach) tas = Math.min(tas, P.climbMach * soundKt(h));
       if (!P.jet) tas = Math.min(tas, cruiseTas(P, t, h));
@@ -213,7 +226,9 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   const STEP = 20;
   // climb
   while (h < cruise) {
-    const ias = h < 10000 ? Math.min(250, P.climbIas) : P.climbIas;
+    // V2 + 10 to about 1,000 ft, then speeding up while the flaps come in, 250 kt below 10,000 ft
+    const v2c = SPD.v2 + 10, lowC = Math.min(250, P.climbIas);
+    const ias = h < 1000 ? v2c : h < 3000 ? v2c + (lowC - v2c) * (h - 1000) / 2000 : h < 10000 ? lowC : P.climbIas;
     let tas = iasToTas(ias, h);
     if (P.jet && P.climbMach) tas = Math.min(tas, P.climbMach * soundKt(h));
     if (!P.jet) tas = Math.min(tas, cruiseTas(P, t, h));

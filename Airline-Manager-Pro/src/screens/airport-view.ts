@@ -9,7 +9,7 @@
 //  - Track an aircraft and the view follows it; when it leaves the airport, the world map takes over
 //    and keeps following it.
 
-interface ApvPlane { id: string; x: number; y: number; hdg: number; alt: number; phase: string; label: string; you: boolean; span: number; prop: boolean; parked?: boolean; kt?: number }
+interface ApvPlane { id: string; x: number; y: number; hdg: number; alt: number; phase: string; label: string; you: boolean; span: number; prop: boolean; parked?: boolean; kt?: number; rwy?: string }
 
 const APV_RANGE = 14000;       // metres from the airport within which aircraft are shown
 
@@ -22,7 +22,7 @@ class AirportView {
   track: string = null; seen = false; userMoved = false; fromWorld: WorldMap = null;
   ptrs: { [id: number]: { x: number; y: number } } = {}; pinch0 = 0; s0 = 0; moved = false;
   graph: { pts: number[][]; adj: { [k: string]: [string, number][] }; parks: number[][]; schematic: boolean } = null;
-  active: { tx: number; ty: number; ux: number; uy: number; len: number; name: string; wind: number; windKt: number } = null;
+  active: { tx: number; ty: number; ux: number; uy: number; len: number; wid: number; name: string; wind: number; windKt: number } = null;
   planes: ApvPlane[] = [];
   lastList = 0;
   /** Drawn inside the world map (zoomed in to airport level) instead of on its own screen. */
@@ -77,7 +77,7 @@ class AirportView {
 
   fetching = false;
   setLayout(L: AirportLayout, upgrade?: boolean) {
-    this.L = L; this.routes = {};
+    this.L = L; this.routes = {}; this.reachCache = {}; this.joins = null; this.joinsBy = {}; this.frames = {};
     if (this.embedded) { this.buildGraph(); this.pickRunway(); this.pc = null; return; }
     if (L.source !== 'runways') this.fetching = false;
     this.labelSource();
@@ -145,7 +145,8 @@ class AirportView {
       if (score > bs) { bs = score; best = { r, dir, hd }; }
     }
     const r = best.r, c = this.xy(r.lat, r.lon), h = best.hd * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
-    this.active = { tx: c[0] - ux * r.len / 2, ty: c[1] - uy * r.len / 2, ux, uy, len: r.len, name: best.dir ? r.b : r.a, wind, windKt };
+    this.active = { tx: c[0] - ux * r.len / 2, ty: c[1] - uy * r.len / 2, ux, uy, len: r.len, wid: r.wid || 45, name: best.dir ? r.b : r.a, wind, windKt };
+    this.joins = null;
     const el = $('#apv-rwy');
     if (el) el.innerHTML = `<b>Runway ${esc(this.active.name || '')}</b><small>Wind ${String(Math.round(wind)).padStart(3, '0')}° at ${windKt} kt${sw ? '' : ' (estimated)'}</small>`;
   }
@@ -180,17 +181,105 @@ class AirportView {
     while (k) { out.unshift(this.nodeXY(k)); k = prev[k]; }
     return out;
   }
+  /** Where taxiways join the runway in use: the taxi network's points on the runway, by distance along it. */
+  joins: { k: string; along: number }[] = null;
+  joinsBy: { [k: string]: { k: string; along: number }[] } = {};
+  frames: { [k: string]: any } = {};
+  /** The runway of this layout that matches a planned runway end (its threshold and direction). */
+  frameFor(re: RunwayEnd): any {
+    const L = this.L; if (!re || !L || !L.runways.length) return null;
+    const key = re.name + '|' + Math.round(re.hdg);
+    if (this.frames[key] !== undefined) return this.frames[key];
+    const t = this.xy(re.thr[1], re.thr[0]);
+    let best: any = null, bs = 1e18;
+    for (const r of L.runways) for (const dir of [0, 1]) {
+      const hd = (r.hdg + dir * 180) % 360, c = this.xy(r.lat, r.lon), h = hd * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
+      const tx = c[0] - ux * r.len / 2, ty = c[1] - uy * r.len / 2;
+      const sc = Math.abs(angDiff(hd, re.hdg)) * 60 + Math.hypot(tx - t[0], ty - t[1]);
+      if (sc < bs) { bs = sc; best = { tx, ty, ux, uy, len: r.len, wid: r.wid || 45, name: (dir ? r.b : r.a) || re.name, wind: this.active ? this.active.wind : 0, windKt: this.active ? this.active.windKt : 0 }; }
+    }
+    // too far from any runway of this layout (a different layout source): use the planned end itself
+    if (bs > 1500) { const e = this.xy(re.end[1], re.end[0]), len = Math.hypot(e[0] - t[0], e[1] - t[1]) || 2500; best = { tx: t[0], ty: t[1], ux: (e[0] - t[0]) / len, uy: (e[1] - t[1]) / len, len, wid: 45, name: re.name, wind: this.active ? this.active.wind : 0, windKt: this.active ? this.active.windKt : 0 }; }
+    return (this.frames[key] = best);
+  }
+  runwayJoins(): { k: string; along: number }[] {
+    if (this.joins) return this.joins;
+    const jk = this.active ? this.active.name + '|' + Math.round(this.active.tx) : '';
+    if (this.joinsBy[jk]) return (this.joins = this.joinsBy[jk]);
+    const g = this.graph, A = this.active, out: { k: string; along: number }[] = [];
+    if (g && A) for (const k in g.adj) {
+      if (k[0] !== 'n') continue;
+      const p = g.pts[+k.slice(1)], dx = p[0] - A.tx, dy = p[1] - A.ty;
+      const along = dx * A.ux + dy * A.uy, across = Math.abs(dx * A.uy - dy * A.ux);
+      if (along > -60 && along < A.len + 60 && across < Math.max(A.wid / 2 + 12, 30)) out.push({ k, along });
+    }
+    return (this.joins = this.joinsBy[jk] = out.sort((a, b) => a.along - b.along));
+  }
+  /** The point on the runway centre line level with a point of the taxi network. */
+  onCentreline(k: string): number[] { const A = this.active, p = this.nodeXY(k), along = (p[0] - A.tx) * A.ux + (p[1] - A.ty) * A.uy; return [A.tx + A.ux * along, A.ty + A.uy * along]; }
+  /** Every point of the taxi network that can be reached from one point (and how far). */
+  reachCache: { [k: string]: { [k: string]: number } } = {};
+  reach(fromKey: string): { [k: string]: number } {
+    if (this.reachCache[fromKey]) return this.reachCache[fromKey];
+    const g = this.graph, dist: { [k: string]: number } = { [fromKey]: 0 }, done: { [k: string]: boolean } = {};
+    for (let guard = 0; guard < 20000; guard++) {
+      let u: string = null, ud = 1e18; for (const k in dist) if (!done[k] && dist[k] < ud) { ud = dist[k]; u = k; }
+      if (!u) break; done[u] = true;
+      for (const [v, d] of (g.adj[u] || [])) if (!done[v] && ud + d < (dist[v] == null ? 1e18 : dist[v])) dist[v] = ud + d;
+    }
+    return (this.reachCache[fromKey] = dist);
+  }
+  /** After landing: roll on along the runway to a taxiway that leaves it, then follow the taxiways to a stand. */
+  arrivalPath(endAlong: number, seed: string, big: boolean): number[][] {
+    const A = this.active, exitPt = [A.tx + A.ux * endAlong, A.ty + A.uy * endAlong];
+    const joins = this.runwayJoins(), ahead = joins.filter(j => j.along >= endAlong - 30), behind = joins.filter(j => j.along < endAlong - 30).reverse();
+    for (const j of ahead.concat(behind)) {
+      const stand = this.standFor(seed, big, j.k); if (!stand) continue;
+      const r = this.route(j.k, stand); if (r.length < 2) continue;
+      return [exitPt, this.onCentreline(j.k)].concat(r);
+    }
+    // no taxiway on the runway (a simple layout): the nearest point of the network, then the taxiways
+    const exit = this.nearestNode(A.tx + A.ux * (endAlong + 80), A.ty + A.uy * (endAlong + 80)), stand = exit ? this.standFor(seed, big, exit) : null;
+    return [exitPt].concat(exit && stand ? this.route(exit, stand) : []);
+  }
+  /** Leaving: from the stand along the taxiways onto the runway near its start, then to the threshold. */
+  departurePath(seed: string, big: boolean): { path: number[][]; stand: string } {
+    const A = this.active, joins = this.runwayJoins().filter(j => j.along < A.len * 0.5);
+    for (const j of joins) {
+      const stand = this.standFor(seed, big, j.k); if (!stand) continue;
+      const r = this.route(stand, j.k); if (r.length < 2) continue;
+      const on = this.onCentreline(j.k), path = r.concat([on]);
+      if (Math.hypot(on[0] - A.tx, on[1] - A.ty) > 5) path.push([A.tx, A.ty]);
+      return { path, stand };
+    }
+    const hold = this.nearestNode(A.tx + A.ux * 60, A.ty + A.uy * 60), stand = hold ? this.standFor(seed, big, hold) : null;
+    return { path: stand && hold ? this.route(stand, hold).concat([[A.tx, A.ty]]) : [], stand };
+  }
   nodeXY(k: string): number[] { const g = this.graph, i = +k.slice(1); return k[0] === 'p' ? [g.parks[i][0], g.parks[i][1]] : [g.pts[i][0], g.pts[i][1]]; }
   nearestNode(x: number, y: number): string {
     const g = this.graph; let best: string = null, bd = 1e18;
     for (const k in g.adj) if (k[0] === 'n') { const p = g.pts[+k.slice(1)], d = (p[0] - x) ** 2 + (p[1] - y) ** 2; if (d < bd) { bd = d; best = k; } }
     return best;
   }
-  standFor(seed: string, big: boolean): string {
+  /** The stand of an aircraft at this airport. It keeps the same stand from taxiing in, through the time it
+   *  stands parked, until it pushes back for its next flight, and no two aircraft share a stand. With `from`,
+   *  only a stand the taxiways lead to from there (null when its stand can't be reached from there). */
+  standFor(reg: string, big: boolean, from?: string): string {
     const g = this.graph; if (!g || !g.parks.length) return null;
-    const ok = g.parks.map((p, i) => i).filter(i => g.adj['p' + i] && (big ? [5, 8, 9, 10, 15].indexOf(g.parks[i][4]) >= 0 || g.schematic : [1, 2, 3, 4, 14, 11].indexOf(g.parks[i][4]) >= 0 || g.schematic));
-    const pool = ok.length ? ok : g.parks.map((p, i) => i).filter(i => g.adj['p' + i]);
-    return pool.length ? 'p' + pool[_hashStr(seed) % pool.length] : null;
+    const book = gateBook(this.icao, this.L), R = from ? this.reach(from) : null, linked = (i: number) => !!g.adj['p' + i];
+    const mine = book[reg];
+    if (mine && g.adj[mine]) return !R || R[mine] != null ? mine : null;
+    const taken: { [k: string]: boolean } = {}; for (const r in book) if (r !== reg) taken[book[r]] = true;
+    const sized = g.parks.map((p, i) => i).filter(i => linked(i) && (big ? [5, 8, 9, 10, 15].indexOf(g.parks[i][4]) >= 0 || g.schematic : [1, 2, 3, 4, 14, 11].indexOf(g.parks[i][4]) >= 0 || g.schematic));
+    const pick = (list: number[]) => {
+      if (!list.length) return null;
+      const h = _hashStr(reg + this.icao) % list.length;
+      for (let n = 0; n < list.length; n++) { const k = 'p' + list[(h + n) % list.length]; if (!taken[k] && (!R || R[k] != null)) return k; }
+      return null;
+    };
+    const k = pick(sized) || pick(g.parks.map((p, i) => i).filter(linked));
+    if (k) book[reg] = k;
+    return k;
   }
   along(path: number[][], fr: number): number[] {
     if (!path.length) return null; if (path.length === 1) return [path[0][0], path[0][1], 0];
@@ -272,7 +361,8 @@ class AirportView {
   }
 
   computePlanes(now: number) {
-    const out: ApvPlane[] = [], L = this.L, A = this.active, g = this.graph;
+    const out: ApvPlane[] = [], L = this.L, g = this.graph, A0 = this.active;
+    let A = A0;
     const icao = this.icao, typeOf = (f: any) => acType(flightTypeId(f));
     const spanOf = (t: AircraftType) => t.cls === 'ga' || t.cls === 'bush' ? 12 : t.cls === 'turboprop' ? 27 : t.seats > 300 ? 64 : t.seats > 200 ? 58 : t.seats > 100 ? 35 : 26;
     for (const f of liveOf()) {
@@ -284,21 +374,25 @@ class AirportView {
         if (Math.hypot(p[0], p[1]) < APV_RANGE) out.push(Object.assign(base, { x: p[0], y: p[1], hdg: Link.sim.hdg, alt: Link.sim.aglFt || 0, phase: f.phase || (Link.sim.onGround ? 'On the ground' : 'Flying'), kt: Link.sim.gs }));
         continue;
       }
-      if (!A || !F.depAt || !g) continue;
+      if (!A0 || !F.depAt || !g) continue;
       const prof: FlightProfile = F.coop ? flightProfile(F.typeId, f.from, f.to, F.depAt) : aiProfile(F);
       const fe = flightEl(F, now), el = fe.el;
-      const roll = Math.min(A.len * 0.65, big ? 2200 : 700), lift = [A.tx + A.ux * roll, A.ty + A.uy * roll];
       let pos: number[] = null, alt = 0, phase = '', kt = 0;
       // the speeds of this flight (docs/reference) and the wind along the runway in use
       const SP = flightSpeeds(flightTypeId(f), f.pax || Math.round(t.seats * 0.8), gcDistanceNm(apt(f.from).pos, apt(f.noDest ? f.from : f.to).pos));
-      const hw = headwind(A.wind, A.windKt, Math.atan2(A.ux, A.uy) * 180 / Math.PI);
-      const rwyHdg = Math.atan2(A.ux, A.uy) * 180 / Math.PI;
+      // each flight uses the runway its own departure or approach was planned for (the wind can change the
+      // runway in use while it flies; it still lands where its approach leads)
+      const fpx = flightPathPos(F, now);
+      const useRunway = (re: RunwayEnd) => { const fr = re ? this.frameFor(re) : null; A = fr || A0; this.active = A; this.joins = this.joinsBy[A.name + '|' + Math.round(A.tx)] || null; };
+      let hw = 0, rwyHdg = 0, roll = 0, lift: number[] = null;
+      const setRunway = (re: RunwayEnd) => { useRunway(re); rwyHdg = Math.atan2(A.ux, A.uy) * 180 / Math.PI; hw = headwind(A.wind, A.windKt, rwyHdg); roll = Math.min(A.len * 0.65, big ? 2200 : 700); lift = [A.tx + A.ux * roll, A.ty + A.uy * roll]; };
+      setRunway(fpx && f.from === icao ? fpx.fp.dep : null);
+      void lift;
       // departing from here
       if (f.from === icao) {
         const tx = this.span(prof, 'Taxi out'), to = this.span(prof, 'Takeoff'), cl = this.span(prof, 'Climb');
         if (tx && el < tx[1]) {
-          const stand = this.standFor(f.reg + 'd' + f.from, big), hold = this.nearestNode(A.tx + A.ux * 60, A.ty + A.uy * 60);
-          const path = stand && hold ? this.route(stand, hold).concat([[A.tx, A.ty]]) : [];
+          const dp = this.departurePath(f.reg, big), stand = dp.stand, path = dp.path;
           const PUSH = 75;   // pushback: about 75 s at 3-5 kt, nose pointing the other way
           // it waits at the gate and pushes back in time to reach the runway about a minute before its slot
           const need = path.length > 1 ? PUSH + this.taxiTimed(path, 0, 0).total + 60 : 0, wait = Math.max(0, (tx[1] - tx[0]) - need);
@@ -326,6 +420,7 @@ class AirportView {
       }
       // arriving here
       if (!pos && f.to === icao && !f.noDest) {
+        setRunway(fpx ? fpx.fp.arr : null);
         const ld = this.span(prof, 'Landing'), ti = this.span(prof, 'Taxi in');
         const td = ld ? ld[0] : prof.totalS;
         if (el < td) {
@@ -345,26 +440,30 @@ class AirportView {
             const v0 = land.v0, d = 400 + v0 * sIn - 0.5 * land.dec * sIn * sIn;
             pos = [A.tx + A.ux * d, A.ty + A.uy * d, rwyHdg]; phase = sIn < 2 ? 'Touchdown' : 'Landing roll'; kt = Math.round((v0 - land.dec * sIn) / KT + hw);
           } else {
-            const exitPt = [A.tx + A.ux * land.end, A.ty + A.uy * land.end], exit = this.nearestNode(A.tx + A.ux * (land.end + 80), A.ty + A.uy * (land.end + 80)), stand = this.standFor(f.reg + 'a' + f.to, big);
-            const path = [exitPt].concat(exit && stand ? this.route(exit, stand) : []);
+            const path = this.arrivalPath(land.end, f.reg, big);
             const r = this.taxiTimed(path, 15, 0), q = this.timedAt(r, sIn - land.t);
-            // at the gate for half a minute, then it is one of the parked aircraft
-            if (q && sIn - land.t < r.total + 30) { pos = q.pos; kt = q.kt; phase = sIn - land.t >= r.total ? 'At the gate' : 'Taxi in'; }
+            // then it stays at its stand (it becomes one of the parked aircraft when the flight is closed)
+            if (q) { pos = q.pos; kt = q.kt; phase = sIn - land.t >= r.total ? 'At the gate' : 'Taxi in'; }
           }
         }
       }
       if (pos && fe.hold) { phase = holdLabel(fe.hold); if (fe.hold.kind === 'gate' || fe.hold.kind === 'runway') kt = 0; }
-      if (pos) out.push(Object.assign(base, { x: pos[0], y: pos[1], hdg: pos[2] || 0, alt, phase, kt }));
+      if (pos) out.push(Object.assign(base, { x: pos[0], y: pos[1], hdg: pos[2] || 0, alt, phase, kt, rwy: A.name }));
+      this.active = A0; this.joins = this.joinsBy[A0.name + '|' + Math.round(A0.tx)] || null; A = A0;
     }
     // the fleet's aircraft parked here
     const used: { [k: string]: boolean } = {}; out.forEach(p => used[p.id] = true);
     for (const a of fleetOf(State.companyId)) {
       if (a.location !== icao || a.status === 'flying' || State.live.some(f => f.reg === a.reg)) continue;
-      const t = acType(a.typeId), st = this.standFor(a.reg + 'a' + icao, t.seats >= 60); if (!st) continue;
+      const j0 = this.runwayJoins()[0], t = acType(a.typeId), st = this.standFor(a.reg, t.seats >= 60, j0 ? j0.k : undefined) || this.standFor(a.reg, t.seats >= 60); if (!st) continue;
       const k = this.nodeXY(st), park = g.parks[+st.slice(1)];
       out.push({ id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? park[2] : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
     }
     this.planes = out;
+    // stands are freed when their aircraft has left (taken off) or isn't here any more
+    const book = gateBook(icao, L), here: { [r: string]: boolean } = {};
+    for (const p of out) if (p.alt < 1 && !/take-off|lift-off|climb/i.test(p.phase)) here[p.parked ? p.id.slice(5) : (State.live.filter(f => f.id === p.id)[0] || {} as any).reg] = true;
+    for (const r in book) if (!here[r]) delete book[r];
   }
 
   /* ---------- drawing ---------- */
@@ -653,6 +752,15 @@ class AirportView {
   }
 }
 
+/** Which aircraft stands on which stand, per airport (for the layout in use). */
+const _gateBooks: { [icao: string]: { src: string; book: { [reg: string]: string } } } = {};
+function gateBook(icao: string, L: AirportLayout): { [reg: string]: string } {
+  const src = L ? L.source + ':' + L.parks.length : '';
+  const e = _gateBooks[icao];
+  if (!e || e.src !== src) return (_gateBooks[icao] = { src, book: {} }).book;
+  return e.book;
+}
+
 function standName(p: number[]): string {
   const n = p[5], num = p[6];
   if (n >= 12 && n <= 37) return String.fromCharCode(65 + n - 12) + num;   // GATE_A … GATE_Z
@@ -685,7 +793,7 @@ ACTIONS['apv-retry'] = () => {
 /** An airport drawn inside the world map: its layout loads in the background (runways first). */
 function makeAirportScene(icao: string, map: WorldMap): AirportView {
   const v: AirportView = Object.create(AirportView.prototype);
-  Object.assign(v, { embedded: true, map, icao, alive: true, track: null, planes: [], routes: {}, ptrs: {}, s: 1, w: 0, h: 0, cx: 0, cy: 0, fetching: true,
+  Object.assign(v, { embedded: true, map, icao, alive: true, track: null, planes: [], routes: {}, reachCache: {}, joins: null, joinsBy: {}, frames: {}, ptrs: {}, s: 1, w: 0, h: 0, cx: 0, cy: 0, fetching: true,
     col: { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') } });
   AirportLayouts.get(icao, L => { if (L && v.alive) v.setLayout(L, true); v.fetching = false; }).then(L => { if (v.alive && L && (!v.L || v.L.source === 'runways' || L.source !== 'runways')) v.setLayout(L); });
   return v;

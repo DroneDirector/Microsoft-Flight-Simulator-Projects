@@ -24,7 +24,7 @@ SCREENS.logbook = {
       ${rows.map((l, i) => {
         const t = acType(plane(l.reg).typeId);
         const fpmCls = l.result === 'crash' ? 'red' : Math.abs(l.landingFpm) > 300 ? 'amber' : Math.abs(l.landingFpm) < 150 ? 'green' : '';
-        return `<div class="lt-row ${l.result === 'crash' && l.decision === 'pending' ? 'pending' : ''} ${l.decision === 'disregarded' ? 'voided' : ''}" role="row" style="--i:${i}">
+        return `<div class="lt-row ${l.result === 'crash' && l.decision === 'pending' ? 'pending' : ''} ${l.decision === 'disregarded' ? 'voided' : ''}" role="row" style="--i:${i}" data-act="log-open" data-id="${l.id}" tabindex="0" aria-label="Open ${esc(l.reg)}, ${esc(l.from)} to ${esc(l.to)}">
           <span>${esc(l.date.slice(5, 10).replace('-', '/'))}<small>${esc(l.date.slice(11))}</small></span>
           <span><b>${esc(l.from)}</b> to <b>${esc(l.to)}</b></span>
           <span>${esc(l.reg)}<small>${esc(t.model)}</small></span>
@@ -40,3 +40,38 @@ SCREENS.logbook = {
     </div>`;
   },
 };
+
+/* ---------- one flight: opens the aircraft with this flight's log ---------- */
+ACTIONS['log-open'] = el => {
+  const l = State.logbook.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!l || !plane(l.reg)) return;
+  Sound.tick();
+  _acLog = l.id;
+  ACTIONS['ac-detail']({ getAttribute: () => l.reg } as any, null);
+};
+
+/** The flight's own log inside the aircraft's page: what happened, the landing, the load, damage found and the money. */
+function flightLogHtml(l: LogEntry): string {
+  const L: any = l, a = plane(l.reg), t = acType(L.typeId || (a ? a.typeId : '')) || (a ? acType(a.typeId) : null);
+  const day = String(l.date).slice(0, 10), fpm = Math.abs(l.landingFpm);
+  const fpmCls = l.result === 'crash' ? 'red' : fpm > 300 ? 'amber' : fpm < 150 ? 'green' : '';
+  // damage reported on this aircraft that day, and the flight's money
+  const issues = State.issues.filter(i => i.reg === l.reg && i.date === day);
+  const tx = State.txns.filter((x: any) => x.reg === l.reg && x.date === day && x.route === `${l.from} → ${l.to}`)[0];
+  const verdict = l.result === 'crash' ? (l.decision === 'registered' ? 'Crash, registered' : l.decision === 'disregarded' ? 'Crash, disregarded (flight voided)' : 'Crash, waiting for your decision')
+    : l.result === 'incident' ? 'Incident: damage that grounds the aircraft' : l.result === 'hard' ? 'Hard landing: the mechanic inspects it' : fpm < 150 ? 'Smooth landing' : 'Normal landing';
+  return `<div class="flog ${l.result}">
+    <div class="flog-h"><span>${statusChip(l.decision === 'disregarded' ? 'voided' : l.result)}</span><b>${esc(l.from)} → ${esc(l.to)}</b><small>${esc(l.date)}${t ? ', ' + esc(t.maker + ' ' + t.model) : ''}</small></div>
+    <p class="flog-v">${esc(verdict)}</p>
+    <div class="kv-row">
+      <div><small>Landing</small><b class="${fpmCls}">${num(l.landingFpm)} fpm</b></div>
+      <div><small>G-force</small><b>${l.g.toFixed(2)} g</b></div>
+      <div><small>Block time</small><b>${hours(l.blockMin)}</b></div>
+      <div><small>Passengers</small><b>${num(l.pax)}</b></div>
+      <div><small>ATC</small><b>${esc(l.atc)}</b></div>
+      ${tx ? `<div><small>Result</small><b class="${tx.amount >= 0 ? 'green' : 'red'}">${money(tx.amount, { sign: true, compact: true })}</b></div>` : ''}
+    </div>
+    ${l.notes ? `<p class="fine-print">${icon('info')}${esc(l.notes)}</p>` : ''}
+    ${issues.length ? `<div class="flog-iss"><small>Found after this flight</small>${issues.map(i => `<button class="mini-row" data-act="open-issue" data-id="${i.id}">${statusChip(i.severity)}<span>${esc(i.title)}</span><small>${money(i.cost, { compact: true })}</small></button>`).join('')}</div>` : ''}
+    <div class="btn-row">${l.result === 'crash' && l.decision === 'pending' ? `<button class="btn danger sm" data-act="open-crash" data-id="${l.id}">Decide about the crash</button>` : ''}${tx ? `<button class="btn ghost sm" data-act="tx-detail" data-id="${tx.id}">${icon('finance')}Money in and out</button>` : ''}</div>
+  </div>`;
+}

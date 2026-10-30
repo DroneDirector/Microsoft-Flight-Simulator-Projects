@@ -159,7 +159,7 @@ function incidentPopup(id: string) {
       <div class="inc-av">${avatarSvg(p.look, role, { accent: company().color })}</div>
       <div class="inc-main">
         <div class="modal-head"><div><small>Conduct report, ${esc(inc.date)}</small><h2>${esc(inc.title)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-        <div class="say-row">${voiceButton(inc.text, 'ops', 'Play the report')}<small class="voice-note">${esc(voiceNote())} · Head of operations</small></div>
+        <div class="say-row">${voiceButton(inc.text, 'ops', 'Play the report')}${voiceNoteEl('Head of operations')}</div>
         <p class="speech">${esc(inc.text)}</p>
         <div class="inc-who"><b>${esc(p.name)}</b><small>${ROLE_NAMES[role]}, ${natLabel(p.nat)}, ${ageOf(p.dob)}, base ${esc(p.base)}</small><small class="${p.warnings ? 'amber' : ''}">${p.warnings ? `Already ${p.warnings} warning${p.warnings > 1 ? 's' : ''} on record: ${esc(warnSummary(p))}` : 'No earlier warnings'}</small><small>This report: <b class="sev-${inc.sev || 'moderate'}">${esc(inc.sev || 'moderate')}</b></small></div>
         ${warnHistory(p)}

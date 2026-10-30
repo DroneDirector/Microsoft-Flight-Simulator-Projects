@@ -194,8 +194,17 @@ function courtPopup(id: string) {
         <div class="modal-head"><div><small>Criminal case, ${esc(c.court)}</small><h2>${esc(c.offence)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
         <div class="inc-who"><b>${esc(c.name)}</b><small>${esc(c.role === 'pax' ? 'Passenger' : c.role === 'airline' ? 'The airline, with you as the accountable manager' : ROLE_NAMES[c.role === 'pilot' ? 'captain' : c.role] || 'Crew')}. Charge: ${esc(c.charge)}</small>
           <small class="${c.status === 'guilty' ? 'amber' : c.status === 'acquitted' ? 'green' : ''}">${c.status === 'open' ? (next ? `Next: ${esc(next.title.toLowerCase())}, around ${esc(when(next.at))}` : 'Awaiting the verdict') : c.status === 'guilty' ? `Guilty: ${esc(c.sentence || '')}` : 'Not guilty'}</small></div>
+        <div class="say-row">${voiceButton(courtSpeech(c, next), 'legal', 'Play the lawyer\'s update')}${voiceNoteEl('Company lawyer')}</div>
         <ol class="court-tl">${c.stages.map(s => `<li class="${s.done ? 'done' : ''}"><time>${s.done || s === next ? esc(when(s.at)) : ''}</time><b>${esc(s.title)}</b>${s.done ? `<p>${esc(s.text)}</p>` : ''}</li>`).join('')}</ol>
       </div>
-    </div>`, { cls: 'wide' });
+    </div>`, { cls: 'wide', onClose: () => Voice.stop() });
+}
+/** The company lawyer's update on a case: where it stands and what comes next. */
+function courtSpeech(c: CourtCase, next: any): string {
+  const done = c.stages.filter(s => s.done), last = done[done.length - 1];
+  const head = `An update on the case against ${c.name}: ${c.offence.toLowerCase()}, before ${c.court}.`;
+  const now = last ? ` ${last.text}` : '';
+  const end = c.status === 'guilty' ? ` The verdict is guilty. ${c.sentence || ''}` : c.status === 'acquitted' ? ' The verdict is not guilty.' : next ? ` Next comes the ${next.title.toLowerCase()}, around ${dateStr(new Date(next.at))}.` : ' We are waiting for the verdict.';
+  return head + now + end;
 }
 ACTIONS['court-open'] = el => { const t = el.closest('.toast'); if (t) t.remove(); courtPopup(el.getAttribute('data-id')); };

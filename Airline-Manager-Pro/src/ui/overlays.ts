@@ -128,6 +128,7 @@ const NOTICE_META: { [k: string]: { label: string; icon: string } } = {
 let _inboxTab = 'all';
 
 function inboxHtml(): string {
+  pruneNotices();
   const tabs = ['all', 'mechanic', 'staff', 'authority', 'flight', 'pilot', 'finance'];
   const list = State.notices.filter(n => _inboxTab === 'all' || n.kind === _inboxTab);
   return `
@@ -164,8 +165,27 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'staff' && n.ref && /^case-/.test(n.ref)) courtPopup(n.ref);
   else if (n.kind === 'staff' && n.ref) incidentPopup(n.ref);
   else if (n.kind === 'birthday') ACTIONS['bday-preview'](null, null);
-  else openLayer('modal', `<div class="modal-head"><h2>${esc(n.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div><div class="modal-body"><p class="lede">${esc(n.body)}</p></div>`, { cls: 'narrow' });
+  else {
+    // the message, read out by whoever sent it
+    const who = noticeSpeaker(n);
+    const wrap = openLayer('modal', `<div class="modal-head"><h2>${esc(n.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div><div class="modal-body"><p class="lede">${esc(n.body)}</p>
+      ${who ? `<div class="say-row">${voiceButton(n.body, who[0], 'Play the message')}${voiceNoteEl(who[1])}</div>` : ''}</div>`, { cls: 'narrow', onClose: () => Voice.stop() });
+    if (who) autoSpeak(wrap);
+  }
 };
+
+/** Who reads a message out: [speaker, their title], or null for messages nobody says (system notes). */
+function noticeSpeaker(n: Notice): [string, string] {
+  if (n.kind === 'pilot') {
+    const f = State.live.filter(x => x.id === n.ref)[0], p: any = f ? pilot(f.pilotId) : (State.pilots as any[]).filter(x => n.body.indexOf(x.name) >= 0 || n.title.indexOf(x.name) >= 0)[0];
+    return [personWho('pilot', p), p ? p.name : 'Pilot'];
+  }
+  if (n.kind === 'mechanic') return ['mechanic', 'Mechanic'];
+  if (n.kind === 'authority') return ['authority', 'Aviation authority'];
+  if (n.kind === 'finance') return ['finance', 'Finance'];
+  if (n.kind === 'staff' || n.kind === 'company' || n.kind === 'flight') return ['ops', 'Head of operations'];
+  return null;
+}
 
 /* ---------- Mechanic pop-up ---------- */
 function mechanicLines(issue: Issue): string {
@@ -174,10 +194,12 @@ function mechanicLines(issue: Issue): string {
     ? `I've had a proper look at ${spellReg(issue.reg)}, your ${t.maker} ${t.model}. I'm afraid she's not going anywhere for now.`
     : `Quick word about ${spellReg(issue.reg)}, the ${t.model}.`;
   const mid = `${issue.title}. ${issue.detail}`;
+  // the time quoted is the time the hangar really takes (all open reports on the aircraft together)
+  const min = issue.status === 'open' ? repairPlanMin(issue.reg) : (issue as any).durMin || 0, n = repairTotal(issue.reg).n;
+  const time = min ? `about ${repairTimeText(min)} in the hangar` : 'a quick job, she\'s ready straight after';
   const end = issue.severity === 'grounding'
-    ? `It's ${issue.severity === 'grounding' ? 'one to two hours' : issue.severity === 'major' ? 'about an hour' : 'a quick job'} in the hangar and roughly ${money(issue.cost)}. Your call, but she stays grounded until it's done.`
-    : issue.days ? `I'd want her for about ${issue.days} day${issue.days > 1 ? 's' : ''}, roughly ${money(issue.cost)}. We can do it now, or I'll pencil it in for later.`
-      : `It's a quick job overnight, about ${money(issue.cost)}. Fix it now or leave it for later, up to you.`;
+    ? `It's ${time}${n > 1 ? ' for everything on her' : ''}, and roughly ${money(issue.cost)}. Your call, but she stays grounded until it's done.`
+    : `It's ${time}${n > 1 ? ' for everything on her' : ''}, about ${money(issue.cost)}. Fix it now or leave it for later, up to you.`;
   return start + ' ' + mid + ' ' + end;
 }
 function spellReg(reg: string): string { return reg.replace('-', ' '); }
@@ -193,7 +215,7 @@ function mechanicPopup(issueId: string) {
         <div class="mech-avatar"><span>JH</span><i class="mech-ring"></i></div>
         <b>Jónas Hansen</b><small>Line maintenance, ${esc(a.base)}</small>
         ${voiceButton(speech, 'mechanic', "Play the mechanic's message")}
-        <small class="voice-note">${esc(voiceNote())}</small>
+        ${voiceNoteEl()}
       </div>
       <div class="mech-main">
         <div class="modal-head"><h2>${esc(issue.reg)}: ${esc(issue.title)}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
@@ -202,12 +224,13 @@ function mechanicPopup(issueId: string) {
         <div class="issue-list">${related.map(i => `
           <div class="issue-row ${i.id === issue.id ? 'cur' : ''}">
             ${statusChip(i.severity)}<b>${esc(i.title)}</b><small>${esc(i.source)}</small>
-            <span class="ir-cost">${money(i.cost)}</span><span class="ir-days">${i.days ? i.days + ' d' : 'Overnight'}</span>
+            <span class="ir-cost">${money(i.cost)}</span><span class="ir-days">${i.status === 'open' ? (repairPlanMin(i.reg, [i]) ? repairTimeText(repairPlanMin(i.reg, [i])) : 'At once') : 'Paid'}</span>
           </div>`).join('')}</div>
-        <div class="modal-actions">
+        ${issue.status === 'open' ? `<div class="modal-actions">
           <button class="btn ghost" data-act="fix-later" data-id="${issue.id}">Fix later</button>
           <button class="btn danger" data-act="fix-now" data-id="${issue.id}">${icon('wrench')}${repairTotal(issue.reg).n > 1 ? `Pay ${money(repairTotal(issue.reg).cost)} and fix all ${repairTotal(issue.reg).n}` : `Pay ${money(issue.cost)} and fix now`}</button>
-        </div>
+        </div>` : `<div class="paid-note">${icon('check')}<span><b>Paid${(issue as any).paidAt ? ' ' + esc(dateStr(new Date((issue as any).paidAt))) : ''}</b><small>${issue.status === 'fixed' ? 'Repaired' : a.status === 'flying' ? 'The repair starts when it lands' : 'Being repaired: ' + Math.max(1, Math.ceil(((issue as any).startedAt + (issue as any).durMin * 60000 - Date.now()) / 60000)) + ' min left'}</small></span>
+          <button class="btn ghost" data-act="close-layer">Close</button></div>`}
         ${issue.severity === 'grounding' ? `<p class="fine-print">${icon('alert')}Grounding damage: ${esc(issue.reg)} can't be flown until this is repaired.</p>` : ''}
       </div>
     </div>`, { cls: 'wide mech-pop', onClose: () => Voice.stop() });
@@ -233,7 +256,11 @@ ACTIONS['fix-now'] = el => {
   const a = plane(i.reg), c = company(a.companyId);
   // one payment repairs everything reported on this aircraft, and it is ready to fly straight away
   const open = State.issues.filter(x => x.reg === i.reg && x.status === 'open'), cost = open.reduce((t, x) => t + x.cost, 0);
+  // a report is paid once: after that the repair carries on and there is nothing more to pay
+  if (!open.length) { closeAll(); toast('Already paid. The mechanic is on it.', 'info'); return; }
   const from = c.balance; c.balance -= cost;
+  const ids: { [k: string]: boolean } = {}; open.forEach(x => { ids[x.id] = true; (x as any).paidAt = Date.now(); });
+  State.notices = State.notices.filter(n => !(n.kind === 'mechanic' && ids[n.ref]));
   repairAll(i.reg);
   if (cost) State.txns.unshift({ id: uid(), companyId: a.companyId, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Repair: ${open.map(x => x.title).join(', ')} (${i.reg})`, amount: -cost, kind: 'maint', reg: i.reg,
     lines: [['Labour', -Math.round(cost * 0.45)], ['Parts', -Math.round(cost * 0.55)]], note: open.map(x => x.detail).join(' '), link: { kind: 'aircraft', id: i.reg } } as any);
@@ -263,12 +290,13 @@ function finePopup(ref: string) {
       <div class="transcript"><small class="tr-h">ATC transcript (${State.settings.atcSource === 'beyondatc' ? 'BeyondATC audio' : 'built-in ATC'})</small>
         ${f.transcript.map((l: any) => `<div class="tr-line w-${l.who.toLowerCase()}"><time>${esc(l.t)}</time><b>${esc(l.who === 'SYS' ? 'Detected' : l.who)}</b><span>${esc(l.text)}</span></div>`).join('')}
       </div>
+      <div class="say-row">${voiceButton(`This is ${f.authority}. ${f.title}, flight ${f.flight}, ${f.reg}, at ${f.airport}, runway ${f.runway}. The fine is ${money(f.amount)}. If you believe the transcript is wrong, you may contest it.`, 'authority', 'Play the authority\'s message')}${voiceNoteEl(f.authority)}</div>
       <p class="fine-print">${icon('info')}If the transcript is wrong, contest the fine and it's removed from your record.</p>
       <div class="modal-actions">
         <button class="btn ghost" data-act="fine-contest" data-ref="${ref}">Contest</button>
         <button class="btn danger" data-act="fine-pay" data-ref="${ref}">Accept and pay ${money(f.amount)}</button>
       </div>
-    </div>`, { cls: 'narrow' });
+    </div>`, { cls: 'narrow', onClose: () => Voice.stop() });
 }
 ACTIONS['fine-pay'] = el => {
   const ref = el.getAttribute('data-ref'); const f = State.fines[ref]; if (!f) return;
@@ -304,13 +332,14 @@ function crashPopup(logId: string) {
         <div><small>Passengers</small><b>${l.pax}</b></div>
         <div><small>Cause</small><b>${esc(l.notes || 'Impact')}</b></div>
       </div>
+      <div class="say-row">${voiceButton(`${l.reg} has crashed on the flight from ${l.from} to ${l.to}, at ${num(Math.abs(l.landingFpm))} feet per minute and ${l.g.toFixed(1)} g, with ${l.pax} passengers on board. Cause: ${l.notes || 'impact'}. You need to decide whether to register the crash or disregard it.`, 'ops', 'Play the report')}${voiceNoteEl('Head of operations')}</div>
       <div class="decide">
         <button class="decide-card bad" data-act="crash-decide" data-id="${l.id}" data-d="registered">
           <b>Register crash</b><small>Goes on your record. Insurance covers part of the repair, reputation drops and ${esc(l.reg)} is out of service.</small></button>
         <button class="decide-card" data-act="crash-decide" data-id="${l.id}" data-d="disregarded">
           <b>Disregard</b><small>As if it never happened. The flight is voided, so it earns no hours or pay.</small></button>
       </div>
-    </div>`, { cls: 'wide' });
+    </div>`, { cls: 'wide', onClose: () => Voice.stop() });
 }
 ACTIONS['crash-decide'] = el => {
   const l = State.logbook.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!l) return;

@@ -2,6 +2,7 @@
 (function boot() {
   document.title = APP.name;
   ErrorLog.init();
+  try { FlightTrace.init(); } catch (e) { /* the trace is optional */ }
   Store.load();
   Store.restoreIfEmpty();
   if (DESKTOP) { Desk.init(); SETTINGS.unshift({ id: 'display', title: 'Display', icon: 'pc', items: [{ type: 'html', html: desktopSettingsHtml }] } as any); }

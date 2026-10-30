@@ -43,7 +43,7 @@ function speedSpec(typeId: string): SpeedSpec {
 }
 
 /** Take-off and landing weights (tonnes) of a flight: empty aircraft, crew, passengers at 100 kg, cargo, fuel. */
-function flightWeights(typeId: string, pax: number, distNm: number): { tow: number; lw: number } {
+function flightWeights(typeId: string, pax: number, distNm: number): { tow: number; lw: number; zfw: number } {
   const S = speedSpec(typeId), t = acType(typeId) || AIRCRAFT[0];
   const crew = t.seats > 100 ? 0.6 : t.seats > 20 ? 0.3 : 0.1, payload = Math.max(0, pax) * 0.1, cargo = payload * 0.15;
   const range = Math.max(200, t.rangeNm || 1000), share = clamp(distNm / range, 0, 1);
@@ -52,7 +52,7 @@ function flightWeights(typeId: string, pax: number, distNm: number): { tow: numb
   const fuel = Math.max(0, Math.min((S.mtow - S.oew) * (0.12 + 0.62 * share), S.mtow - zfw));
   const tow = Math.min(S.mtow, zfw + fuel), burn = Math.min((S.mtow - S.oew) * 0.62 * share * 0.9, fuel * 0.85);   // trip fuel; reserves stay
   const lw = Math.min(S.mlw, Math.max(zfw, tow - burn));
-  return { tow, lw };
+  return { tow, lw, zfw };
 }
 
 /** A speed within a range for a weight: the top at the maximum weight, scaling with √weight, never below the bottom. */
