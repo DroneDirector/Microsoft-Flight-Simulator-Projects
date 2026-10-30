@@ -55,7 +55,7 @@ function flightCard(f: LiveFlight): string {
       ${weatherChip(f)}
       ${coPilotChip()}
     </div>` : `<div class="fc-sync"><div class="sync-item">${icon('user')}<span><small>Flown by</small><b>${esc(pilot(f.pilotId).name)}</b></span></div>
-      <div class="sync-item">${icon('pax')}<span><small>On board</small><b>${f.pax} passengers</b></span></div></div>`}
+      ${onBoardHtml(onBoardFlight(f))}</div>`}
   </div>`;
 }
 
@@ -127,7 +127,7 @@ SCREENS.ops = {
           <div class="map-host" id="ops-map"></div>
           <div class="map-legend"><b>Live operations</b><span>${live.length} airborne</span></div>
           <div class="map-sel" id="ops-sel"></div>
-          <div class="map-tools">${mapSearchBtn()}${layerBtn()}</div>
+          <div class="map-tools">${mapSearchBtn()}${layerBtn()}${view3dBtn()}</div>
           <button class="map-expand" data-act="go" data-screen="map" aria-label="Open the full map">${icon('map')}Full map</button>
         </div>
         <aside class="ops-side">

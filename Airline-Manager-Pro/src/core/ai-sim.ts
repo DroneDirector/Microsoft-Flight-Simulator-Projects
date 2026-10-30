@@ -178,6 +178,9 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   // a repair paid for while it flew starts now that it is on the ground
   for (const i of State.issues as any[]) if (i.reg === a.reg && i.status === 'scheduled') { i.startedAt = at; a.status = 'maintenance'; }
   try { FlightTrace.arrived(f, at); } catch (e) { /* ignore */ }
+  // for the turnaround at the gate: when it got there, who got off, the fuel left
+  (a as any).lastGateAt = at; (a as any).lastPax = f.pax || 0;
+  try { (a as any).lastFuelKg = legFuel(a.typeId, f.pax || 0, f.from, f.to).land; } catch (e) { /* ignore */ }
   // real-world fares, on-board sales and costs (economics.ts)
   const burnH = BURN_KG_H[t.cls] || 2000;
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
@@ -255,7 +258,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       const test = n.from === n.to;
       if (!n.to || (test && !aiTestRoute(n.pilotId, n.from))) { p.status = 'standby'; continue; }
       // passengers and cargo from demand on the route (none on a test or ferry flight; a charter's own load)
-      const ld = test || n.ferry ? { pax: 0, paxJ: 0, paxF: 0, cargoKg: 0 } : n.job ? Jobs.loadFor(n.job) : aiLoad(n.reg, n.from, n.to, n.leg || 0);
+      const ld = aiPlannedLoad(n);
       const depAt = Math.max(n.depAt, earliest), prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
       const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF, cargoKg: ld.cargoKg, paxMax: cabinSeats(acType(a.typeId), a) || n.paxMax, test,
         alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg, ferry: !!n.ferry, job: n.job || undefined, jobNext: n.jobNext || undefined };
@@ -301,10 +304,12 @@ function aiRefreshCards() {
   for (const el of $all('[data-fc]')) {
     const f = State.live.filter(x => x.id === el.getAttribute('data-fc'))[0];
     if (!f) { const pop = el.closest('.sel-pop'); if (pop) pop.remove(); continue; }
-    if (!aiOn(f)) continue;
+    if (f.real) continue;
     const tmp = document.createElement('div'); tmp.innerHTML = flightCard(f).trim();
     el.replaceWith(tmp.firstElementChild);
   }
+  // aircraft at the gate: the turnaround counts on
+  for (const el of $all('[data-ob]')) { const a = plane(el.getAttribute('data-ob')), o = a ? onBoardParked(a) : null; if (o) el.innerHTML = onBoardHtml(o); }
 }
 
 function startAiClock() {

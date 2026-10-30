@@ -85,6 +85,7 @@ ACTIONS['ac-detail'] = el => {
     <div class="modal-body ac-detail">
       ${focus ? flightLogHtml(focus) : ''}
       <div class="acd-hero">${aircraftArt(a.typeId, { color: div ? div.color : c.color, color2: c.color2, reg: a.reg })}</div>
+      ${a.status !== 'flying' && onBoardParked(a) ? `<div class="fc-sync ob-row" data-ob="${esc(a.reg)}">${onBoardHtml(onBoardParked(a))}</div>` : ''}
       <div class="kv-row">
         <div><small>Airframe hours</small><b>${num(a.hoursMin / 60)}</b></div>
         <div><small>Cycles</small><b>${num(a.cycles)}</b></div>
