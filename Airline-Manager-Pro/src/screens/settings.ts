@@ -74,6 +74,7 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => servicesHtml() },
   ] },
   { id: 'staff', title: 'Staff', icon: 'pilots', items: [
+    { type: 'html', html: () => payScaleHtml() },
     { type: 'choice', key: 'groundHandling', label: 'Apron crew: mechanics, drivers and baggage handlers', hint: 'Home base only: your own apron crew works at your main base; everywhere else the local handling company services your aircraft (you pay its fee per turnaround and can\'t manage its people). Every airport: you hire your own apron crew for any airport you fly to. Co-pilots and cabin crew are always your own.', options: [['base', 'Home base only'], ['everywhere', 'Every airport']] },
     { type: 'toggle', key: 'conduct', label: 'Conduct reports and behaviour', hint: 'Misconduct, warnings and court cases for your AI crew. Switching off never removes what already happened; court cases pause and carry on when you switch back on.' },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Most of the time your staff behave well. Choose how often someone steps out of line. You'll be asked to discipline or dismiss them when it happens.</p>` },

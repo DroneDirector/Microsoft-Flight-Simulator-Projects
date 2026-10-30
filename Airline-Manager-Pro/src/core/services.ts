@@ -104,6 +104,10 @@ function serviceEffects(cid: string, cls: string, nm: number, intl: boolean, pY:
   pts += s.lounge === 'yes' ? 1 : 0;
   pts += s.pets !== 'no' ? 0.5 : 0;
   // fully no-frills short haul is normal; fully no-frills long haul puts people off
+  // the cabin crew make the service: well-paid, happy, experienced crew lift it; cheap, unhappy crew drag it down
+  const fas = typeof staffOf === 'function' ? staffOf(cid, 'fa').filter((p: any) => !p.onStrike) : [];
+  const crewQ = fas.length ? fas.reduce((a2: number, p: any) => a2 + workRating(p), 0) / fas.length : 4;
+  pts += (crewQ - 4) * 4;
   const expect = long ? 9 : mid ? 4 : 2;
   const demand = clamp(1 + (pts - expect) * 0.008, 0.88, 1.1);
   const score = Math.round(clamp(50 + (pts - expect) * 4, 10, 100));

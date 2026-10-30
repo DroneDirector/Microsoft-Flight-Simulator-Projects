@@ -93,7 +93,7 @@ function makePerson(seed: string, role: CrewRole, companyId: string, base: strin
   const age = role === 'captain' ? 34 + r() * 24 : role === 'fo' ? 24 + r() * 16 : 21 + r() * 30;
   const y = 2026 - Math.floor(age), m = 1 + Math.floor(r() * 12), d = 1 + Math.floor(r() * 28);
   if (age < 45 && look.hairColor >= 8) look.hairColor = look.skin > 5 ? 0 : 2;
-  const salary = { captain: 3900, fo: 2300, fa: 920, mech: 1350, ground: 760 }[role] * (0.9 + r() * 0.25);
+  const salary = (typeof goingRate === 'function' ? goingRate({ xp: 0 }, role, base, companyId || undefined) : ({ captain: 2900, fo: 1500, fa: 620, mech: 1100, ground: 560 } as any)[role]) * (0.9 + r() * 0.25);
   return {
     id: role + '-' + _hash(seed).toString(36), name, role, sex, look, dob: `${y}-${m < 10 ? '0' : ''}${m}-${d < 10 ? '0' : ''}${d}`, nat,
     companyId, base, salary: Math.round(salary / 10) * 10, hired: '2026-09-' + (10 + Math.floor(r() * 18)), warnings: 0, rating: 3.6 + r() * 1.4,

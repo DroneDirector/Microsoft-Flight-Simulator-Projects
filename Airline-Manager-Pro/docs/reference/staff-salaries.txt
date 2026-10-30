@@ -1,0 +1,36 @@
+Staff pay: going rates used by the app (src/core/strikes.ts)
+==============================================================
+
+The app pays weekly, in USD. Going rate = base (Europe, full-service airline, level 1)
+x region factor x airline-kind factor x experience (about 1.25x at level 100, about 2.15x at level 500).
+
+Base, weekly (yearly):
+  Captain      2,900  (~151,000)     Europe legacy captains start ~125-155k EUR, 200-250k after 10 years;
+                                     low-cost 105-125k EUR start (RotatePilot pay tables, 2026).
+  First officer 1,500 (~78,000)      Europe legacy FOs 58-73k EUR start, 95-120k after 10 years; low-cost 32-48k.
+  Cabin crew     620  (~32,000)      Europe typical full-time ~30k EUR; Lufthansa avg ~24.5k, Swiss ~43-52k,
+                                     Aer Lingus ~30k base + 6.5k variable (AviationCV salary article).
+  Mechanic     1,100  (~57,000)      Licensed engineers in Europe (worked out, C).
+  Ground crew    560  (~29,000)      Ramp, baggage and drivers in Europe (worked out, C).
+
+Region factors (captain, FO, cabin crew, mechanic, ground):
+  Europe          1.00  1.00  1.00  1.00  1.00
+  North America   1.55  1.45  2.40  1.35  1.45   US BLS May 2024 mean wages: airline pilots 280,570 USD,
+                                                  flight attendants 78,950, aircraft service attendants 43,630;
+                                                  US major captains 330-380k, regional FOs 50-93k (RotatePilot).
+  Middle East     1.15  1.15  1.35  0.90  0.60   Tax-free, housing included; cabin crew 20-63k EUR (AviationCV).
+  Asia            1.05  0.95  0.80  0.70  0.50   Singapore Airlines cabin crew 15.6-39k EUR (AviationCV). (C)
+  Oceania         1.15  1.10  1.50  1.15  1.25   Qantas cabin crew 30-60k EUR (AviationCV). (C)
+  Latin America   0.60  0.55  0.50  0.50  0.40   (C)
+  Africa          0.65  0.60  0.50  0.50  0.35   (C)
+  Russia/CIS      0.70  0.65  0.50  0.55  0.45   (C)
+
+Kind of airline: bush outfits pay pilots 0.5x and others 0.8x; regional airlines pay pilots 0.75x and
+others 0.9x (US regional captains 100-190k against major 330k+).
+
+C = worked out from the sources above; to be confirmed with more data.
+
+Sources:
+  https://www.bls.gov/opub/ted/2025/national-aviation-day-2025.htm
+  https://rotatepilot.com/pilot-pay-2026
+  https://blog.aviationcv.com/cabin-crew-salary-what-you-can-expect-to-earn-and-what-impacts-it/

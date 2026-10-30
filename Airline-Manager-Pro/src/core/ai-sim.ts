@@ -289,6 +289,8 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       if ((a as any).noBase) { p.status = 'standby'; wait(now + 15 * 60e3, 'No free stand at its base'); continue; }
       // operating certificate suspended by a court: the airline's aircraft stay on the ground
       const gu = (S.groundedUntil || {})[a.companyId]; if (gu && gu > n.depAt) { wait(gu, 'Operating certificate suspended'); continue; }
+      // a strike: the leg waits (and is cancelled after five hours)
+      const sb = strikeBlock(a.companyId, a.typeId, n.from); if (sb) { wait(now + 60 * 60e3, sb); continue; }
       // never off and back onto the same airport, except a test flight you set up
       const test = n.from === n.to;
       if (!n.to || (test && !aiTestRoute(n.pilotId, n.from))) { p.status = 'standby'; continue; }

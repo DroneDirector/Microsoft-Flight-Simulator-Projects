@@ -2227,3 +2227,10 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .day-leg.cancelled { opacity: .75; } .day-leg.cancelled .dl-r b { text-decoration: line-through; }
 .pax-row.famous { border-color: rgba(242, 193, 78, .55); background: rgba(242, 193, 78, .07); }
 .pax-star { display: inline-flex; color: #F2C14E; vertical-align: -2px; } .pax-star svg { width: 13px; height: 13px; }
+
+/* Strike decisions */
+.strike-modal .panel { max-width: 560px; }
+.strike-opts { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.strike-opts .btn { height: auto; min-height: 44px; padding: 10px 14px; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; justify-items: start; text-align: left; white-space: normal; }
+.strike-opts .btn svg { grid-row: span 2; }
+.strike-opts .btn small { grid-column: 2; color: inherit; font-weight: 500; font-size: 12px; opacity: .85; line-height: 1.35; }
