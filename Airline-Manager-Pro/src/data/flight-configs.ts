@@ -17,7 +17,60 @@ interface ConfigSpec {
   climbIas?: number; climbMach?: number; descIas?: number; descMach?: number; cruiseIas?: number;
 }
 
-const FLIGHT_CONFIGS: { [typeId: string]: ConfigSpec } = {};
+const FLIGHT_CONFIGS: { [typeId: string]: ConfigSpec } = {
+  // Airbus A320 family: CONF 1 / 1+F 230/215, 2 200, 3 185, FULL 177; gear 250 down, 220 up, 280 extended
+  'a320-fenix': { flaps: [{ n: '1', vfe: 230 }, { n: '2', vfe: 200 }, { n: '3', vfe: 185 }, { n: 'FULL', vfe: 177 }], to: ['1'], land: ['FULL'],
+    gear: { vloExt: 250, vloRet: 220, vle: 280 }, steps: [{ n: '1', at: 210 }, { n: '2', at: 190 }, { n: '3', at: 175 }, { n: 'FULL', at: 160 }], clean: 210, vmo: 350, mmo: 0.82, climbIas: 300, climbMach: 0.78, descIas: 300, descMach: 0.78 },
+  'a320neo': { flaps: [{ n: '1', vfe: 230 }, { n: '2', vfe: 200 }, { n: '3', vfe: 185 }, { n: 'FULL', vfe: 177 }], to: ['1'], land: ['FULL'],
+    gear: { vloExt: 250, vloRet: 220, vle: 280 }, steps: [{ n: '1', at: 210 }, { n: '2', at: 190 }, { n: '3', at: 175 }, { n: 'FULL', at: 158 }], clean: 210, vmo: 350, mmo: 0.82, climbIas: 300, climbMach: 0.78, descIas: 300, descMach: 0.78 },
+  // Airbus A350-900: CONF 1 255, 1+F 220, 2 212, 3 195, FULL 186
+  'a350-ini': { flaps: [{ n: '1', vfe: 255 }, { n: '2', vfe: 212 }, { n: '3', vfe: 195 }, { n: 'FULL', vfe: 186 }], to: ['1'], land: ['FULL'],
+    gear: { vloExt: 250, vloRet: 250, vle: 250 }, steps: [{ n: '1', at: 225 }, { n: '2', at: 200 }, { n: '3', at: 185 }, { n: 'FULL', at: 168 }], clean: 225, vmo: 340, mmo: 0.89, climbIas: 310, climbMach: 0.85, descIas: 300, descMach: 0.85 },
+  // Airbus A310-300: slats/flaps 15/0, 15/15, 15/20, 30/40
+  'a310-ini': { flaps: [{ n: '15/0', vfe: 240 }, { n: '15/15', vfe: 215 }, { n: '15/20', vfe: 205 }, { n: '30/40', vfe: 168 }], to: ['15/15'], land: ['30/40'],
+    gear: { vloExt: 270, vloRet: 240, vle: 270 }, steps: [{ n: '15/0', at: 215 }, { n: '15/15', at: 195 }, { n: '15/20', at: 180 }, { n: '30/40', at: 160 }], clean: 215, vmo: 360, mmo: 0.84, climbIas: 300, climbMach: 0.79, descIas: 290, descMach: 0.79 },
+  // Boeing 737NG: flaps 1/2/5 250, 10 210, 15 200, 25 190, 30 175, 40 162; gear 270 down, 235 up, 320 extended;
+  // flap manoeuvring speeds UP Vref40+70, 1 +50, 5 +30, 15 +20
+  'b738-pmdg': { flaps: [{ n: '1', vfe: 250 }, { n: '2', vfe: 250 }, { n: '5', vfe: 250 }, { n: '10', vfe: 210 }, { n: '15', vfe: 200 }, { n: '25', vfe: 190 }, { n: '30', vfe: 175 }, { n: '40', vfe: 162 }], to: ['5'], land: ['30'],
+    gear: { vloExt: 270, vloRet: 235, vle: 320 }, steps: [{ n: '1', at: 200 }, { n: '5', at: 180 }, { n: '15', at: 165 }, { n: '25', at: 155 }, { n: '30', at: 148 }], clean: 215, vmo: 340, mmo: 0.82, climbIas: 280, climbMach: 0.78, descIas: 280, descMach: 0.78 },
+  'b736-pmdg': { flaps: [{ n: '1', vfe: 250 }, { n: '2', vfe: 250 }, { n: '5', vfe: 250 }, { n: '10', vfe: 210 }, { n: '15', vfe: 200 }, { n: '25', vfe: 190 }, { n: '30', vfe: 175 }, { n: '40', vfe: 162 }], to: ['5'], land: ['30'],
+    gear: { vloExt: 270, vloRet: 235, vle: 320 }, steps: [{ n: '1', at: 185 }, { n: '5', at: 165 }, { n: '15', at: 152 }, { n: '25', at: 142 }, { n: '30', at: 136 }], clean: 200, vmo: 340, mmo: 0.82, climbIas: 280, climbMach: 0.78, descIas: 280, descMach: 0.78 },
+  // Boeing 777-300ER: flaps 1 255, 5 235, 15 215, 20 195, 25 185, 30 170; gear 270, 320 extended
+  'b77w-pmdg': { flaps: [{ n: '1', vfe: 255 }, { n: '5', vfe: 235 }, { n: '15', vfe: 215 }, { n: '20', vfe: 195 }, { n: '25', vfe: 185 }, { n: '30', vfe: 170 }], to: ['15'], land: ['30'],
+    gear: { vloExt: 270, vloRet: 270, vle: 320 }, steps: [{ n: '1', at: 225 }, { n: '5', at: 205 }, { n: '15', at: 185 }, { n: '20', at: 175 }, { n: '30', at: 158 }], clean: 235, vmo: 330, mmo: 0.87, climbIas: 310, climbMach: 0.84, descIas: 310, descMach: 0.84 },
+  // Boeing 787-10: flaps 1, 5, 15, 20, 25, 30
+  'b78x': { flaps: [{ n: '1', vfe: 250 }, { n: '5', vfe: 230 }, { n: '15', vfe: 200 }, { n: '20', vfe: 190 }, { n: '25', vfe: 180 }, { n: '30', vfe: 175 }], to: ['15'], land: ['30'],
+    gear: { vloExt: 270, vloRet: 270, vle: 270 }, steps: [{ n: '1', at: 220 }, { n: '5', at: 200 }, { n: '15', at: 182 }, { n: '20', at: 172 }, { n: '30', at: 155 }], clean: 230, vmo: 350, mmo: 0.9, climbIas: 310, climbMach: 0.85, descIas: 300, descMach: 0.85 },
+  // Boeing 747-8: flaps 1 280, 5 260, 10 240, 20 230, 25 205, 30 180
+  'b748': { flaps: [{ n: '1', vfe: 280 }, { n: '5', vfe: 260 }, { n: '10', vfe: 240 }, { n: '20', vfe: 230 }, { n: '25', vfe: 205 }, { n: '30', vfe: 180 }], to: ['20'], land: ['30'],
+    gear: { vloExt: 270, vloRet: 270, vle: 320 }, steps: [{ n: '1', at: 240 }, { n: '5', at: 220 }, { n: '10', at: 200 }, { n: '20', at: 185 }, { n: '25', at: 172 }, { n: '30', at: 162 }], clean: 255, vmo: 365, mmo: 0.9, climbIas: 320, climbMach: 0.85, descIas: 310, descMach: 0.85 },
+  // Bombardier CRJ700/900: slats/flaps 1, 8, 20, 30, 45
+  'crj9-aero': { flaps: [{ n: '1', vfe: 230 }, { n: '8', vfe: 230 }, { n: '20', vfe: 220 }, { n: '30', vfe: 185 }, { n: '45', vfe: 170 }], to: ['8'], land: ['45'],
+    gear: { vloExt: 220, vloRet: 200, vle: 220 }, steps: [{ n: '1', at: 210 }, { n: '8', at: 200 }, { n: '20', at: 185 }, { n: '30', at: 170 }, { n: '45', at: 150 }], clean: 210, vmo: 335, mmo: 0.85, climbIas: 290, climbMach: 0.77, descIas: 290, descMach: 0.77 },
+  'crj7-aero': { flaps: [{ n: '1', vfe: 230 }, { n: '8', vfe: 230 }, { n: '20', vfe: 220 }, { n: '30', vfe: 185 }, { n: '45', vfe: 170 }], to: ['8'], land: ['45'],
+    gear: { vloExt: 220, vloRet: 200, vle: 220 }, steps: [{ n: '1', at: 205 }, { n: '8', at: 195 }, { n: '20', at: 180 }, { n: '30', at: 165 }, { n: '45', at: 145 }], clean: 205, vmo: 335, mmo: 0.85, climbIas: 290, climbMach: 0.77, descIas: 290, descMach: 0.77 },
+  // ATR 72-600: flaps 15 185, 30 150; gear 170 down, 160 up, 185 extended
+  'atr72': { flaps: [{ n: '15', vfe: 185 }, { n: '30', vfe: 150 }], to: ['15'], land: ['30'],
+    gear: { vloExt: 170, vloRet: 160, vle: 185 }, steps: [{ n: '15', at: 165 }, { n: '30', at: 140 }], clean: 180, vmo: 250, climbIas: 170, cruiseIas: 200, descIas: 240 },
+  // DHC-6 Twin Otter: flaps 10, 20, 37 (full)
+  'dhc6-aero': { flaps: [{ n: '10', vfe: 140 }, { n: '20', vfe: 120 }, { n: 'FULL', vfe: 103 }], to: ['10'], land: ['FULL'],
+    gear: 'fixed', steps: [{ n: '10', at: 125 }, { n: '20', at: 110 }, { n: 'FULL', at: 95 }], clean: 120, vmo: 170, climbIas: 100, cruiseIas: 140, descIas: 140 },
+  // DHC-2 Beaver: flaps take-off and landing
+  'dhc2': { flaps: [{ n: 'T/O', vfe: 90 }, { n: 'LDG', vfe: 80 }], to: ['T/O'], land: ['LDG'],
+    gear: 'fixed', steps: [{ n: 'T/O', at: 85 }, { n: 'LDG', at: 75 }], clean: 95, vne: 157, climbIas: 80, cruiseIas: 110, descIas: 110 },
+  // Cessna 208B: flaps 10 175, 20 150, 30 125
+  'c208': { flaps: [{ n: '10', vfe: 175 }, { n: '20', vfe: 150 }, { n: '30', vfe: 125 }], to: ['20'], land: ['30'],
+    gear: 'fixed', steps: [{ n: '10', at: 140 }, { n: '20', at: 120 }, { n: '30', at: 95 }], clean: 140, vmo: 175, climbIas: 110, cruiseIas: 150, descIas: 165 },
+  // Daher Kodiak 100: flaps 10, 20, 35
+  'kodiak': { flaps: [{ n: '10', vfe: 140 }, { n: '20', vfe: 120 }, { n: '35', vfe: 100 }], to: ['20'], land: ['35'],
+    gear: 'fixed', steps: [{ n: '10', at: 125 }, { n: '20', at: 110 }, { n: '35', at: 90 }], clean: 130, vmo: 182, climbIas: 105, cruiseIas: 150, descIas: 160 },
+  // Pilatus PC-12: flaps 15 163, 30 130, 40 117; gear 180
+  'pc12': { flaps: [{ n: '15', vfe: 163 }, { n: '30', vfe: 130 }, { n: '40', vfe: 117 }], to: ['15'], land: ['40'],
+    gear: { vloExt: 180, vloRet: 180, vle: 236 }, steps: [{ n: '15', at: 140 }, { n: '30', at: 115 }, { n: '40', at: 100 }], clean: 140, vmo: 240, climbIas: 125, cruiseIas: 190, descIas: 220 },
+  // Cessna 172S: flaps 10 110, 20 and 30 85
+  'c172': { flaps: [{ n: '10', vfe: 110 }, { n: '20', vfe: 85 }, { n: '30', vfe: 85 }], to: ['10'], land: ['30'],
+    gear: 'fixed', steps: [{ n: '10', at: 85 }, { n: '20', at: 75 }, { n: '30', at: 68 }], clean: 90, vne: 163, vno: 129, climbIas: 75, cruiseIas: 120, descIas: 120 },
+};
 
 /** The config data for a type: its own, or the nearest type of its class. */
 function configSpec(typeId: string): ConfigSpec {
@@ -45,6 +98,9 @@ function flightConfig(typeId: string, phase: string, ias: number, aglFt: number,
     fi = toIdx;
     if (C) for (let i = toIdx; i >= 1; i--) { const st = C.steps.filter(s => s.n === C.flaps[i - 1].n)[0]; if (st && ias > st.at + 10) fi = i - 1; }
     else fi = aglFt > 1500 ? 0 : toIdx;
+    // light aircraft bring the take-off flaps in once clear of obstacles; everyone is clean by 3,000 ft
+    if (fixed && aglFt > 400) fi = 0;
+    if (aglFt > 3000) fi = 0;
   } else if (/approach|final|landing|star|arrival|descent|touchdown/.test(ph)) {
     // on the approach: each step at its speed, the gear at about 2,000 ft or the final fix
     fi = 0;
