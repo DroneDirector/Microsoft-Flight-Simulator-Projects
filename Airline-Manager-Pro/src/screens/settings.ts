@@ -266,7 +266,7 @@ ACTIONS.settings = el => {
 };
 function rerenderSettingsBody(anim?: boolean) {
   const b = $('#set-body'); if (!b) return;
-  b.innerHTML = settingsBody();
+  if (anim) b.innerHTML = settingsBody(); else patchHtml(b, settingsBody());   // updates in place don't flash
   if (anim) { b.classList.remove('swap'); void b.offsetWidth; b.classList.add('swap'); }
 }
 ACTIONS['set-section'] = el => {

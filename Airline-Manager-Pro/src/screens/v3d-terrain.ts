@@ -48,7 +48,7 @@ const V3dTerrain = {
     let prev: V3dRing = null;
     const next = (i: number) => {
       if (i >= zs.length || gen !== this.gen || !V3d.open) return;
-      this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; } next(i + 1); });
+      this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; if (this.rings.length === 1 && (V3d as any).lastL && V3d.icao && (V3d as any).lastL.icao === V3d.icao) { try { v3dBuildAirport((V3d as any).lastL); } catch (e) { /* ignore */ } } } next(i + 1); });
     };
     next(0);
   },
