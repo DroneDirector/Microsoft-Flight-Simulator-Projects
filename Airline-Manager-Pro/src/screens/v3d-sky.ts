@@ -493,15 +493,27 @@ function v3dLightPoints(pos: number[], col: number[], size: number[], kind?: num
     vertexShader: `#include <common>
 #include <logdepthbuf_pars_vertex>
 attribute float aSize; attribute float aKind; attribute vec3 aDir; attribute float aPhase;
-uniform float uScale; uniform float uTime; uniform vec4 uFlags; uniform vec4 uFlags2; varying vec3 vCol; varying float vOn;
+uniform float uScale; uniform float uTime; uniform vec4 uFlags; uniform vec4 uFlags2; varying vec3 vCol; varying float vOn; varying float vDay;
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   float on = uFlags.x;
   if (aKind > 0.5 && aKind < 1.5) { float ph = fract(uTime * 0.9 + aPhase); on = (step(ph, 0.05) + step(0.12, ph) * step(ph, 0.17)) * uFlags.y; }
   else if (aKind > 1.5 && aKind < 2.5) { float ph = fract(uTime * 0.8 + aPhase); on = step(ph, 0.14) * uFlags.z; }
   else if (aKind > 2.5 && aKind < 4.5) { vec3 wd = normalize(mat3(modelMatrix) * aDir); vec3 tc = normalize(cameraPosition - wp.xyz); on = (aKind < 3.5 ? uFlags.w : uFlags2.x) * (0.15 + 2.6 * pow(max(dot(wd, tc), 0.0), 8.0)); }
-  else if (aKind > 4.5) on = uFlags2.y;
-  vOn = on; vCol = color;
+  else if (aKind > 4.5 && aKind < 5.5) on = uFlags2.y;
+  vCol = color; vDay = 0.0;
+  if (aKind > 5.5 && aKind < 6.5) {
+    vec3 tc = cameraPosition - wp.xyz; float hd = length(tc.xz);
+    float ang = degrees(atan(tc.y, max(hd, 0.001)));
+    vCol = ang > aPhase ? vec3(1.0, 0.97, 0.92) : vec3(1.0, 0.12, 0.08);
+    on = smoothstep(0.0, 0.3, dot(normalize(tc.xz), normalize(aDir.xz)));   // only towards the approach
+    vDay = 1.0;
+  } else if (aKind > 6.5) {
+    float ph = fract(uTime * 2.0);
+    on = 1.0 - smoothstep(0.0, 0.05, abs(ph - aPhase * 0.8));
+    on *= smoothstep(-0.2, 0.3, dot(normalize((cameraPosition - wp.xyz).xz), normalize(aDir.xz)));
+  }
+  vOn = on;
   vec4 mv = viewMatrix * wp;
   gl_PointSize = clamp(aSize * (aKind > 2.5 && aKind < 4.5 ? 1.0 + on : 1.0) * uScale / max(1.0, -mv.z), 1.6, 34.0);
   gl_Position = projectionMatrix * mv;
@@ -509,11 +521,11 @@ void main() {
 }`,
     fragmentShader: `#include <common>
 #include <logdepthbuf_pars_fragment>
-uniform float uOn; uniform float uGlow; uniform float uAlways; varying vec3 vCol; varying float vOn;
+uniform float uOn; uniform float uGlow; uniform float uAlways; varying vec3 vCol; varying float vOn; varying float vDay;
 void main() {
   #include <logdepthbuf_fragment>
   float d = length(gl_PointCoord - 0.5) * 2.0;
-  float a = (exp(-d * d * 5.0) + 0.6 * exp(-d * d * 40.0)) * vOn * max(uOn, uAlways) * uGlow;
+  float a = (exp(-d * d * 5.0) + 0.6 * exp(-d * d * 40.0)) * vOn * max(max(uOn, uAlways), vDay) * max(uGlow, vDay * 0.9);
   gl_FragColor = vec4(vCol * 1.4, clamp(a, 0.0, 1.0));
 }` });
   const pts = new T.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 20;
@@ -523,7 +535,8 @@ void main() {
 function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => number[], gy: (x: number, z: number) => number): any {
   if (!skyOpt('v3dAptLights')) return null;
   const pos: number[] = [], col: number[] = [], size: number[] = [];
-  const add = (x: number, z: number, h: number, c: number[], s: number) => { pos.push(x, gy(x, z) + h, z); col.push(c[0], c[1], c[2]); size.push(s); };
+  const kind: number[] = [], dirs: number[] = [], phs: number[] = [];
+  const add = (x: number, z: number, h: number, c: number[], s: number, k?: number, d?: number[], ph?: number) => { pos.push(x, gy(x, z) + h, z); col.push(c[0], c[1], c[2]); size.push(s); kind.push(k || 0); dirs.push(...(d || [0, 0, 0])); phs.push(ph || 0); };
   const W = [1, 0.95, 0.85], RED = [1, 0.15, 0.1], GRN = [0.2, 1, 0.45], BLU = [0.25, 0.45, 1], AMB = [1, 0.75, 0.25], FLOOD = [1, 0.72, 0.42];
   for (const r of L.runways) {
     if (r.surf === 9) continue;
@@ -535,10 +548,36 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
     if (r.len >= 1500) for (let a = -half + 15; a < half; a += 30) { const left = half - a, c = left < 300 ? RED : left < 900 ? ((Math.round(a / 30) % 2) ? RED : W) : W; const p = at(a, 0); add(p[0], p[1], 0.7, c, 1.6); }
     // thresholds green, ends red
     for (let b = -w; b <= w + 0.1; b += (2 * w) / 8) { const p1 = at(-half, b), p2 = at(half, b); add(p1[0], p1[1], 0.8, GRN, 2.2); add(p2[0], p2[1], 0.8, RED, 2.2); }
-    // approach lights before both thresholds on instrument runways: a line of bars and a cross bar 300 m out
-    if (r.len >= 1800) for (const dirn of [-1, 1]) {
-      for (let a = 30; a <= 900; a += 30) for (const b of [-2, -1, 0, 1, 2]) { const p = at(dirn * (half + a), b * 1.2); add(p[0], p[1], 1.5, W, 2.0); }
-      for (let b = -15; b <= 15; b += 1.5) { const p = at(dirn * (half + 300), b); add(p[0], p[1], 1.5, W, 2.0); }
+    for (const dirn of [-1, 1]) {
+      const out = [f[0] * dirn, 0, f[1] * dirn];   // from the threshold out towards the aircraft on approach
+      // approach lights before the threshold: on long runways the full system (900 m of white bars, a cross bar
+      // at 300 m, red side bars in the last 300 m, and flashing lights running towards the runway twice a
+      // second); on medium runways a shorter one (420 m with flashers)
+      if (r.len >= 1800) {
+        const full = r.len >= 2400, reach = full ? 900 : 420;
+        for (let a = 30; a <= reach; a += 30) for (const b of [-2, -1, 0, 1, 2]) { const p = at(dirn * (half + a), b * 1.05); add(p[0], p[1], 1.5, W, 2.0); }
+        for (let b = -15; b <= 15; b += 1.5) { const p = at(dirn * (half + 300), b); add(p[0], p[1], 1.5, W, 2.0); }
+        if (full) {
+          for (let b = -7; b <= 7; b += 1) if (Math.abs(b) > 2) { const p = at(dirn * (half + 150), b); add(p[0], p[1], 1.5, W, 1.8); }
+          for (let a = 30; a <= 270; a += 30) for (const sd of [-1, 1]) for (const bb of [0, 1, 2]) { const p = at(dirn * (half + a), sd * (11 + bb * 1.5)); add(p[0], p[1], 1.2, RED, 1.7); }
+        }
+        // the sequenced flashers ("the rabbit"), from the far end in to the cross bar
+        const f0 = full ? 330 : 210;
+        for (let a = reach; a >= f0; a -= 30) { const p = at(dirn * (half + a), 0); add(p[0], p[1], 2.2, [1, 1, 1], 4.2, 7, out, (reach - a) / Math.max(30, reach - f0 + 30)); }
+      }
+      // glide path lights beside the touchdown zone, on the left: PAPI (four lights) on longer runways, VASI
+      // (two bars) on shorter ones. Each shows white above its angle and red below; on the 3° path two white,
+      // two red (PAPI), or white over red (VASI)
+      if (r.len >= 1200) {
+        const left = dirn, edge = (r.wid || 45) / 2;   // the left of an aircraft landing on this end
+        const th = (a: number) => dirn < 0 ? -half + a : half - a;
+        if (r.len >= 1800) {
+          const angles = [2.5, 2.8333, 3.1667, 3.5];   // from the outermost light in towards the runway (the one nearest the runway is set highest)
+          angles.forEach((ang, i) => { const p = at(th(300), left * (edge + 15 + (3 - i) * 9)); add(p[0], p[1], 1.0, RED, 3.4, 6, out, ang); });
+        } else {
+          for (const [a0, ang] of [[150, 2.5], [300, 3.0]] as number[][]) for (const k of [0, 1, 2]) { const p = at(th(a0), left * (edge + 12 + k * 4)); add(p[0], p[1], 1.0, RED, 2.2, 6, out, ang); }
+        }
+      }
     }
   }
   // taxiways: green centre line every 30 m, blue edges every 60 m
@@ -559,7 +598,7 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
     }
   }
   if (!size.length) return null;
-  return v3dLightPoints(pos, col, size);
+  return v3dLightPoints(pos, col, size, kind, dirs, phs);
 }
 
 /* ---------- aircraft lights ---------- */
@@ -582,7 +621,10 @@ function v3dPlaneLightsAdd(body: any, typeId: string) {
   // the nose points along −x of the model; the lights are aimed a little down
   const nrm = (a: number[]) => { const l = Math.hypot(a[0], a[1], a[2]); return a.map(q => q / l); };
   const landDir = nrm([-1, -0.1, 0]), taxiDir = nrm([-1, -0.22, 0]);
-  const lA = v(W.x + 1.2, -rootY * 1.8, wz0 - 0.15), lB = v(W.x + 1.2, rootY * 1.8, wz0 - 0.15);
+  // the landing lights sit in the leading edge of each wing, a short way out from the fuselage, so the light
+  // (and its beam) comes out of the front of the wing
+  const ly = rootY + (semi - rootY) * 0.16, lx = W.x + (ly - rootY) * Math.tan(W.sweep * D2R) - 0.12, lz = wz0 + (ly - rootY) * Math.tan(W.dih * D2R) - 0.04;
+  const lA = v(lx, -ly, lz), lB = v(lx, ly, lz);
   add(lA, [1, 0.97, 0.88], 3.2 * span, 3, landDir); add(lB, [1, 0.97, 0.88], 3.2 * span, 3, landDir);           // landing lights, under the wings
   const nl = v(s.gear.nose, 0, Math.max(0.6, s.ground * 0.55));
   add(nl, [1, 0.96, 0.85], 2.4 * span, 4, taxiDir);                                                            // taxi and take-off light, on the nose gear
@@ -625,7 +667,7 @@ void main() {
   for (let x = s.win.from; x <= s.win.to + 1e-6; x += s.win.pitch) {
     if (s.doors.some(d => Math.abs(d - x) < (airliner ? 0.75 : 0.55))) continue;
     const hw = fusSection(s, x).hw + 0.04;
-    for (const side of [-1, 1]) { const q = v(x, side * hw, zw); cp.push(q.x, q.y, q.z); cc.push(1, 0.8, 0.52); cs.push(airliner ? 0.55 : 0.4); }
+    for (const side of [-1, 1]) { const q = v(x, side * hw, zw); cp.push(q.x, q.y, q.z); cc.push(0.62, 0.5, 0.32); cs.push(airliner ? 0.5 : 0.36); }
   }
   // the cockpit: the front windscreen and the side windows, softly lit from inside (seen from outside only)
   const fw = s.nose * 0.5, fs = s.nose * 0.66, ckz = s.ground + s.h * 0.76;
