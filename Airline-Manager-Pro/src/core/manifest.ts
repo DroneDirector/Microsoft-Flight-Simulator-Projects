@@ -77,17 +77,34 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
 /* ---------- the passenger list ---------- */
 ACTIONS['pax-list'] = el => {
   const f = State.live.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!f) return;
-  Sound.tick();
+  Sound.tick(); _paxJump = {};
   const list = manifestOf(f), flagged = list.filter(p => p.record).length, star = list.filter(p => p.famous)[0];
   const clsName: { [k: string]: string } = { F: 'First', J: 'Business', Y: 'Economy' };
   const groups = (['F', 'J', 'Y'] as const).map(c => [c, list.filter(p => p.cls === c)] as [string, PaxSeat[]]).filter(g => g[1].length);
-  openLayer('modal', `<div class="modal-head"><div><h2>Passengers: ${esc(f.callsign)}</h2><small>${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)} · ${list.length} on board${flagged ? ` · ${flagged} with a conduct record` : ''}${star ? ` · ${esc(star.famous.toLowerCase())} on board` : ''}${list.some(p => p.pet) ? ` · ${list.filter(p => p.pet && !p.pet.left).length} ${list.filter(p => p.pet && !p.pet.left).length === 1 ? 'pet' : 'pets'}` : ''}${f.you ? ' · numbers from the simulator' : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+  openLayer('modal', `<div class="modal-head"><div><h2>Passengers: ${esc(f.callsign)}</h2><small>${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)} · ${list.length} on board${f.you ? ' · numbers from the simulator' : ''}</small>
+      <div class="pax-chips">${(() => {
+        // tap a chip to jump to them in the list (again for the next one)
+        const pets = list.filter(p => p.pet), dogs = pets.filter(p => p.pet.kind === 'dog' && !p.pet.left).length, cats = pets.filter(p => p.pet.kind === 'cat' && !p.pet.left).length, left = pets.filter(p => p.pet.left).length;
+        const chip = (k: string, cls: string, ic: string, txt: string) => `<button class="pax-chip ${cls}" data-act="pax-jump" data-k="${k}">${ic}${esc(txt)}</button>`;
+        return [flagged ? chip('rec', 'rec', icon('alert'), `${flagged} with a conduct record`) : '',
+          dogs || cats ? chip('pet', 'pet', '', [dogs ? `${dogs} ${dogs === 1 ? 'dog' : 'dogs'}` : '', cats ? `${cats} ${cats === 1 ? 'cat' : 'cats'}` : ''].filter(Boolean).join(', ') + ' on board') : '',
+          left ? chip('petleft', 'pet left', '', `${left} ${left === 1 ? 'pet' : 'pets'} left behind`) : '',
+          star ? chip('star', 'star', icon('star'), star.famous) : ''].join('');
+      })()}</div></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body pax-list">${groups.map(([c, ps]) => `<h4>${clsName[c]} · ${ps.length}</h4>${ps.map((p, i) => paxRowHtml(f.id, p, i)).join('')}`).join('') || emptyState('Nobody on board', 'The passengers show here once they have boarded.')}</div>`, { cls: 'wide pax-pop' });
   paxFacesLazy();
 };
+let _paxJump: { [k: string]: number } = {};
+ACTIONS['pax-jump'] = el => {
+  const k = el.getAttribute('data-k'), rows = Array.from(document.querySelectorAll(`.pax-pop .pax-row.has-${k}`)) as HTMLElement[]; if (!rows.length) return;
+  const i = (_paxJump[k] = ((_paxJump[k] == null ? -1 : _paxJump[k]) + 1) % rows.length), row = rows[i];
+  row.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' });
+  rows.forEach(r => r.classList.remove('flash')); void row.offsetWidth; row.classList.add('flash');
+  Sound.tick();
+};
 function paxRowHtml(fid: string, p: PaxSeat, i: number): string {
   const rec = p.record, banned = rec && rec.banned;
-  return `<div class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''} ${p.famous ? 'famous' : ''}">
+  return `<div class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''} ${p.famous ? 'famous' : ''} ${p.pet ? (p.pet.left ? 'has-petleft' : 'has-pet') : ''} ${rec ? 'has-rec' : ''} ${p.famous ? 'has-star' : ''}">
     <span class="pax-face" data-face="${esc(fid)}|${esc(p.key)}" data-i="${i}"></span>
     <span class="pax-who"><b>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small>${p.pet ? `<span class="pax-pet ${p.pet.left ? 'left' : ''}" title="${esc(p.pet.left || '')}">${petSvg(p.pet)}<small>${esc(p.pet.name)}, ${p.pet.kind}, ${p.pet.left ? 'stayed behind' : p.pet.where === 'cabin' ? 'under the seat' : 'in the hold'}</small></span>` : ''}</span>
     <span class="pax-seat">${esc(p.seat)}</span>
