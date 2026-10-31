@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.32 (2026-10-31)
+
+- layoutGenerate: ICAO-dimensioned taxiways, exits, apron and stands from runway data for unmapped airports (runways source, or OSM without taxiways); airport view uses it
+- Newspaper Pets section
+
 ## 0.9.31 (2026-10-31)
 
 - 3D ground paint as batched meshes (v3dGroundPaint) instead of a canvas texture; canvas sheet kept as fallback
