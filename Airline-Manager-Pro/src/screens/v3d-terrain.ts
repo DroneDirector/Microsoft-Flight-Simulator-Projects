@@ -231,7 +231,16 @@ const V3dTerrain = {
     const next = () => { this._satBusy = false; const n2 = (this._satQ || []).shift(); if (n2 && gen === this.gen && V3d.open) this.loadSat(n2); };
     const z = r.z + k, N = r.N << k;
     this.tiles(SAT_URL, z, r.x0 << k, r.y0 << k, N, 'jpg').then(cv0 => {
-      if (!cv0 || !V3d.open || gen !== this.gen) { next(); return; }
+      if (!V3d.open || gen !== this.gen) { next(); return; }
+      // where the country's aerial photos are open, they cover the whole ring (the satellite only shows
+      // where there are no photos, such as at sea); they load even if the satellite imagery didn't
+      const base = cv0 || (() => { const c = document.createElement('canvas'); c.width = c.height = 256 * N; return c; })();
+      orthoOver(base, z, r.x0 << k, r.y0 << k, N).then(drew => { if (!cv0 && !drew) { next(); return; } this.finishSat(r, base, maxTex, gen, next); });
+    });
+  },
+  finishSat(r: V3dRing, cv0: HTMLCanvasElement, maxTex: number, gen: number, next: () => void) {
+    {
+      if (!V3d.open || gen !== this.gen) { next(); return; }
       let cv = cv0;
       if (cv0.width > maxTex) { cv = document.createElement('canvas'); cv.width = cv.height = maxTex; const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(cv0, 0, 0, maxTex, maxTex); }
       const T = THREE; r.satTex = new T.CanvasTexture(cv); r.satTex.colorSpace = T.SRGBColorSpace;
@@ -243,7 +252,7 @@ const V3dTerrain = {
       if ((State.settings as any).v3dSat && r.mesh) { r.mesh.material.map = r.satTex; r.mesh.material.needsUpdate = true; }
       this.prog.sat = (this.prog.sat || 0) + 1;
       setTimeout(next, 60);
-    });
+    }
   },
   setSat(on: boolean) {
     for (const r of this.rings) { if (on) this.loadSat(r); else if (r.mesh) { r.mesh.material.map = r.mapTex; r.mesh.material.needsUpdate = true; } }
@@ -452,4 +461,34 @@ function drawNoWhite(g: CanvasRenderingContext2D, im: HTMLImageElement, W: numbe
     s.putImageData(d, 0, 0); g.drawImage(strip, 0, y);
   }
   strip.width = strip.height = 1;
+}
+
+/** Lay the country's open aerial photos over a ring's satellite picture (the tiles z, x0, y0, N × N of it).
+ *  Resolves when done; nothing changes where there are no photos or they are switched off. */
+function orthoOver(cv: HTMLCanvasElement, z: number, x0: number, y0: number, N: number): Promise<boolean> {
+  const o = V3d.origin ? orthoFor(countryAt(V3d.origin)) : null; if (!o || satCustom()) return Promise.resolve(false);
+  const g = cv.getContext('2d'), W = cv.width, n = 1 << z;
+  return new Promise<boolean>(ok => {
+    let drew = false;
+    const stop = setTimeout(() => ok(drew), 25000);   // a slow service never holds up the view
+    const fin = () => { clearTimeout(stop); ok(drew); };
+    if (o.arcExport) {
+      // one picture for the ring, in the web map projection
+      const R = 6378137, mx = (x: number) => (x / n * 360 - 180) * D2R * R, my = (y: number) => { const k = Math.PI - 2 * Math.PI * y / n; return R * Math.log(Math.tan(Math.PI / 4 + Math.atan(Math.sinh(k)) / 2)); };
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => { try { drawNoWhite(g, im, W); drew = true; } catch (e) { /* not allowed */ } fin(); };
+      im.onerror = fin;
+      const sz = Math.min(W, 4096);
+      im.src = `${o.arcExport}?bbox=${mx(x0)},${my(y0 + N)},${mx(x0 + N)},${my(y0)}&bboxSR=3857&imageSR=3857&size=${sz},${sz}&format=jpg&transparent=false&f=image`;
+      return;
+    }
+    const url = orthoUrl(o), px = W / N; let left = N * N;
+    const one = () => { if (--left === 0) fin(); };
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => { try { if (!orthoBlank(im)) { g.drawImage(im, i * px, j * px, px, px); drew = true; } } catch (e) { /* skip */ } one(); };
+      im.onerror = one;
+      im.src = url.replace('{z}', String(z)).replace('{x}', String((x0 + i + n) % n)).replace('{y}', String(y0 + j));
+    }
+  });
 }

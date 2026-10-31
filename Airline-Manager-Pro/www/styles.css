@@ -2477,3 +2477,5 @@ html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
 .v3d-free.v3d-pc .v3d-modes { margin-left: 190px; }
 .upd-bar i { transition: width .4s ease; }
 .upd-prog.hide { display: none; }
+.pf-map-h { display: flex; align-items: center; gap: 12px; margin-top: 16px; } .pf-map-h small { color: var(--ink-2); flex: 1; }
+.pf-world { height: auto; aspect-ratio: 1000 / 470; background: radial-gradient(ellipse at center, rgba(40,80,130,.25), rgba(10,20,36,.2)); }
