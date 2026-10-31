@@ -209,15 +209,18 @@ function simArrival(arr: RunwayEnd, from: number[]): { star: number[][]; app: nu
 
 const _paths: { [k: string]: FlightPath } = {};
 /** The whole path of a flight from runway to runway (cached). Null when the runways aren't known. */
-function flightPathFor(from: string, to: string): FlightPath {
+function flightPathFor(from: string, to: string, noSim?: boolean): FlightPath {
   if (!from || !to || from === to || !World.runways) return null;
   const dep = activeRunway(from), arr = activeRunway(to);
   if (!dep || !arr) return null;
-  const key = from + '>' + to + '|' + dep.name + '>' + arr.name;
+  const key = from + '>' + to + '|' + dep.name + '>' + arr.name + (noSim ? '|own' : '');
   if (_paths[key]) return _paths[key];
   // departure: the published one from the simulator, or straight ahead for 4 nm and a turn onto the route
   let sidPts: number[][], sidName: string;
-  const sd = simDeparture(dep, arr.thr);
+  // the simulator's procedures, when every point of them is near the airport (a point in the wrong place
+  // would send the path on a huge detour, and the aircraft along it far too fast)
+  const near = (pts: number[][], c: number[], nm: number) => pts.every(q => q && isFinite(q[0]) && isFinite(q[1]) && gcDistanceNm(q, c) < nm);
+  let sd = noSim ? null : simDeparture(dep, arr.thr); if (sd && !near(sd.pts, dep.thr, 120)) sd = null;
   if (sd) { sidPts = sd.pts; sidName = sd.name; }
   else {
     const sidA = geoDest(dep.end, dep.hdg, 4), turn = angDiff(dep.hdg, geoBrg(sidA, arr.thr));
@@ -230,7 +233,7 @@ function flightPathFor(from: string, to: string): FlightPath {
   const sidEnd = sidPts[sidPts.length - 1];
   // arrival and approach: published ones, or generated (straight in, or downwind and base; IF 10 nm, FAF 5.5 nm)
   let starPts: number[][], appPts: number[][], starName: string, appName: string;
-  const sa = simArrival(arr, sidEnd);
+  let sa = noSim ? null : simArrival(arr, sidEnd); if (sa && !near((sa.star || []).concat(sa.app || []), arr.thr, 200)) sa = null;
   if (sa) {
     starPts = sa.star; appPts = sa.app; starName = sa.starName || `${arr.name} arrival`; appName = sa.appName;
     if (!starPts.length) starPts = [geoDest(appPts[0], geoBrg(appPts[0], sidEnd), 15)];
@@ -272,7 +275,10 @@ function flightPathFor(from: string, to: string): FlightPath {
     { kind: 'star', name: starName, from: idx(iStar), to: idx(iApp) },
     { kind: 'app', name: appName, from: idx(iApp), to: cum[cum.length - 1] },
   ];
-  return (_paths[key] = { pts, cum, len: cum[cum.length - 1], parts, dep, arr, sim: !!(sd || sa) } as any);
+  const len = cum[cum.length - 1], gc = gcDistanceNm(dep.thr, arr.thr);
+  // still much longer than the trip itself: the app's own departure and arrival instead
+  if ((sd || sa) && !noSim && len > gc * 1.35 + 120) { const own = flightPathFor(from, to, true); if (own) return (_paths[key] = own); }
+  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa) } as any);
 }
 
 /** The point `d` nm along a path, and the direction of travel there. */

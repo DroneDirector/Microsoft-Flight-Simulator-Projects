@@ -28,8 +28,12 @@ const AirportLayouts = {
    *  or with null when there is nothing better to come. */
   get(icao: string, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     icao = String(icao || '').toUpperCase();
+    const c0 = this.cache[icao] || this.kept(icao);
+    if (c0) return this.getWith(icao, c0, better);
+    return LayoutDb.get(icao).then(l => { if (l) this.cache[icao] = l; return this.getWith(icao, l, better); });
+  },
+  getWith(icao: string, c: AirportLayout, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     const linked = Link.status === 'connected';
-    const c = this.cache[icao] || this.kept(icao);
     if (c && (c.source === 'sim' || (!linked && c.source === 'osm'))) return Promise.resolve(c);
     const now = c ? Promise.resolve(c) : this.fromRunways(icao);
     now.then(first => {
@@ -58,7 +62,7 @@ const AirportLayouts = {
     const ws = this.waiting[icao] || []; delete this.waiting[icao];
     ws.forEach(w => clearTimeout(w.timer));
     let l: AirportLayout = null;
-    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; this.keep('amp-sim:' + icao, l); }
+    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; LayoutDb.put(icao, l); }
     ws.forEach(w => w.ok(l));
   },
 
@@ -344,3 +348,42 @@ function layoutGenerate(l: AirportLayout, a: any) {
   if (l.names && !l.names.length) l.names.push('');
   l.gen = true;
 }
+
+/* ---------- the device's store of airport layouts ---------- */
+// Layouts from your simulator (its SDK facility data, read by the PC app) and OpenStreetMap, kept on this
+// device in its database (no small limit): up to 1,500 airports, the simulator's kept for good.
+const LayoutDb = {
+  _db: null as Promise<IDBDatabase>,
+  db(): Promise<IDBDatabase> {
+    if (this._db) return this._db;
+    this._db = new Promise((ok, no) => { try { const r = indexedDB.open('amp-layouts', 1); r.onupgradeneeded = () => r.result.createObjectStore('l', { keyPath: 'k' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); } catch (e) { no(e); } });
+    return this._db;
+  },
+  get(icao: string): Promise<AirportLayout> {
+    return this.db().then(d => new Promise<AirportLayout>(ok => { const r = d.transaction('l').objectStore('l').get(icao); r.onsuccess = () => ok(r.result ? r.result.l : null); r.onerror = () => ok(null); })).catch(() => null);
+  },
+  put(icao: string, l: AirportLayout) {
+    this.db().then(d => { const t = d.transaction('l', 'readwrite'); t.objectStore('l').put({ k: icao, at: Date.now(), src: l.source, l }); }).catch(() => { /* not available: kept for this session */ });
+  },
+  /** The airports kept, with where each came from. */
+  keys(): Promise<{ [icao: string]: string }> {
+    return this.db().then(d => new Promise<{ [icao: string]: string }>(ok => { const out: { [k: string]: string } = {}, r = d.transaction('l').objectStore('l').openCursor(); r.onsuccess = () => { const c = r.result; if (c) { out[c.value.k] = c.value.src; c.continue(); } else ok(out); }; r.onerror = () => ok(out); })).catch(() => ({}));
+  },
+};
+/** When linked: the airports that matter to you (bases, routes, flights, bookings, jobs and the big airports
+ *  around your home base) are read from the simulator by the PC app in the background and kept here. */
+let _lpAt = 0;
+function layoutPrefetch() {
+  if (Link.status !== 'connected' || !Link.sim || !Link.sim.connected || Date.now() - _lpAt < 6 * 3600e3) return;
+  _lpAt = Date.now();
+  const c = company(), set: { [k: string]: 1 } = {}, add = (k: string) => { if (k && /^[A-Z0-9]{3,4}$/.test(k)) set[k] = 1; };
+  try { companyBases(c.id).forEach(add); } catch (e) { /* ignore */ }
+  State.routes.filter(r => r.companyId === c.id).forEach(r => r.legs.forEach(add));
+  State.live.forEach((f: any) => { if (!f.tfc) { add(f.from); add(f.to); } });
+  try { bookings().forEach((b: any) => { add(b.from); add(b.to); }); } catch (e) { /* ignore */ }
+  try { ((State as any).jobs && (State as any).jobs.list || []).forEach((j: any) => { add(j.from); add(j.to); }); } catch (e) { /* ignore */ }
+  const H = apt(c.hub);
+  if (H && World.ready) (World.list as any[]).filter(w => w.size === 2 && w.pos && /^[A-Z]{4}$/.test(w.icao)).map(w => [w.icao, gcDistanceNm(H.pos, w.pos)] as [string, number]).sort((a, b) => a[1] - b[1]).slice(0, 150).forEach(x => add(x[0]));
+  LayoutDb.keys().then(have => { const list = Object.keys(set).filter(k => have[k] !== 'sim'); if (list.length) linkSend({ type: 'layout-prefetch', list }); });
+}
+setInterval(() => { try { layoutPrefetch(); } catch (e) { /* ignore */ } }, 120e3);

@@ -22,13 +22,32 @@ export function dataDir(): string {
   return path.join(base, 'Airline Manager Pro');
 }
 
+/** Airport layouts read from the simulator (its own SDK facility data), kept on this PC so they are there
+ *  again later, also while the simulator isn't running. Only on this PC: never shared or uploaded. */
+const LayoutStore = {
+  dir(): string { return path.join(dataDir(), 'layouts'); },
+  file(icao: string): string { return path.join(this.dir(), icao.replace(/[^A-Z0-9]/g, '') + '.json'); },
+  get(icao: string): { at: number; l: any } | null { try { return JSON.parse(fs.readFileSync(this.file(icao), 'utf8')); } catch (e) { return null; } },
+  put(icao: string, l: any) { try { fs.mkdirSync(this.dir(), { recursive: true }); fs.writeFileSync(this.file(icao), JSON.stringify({ at: Date.now(), l })); } catch (e) { /* disk full or read-only: it is fetched again next time */ } },
+};
+
 /** Wire a sim source, the tracker and the link server together. Used by the app and the tests. */
 export function run(source: SimSource, server: LinkServer, log: (s: string) => void) {
   const tracker = new FlightTracker();
   let lastSent = 0, last = emptySnapshot();
   let airports: Airport[] = [];
+  let simOk = false;
+  // airports the phone wants ready (its bases, routes, destinations): read from the simulator one at a time
+  const want: { c: any; icao: string }[] = [];
+  let fetching = false;
+  const nextWanted = () => {
+    if (fetching || !want.length || !simOk || !source.getLayout) return;
+    const w = want.shift()!; fetching = true;
+    source.getLayout(w.icao).then(l => { if (l && (l.runways || []).length) { LayoutStore.put(w.icao, l); try { w.c.send({ type: 'layout', icao: w.icao, layout: l }); } catch (e) { /* phone gone */ } } }, () => { /* not in the simulator */ })
+      .then(() => { fetching = false; setTimeout(nextWanted, 1200); });
+  };
 
-  source.on('status', (ok: boolean, text: string) => { log(text); });
+  source.on('status', (ok: boolean, text: string) => { log(text); simOk = ok; if (ok) setTimeout(nextWanted, 3000); });
   source.on('airports', (list: Airport[]) => {
     tracker.setAirports(list);
     const seen: { [k: string]: boolean } = {};
@@ -52,10 +71,23 @@ export function run(source: SimSource, server: LinkServer, log: (s: string) => v
       const icao = String(m.icao || '').toUpperCase().slice(0, 8);
       if (!source.getProcedures) c.send({ type: 'procs', icao, error: 'No simulator procedures' });
       else source.getProcedures(icao).then(p => c.send({ type: 'procs', icao, procs: p }), (e: any) => c.send({ type: 'procs', icao, error: String(e && e.message || e) }));
-    } else if (m.type === 'layout' && !source.getLayout) c.send({ type: 'layout', icao: String(m.icao || '').toUpperCase().slice(0, 8), error: 'No simulator layouts' });
-    else if (m.type === 'layout' && source.getLayout) {
-      const icao = String(m.icao || '').toUpperCase().slice(0, 8);
-      source.getLayout(icao).then(l => c.send({ type: 'layout', icao, layout: l }), (e: any) => c.send({ type: 'layout', icao, error: String(e && e.message || e) }));
+    } else if (m.type === 'layout') {
+      // from the simulator when it runs (and kept on this PC); otherwise the copy kept from before
+      const icao = String(m.icao || '').toUpperCase().slice(0, 8), kept = LayoutStore.get(icao);
+      const fromStore = (why: string) => kept && kept.l ? c.send({ type: 'layout', icao, layout: kept.l }) : c.send({ type: 'layout', icao, error: why });
+      if (!source.getLayout || !simOk) fromStore('No simulator layouts');
+      else source.getLayout(icao).then(l => { if (l && (l.runways || []).length) { LayoutStore.put(icao, l); c.send({ type: 'layout', icao, layout: l }); } else fromStore('Not in the simulator'); }, (e: any) => fromStore(String(e && e.message || e)));
+    } else if (m.type === 'layout-prefetch' && Array.isArray(m.list)) {
+      // the phone's list: kept ones go straight back, the rest are read from the simulator in the background
+      let n = 0;
+      for (const raw of m.list.slice(0, 600)) {
+        const icao = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8); if (!icao) continue;
+        const kept = LayoutStore.get(icao);
+        if (kept && kept.l && Date.now() - kept.at < 60 * 864e5) { c.send({ type: 'layout', icao, layout: kept.l }); continue; }
+        if (!want.some(w => w.icao === icao)) { want.push({ c, icao }); n++; }
+      }
+      if (n) log(`Reading ${n} airport layouts from the simulator for ${c.device}`);
+      nextWanted();
     } else if (m.type === 'flightplan') {
       try { const p = saveFlightPlan(m.name, m.text); c.send({ type: 'flightplan-saved', path: p }); log(`Flight plan saved: ${p}`); }
       catch (e: any) { c.send({ type: 'flightplan-saved', error: String(e && e.message || e) }); }

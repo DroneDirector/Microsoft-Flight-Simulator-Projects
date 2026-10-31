@@ -4,6 +4,8 @@
 
 - layoutGenerate: ICAO-dimensioned taxiways, exits, apron and stands from runway data for unmapped airports (runways source, or OSM without taxiways); airport view uses it
 - Newspaper Pets section
+- Sim layouts: PC LayoutStore (dataDir/layouts) and layout-prefetch queue; phone LayoutDb (IndexedDB, no 30 cap) and prefetch list when linked
+- flightPathFor: sim procedures with far-off points or a path much longer than the trip are replaced by the generated ones
 
 ## 0.9.31 (2026-10-31)
 
