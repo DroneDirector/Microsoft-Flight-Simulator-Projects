@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.24 (2026-10-31)
+
+- Boarding scan notice opens the decision (was routed to the crash report); settled or departed flights explained
+
 ## 0.9.23 (2026-10-31)
 
 - Aerial photos (ortho) removed: satellite rings and the fixed 5 km airport patch as in 0.9.19; settings and credits removed

@@ -229,9 +229,17 @@ function boardingScan(f: LiveFlight) {
   try { renderTopbar(); Sound.chime(); toast(`Boarding scan: ${banned.name} is on a no-fly list`, 'warn', { label: 'Decide', act: 'scan-open', data: f.id }); } catch (e) { /* not ready */ }
   setTimeout(() => { if (F.scanFlag && !F.scanFlag.done) scanDecide(f.id, true, true); }, 10 * 60000);
 }
-ACTIONS['scan-open'] = el => {
-  const id = el.getAttribute('data-id'), f: any = State.live.filter(x => x.id === id)[0]; if (!f || !f.scanFlag) return;
-  const t = el.closest && el.closest('.toast'); if (t) t.remove();
+ACTIONS['scan-open'] = el => { const t = el.closest && el.closest('.toast'); if (t) t.remove(); scanPopup(el.getAttribute('data-id')); };
+/** The boarding scan decision (from the toast or the notice); says so when it has already been settled. */
+function scanPopup(id: string) {
+  const f: any = State.live.filter(x => x.id === id)[0];
+  if (!f || !f.scanFlag || f.scanFlag.done) {
+    State.notices = State.notices.filter(n => n.ref !== 'scan-' + id); try { renderTopbar(); } catch (e) { /* ignore */ }
+    const why = !f ? 'That flight has already left the gate, so the passenger flew as booked.' : f.scanFlag && f.scanFlag.done ? `This was already decided: ${esc(f.scanFlag.name)} was ${f.scanFlag.denied ? 'denied boarding' : 'let on board'}.` : 'There is nothing left to decide for this flight.';
+    openLayer('modal', `<div class="modal-head"><div><h2>Boarding scan</h2>${f ? `<small>${esc(f.callsign)} · ${esc(f.from)} → ${esc(f.to)}</small>` : ''}</div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+      <div class="modal-body"><p class="lede">${why}</p><div class="modal-actions"><button class="btn" data-act="close-layer">OK</button></div></div>`, { cls: 'narrow' });
+    return;
+  }
   const p = manifestOf(f).filter(x => x.key === f.scanFlag.key)[0], rec = paxStore()[f.scanFlag.key];
   const line = `${f.callsign}, the gate here. The scan flagged ${f.scanFlag.name}, seat ${f.scanFlag.seat}. Passport and boarding pass match a passenger banned by ${rec ? rec.bannedBy || 'an airline' : 'an airline'}. Do you want them denied?`;
   openLayer('modal', `<div class="modal-head"><div><h2>Boarding scan</h2><small>${esc(f.callsign)} · ${esc(f.from)} → ${esc(f.to)}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
@@ -240,7 +248,7 @@ ACTIONS['scan-open'] = el => {
       ${rec ? rec.notes.map(n => `<p class="lede">${esc(n.title)} (${esc(n.date)}): ${esc(n.text)}</p>`).join('') : ''}
       <div class="say-row">${voiceButton(line, 'gate', 'Play the gate agent')}${voiceNoteEl()}</div>
       <div class="modal-actions"><button class="btn ghost" data-act="scan-let" data-id="${esc(id)}">Let them on</button><button class="btn danger" data-act="scan-deny" data-id="${esc(id)}">${icon('shield')}Deny boarding</button></div></div>`, { cls: 'narrow', onClose: () => Voice.stop() });
-};
+}
 ACTIONS['scan-deny'] = el => scanDecide(el.getAttribute('data-id'), true);
 ACTIONS['scan-let'] = el => scanDecide(el.getAttribute('data-id'), false);
 function scanDecide(id: string, deny: boolean, auto?: boolean) {
