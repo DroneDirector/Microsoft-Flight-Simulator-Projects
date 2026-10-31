@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.16 (2026-10-31)
+
+- Map airport card: View in 3D (airport-only 3D view in free camera mode)
+
 ## 0.9.15 (2026-10-31)
 
 - 3D free camera (stick, height buttons, speed slider, help card, keyboard), Overview on close from free camera
