@@ -134,7 +134,7 @@ function newsKind(p: any, cid: string, what: string) {
 function newsPet(f: any, petName: string, kind: string) {
   if (Math.random() > 0.15) return; const a = plane(f.reg), c = a ? company(a.companyId) : company();
   if (!newsOnce('pet:' + f.id, 'pet', 7 * 864e5)) return;
-  newsPost(c, f.to, { section: 'People', art: newsPlaneArt(c), headline: `${petName} the ${kind} wins over the crew`, standfirst: `A ${kind} travelling on ${f.callsign} got a visit from the flight deck mid-flight.`,
+  newsPost(c, f.to, { section: 'Pets', art: newsPlaneArt(c), headline: `${petName} the ${kind} wins over the crew`, standfirst: `A ${kind} travelling on ${f.callsign} got a visit from the flight deck mid-flight.`,
     body: [`Crew at ${c.name} sometimes check on pets travelling with passengers or in the hold. This one got a scratch behind the ears and a lot of attention.`],
     quote: ['Best part of my week.', 'A member of the crew'] });
 }
@@ -222,6 +222,8 @@ SCREENS.news = {
   title: 'Newspaper', icon: 'news',
   render() {
     const all = newsList().filter(a => !a.companyId || State.companies.some(c => c.id === a.companyId));
+    // pet stories printed before the Pets section existed move there
+    all.forEach((a: any) => { if (a.section === 'People' && / wins over the crew$/.test(a.headline || '')) { a.section = 'Pets'; Store.soon(); } });
     const secs = ['all'].concat(all.map(a => a.section).filter((s, i, l) => l.indexOf(s) === i));
     const list = all.filter(a => _npSec === 'all' || a.section === _npSec);
     const when = (t: number) => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });

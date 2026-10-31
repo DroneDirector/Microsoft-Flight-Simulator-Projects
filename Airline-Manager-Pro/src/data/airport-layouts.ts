@@ -16,6 +16,7 @@ interface AirportLayout {
   parkNames?: string[];                                  // stand names ("A12", "214") where known
   areas?: { k: 'apron' | 'terminal'; pts: number[][] }[]; // aprons and terminal buildings (metres)
   source: 'sim' | 'osm' | 'runways';
+  gen?: boolean;                                         // taxiways laid out from the runways (not mapped)
 }
 
 const AirportLayouts = {
@@ -27,8 +28,12 @@ const AirportLayouts = {
    *  or with null when there is nothing better to come. */
   get(icao: string, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     icao = String(icao || '').toUpperCase();
+    const c0 = this.cache[icao] || this.kept(icao);
+    if (c0) return this.getWith(icao, c0, better);
+    return LayoutDb.get(icao).then(l => { if (l) this.cache[icao] = l; return this.getWith(icao, l, better); });
+  },
+  getWith(icao: string, c: AirportLayout, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     const linked = Link.status === 'connected';
-    const c = this.cache[icao] || this.kept(icao);
     if (c && (c.source === 'sim' || (!linked && c.source === 'osm'))) return Promise.resolve(c);
     const now = c ? Promise.resolve(c) : this.fromRunways(icao);
     now.then(first => {
@@ -57,7 +62,7 @@ const AirportLayouts = {
     const ws = this.waiting[icao] || []; delete this.waiting[icao];
     ws.forEach(w => clearTimeout(w.timer));
     let l: AirportLayout = null;
-    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; this.keep('amp-sim:' + icao, l); }
+    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; LayoutDb.put(icao, l); }
     ws.forEach(w => w.ok(l));
   },
 
@@ -82,6 +87,7 @@ const AirportLayouts = {
         if (!len) continue;
         l.runways.push({ lat, lon, hdg, len, wid: Math.max(18, (widFt || 100) * 0.3048), surf: /ASP|CON|BIT|PEM/i.test(surf || '') ? 4 : /GRS|TURF|GRASS/i.test(surf || '') ? 1 : /WAT/i.test(surf || '') ? 9 : 2, a: String(id1 || ''), b: String(id2 || '') });
       }
+      try { layoutGenerate(l, a); } catch (e) { /* the runways alone */ }
       this.cache[icao] = l;
       return l;
     });
@@ -276,6 +282,108 @@ const AirportLayouts = {
       if (o && o[3] > 0 && r.wid === 45) r.wid = Math.max(18, o[3] * 0.3048);
     }
     if (!l.runways.length) return null;
+    // mapped runways but no taxiways (common at smaller airports): laid out to the standard dimensions
+    if (!l.paths.some(p => p[0] === 1 || p[0] === 4)) try { layoutGenerate(l, a); } catch (e) { /* as mapped */ }
     return l;
   },
 };
+/* ---------- taxiways laid out from the runways ---------- */
+// For airports with no mapped taxiways: a taxi system built from the real runways (position, length, width,
+// heading) with the ICAO Annex 14 dimensions for that size of runway: the parallel taxiway's distance from the
+// runway centre line, taxiway widths, exits at both ends and along the runway, and an apron with stands on the
+// side of the airport's reference point (where the terminal usually is). Realistic in size and place; not an
+// exact copy of the real airport.
+function layoutGenerate(l: AirportLayout, a: any) {
+  const paved = l.runways.filter(r => r.surf === 4 && r.len >= 700).sort((x, y) => y.len - x.len);
+  if (!paved.length) return;
+  const size = a && a.size != null ? a.size : paved[0].len > 2500 ? 2 : paved[0].len > 1400 ? 1 : 0;
+  const pts: number[][] = l.points, paths: number[][] = l.paths, parks: number[][] = l.parks;
+  const P = (x: number, y: number, t: number) => { pts.push([Math.round(x * 10) / 10, Math.round(y * 10) / 10, t]); return pts.length - 1; };
+  const k = Math.cos(l.lat * Math.PI / 180), xy = (lat: number, lon: number) => [(lon - l.lon) * 111320 * k, (lat - l.lat) * 110540];
+  const arp = a && a.pos ? xy(a.pos[1], a.pos[0]) : [0, 0];
+  paved.slice(0, 3).forEach((r, ri) => {
+    // ICAO aerodrome code by runway size: separation to the parallel taxiway and taxiway width
+    const code = r.wid >= 44 || r.len >= 2800 ? 'E' : r.wid >= 29 || r.len >= 1800 ? 'C' : r.wid >= 22 ? 'B' : 'A';
+    const sep = code === 'E' ? 182.5 : code === 'C' ? 168 : code === 'B' ? 87 : 52, tw = code === 'E' ? 23 : code === 'C' ? 18 : code === 'B' ? 10.5 : 7.5;
+    const c = xy(r.lat, r.lon), h = r.hdg * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
+    // the side towards the reference point (the terminal side); a coin toss when it sits on the runway
+    let px = Math.cos(h), py = -Math.sin(h); const side = (arp[0] - c[0]) * px + (arp[1] - c[1]) * py;
+    if (side < 0 || (Math.abs(side) < 60 && _hashStr(l.icao + r.a) % 2)) { px = -px; py = -py; }
+    const at = (s0: number, o: number) => [c[0] + ux * s0 + px * o, c[1] + uy * s0 + py * o];
+    const half = r.len / 2, exits = r.len > 2600 ? 3 : r.len > 1500 ? 2 : 1;
+    const ss = [-half + 25]; for (let i = 1; i <= exits; i++) ss.push(-half + r.len * i / (exits + 1)); ss.push(half - 25);
+    const rw = ss.map(s0 => { const q = at(s0, 0); return P(q[0], q[1], 2); }), tx = ss.map(s0 => { const q = at(s0, sep); return P(q[0], q[1], 1); });
+    for (let i = 0; i < ss.length; i++) {
+      if (i) { paths.push([2, r.wid, rw[i - 1], rw[i], 0, 0, 0]); paths.push([1, tw, tx[i - 1], tx[i], 0, 0, 0]); }
+      paths.push([1, tw, rw[i], tx[i], 0, 0, 0]);
+    }
+    // the apron and its stands: once, next to the longest runway, abreast of the reference point
+    if (ri !== 0) return;
+    const sA = clamp((arp[0] - c[0]) * ux + (arp[1] - c[1]) * uy, -half * 0.55, half * 0.55);
+    const W = size >= 2 ? Math.min(r.len * 0.55, 1300) : size === 1 ? Math.min(r.len * 0.4, 520) : Math.min(r.len * 0.3, 180);
+    const kind = size >= 2 ? { sp: 70, r: 32, t: 10, depth: 95 } : size === 1 ? { sp: 42, r: 20, t: 9, depth: 62 } : { sp: 24, r: 11, t: 3, depth: 34 };
+    const oF = sep + tw / 2 + 12, oL = oF + 22, oB = oL + kind.depth;
+    const n = Math.max(2, Math.floor(W / kind.sp)), s0 = sA - (n - 1) * kind.sp / 2;
+    // apron taxilane along the front of the apron, linked to the parallel taxiway at both ends
+    const lane: number[] = [];
+    for (let i = 0; i < n; i++) { const q = at(s0 + i * kind.sp, oL); lane.push(P(q[0], q[1], 1)); if (i) paths.push([4, Math.max(10, tw - 4), lane[i - 1], lane[i], 0, 0, 0]); }
+    for (const [li, sx] of [[0, s0], [n - 1, s0 + (n - 1) * kind.sp]] as number[][]) {
+      const q = at(sx, sep), j = P(q[0], q[1], 1); paths.push([1, tw, j, lane[li], 0, 0, 0]);
+      // and the new junction joined into the parallel taxiway between its neighbours
+      let lo = -1, hi = -1; ss.forEach((v, i) => { if (v <= sx && (lo < 0 || v > ss[lo])) lo = i; if (v >= sx && (hi < 0 || v < ss[hi])) hi = i; });
+      if (lo >= 0) paths.push([1, tw, tx[lo], j, 0, 0, 0]); if (hi >= 0 && hi !== lo) paths.push([1, tw, j, tx[hi], 0, 0, 0]);
+    }
+    // stands: nose towards the terminal, the nose wheel stop near the back of the apron
+    const hdgOut = (Math.atan2(px, py) * 180 / Math.PI + 360) % 360;
+    l.parkNames = l.parkNames || [];
+    for (let i = 0; i < n; i++) {
+      const q = at(s0 + i * kind.sp, oB - 8), ni = l.parkNames.length; l.parkNames.push(String((size >= 1 ? 1 : 0) * 10 + i + 1));
+      parks.push([Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10, Math.round(hdgOut), kind.r, kind.t, 0, ni]);
+      paths.push([3, 8, lane[i], parks.length - 1, 0, 0, 0]);
+    }
+    const poly = (o1: number, o2: number) => [at(s0 - kind.sp * 0.7, o1), at(s0 + (n - 1) * kind.sp + kind.sp * 0.7, o1), at(s0 + (n - 1) * kind.sp + kind.sp * 0.7, o2), at(s0 - kind.sp * 0.7, o2)].map(q => [Math.round(q[0]), Math.round(q[1])]);
+    l.areas = (l.areas || []).concat([{ k: 'apron', pts: poly(oF, oB) }]);
+    if (size >= 1) l.areas.push({ k: 'terminal', pts: poly(oB + 6, oB + 6 + (size >= 2 ? 55 : 32)) });
+  });
+  if (l.names && !l.names.length) l.names.push('');
+  l.gen = true;
+}
+
+/* ---------- the device's store of airport layouts ---------- */
+// Layouts from your simulator (its SDK facility data, read by the PC app) and OpenStreetMap, kept on this
+// device in its database (no small limit): up to 1,500 airports, the simulator's kept for good.
+const LayoutDb = {
+  _db: null as Promise<IDBDatabase>,
+  db(): Promise<IDBDatabase> {
+    if (this._db) return this._db;
+    this._db = new Promise((ok, no) => { try { const r = indexedDB.open('amp-layouts', 1); r.onupgradeneeded = () => r.result.createObjectStore('l', { keyPath: 'k' }); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); } catch (e) { no(e); } });
+    return this._db;
+  },
+  get(icao: string): Promise<AirportLayout> {
+    return this.db().then(d => new Promise<AirportLayout>(ok => { const r = d.transaction('l').objectStore('l').get(icao); r.onsuccess = () => ok(r.result ? r.result.l : null); r.onerror = () => ok(null); })).catch(() => null);
+  },
+  put(icao: string, l: AirportLayout) {
+    this.db().then(d => { const t = d.transaction('l', 'readwrite'); t.objectStore('l').put({ k: icao, at: Date.now(), src: l.source, l }); }).catch(() => { /* not available: kept for this session */ });
+  },
+  /** The airports kept, with where each came from. */
+  keys(): Promise<{ [icao: string]: string }> {
+    return this.db().then(d => new Promise<{ [icao: string]: string }>(ok => { const out: { [k: string]: string } = {}, r = d.transaction('l').objectStore('l').openCursor(); r.onsuccess = () => { const c = r.result; if (c) { out[c.value.k] = c.value.src; c.continue(); } else ok(out); }; r.onerror = () => ok(out); })).catch(() => ({}));
+  },
+};
+/** When linked: the airports that matter to you (bases, routes, flights, bookings, jobs and the big airports
+ *  around your home base) are read from the simulator by the PC app in the background and kept here. */
+let _lpAt = 0;
+function layoutPrefetch() {
+  if (Link.status !== 'connected' || !Link.sim || !Link.sim.connected || Date.now() - _lpAt < 6 * 3600e3) return;
+  _lpAt = Date.now();
+  const c = company(), set: { [k: string]: 1 } = {}, add = (k: string) => { if (k && /^[A-Z0-9]{3,4}$/.test(k)) set[k] = 1; };
+  try { companyBases(c.id).forEach(add); } catch (e) { /* ignore */ }
+  State.routes.filter(r => r.companyId === c.id).forEach(r => r.legs.forEach(add));
+  State.live.forEach((f: any) => { if (!f.tfc) { add(f.from); add(f.to); } });
+  try { bookings().forEach((b: any) => { add(b.from); add(b.to); }); } catch (e) { /* ignore */ }
+  try { ((State as any).jobs && (State as any).jobs.list || []).forEach((j: any) => { add(j.from); add(j.to); }); } catch (e) { /* ignore */ }
+  const H = apt(c.hub);
+  if (H && World.ready) (World.list as any[]).filter(w => w.size === 2 && w.pos && /^[A-Z]{4}$/.test(w.icao)).map(w => [w.icao, gcDistanceNm(H.pos, w.pos)] as [string, number]).sort((a, b) => a[1] - b[1]).slice(0, 150).forEach(x => add(x[0]));
+  LayoutDb.keys().then(have => { const list = Object.keys(set).filter(k => have[k] !== 'sim'); if (list.length) linkSend({ type: 'layout-prefetch', list }); });
+}
+setInterval(() => { try { layoutPrefetch(); } catch (e) { /* ignore */ } }, 120e3);

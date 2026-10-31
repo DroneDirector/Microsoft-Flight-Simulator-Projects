@@ -94,7 +94,7 @@ class AirportView {
   labelSource() {
     const src = $('#apv-src'), L = this.L; if (!src || !L) return;
     src.innerHTML = L.source === 'sim' ? 'Layout from your simulator' : L.source === 'osm' ? 'Real airport layout · © OpenStreetMap contributors'
-      : this.fetching ? '<span class="apv-spin"></span>Real runways · getting the full layout…' : L.runways.length ? 'Real runways · taxiways and apron drawn simplified' : 'No runway data for this airport';
+      : this.fetching ? '<span class="apv-spin"></span>Real runways · getting the full layout…' : L.runways.length ? (L.gen ? 'Real runways · taxiways and apron laid out to the standard dimensions' : 'Real runways · taxiways and apron drawn simplified') : 'No runway data for this airport';
     src.classList.toggle('sim', L.source !== 'runways');
   }
 
@@ -102,7 +102,7 @@ class AirportView {
   buildGraph() {
     const L = this.L, adj: { [k: string]: [string, number][] } = {};
     const link = (a: string, b: string, d: number) => { (adj[a] = adj[a] || []).push([b, d]); (adj[b] = adj[b] || []).push([a, d]); };
-    if (L.source !== 'runways' && L.points.length && L.paths.length) {
+    if ((L.source !== 'runways' || L.gen) && L.points.length && L.paths.length) {
       const P = L.points;
       for (const p of L.paths) {
         const [type, , st, en] = p;
