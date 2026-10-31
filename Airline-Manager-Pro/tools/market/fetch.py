@@ -92,6 +92,9 @@ def steo_jet_fuel():
                     out.append([f"{year}-{m:02d}", round(float(row[i]), 2)])
             print(f"::notice::STEO points {len(out)}, last {out[-3:]}")
             return out
+        for ws in wb.worksheets[:4]:
+            for r in ws.iter_rows(values_only=True):
+                if r and any(c is not None and ("JKT" in str(c) or "Jet" in str(c)) for c in r): print(f"::notice::STEO {ws.title}: {[str(c) for c in r[:5]]}")
         print("::notice::STEO: JKTCUUS not found in " + ", ".join(w.title for w in wb.worksheets))
     except Exception as e:
         print(f"::warning::outlook not read: {e}")
