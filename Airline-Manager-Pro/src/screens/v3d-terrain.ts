@@ -14,6 +14,14 @@ function v3dKm(): number { return clamp(+(State.settings as any).v3dKm || 150, 2
 const EARTH_R = 6371000;
 const SAT_URL = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/';
 /** Satellite detail, 0 (standard) to 3 (highest); Settings → 3D view. */
+/** The biggest single picture this device's graphics can safely hold. Phones and tablets share their memory
+ *  between the app and the graphics, and Android closes an app that asks for too much without a word, so
+ *  they get 4096 pixels (2048 with little memory); a PC can take 8192. */
+function v3dTexCap(): number {
+  const gl = (V3d.r && V3d.r.capabilities && V3d.r.capabilities.maxTextureSize) || 4096, mem = (navigator as any).deviceMemory || 4;
+  const cap = DESKTOP ? (mem >= 8 ? 8192 : 4096) : mem <= 3 ? 2048 : 4096;
+  return Math.min(gl, cap);
+}
 function v3dSatQ(): number { const v = (State.settings as any).v3dSatQ; return v == null ? 1 : clamp(Math.round(+v), 0, 3); }
 
 interface V3dRing { z: number; x0: number; y0: number; N: number; size: number; H: Float32Array; mask: Uint8ClampedArray; mesh: any; mapTex: any; satTex: any; inner: V3dRing; ok: boolean }
@@ -29,14 +37,14 @@ function v3dRange(lat?: number): { rings: number[]; fog: number[]; far: number }
 function v3dCurve(x: number, z: number): number { return (x * x + z * z) / (2 * EARTH_R); }
 
 const V3dTerrain = {
-  rings: [] as V3dRing[], gen: 0, origin: null as number[], prog: { got: 0, want: 1 },
+  rings: [] as V3dRing[], gen: 0, origin: null as number[], prog: { got: 0, want: 1, sat: 0 } as any, _satBusy: false, _satQ: [] as V3dRing[],
 
   /** Load the rings around a point (the view's origin), finest first, so the near ground shows quickly. */
   load(centre: number[]) {
     const gen = ++this.gen;
     this.clear(); this.origin = centre.slice();
     const zs = v3dRange(centre[1]).rings;
-    this.prog = { got: 0, want: 27 + (V3d.icao ? 1 : 0) };
+    this.prog = { got: 0, want: 27 + (V3d.icao ? 1 : 0), sat: 0 }; this._satQ = []; this._satBusy = false;
     let prev: V3dRing = null;
     const next = (i: number) => {
       if (i >= zs.length || gen !== this.gen || !V3d.open) return;
@@ -82,7 +90,7 @@ const V3dTerrain = {
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const im = new Image(); im.crossOrigin = 'anonymous';
         const done = () => { if (z === 12 && ext === 'png') this.prog.got++; if (--left === 0) ok(got ? cv : null); };
-        im.onload = () => { c.drawImage(im, i * 256, j * 256); got++; done(); };
+        im.onload = () => { try { c.drawImage(im, i * 256, j * 256); got++; } catch (e) { /* out of memory: skip this tile */ } done(); };
         im.onerror = done;
         const x = (x0 + i + n) % n, y = y0 + j;
         im.src = ext === 'png' ? `${base}${z}/${x}/${y}.png` : `${base}${z}/${y}/${x}.jpg`;
@@ -208,19 +216,28 @@ const V3dTerrain = {
     // finer imagery than the terrain tiles: up to three zoom levels more near you (Settings → Satellite
     // detail), one less for each ring further out, never past zoom 15 (the imagery is about 10 m a pixel),
     // and never a bigger picture than the device's graphics can take
-    const q = v3dSatQ(), maxTex = Math.min(8192, (V3d.r && V3d.r.capabilities && V3d.r.capabilities.maxTextureSize) || 4096);
+    const q = v3dSatQ(), maxTex = v3dTexCap();
     let k = Math.max(0, q - (r.z >= 12 ? 0 : r.z >= 10 ? 1 : 2));
-    while (k > 0 && (r.z + k > 15 || 256 * r.N * (1 << k) > maxTex * 1.25)) k--;
+    // never more tiles than fit the safe picture size (no huge picture in memory first, then shrunk)
+    while (k > 0 && (r.z + k > 15 || 256 * r.N * (1 << k) > maxTex)) k--;
+    // one ring's imagery at a time, so the memory never has several big pictures at once
+    if (this._satBusy) { this._satQ = (this._satQ || []).concat([r]); return; }
+    this._satBusy = true; const gen = this.gen;
+    const next = () => { this._satBusy = false; const n2 = (this._satQ || []).shift(); if (n2 && gen === this.gen && V3d.open) this.loadSat(n2); };
     const z = r.z + k, N = r.N << k;
     this.tiles(SAT_URL, z, r.x0 << k, r.y0 << k, N, 'jpg').then(cv0 => {
-      if (!cv0 || !V3d.open) return;
+      if (!cv0 || !V3d.open || gen !== this.gen) { next(); return; }
       let cv = cv0;
       if (cv0.width > maxTex) { cv = document.createElement('canvas'); cv.width = cv.height = maxTex; const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(cv0, 0, 0, maxTex, maxTex); }
       const T = THREE; r.satTex = new T.CanvasTexture(cv); r.satTex.colorSpace = T.SRGBColorSpace;
       // the sharpest filtering the device has, so the ground stays crisp at a low angle from high up
       r.satTex.anisotropy = (V3d.r && V3d.r.capabilities && V3d.r.capabilities.getMaxAnisotropy) ? V3d.r.capabilities.getMaxAnisotropy() : 8;
       r.satTex.generateMipmaps = true; r.satTex.minFilter = T.LinearMipmapLinearFilter;
+      // once the picture is on the graphics card, its copy in the app's memory is let go
+      const tex = r.satTex; tex.onUpdate = () => { const im: any = tex.image; tex.onUpdate = null; setTimeout(() => { try { if (im && im.width) { im.width = 1; im.height = 1; } } catch (e) { /* ignore */ } }, 0); };
       if ((State.settings as any).v3dSat && r.mesh) { r.mesh.material.map = r.satTex; r.mesh.material.needsUpdate = true; }
+      this.prog.sat = (this.prog.sat || 0) + 1;
+      setTimeout(next, 60);
     });
   },
   setSat(on: boolean) {

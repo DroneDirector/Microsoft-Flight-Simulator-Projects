@@ -38,6 +38,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
   V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false;
+  v3dCrashGuard(true);
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0;
@@ -95,6 +96,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
 function v3dClose() {
   if (!V3d.open) return;
   V3d.open = false; cancelAnimationFrame(V3d.raf); document.body.classList.remove('v3d-on');
+  v3dCrashGuard(false);
   removeEventListener('resize', v3dSize);
   try {
     V3d.scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); } });
@@ -135,6 +137,8 @@ function v3dSize() {
 /** Drag to look around, pinch or scroll to zoom, tap an aircraft for its flight. */
 function v3dBind() {
   const cv = V3d.cv; cv.style.touchAction = 'none';
+  cv.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); if (!V3d.open) return;   // closing the view lets go of the graphics on purpose
+    try { ErrorLog.add('3d', 'The 3D view lost its graphics', `Satellite detail ${v3dSatQ()}`, 'WebGL context lost'); } catch (x) { /* ignore */ } const S: any = State.settings; if ((S.v3dSatQ || 0) > 0) { S.v3dSatQ--; Store.soon(); } v3dClose(); toast('The 3D view ran out of graphics memory and closed. Satellite detail was lowered one step.', 'warn'); });
   cv.addEventListener('pointerdown', (e: PointerEvent) => {
     cv.setPointerCapture(e.pointerId); V3d.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY };
     const ids = Object.keys(V3d.ptrs);
@@ -504,16 +508,20 @@ function v3dLoaderTick(now: number) {
   const L = V3d.root && V3d.root.querySelector('.v3d-load') as HTMLElement; if (!L || V3d.loaded) return;
   const pr = V3dTerrain.prog, k = clamp(pr.got / Math.max(1, pr.want), 0, 1);
   // shown at least 5 seconds; done when the near ground (and the airport) are built, or after 20 s
-  const near = V3dTerrain.rings.length > 0 && (!V3d.icao || V3d.aptReady), t = now - V3d.loadT0;
+  const satOn = !!(State.settings as any).v3dSat, q = satOn ? v3dSatQ() : 0;
+  // with satellite imagery: the two nearest rings' pictures are loaded too (and on the graphics card)
+  const satReady = !satOn || (pr.sat || 0) >= Math.min(2, V3dTerrain.rings.length || 2);
+  const near = V3dTerrain.rings.length > 0 && (!V3d.icao || V3d.aptReady) && satReady, t = now - V3d.loadT0;
+  const minMs = V3D_SPLASH_MS + q * 1500, maxMs = 20000 + q * 8000;
   // the loading screen stays at least 5 seconds; its bar never runs ahead of that, so it fills smoothly
-  const shown = Math.min(near ? 1 : Math.min(0.97, k * 0.9 + Math.min(0.08, t / 40000)), t / V3D_SPLASH_MS);
+  const shown = Math.min(near ? 1 : Math.min(0.97, k * 0.8 + (satOn ? Math.min(2, pr.sat || 0) * 0.05 : 0.1) + Math.min(0.07, t / 60000)), t / minMs);
   V3d.shown = Math.max(V3d.shown || 0, shown);
   const fill = L.querySelector('.spl-fill') as HTMLElement, tip = L.querySelector('.spl-tip') as HTMLElement, pct = L.querySelector('.spl-pct') as HTMLElement, step = L.querySelector('.spl-step') as HTMLElement;
   if (fill) fill.style.width = (V3d.shown * 100).toFixed(1) + '%';
   if (tip) tip.style.left = (V3d.shown * 100).toFixed(1) + '%';
   if (pct) pct.textContent = Math.round(V3d.shown * 100) + '%';
-  if (step) step.textContent = V3d.shown < 0.5 ? 'Loading the mountains and the sea…' : V3d.shown < 0.9 ? (V3d.icao ? `Building ${V3d.icao}…` : 'Painting the coastlines…') : 'Ready';
-  if ((near && t >= V3D_SPLASH_MS) || t > 20000) {
+  if (step) step.textContent = V3d.shown < 0.45 ? 'Loading the mountains and the sea…' : satOn && !satReady ? `Loading satellite imagery${q >= 3 ? ' (highest detail)' : q >= 2 ? ' (very sharp)' : ''}…` : V3d.shown < 0.9 ? (V3d.icao ? `Building ${V3d.icao}…` : 'Painting the coastlines…') : 'Ready';
+  if ((near && t >= minMs) || t > maxMs) {
     V3d.loaded = true; L.classList.add('out'); setTimeout(() => L.remove(), 800);
   }
 }
@@ -708,4 +716,25 @@ function v3dHoldLines(L: AirportLayout, g: any, loc: (x: number, y: number) => n
       g.add(m);
     }
   }
+}
+
+/* ---------- when the device runs out of graphics memory ---------- */
+// Android closes the app without an error when the graphics take too much memory. A mark is kept while
+// the 3D view is open (and visible); if the app starts again with the mark still there, it was closed in
+// the middle of the 3D view: that goes into the error log, and the satellite detail steps down one level.
+function v3dCrashGuard(open: boolean) {
+  try {
+    if (open) localStorage.setItem('amp-v3d-open', JSON.stringify({ at: Date.now(), q: v3dSatQ(), sat: !!(State.settings as any).v3dSat, cap: v3dTexCap(), mem: (navigator as any).deviceMemory || 0, ver: APP.version }));
+    else localStorage.removeItem('amp-v3d-open');
+  } catch (e) { /* storage full */ }
+}
+document.addEventListener('visibilitychange', () => { if (!V3d.open) return; if (document.hidden) v3dCrashGuard(false); else v3dCrashGuard(true); });
+function v3dCrashCheck() {
+  let m: any = null; try { m = JSON.parse(localStorage.getItem('amp-v3d-open') || 'null'); localStorage.removeItem('amp-v3d-open'); } catch (e) { return; }
+  if (!m || Date.now() - m.at > 7 * 864e5) return;
+  const names = ['Standard', 'Sharp', 'Very sharp', 'Highest'], S: any = State.settings;
+  try { ErrorLog.add('3d', 'The app was closed by the system during the 3D view', `Satellite ${m.sat ? 'on, detail ' + names[m.q] : 'off'}; graphics limit ${m.cap}px; device memory ${m.mem || '?'} GB`, `The 3D view was open (version ${m.ver}) when Android closed the app, most likely because the graphics ran out of memory.`); } catch (e) { /* ignore */ }
+  let lowered = '';
+  if (m.sat && (S.v3dSatQ == null ? 1 : S.v3dSatQ) > 0) { S.v3dSatQ = Math.max(0, (S.v3dSatQ == null ? 1 : S.v3dSatQ) - 1); lowered = names[S.v3dSatQ]; Store.soon(); }
+  State.notices.unshift({ id: uid(), kind: 'mechanic' as any, title: 'The 3D view closed the app', body: `Your device ran out of graphics memory in the 3D view.${lowered ? ` Satellite detail is now ${lowered}; you can raise it again in Settings → 3D view.` : ''} The details are in Settings → Updates and errors.`, time: 'Now', at: Date.now(), read: false } as any);
 }
