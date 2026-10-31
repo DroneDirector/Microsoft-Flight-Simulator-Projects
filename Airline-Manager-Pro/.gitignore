@@ -11,3 +11,6 @@ www/vendor/
 www/humans.bin
 www/airports-world.json
 www/runways-world.json
+
+# test screenshots never belong in the repository root
+/*.png

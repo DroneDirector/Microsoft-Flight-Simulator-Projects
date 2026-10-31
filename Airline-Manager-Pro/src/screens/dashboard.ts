@@ -39,12 +39,12 @@ function flightCard(f: LiveFlight): string {
       <div class="r"><b>${f.noDest ? '—' : esc(f.to)}</b><small>${f.noDest ? 'No destination yet' : esc(B.city)}</small></div>
     </div>
     <div class="fc-grid">
-      <div><small>Phase</small><b>${esc(f.phase)}</b></div>
+      <div class="fc-ph"><small>Phase</small><b>${esc(f.phase)}</b></div>
       <div><small>Altitude</small><b>${altTxt}</b></div>
       <div><small>Remaining</small><b>${f.noDest ? '—' : num(left) + ' nm'}</b></div>
       <div><small>Arrives in</small><b>${arrivesIn(f)}</b></div>
       <div><small>Heading</small><b>${String(mo.hdg % 360).padStart(3, '0')}°</b></div>
-      <div><small>Vertical speed</small><b>${mo.vs > 0 ? '+' : mo.vs < 0 ? '−' : ''}${num(Math.abs(mo.vs))} ft/min</b></div>
+      <div class="fc-vs"><small>Vertical speed</small><b>${mo.vs > 0 ? '+' : mo.vs < 0 ? '−' : ''}${num(Math.abs(mo.vs))} ft/min</b></div>
       <div><small>Ground speed</small><b>${f.gs ? num(f.gs) + ' kt' : '—'}</b></div>
     </div>
     ${f.you ? `<div class="fc-sync">

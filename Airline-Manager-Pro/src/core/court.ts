@@ -104,7 +104,11 @@ function openCourtCase(who: any, role: string, offenceIdx?: number, why?: string
   S.cases = S.cases || []; S.cases.unshift(c);
   // staff are suspended: off duty, their flights stop
   if (role !== 'pax' && role !== 'airline') { who.status = 'off'; who.suspended = c.id; }
-  if (o.fatal && ac && role !== 'airline') courtWriteOff(ac, c);
+  if (o.fatal && ac && role !== 'airline') {
+    const typeId = ac.typeId, reg = ac.reg, co = company(ac.companyId), f = State.live.filter(x => x.reg === reg)[0];
+    courtWriteOff(ac, c);
+    try { setTimeout(() => newsCrash({ key: 'case-' + c.id, c: co, typeId, reg, callsign: f ? f.callsign : undefined, from: f ? f.from : undefined, to: f ? f.to : co.hub, pax: f ? f.pax : undefined, dead: true, cause: fill(o.text) }), 5000); } catch (e) { /* ignore */ }
+  }
   courtNotice(c, c.stages[0]);
   c.stages[0].done = true;
   Store.save();

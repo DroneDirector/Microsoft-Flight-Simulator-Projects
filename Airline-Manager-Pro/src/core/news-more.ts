@@ -74,13 +74,26 @@ function newsStrike(cid: string, g: PayGroup, why: string, stage: 'start' | 'end
 }
 
 /* ---------- flights ---------- */
+/** A crash in the papers: any of the airline's aircraft, your own flight or a hired pilot's. */
+function newsCrash(o: { key: string; c: Company; typeId: string; reg: string; callsign?: string; from?: string; to: string; pax?: number; dead?: boolean; cause?: string }) {
+  if (!o.c || !newsOnce('crash:' + o.key, 'crash', 0)) return;
+  const t = acType(o.typeId), model = t ? t.model : 'aircraft', at = newsCity(o.to), fl = o.callsign ? `flight ${o.callsign}` : o.reg;
+  const onBoard = o.pax ? `On board were ${num(o.pax)} passengers and the crew.` : '';
+  const art = newsPlaneArt(o.c, o.typeId, o.reg); art.crash = true;
+  newsPost(o.c, o.to, { section: 'News', art,
+    headline: o.dead ? `Deaths as ${o.c.name} ${model} crashes at ${at}` : `${o.c.name} ${model} crashes at ${at}: everyone survives`,
+    standfirst: `${o.c.name} ${fl}, a ${model} (${o.reg})${o.from ? ` from ${newsCity(o.from)}` : ''}, crashed on arrival at ${at}. ${o.dead ? 'There are fatalities.' : 'Everyone on board got out, some with injuries.'}`,
+    body: [
+      `${onBoard} Emergency services were at the scene within minutes${o.dead ? ', and hospitals in the area were put on alert' : ' and took the injured to hospital'}.`,
+      o.cause ? `Investigators say: ${o.cause}` : `The accident investigation board has opened an inquiry. The flight recorders have been recovered and will be read out in the coming days.`,
+      `The airport was closed for several hours. ${o.c.name} has set up a help line for families and friends of those on board.`,
+    ],
+    quote: [o.dead ? 'This is the darkest day in our history. Our thoughts are with the families, and we will help the investigators in every way.' : 'We are thankful everyone survived. We will help the investigators find out what happened.', `${newsSpokes(o.c)}, ${o.c.name}`] });
+}
+/** Your own flight, from its logbook entry (once you have registered the crash). */
 function newsIncident(logId: string) {
-  const l: any = State.logbook.filter(x => x.id === logId)[0]; if (!l) return; const a = plane(l.reg); if (!a) return; const c = company(a.companyId);
-  if (!newsOnce('crash:' + logId, 'crash', 0)) return;
-  newsPost(c, l.to, { section: 'News', art: newsPlaneArt(c, a.typeId, a.reg),
-    headline: `${c.name} aircraft in serious accident near ${newsCity(l.to)}`, standfirst: `A ${acType(a.typeId).model}, ${a.reg}, flying from ${newsCity(l.from)} came to grief on arrival at ${newsCity(l.to)}. Investigators are on their way.`,
-    body: [`Emergency services were at the scene within minutes. The accident investigation board has opened an inquiry and the aircraft's recorders have been recovered.`, `${c.name} has set up a help line for families.`],
-    quote: ['Our thoughts are with everyone on board and their families. We will help the investigators in every way.', `${newsSpokes(c)}, ${c.name}`] });
+  const l: any = State.logbook.filter(x => x.id === logId)[0]; if (!l) return; const a = plane(l.reg); if (!a) return;
+  newsCrash({ key: logId, c: company(a.companyId), typeId: a.typeId, reg: a.reg, callsign: l.callsign, from: l.from, to: l.to, pax: l.pax, dead: Math.abs(l.landingFpm || 0) > 1500 || (l.g || 0) > 4 });
 }
 function newsMedical(f: any) {
   const a = plane(f.reg), c = a ? company(a.companyId) : company(), m = f.medical; if (!m || !newsOnce('med:' + f.id, 'med', 2 * 864e5)) return;

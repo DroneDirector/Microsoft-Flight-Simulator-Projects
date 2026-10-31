@@ -29,14 +29,16 @@ function warnAdvance() {
     const cid = p.companyId || State.companyId, c = company(cid) || company();
     if (Math.random() < warnLearnChance(p, w.strong)) {
       p.learned = (p.learned || 0) + 1; p.rating = clamp(Math.round(((p.rating || 3.5) + 0.1) * 100) / 100, 1, 5);
-      State.notices.unshift({ id: uid(), kind: 'staff' as any, title: `${p.name} took the warning to heart`, body: `Since the ${w.strong ? 'final ' : ''}warning, ${p.name} has been more careful. Supervisors in ${p.base || c.hub} have noticed.`, time: 'Now', at: now, read: false } as any);
+      const nid = uid();
+      State.notices.unshift({ id: nid, kind: 'staff' as any, title: `${p.name} took the warning to heart`, body: `Since the ${w.strong ? 'final ' : ''}warning, ${p.name} has been more careful. Supervisors in ${p.base || c.hub} have noticed.`, time: 'Now', at: now, read: false, ref: 'wo-' + nid, wo: { pid: p.id, inc: w.inc, strong: w.strong, learned: true } } as any);
       continue;
     }
     p.stubborn = (p.stubborn || 0) + 1;
     // pushing back is rare; it gets likelier with every warning they ignored
     const revolt = Math.random() < clamp(0.1 + 0.07 * (p.stubborn - 1) + (w.strong ? 0.04 : 0), 0, 0.42);
     if (!revolt) {
-      State.notices.unshift({ id: uid(), kind: 'staff' as any, title: `${p.name} didn't learn from the warning`, body: `${p.name} carries on as before. More trouble is likely.${personRole(p) === 'mech' ? ' A mechanic who doesn\'t learn makes mistakes on the aircraft.' : ''}`, time: 'Now', at: now, read: false } as any);
+      const nid = uid();
+      State.notices.unshift({ id: nid, kind: 'staff' as any, title: `${p.name} didn't learn from the warning`, body: `${p.name} carries on as before. More trouble is likely.${personRole(p) === 'mech' ? ' A mechanic who doesn\'t learn makes mistakes on the aircraft.' : ''}`, time: 'Now', at: now, read: false, ref: 'wo-' + nid, wo: { pid: p.id, inc: w.inc, strong: w.strong, learned: false } } as any);
       continue;
     }
     const t = REVOLTS[Math.floor(Math.random() * REVOLTS.length)];
@@ -48,6 +50,39 @@ function warnAdvance() {
     State.notices.unshift({ id: 'n-' + inc.id, kind: 'staff' as any, title: `${p.name} pushes back against your warning`, body: `${t[0]}. Give a stronger warning or dismiss them.`, time: 'Now', at: now, read: false, ref: inc.id } as any);
     try { renderTopbar(); Sound.chime(); toast(`${p.name} pushes back against your warning`, 'warn', { label: 'Open', act: 'open-incident', data: inc.id }); } catch (e) { /* not ready */ }
   }
+}
+/** The whole report on how a warning went: who, what it was for, how they took it, their record, and what you can do. */
+function warnOutcomeReport(n: any): { text: string; p: any; inc: any } {
+  const o = n.wo || {}, S: any = State, p = staffById(o.pid), inc = (S.incidents || []).filter((x: any) => x.id === o.inc)[0];
+  if (!p) return { text: n.body, p: null, inc };
+  const role = personRole(p), log = (p.warnLog || []).filter((x: any) => x.inc === o.inc)[0];
+  const ord = (k: number) => ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'][k] || k + (k % 10 === 1 && k % 100 !== 11 ? 'st' : k % 10 === 2 && k % 100 !== 12 ? 'nd' : k % 10 === 3 && k % 100 !== 13 ? 'rd' : 'th');
+  const parts: string[] = [];
+  parts.push(`${p.name}, ${ROLE_NAMES[role].toLowerCase()} based in ${p.base || company().hub}, was given a ${o.strong ? 'final' : 'formal'} warning${log && log.given ? ' on ' + dateStr(new Date(log.given)).slice(0, 10) : ''}${inc ? ` for "${inc.title}"` : ''}.`);
+  if (inc && inc.text) parts.push(`What happened: ${inc.text}`);
+  if (o.learned) parts.push(`Since then ${p.name} has been more careful, and the supervisors in ${p.base || company().hub} have noticed. Their rating goes up a little.`);
+  else parts.push(`Since then ${p.name} has carried on as before. The warning has not changed anything, and more trouble is likely.${role === 'mech' ? ' A mechanic who doesn\'t learn makes mistakes on the aircraft: the risk of a maintenance error grows with every warning ignored.' : ''}`);
+  parts.push(`This was their ${ord(p.warnings || 1)} warning.${p.learned ? ` They improved after ${p.learned}.` : ''}${p.stubborn ? ` They have ignored ${p.stubborn === 1 ? 'one' : p.stubborn}.` : ''}${(p.warnings || 0) >= 3 ? ' Passengers are starting to hear about it, which lowers your ratings and popularity for a while.' : ''}`);
+  if (!o.learned) parts.push(`What you can do: if it happens again you can give a final warning or dismiss ${p.name}. Every further warning is less likely to work than the last.`);
+  return { text: parts.join(' '), p, inc };
+}
+function warnOutcomePopup(nid: string) {
+  const n: any = State.notices.filter(x => x.id === nid)[0]; if (!n) return;
+  const r = warnOutcomeReport(n), p = r.p, at = n.at;
+  closeAll();
+  const role = p ? personRole(p) : 'fa';
+  const wrap = openLayer('modal', `
+    <div class="inc">
+      ${p ? `<div class="inc-av">${avatarSvg(p.look, role, { accent: company().color })}</div>` : ''}
+      <div class="inc-main">
+        <div class="modal-head"><div><small>Report from the head of operations${at ? ' · ' + esc(receivedText(at)) : ''}</small><h2>${esc(n.title)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+        <div class="say-row">${voiceButton(r.text, 'ops', 'Play the report')}${voiceNoteEl('Head of operations')}</div>
+        <p class="speech">${esc(r.text)}</p>
+        ${p ? `<div class="inc-who"><b>${esc(p.name)}</b><small>${ROLE_NAMES[role]}, ${natLabel(p.nat)}, ${ageOf(p.dob)}, base ${esc(p.base)}</small></div>${warnHistory(p)}
+        <div class="modal-actions"><button class="btn ghost" data-act="staff-detail" data-id="${esc(p.id)}">${icon('user')}Open ${esc(p.name.split(' ')[0])}'s record</button>${r.inc ? `<button class="btn ghost" data-act="open-incident" data-id="${esc(r.inc.id)}">${icon('alert')}The original report</button>` : ''}</div>` : '<p class="lede">This person no longer works for you.</p>'}
+      </div>
+    </div>`, { cls: 'wide', onClose: () => Voice.stop() });
+  try { autoSpeak(wrap); } catch (e) { /* ignore */ }
 }
 function startWarnClock() { setTimeout(warnAdvance, 15000); setInterval(warnAdvance, 60000); }
 
