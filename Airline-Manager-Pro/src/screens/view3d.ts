@@ -51,7 +51,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = id.indexOf('apt:') === 0 ? 'free' : 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0; (V3d as any).fc = null; (V3d as any).fcStart = id.indexOf('apt:') === 0;
   const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
-  root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-cockpit-glow"></div><div class="v3d-labels"></div>
+  root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
       <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
       <span class="v3d-batt">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
@@ -301,6 +301,7 @@ function v3dBuildAirport(L: AirportLayout) {
     g.add(m);
   }
   if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }
+  try { g.traverse((o: any) => { if (o.isMesh && o.material && o.material.isMeshBasicMaterial) v3dSpotHook(o.material); }); } catch (e) { /* plain */ }
   V3d.airport = g; V3d.scene.add(g);
   try { v3dAirportPatch(); } catch (x) { /* never stop the view */ }
 }
@@ -497,7 +498,7 @@ function v3dLoop(now: number) {
     P.pitch += (clamp(Math.atan2(vs / 196.85, gs * 0.5144) / D2R + (w.onGround ? 0 : 2.5), -6, 15) - P.pitch) * Math.min(1, dt * 1.5);
     // flaps and gear by phase (the type's own speeds in flight-configs when available)
     const ph = w.phase.toLowerCase();
-    try { v3dPlaneLightsSet(P.model, ph, (w.altM - ground) / 0.3048, w.onGround); } catch (e) { /* no lights */ }
+    try { v3dPlaneLightsSet(P.model, ph, (w.altM - ground) / 0.3048, w.onGround, w.altM / 0.3048, g.gs); } catch (e) { /* no lights */ }
     const cfg = flightConfig(P.type, ph, (g as any).ias || g.gs || 0, (w.altM - ground) / 0.3048, w.onGround);
     // your own flight: the flaps and gear as they are in the simulator
     const simCfg = g.you && g.real && Link.sim && Link.sim.lat ? { f: clamp((Link.sim.flapsIndex || 0) / Math.max(1, (configSpec(P.type) || { flaps: [1, 2, 3, 4] } as any).flaps.length), 0, 1), g: Link.sim.gearDown ? 1 : 0 } : null;
@@ -540,7 +541,6 @@ function v3dLoop(now: number) {
     v3dFreeStart(); v3dFreeUiBind();
   }
   if (P && V3d.mode !== 'fwd' && !P.model.visible) P.model.visible = true;
-  if (V3d.mode !== 'fwd') { const gl = V3d.root.querySelector('.v3d-cockpit-glow') as HTMLElement; if (gl && gl.style.opacity !== '0') gl.style.opacity = '0'; }
   if (V3d.mode === 'free') { if (fc()) v3dFreeStep(dt); }
   else if (P) {
     const s = shapeOf(P.type), centre = P.pos.clone().add(new T.Vector3(0, s.ground + s.h / 2, 0));
@@ -557,9 +557,6 @@ function v3dLoop(now: number) {
       V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
       if (V3d.cam.fov !== 60) { V3d.cam.fov = 60; V3d.cam.updateProjectionMatrix(); }
       P.model.visible = false;
-      // at night, a faint glow of the cockpit's own lights along the bottom of the view
-      const glow = V3d.root.querySelector('.v3d-cockpit-glow') as HTMLElement, nk = V3dSky.U ? V3dSky.U.uLightsOn.value : 0;
-      if (glow) glow.style.opacity = (nk * 0.55).toFixed(2);
     } else if (V3d.mode === 'tower' && V3d.icao) {
       const tw = new T.Vector3(380, V3d.elev + 45, -260);
       const want = V3d.dist ? centre.clone().add(tw.clone().sub(centre).normalize().multiplyScalar(V3d.dist)) : tw;

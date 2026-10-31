@@ -2072,8 +2072,6 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .v3d-top { position: absolute; left: 12px; right: 12px; top: calc(10px + env(safe-area-inset-top)); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; pointer-events: none; }
 .v3d-top > * { pointer-events: auto; }
 .v3d-top .icon-btn { background: rgba(8, 20, 36, .8); }
-/* the forward view at night: the cockpit's own soft light along the bottom */
-.v3d-cockpit-glow { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .6s; background: radial-gradient(120% 38% at 50% 108%, rgba(255, 190, 120, .32), rgba(255, 170, 90, .1) 55%, transparent 80%); }
 /* the battery in the 3D view: straight after the camera buttons (it moves along if there are more of them) */
 .v3d-batt { display: flex; }
 .v3d-batt:empty { display: none; }

@@ -63,6 +63,35 @@ vec3 skyCol(vec3 d) {
   if (d.y < 0.0) c = mix(c, hor * 0.75, clamp(-d.y * 5.0, 0.0, 1.0));
   return c;
 }`;
+/** The light aircraft throw on the ground (landing and taxi lights), added to what is there. */
+const SPOT_GLSL = `
+uniform vec3 uSpotPos[4]; uniform vec3 uSpotDir[4]; uniform vec4 uSpotK; uniform vec4 uSpotR; uniform float uLightsOn;
+vec3 spotLight(vec3 wp) {
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    float k = i == 0 ? uSpotK.x : i == 1 ? uSpotK.y : i == 2 ? uSpotK.z : uSpotK.w;
+    float rr = i == 0 ? uSpotR.x : i == 1 ? uSpotR.y : i == 2 ? uSpotR.z : uSpotR.w;
+    if (k <= 0.0) continue;
+    vec3 L = wp - uSpotPos[i]; float d = length(L);
+    float cone = smoothstep(0.93, 0.985, dot(L / max(d, 0.001), uSpotDir[i]));
+    float fall = 1.0 / (1.0 + (d / rr) * (d / rr) * 6.0);
+    acc += vec3(1.0, 0.93, 0.8) * k * cone * fall * 2.4;
+  }
+  return acc * uLightsOn;
+}`;
+/** Plain (unlit) materials of the scene that should catch aircraft lights: the runways and the airport's paint. */
+function v3dSpotHook(m: any) {
+  if (m.userData.spotHook || m.userData.ground || !m.map) return;
+  m.userData.spotHook = true;
+  const U = v3dSkyUniforms();
+  m.onBeforeCompile = (sh: any) => {
+    Object.assign(sh.uniforms, { uSpotPos: U.uSpotPos, uSpotDir: U.uSpotDir, uSpotK: U.uSpotK, uSpotR: U.uSpotR, uLightsOn: U.uLightsOn });
+    sh.vertexShader = 'varying vec3 vWposS;\n' + sh.vertexShader.replace('#include <fog_vertex>', 'vWposS = (modelMatrix * vec4(position, 1.0)).xyz;\n#include <fog_vertex>');
+    sh.fragmentShader = 'varying vec3 vWposS;\n' + SPOT_GLSL + '\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb += (sampledDiffuseColor.rgb + vec3(0.05)) * spotLight(vWposS);');
+  };
+  m.customProgramCacheKey = () => 'v3d-spot';
+  m.needsUpdate = true;
+}
 /** The same as the shader's skyCol, for the fog and the background (display values 0–1). */
 function skyColJs(d: number[], u: any): number[] {
   const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
@@ -79,7 +108,7 @@ function skyColJs(d: number[], u: any): number[] {
 
 /* ---------- state ---------- */
 const V3dSky: any = {
-  U: null, dome: null, sun: null, moon: null, stars: null, rt: null, mcam: null, astroAt: 0, dimAt: 0, a: null, tint: [1, 1, 1], amb: 1,
+  U: null, dome: null, sun: null, moon: null, stars: null, rt: null, mcam: null, astroAt: 0, dimAt: 0, a: null, tint: [1, 1, 1], amb: 1, spots: [] as any[],
 };
 function v3dSkyUniforms(): any {
   if (V3dSky.U) return V3dSky.U;
@@ -89,6 +118,9 @@ function v3dSkyUniforms(): any {
     uSunCol: { value: new T.Color(1, 1, 1) }, uSunVis: { value: 1 }, uMoonVis: { value: 0 }, uAmb: { value: 1 }, uNight: { value: 0 },
     uTime: { value: 0 }, uWind: { value: 0.3 }, uWindDir: { value: 0 }, uWater: { value: 1 }, uMirror: { value: 0 }, uMirrorPass: { value: 0 },
     uMirrorTex: { value: null }, uMirrorMat: { value: new T.Matrix4() }, uLightsOn: { value: 0 }, uPxScale: { value: 800 }, uGlow: { value: 1 },
+    uMist: { value: 0 },
+    // up to four aircraft lights shining on the ground (landing and taxi lights): position, aim, strength, reach
+    uSpotPos: { value: [0, 1, 2, 3].map(() => new T.Vector3()) }, uSpotDir: { value: [0, 1, 2, 3].map(() => new T.Vector3(0, -1, 0)) }, uSpotK: { value: new T.Vector4() }, uSpotR: { value: new T.Vector4(1, 1, 1, 1) },
   };
   return V3dSky.U;
 }
@@ -116,6 +148,7 @@ uniform sampler2D uWet; uniform sampler2D uCity; uniform float uCityOn;
 uniform vec3 uSunCol; uniform float uSunVis; uniform float uMoonVis; uniform float uAmb; uniform float uNight; uniform float uTime;
 uniform float uWind; uniform float uWindDir; uniform float uWater; uniform float uMirror; uniform float uMirrorPass; uniform sampler2D uMirrorTex; uniform mat4 uMirrorMat;
 ${SKY_GLSL}
+${SPOT_GLSL}
 ` + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
 {
   float wet = texture2D(uWet, vUv2).r;
@@ -152,7 +185,7 @@ ${SKY_GLSL}
     wc = mix(wc, vec3(0.85) * uAmb, clamp(surf, 0.0, 0.7));
     diffuseColor.rgb = mix(diffuseColor.rgb, wc, smoothstep(0.3, 0.6, wet));
   }
-  diffuseColor.rgb += cityL;
+  diffuseColor.rgb += cityL + (sampledDiffuseColor.rgb + vec3(0.05)) * spotLight(vWpos) * (1.0 - smoothstep(0.3, 0.6, wet) * 0.7);
 }`);
   };
   m.customProgramCacheKey = () => 'v3d-ground';
@@ -291,20 +324,22 @@ function v3dSkyClear() {
 }
 
 /** The weather nearest the view: wind (0–1 and the direction it blows to) and how overcast it is. */
-function v3dSkyWeather(lon: number, lat: number): { wind: number; dir: number; cloud: number } {
+function v3dSkyWeather(lon: number, lat: number): { wind: number; dir: number; cloud: number; visM: number } {
   const L: any = typeof Link !== 'undefined' ? (Link as any).sim : null;
-  let kt = -1, from = 0, cloud = 0;
-  if (L && L.wx && L.lat && gcDistanceNm([L.lon, L.lat], [lon, lat]) < 30) { kt = L.wx.windKt; from = L.wx.windDir; }
+  let kt = -1, from = 0, cloud = 0, visM = -1;
+  if (L && L.wx && L.lat && gcDistanceNm([L.lon, L.lat], [lon, lat]) < 30) { kt = L.wx.windKt; from = L.wx.windDir; visM = L.wx.inCloud ? 300 : L.wx.visM || -1; }
   let best = 1e9, w: any = null; const cache: any = LiveWx.cache;
   for (const k in cache) { const A = apt(k); if (!A) continue; const d = gcDistanceNm(A.pos, [lon, lat]); if (d < best && d < 120) { best = d; w = cache[k]; } }
   if (w) {
     if (kt < 0) { kt = w.kt || 0; from = w.dir >= 0 ? w.dir : 0; }
+    // the report's visibility is in statute miles ("10+" is ten or more)
+    if (visM < 0) { const mi = parseFloat(String(w.vis || '')); if (isFinite(mi)) visM = /\+/.test(String(w.vis)) ? 16000 : mi * 1609; if (/FG|BR|HZ/.test(w.wx || '')) visM = Math.min(visM < 0 ? 5000 : visM, /FG/.test(w.wx || '') ? 800 : 4000); }
     for (const c of w.clouds || []) cloud = Math.max(cloud, c.cover === 'OVC' ? 1 : c.cover === 'BKN' ? 0.6 : c.cover === 'SCT' ? 0.2 : 0);
   }
   if (kt < 0) kt = 8;
   // the waves run with the wind: towards where it blows (x east, z south)
   const to = (from + 180) * D2R;
-  return { wind: clamp(kt / 32, 0, 1), dir: Math.atan2(-Math.cos(to), Math.sin(to)), cloud };
+  return { wind: clamp(kt / 32, 0, 1), dir: Math.atan2(-Math.cos(to), Math.sin(to)), cloud, visM: visM < 0 ? 16000 : visM };
 }
 
 /** Each frame: the sun, moon and stars where they are now, the light and colours to match, the water, the mirror picture. */
@@ -336,6 +371,15 @@ function v3dSkyStep(now: number) {
   U.uSunAlt.value = Math.sin(sunAlt * D2R);
   U.uDay.value = Math.pow(sstep(-12, 8, sunAlt), 1.4);
   U.uCloud.value = A.wx.cloud; U.uWind.value = A.wx.wind; U.uWindDir.value = A.wx.dir;
+  U.uMist.value = clamp((8000 - A.wx.visM) / 7000, 0, 1);   // mist and fog: the beams of landing lights show
+  // the four aircraft lights nearest the camera shine on the ground
+  {
+    const cp0 = cam.position, list = (V3dSky.spots as any[]).sort((a, b) => a.pos.distanceToSquared(cp0) - b.pos.distanceToSquared(cp0)).slice(0, 4);
+    const ks = [0, 0, 0, 0], rs = [1, 1, 1, 1];
+    list.forEach((sp, i) => { U.uSpotPos.value[i].copy(sp.pos); U.uSpotDir.value[i].copy(sp.dir).normalize(); ks[i] = sp.k; rs[i] = sp.range; });
+    U.uSpotK.value.set(ks[0], ks[1], ks[2], ks[3]); U.uSpotR.value.set(rs[0], rs[1], rs[2], rs[3]);
+    V3dSky.spots = [];
+  }
   const sunVis = sstep(-1.2, 1.5, sunAlt) * (1 - 0.85 * A.wx.cloud), moonUp = sstep(-1, 2, moonAlt);
   U.uSunVis.value = sunVis;
   U.uMoonK.value = moonUp * A.illum * (1 - U.uDay.value);
@@ -407,6 +451,7 @@ function v3dSkyStep(now: number) {
       const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
       for (const m of ms) {
         if (!m || !(m.isMeshBasicMaterial || m.isSpriteMaterial) || m.userData.noDim) continue;
+        if (m.isMeshBasicMaterial && o.isMesh && !m.userData.ground && V3d.airport && o.parent === V3d.airport) v3dSpotHook(m);
         if (!m.userData.c0) m.userData.c0 = m.color.clone();
         m.color.setRGB(m.userData.c0.r * k[0], m.userData.c0.g * k[1], m.userData.c0.b * k[2]);
       }
@@ -443,21 +488,22 @@ function v3dLightPoints(pos: number[], col: number[], size: number[], kind?: num
   geo.setAttribute('aDir', new T.Float32BufferAttribute(dir || new Array(n * 3).fill(0), 3));
   geo.setAttribute('aPhase', new T.Float32BufferAttribute(phase || new Array(n).fill(0), 1));
   const mat = new T.ShaderMaterial({
-    uniforms: { uOn: U.uLightsOn, uScale: U.uPxScale, uTime: U.uTime, uGlow: U.uGlow, uFlags: { value: new T.Vector4(1, 1, 1, 0) }, uAlways: { value: 0 } },
+    uniforms: { uOn: U.uLightsOn, uScale: U.uPxScale, uTime: U.uTime, uGlow: U.uGlow, uFlags: { value: new T.Vector4(1, 1, 1, 0) }, uFlags2: { value: new T.Vector4(0, 0, 0, 0) }, uAlways: { value: 0 } },
     transparent: true, depthWrite: false, blending: T.AdditiveBlending, vertexColors: true, fog: false,
     vertexShader: `#include <common>
 #include <logdepthbuf_pars_vertex>
 attribute float aSize; attribute float aKind; attribute vec3 aDir; attribute float aPhase;
-uniform float uScale; uniform float uTime; uniform vec4 uFlags; varying vec3 vCol; varying float vOn;
+uniform float uScale; uniform float uTime; uniform vec4 uFlags; uniform vec4 uFlags2; varying vec3 vCol; varying float vOn;
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   float on = uFlags.x;
   if (aKind > 0.5 && aKind < 1.5) { float ph = fract(uTime * 0.9 + aPhase); on = (step(ph, 0.05) + step(0.12, ph) * step(ph, 0.17)) * uFlags.y; }
   else if (aKind > 1.5 && aKind < 2.5) { float ph = fract(uTime * 0.8 + aPhase); on = step(ph, 0.14) * uFlags.z; }
-  else if (aKind > 2.5) { vec3 wd = normalize(mat3(modelMatrix) * aDir); vec3 tc = normalize(cameraPosition - wp.xyz); on = uFlags.w * (0.15 + 2.6 * pow(max(dot(wd, tc), 0.0), 8.0)); }
+  else if (aKind > 2.5 && aKind < 4.5) { vec3 wd = normalize(mat3(modelMatrix) * aDir); vec3 tc = normalize(cameraPosition - wp.xyz); on = (aKind < 3.5 ? uFlags.w : uFlags2.x) * (0.15 + 2.6 * pow(max(dot(wd, tc), 0.0), 8.0)); }
+  else if (aKind > 4.5) on = uFlags2.y;
   vOn = on; vCol = color;
   vec4 mv = viewMatrix * wp;
-  gl_PointSize = clamp(aSize * (aKind > 2.5 ? 1.0 + on : 1.0) * uScale / max(1.0, -mv.z), 1.6, 34.0);
+  gl_PointSize = clamp(aSize * (aKind > 2.5 && aKind < 4.5 ? 1.0 + on : 1.0) * uScale / max(1.0, -mv.z), 1.6, 34.0);
   gl_Position = projectionMatrix * mv;
   #include <logdepthbuf_vertex>
 }`,
@@ -533,10 +579,42 @@ function v3dPlaneLightsAdd(body: any, typeId: string) {
   add(v(tipX, semi, tipZ), [1, 1, 1], 2.6 * span, 1, undefined, 0);
   add(v(s.L * 0.42, 0, s.ground + s.h + 0.15), [1, 0.1, 0.05], 1.8 * span, 2, undefined, 0);   // beacons, top and bottom
   add(v(s.L * 0.5, 0, s.ground - 0.1), [1, 0.1, 0.05], 1.8 * span, 2, undefined, 0.5);
-  const fwd = [-1, 0, 0];   // the nose points along −x of the model
-  add(v(W.x + 1.2, -rootY * 1.8, wz0), [1, 0.97, 0.88], 3.2 * span, 3, fwd);   // landing lights
-  add(v(W.x + 1.2, rootY * 1.8, wz0), [1, 0.97, 0.88], 3.2 * span, 3, fwd);
-  add(v(s.gear.nose, 0, s.ground * 0.5), [1, 0.97, 0.88], 2.4 * span, 3, fwd);
+  // the nose points along −x of the model; the lights are aimed a little down
+  const nrm = (a: number[]) => { const l = Math.hypot(a[0], a[1], a[2]); return a.map(q => q / l); };
+  const landDir = nrm([-1, -0.1, 0]), taxiDir = nrm([-1, -0.22, 0]);
+  const lA = v(W.x + 1.2, -rootY * 1.8, wz0 - 0.15), lB = v(W.x + 1.2, rootY * 1.8, wz0 - 0.15);
+  add(lA, [1, 0.97, 0.88], 3.2 * span, 3, landDir); add(lB, [1, 0.97, 0.88], 3.2 * span, 3, landDir);           // landing lights, under the wings
+  const nl = v(s.gear.nose, 0, Math.max(0.6, s.ground * 0.55));
+  add(nl, [1, 0.96, 0.85], 2.4 * span, 4, taxiDir);                                                            // taxi and take-off light, on the nose gear
+  add(nl, [1, 0.96, 0.85], 1.8 * span, 4, nrm([-0.7, -0.12, 0.7])); add(nl, [1, 0.96, 0.85], 1.8 * span, 4, nrm([-0.7, -0.12, -0.7]));   // runway turn-off lights
+  add(v(s.fin.x + 0.8, 0, s.ground + s.h + 0.4), [1, 0.98, 0.92], 2.2 * span, 5);                               // logo light on the fin
+  body.userData.lightSrc = { land: [lA, lB], nose: nl, landDir, taxiDir };
+  // the beams of the landing lights, seen in mist and fog
+  const T = THREE, beamMat = new T.ShaderMaterial({
+    uniforms: { uK: { value: 0 } }, transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, fog: false,
+    vertexShader: `#include <common>
+#include <logdepthbuf_pars_vertex>
+varying float vA; varying vec3 vN; varying vec3 vV;
+void main() { vA = uv.y; vec4 wp = modelMatrix * vec4(position, 1.0); vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp;
+#include <logdepthbuf_vertex>
+}`,
+    fragmentShader: `#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform float uK; varying float vA; varying vec3 vN; varying vec3 vV;
+void main() {
+  #include <logdepthbuf_fragment>
+  float edge = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.5);
+  gl_FragColor = vec4(1.0, 0.95, 0.85, pow(vA, 2.2) * (1.0 - edge * 0.85) * 0.16 * uK);
+}` });
+  const beams: any[] = [];
+  for (const p0 of [lA, lB]) {
+    const len = 160, cone = new T.ConeGeometry(len * 0.13, len, 20, 1, true);
+    cone.translate(0, -len / 2, 0);                       // the tip at the light
+    const m = new T.Mesh(cone, beamMat); m.position.copy(p0);
+    m.quaternion.setFromUnitVectors(new T.Vector3(0, -1, 0), new T.Vector3(landDir[0], landDir[1], landDir[2]));
+    m.renderOrder = 30; m.frustumCulled = false; m.visible = false; body.add(m); beams.push(m);
+  }
+  body.userData.beams = beams; body.userData.beamMat = beamMat;
   const pts = v3dLightPoints(pos, col, size, kind, dir, ph);
   pts.material.uniforms.uAlways.value = 1;   // aircraft lights are on by day too (only less bright)
   body.add(pts); body.userData.lights = pts;
@@ -549,17 +627,48 @@ function v3dPlaneLightsAdd(body: any, typeId: string) {
     const hw = fusSection(s, x).hw + 0.04;
     for (const side of [-1, 1]) { const q = v(x, side * hw, zw); cp.push(q.x, q.y, q.z); cc.push(1, 0.8, 0.52); cs.push(airliner ? 0.55 : 0.4); }
   }
-  const ck = s.nose * 0.62, ckz = s.ground + s.h * 0.74, ckw = fusSection(s, ck).hw * 0.75;
-  for (const yy of [-ckw, -ckw * 0.35, ckw * 0.35, ckw]) { const q = v(ck, yy, ckz); cp.push(q.x, q.y, q.z); cc.push(0.42, 0.46, 0.55); cs.push(0.7); }
+  // the cockpit: the front windscreen and the side windows, softly lit from inside (seen from outside only)
+  const fw = s.nose * 0.5, fs = s.nose * 0.66, ckz = s.ground + s.h * 0.76;
+  const hwF = fusSection(s, fw).hw, hwS = fusSection(s, fs).hw;
+  // a soft, dim glow spread across the windscreen and the side windows (the crew keep it low at night)
+  const ckPts: number[][] = [];
+  for (const f of [-0.75, -0.45, -0.15, 0.15, 0.45, 0.75]) ckPts.push([fw + Math.abs(f) * 0.35, f * hwF]);
+  for (const sd of [-1, 1]) for (const dx of [0, 0.45]) ckPts.push([fs + dx, sd * (fusSection(s, fs + dx).hw + 0.03)]);
+  for (const [x, yy] of ckPts) { const q = v(x, yy, ckz); cp.push(q.x, q.y, q.z); cc.push(0.34, 0.31, 0.25); cs.push(airliner ? 0.45 : 0.32); }
   if (cs.length) { const cab = v3dLightPoints(cp, cc, cs); body.add(cab); body.userData.cabin = cab; }
 }
-/** Which lights are on, by the phase of the flight. */
-function v3dPlaneLightsSet(model: any, ph: string, agl: number, onGround: boolean) {
+/** Which lights are on, as airline crews switch them through a flight:
+ * navigation lights whenever the aircraft has power; the red beacon from pushback and engine start until the
+ * engines are off at the gate; the white strobes from lining up until the runway is vacated after landing;
+ * landing lights for take-off and the climb to 10,000 ft, and again from 10,000 ft on the way down until the
+ * runway is vacated; the nose gear's taxi light for taxiing and its take-off light (with the runway turn-off
+ * lights) on the runway, until the gear comes up, and again with the gear down on approach; the logo light
+ * on the ground and below 10,000 ft. (They show in the dark; strobes and beacons by day too.) */
+function v3dPlaneLightsSet(model: any, ph: string, agl: number, onGround: boolean, altFt?: number, gs?: number) {
   const body = model.userData.body, L = body && body.userData.lights; if (!L) return;
   const parked = /park|gate|boarding|deboard|arrived|turnaround/.test(ph);
-  const taxi = /taxi|pushback/.test(ph);
-  const land = !parked && !taxi && (/take-?off|lift-?off|final|landing|touchdown|roll/.test(ph) || (!onGround && agl < 3000));
-  L.material.uniforms.uFlags.value.set(1, parked || taxi ? 0 : 1, parked ? 0 : 1, land ? 1 : 0);
+  const push = /pushback/.test(ph), taxi = /taxi|holding short/.test(ph), lineUp = /lining up/.test(ph);
+  const toRoll = /take-?off|lift-?off/.test(ph), onRwyLanding = onGround && /touchdown|landing|roll/.test(ph);
+  const alt = altFt == null ? agl : altFt, low = alt < 10000;
+  const nav = 1, beacon = parked ? 0 : 1;
+  const strobe = lineUp || toRoll || !onGround || onRwyLanding ? 1 : 0;
+  const landing = toRoll || (!onGround && low) || (onRwyLanding && (gs == null || gs > 30)) ? 1 : 0;
+  const gearDown = onGround || /final|landing|approach|lift-?off|take-?off/.test(ph) || agl < 2000;
+  const nose = push ? 0 : taxi || lineUp || toRoll || onRwyLanding || (!onGround && gearDown && low && !/climb/.test(ph)) ? 1 : 0;
+  const logo = onGround || low ? 1 : 0;
+  L.material.uniforms.uFlags.value.set(nav, strobe, beacon, landing);
+  L.material.uniforms.uFlags2.value.set(nose, logo, 0, 0);
+  // the light they throw on the ground, and their beams in mist
+  const src = body.userData.lightSrc, U = v3dSkyUniforms();
+  if (src && (landing || nose) && U.uLightsOn.value > 0.02) {
+    body.updateMatrixWorld();
+    const T = THREE, at = (p: any) => p.clone().applyMatrix4(body.matrixWorld), dirOf = (d: number[]) => new T.Vector3(d[0], d[1], d[2]).transformDirection(body.matrixWorld);
+    const a = at(src.land[0]), b = at(src.land[1]);
+    if (landing) V3dSky.spots.push({ pos: a.add(b).multiplyScalar(0.5), dir: dirOf(src.landDir), k: 1, range: 420 });
+    if (nose) V3dSky.spots.push({ pos: at(src.nose), dir: dirOf(src.taxiDir), k: landing ? 0.45 : 0.8, range: 110 });
+  }
+  const beams = body.userData.beams;
+  if (beams) { const k = landing * U.uMist.value * U.uLightsOn.value; body.userData.beamMat.uniforms.uK.value = k; for (const m of beams) m.visible = k > 0.01; }
 }
 
 /* ---------- day and night on the 2D map ---------- */
