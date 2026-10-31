@@ -49,6 +49,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-info"></div>
     <div class="v3d-status"></div>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
+    ${Mode.coop() ? '' : `<button class="v3d-sat v3d-tfc tfc-btn ${Traffic.on() ? 'on' : ''}" data-act="tfc-toggle">${icon('fleet')}Other airlines</button>`}
     <small class="v3d-credit">Terrain: Terrain Tiles on AWS · water: © OpenStreetMap contributors · imagery: Sentinel-2 cloudless 2016 by EOX (see Settings → About)</small>
     ${v3dLoaderHtml()}`;
   // opened from the small map on the overview: it grows from that window to the whole screen
@@ -311,19 +312,27 @@ function v3dLoop(now: number) {
 
   // aircraft within about 40 km
   const seen: { [id: string]: boolean } = {};
-  for (const g of State.live) {
+  // other airlines' aircraft: only those near enough and in front of the camera are drawn
+  const tfc = Traffic.live(), fr = new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(V3d.cam.projectionMatrix, V3d.cam.matrixWorldInverse));
+  const tfcNear = tfc.filter((g: any) => { const a = apt(g.from), b = apt(g.to); if (!a || !b || !V3d.origin) return false; const pp = flightPathPos(g); if (!pp) return false; g._ll = pp.pos; return gcDistanceNm(V3d.origin, pp.pos) < 24; });
+  for (const g of (State.live as any[]).concat(tfcNear)) {
     const w = g.id === f.id ? w0 : v3dWhere(g);
     const q = v3dXY(w.lon, w.lat); if (Math.hypot(q[0], q[1]) > 40000 && g.id !== f.id) continue;
+    if ((g as any).tfc) {
+      const inView = fr.containsPoint(new T.Vector3(q[0], w.altM, q[1])) || fr.intersectsSphere(new T.Sphere(new T.Vector3(q[0], w.altM, q[1]), 80));
+      if (!inView) { const P0 = V3d.planes[g.id]; if (P0) { seen[g.id] = true; P0.model.visible = false; P0.label.style.display = 'none'; } continue; }
+    }
     seen[g.id] = true;
     let P = V3d.planes[g.id];
+    if (P && (g as any).tfc && !P.model.visible) { P.model.visible = true; P.label.style.display = ''; }
     const typeId = flightTypeId(g);
     if (!P) {
-      const a = plane(g.reg), c = a ? company(a.companyId) : company();
+      const a = plane(g.reg), c: any = a ? company(a.companyId) : (g as any).tfc ? { color: (g as any).tfc.color, color2: (g as any).tfc.color2, id: (g as any).tfc.airline } : company();
       // the model is built from its nose; a pivot in its middle places and turns it
       const body = buildAircraftModel(typeId, liveryFor(c.color, c.color2, c.id)), model = new T.Group();
       body.position.x = -shapeOf(typeId).L / 2; model.add(body); model.userData.flightId = g.id; model.userData.set = body.userData.set;
       V3d.scene.add(model);
-      const lab = document.createElement('span'); lab.className = 'v3d-lab'; lab.textContent = g.callsign; V3d.root.querySelector('.v3d-labels').appendChild(lab);
+      const lab = document.createElement('span'); lab.className = 'v3d-lab' + ((g as any).tfc ? ' tfc' : ''); lab.textContent = (g as any).tfc ? `${(g as any).tfc.airline} ${g.callsign}` : g.callsign; V3d.root.querySelector('.v3d-labels').appendChild(lab);
       P = V3d.planes[g.id] = { id: g.id, model, type: typeId, pos: null, tgt: new T.Vector3(), hdg: w.hdg, tgtHdg: w.hdg, bank: 0, pitch: 0, flaps: 0, gear: 1, label: lab, seen: now };
     }
     const s = shapeOf(P.type);
@@ -487,4 +496,10 @@ function v3dLoaderTick(now: number) {
   if ((near && t >= V3D_SPLASH_MS) || t > 20000) {
     V3d.loaded = true; L.classList.add('out'); setTimeout(() => L.remove(), 800);
   }
+}
+
+/** Other airlines switched off: their aircraft leave the 3D scene at once. */
+function v3dTrafficSync() {
+  if (Traffic.on() || !V3d.planes) return;
+  for (const id of Object.keys(V3d.planes)) if (/^tfc-/.test(id)) { const P = V3d.planes[id]; try { V3d.scene.remove(P.model); P.label.remove(); } catch (e) { /* ignore */ } delete V3d.planes[id]; }
 }

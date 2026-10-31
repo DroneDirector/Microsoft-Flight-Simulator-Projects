@@ -449,6 +449,7 @@ class WorldMap {
     }
     try { WxLayer.draw(c, this, degPx); } catch (e) { /* never stop the map */ }
     try { if (typeof Network !== 'undefined') Network.drawOnMap(c, this, degPx); } catch (e) { /* never stop the map */ }
+    try { this.drawTraffic(c, degPx); } catch (e) { /* never stop the map */ }
     for (const f of liveOf()) {
       // (your demo flight moves on the real clock along its profile: demoUpdate in ai-sim.ts)
       const Af = apt(f.from), Bf = apt(f.to); if (!Af || !Bf) continue;   // an airport not loaded yet: drawn once it is
@@ -502,6 +503,28 @@ class WorldMap {
       }
     }
     this.placeBubble();
+  }
+
+  /** Other airlines' aircraft: small grey glyphs, the airline's name when zoomed in. */
+  drawTraffic(c: CanvasRenderingContext2D, degPx: number) {
+    const list = Traffic.live(); if (!list.length) return;
+    const light = this.ml && State.settings.mapStyle === 'street', now = Date.now(), used: number[][] = [];
+    for (const f of list) {
+      const pp = flightPathPos(f, now); if (!pp) continue;
+      const here = this.px(pp.pos[0], pp.pos[1]); if (!here || here[0] < -30 || here[1] < -30 || here[0] > this.w + 30 || here[1] > this.h + 30) continue;
+      const ah = this.px.apply(this, geoDest(pp.pos, pp.hdg, 0.5)), hdg = Math.atan2(ah[0] - here[0], -(ah[1] - here[1])) / D2R;
+      const t = acType(f.typeId), prop = t && (t.cls === 'turboprop' || t.cls === 'bush');
+      c.globalAlpha = 0.72; drawPlaneGlyph(c, here[0], here[1], hdg, 13, prop, light ? '#5B6B80' : '#8C9BB0', light ? '#FFFFFF' : '#0B1626'); c.globalAlpha = 1;
+      if (this.opts.labels !== false && degPx > 10) {
+        c.font = '500 10px Inter, sans-serif'; const lab = `${f.tfc.airline} ${f.callsign}`, w = c.measureText(lab).width;
+        // a name only where it doesn't sit on another one
+        const box = [here[0] + 10, here[1] - 19, here[0] + 16 + w, here[1] - 6];
+        if (used.some(u => box[0] < u[2] && box[2] > u[0] && box[1] < u[3] && box[3] > u[1])) continue;
+        used.push(box);
+        c.fillStyle = light ? 'rgba(255,255,255,.75)' : 'rgba(6,16,30,.6)'; c.fillRect(here[0] + 10, here[1] - 19, w + 6, 13);
+        c.fillStyle = light ? '#3B4A5E' : '#A9B6C8'; c.fillText(lab, here[0] + 13, here[1] - 9);
+      }
+    }
   }
 
   /** Add a polyline to the current path, cut to the screen (plus a margin). */
