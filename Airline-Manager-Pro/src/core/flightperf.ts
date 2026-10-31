@@ -133,7 +133,11 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   const month = new Date(when || Date.now()).getMonth();
   const key = typeId + '|' + from + '|' + to + '|' + month;
   if (_profiles[key]) return _profiles[key];
-  const t = acType(typeId) || AIRCRAFT[0], A = apt(from), B = apt(to);
+  const t = acType(typeId) || AIRCRAFT[0];
+  // where the airports are: from the airport list, or from their runways; if neither is known yet (the world
+  // list still loading), the profile is worked out but not kept, so it is made again with the real distance
+  const at = (k: string): any => { const a = apt(k); if (a && a.pos) return a; try { const r: any = World.runways ? activeRunway(k) : null; return r && r.thr ? { pos: r.thr } : null; } catch (e) { return null; } };
+  const A = at(from), B = at(to), keep = !!(A && B);
   // the type's own climb and descent speeds and flap schedule (flight-configs.ts), over the model defaults
   const CF: ConfigSpec = typeof FLIGHT_CONFIGS !== 'undefined' ? FLIGHT_CONFIGS[typeId] : null;
   const P = Object.assign({}, perfFor(t), CF ? { climbIas: CF.climbIas || undefined, descIas: CF.descIas || undefined } : {}) as PerfSpec;
@@ -256,7 +260,7 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   s += taxiIn * 60; push('Taxi in', 0);
   const airS = s - taxiOut * 60 - taxiIn * 60;
   const prof = { pts, totalS: s, routeNm, cruiseAlt: cruise, airS };
-  _profiles[key] = prof;
+  if (keep) _profiles[key] = prof;
   return prof;
 }
 

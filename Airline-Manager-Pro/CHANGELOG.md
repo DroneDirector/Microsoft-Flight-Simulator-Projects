@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.36 (2026-10-31)
+
+- flightProfile: airport positions from the runways when the world list isn't loaded; profiles with unknown airports aren't cached (was gc 200 kept for the session → 4.5× ground speed)
+- flightPathPos: sim path longer than routeNm × 1.4 + 40 → own path
+
 ## 0.9.35 (2026-10-31)
 
 - Clouds: v3d-clouds.ts (3D instanced billboards from METAR layers, 2D see-through layer), cloudKm/cloudDetail settings, METAR cloud layers kept (metarClouds)
