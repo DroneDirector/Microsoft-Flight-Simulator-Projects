@@ -13,7 +13,7 @@
 interface Job {
   id: string; companyId: string; kind: 'pax' | 'cargo'; title: string; client: string; from: string; to: string;
   pax: number; kg: number; pay: number; nm: number; posted: number; expires: number; due: number;
-  status: 'open' | 'accepted' | 'flying' | 'done' | 'late' | 'failed'; by?: string; reg?: string; doneAt?: number; tx?: string;
+  status: 'open' | 'accepted' | 'flying' | 'done' | 'late' | 'failed'; by?: string; reg?: string; queued?: boolean; doneAt?: number; tx?: string;
 }
 interface Tour { id: string; name: string; desc: string; legs: string[]; reward: number; bush?: boolean }
 interface JobsState { list: Job[]; next: { [cid: string]: number }; tours: { [id: string]: { start: number; idx: number; done?: number } }; weekly: { [week: string]: number } }
@@ -147,17 +147,40 @@ noticesAt(Date.now());
     if (!p || !a) return 'Choose a pilot and an aircraft';
     if (!Ratings.rated(p, a.typeId)) return `${p.name} isn't rated on the ${acType(a.typeId).model}`;
     if (p.status === 'training') return `${p.name} is on a course`;
-    if (State.live.some(f => f.pilotId === pilotId) || (S.aiNext || []).some((n: any) => n.pilotId === pilotId)) return `${p.name} is flying a route. Take them off it under Pilots first, or choose another pilot.`;
-    if (State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg) || a.status !== 'parked') return `${reg} isn't free`;
+    if (jobsState().list.some(x => x.queued && x.by === pilotId && x.status === 'accepted')) return `${p.name} already has a job waiting for after this flight`;
+    if (State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg) || a.status !== 'parked' || ((a as any).jobHold && (a as any).jobHold !== id)) return `${reg} isn't free`;
     const why = jobFits(j, a); if (why) return `${reg}: ${why}`;
+    // a pilot in the air takes the job after landing: the aircraft is kept for it, and they travel to it then
+    if (State.live.some(f => f.pilotId === pilotId)) {
+      j.status = 'accepted'; j.by = pilotId; j.reg = reg; j.queued = true; (a as any).jobHold = j.id;
+      return 'queued';
+    }
+    // a pilot on the ground between route legs: the job comes first, the route waits
+    S.aiNext = (S.aiNext || []).filter((n: any) => !(n.pilotId === pilotId && !n.job && !n.jobNext));
     const c = company(j.companyId), t = acType(a.typeId), spd = aiSpeed();
     const callsign = c.icao + (8000 + (_hashStr(j.id) % 1000));
     const base = { reg, pilotId, spd, depAt: Date.now() + AI_TURN_MIN * 60e3 / spd, dutyMin: 0, leg: 0, callsign, paxMax: cabinSeats(t, a) };
     S.aiNext = S.aiNext || [];
-    if (a.location !== j.from) S.aiNext.push(Object.assign({ from: a.location, to: j.from, ferry: true, jobNext: j.id }, base));
-    else S.aiNext.push(Object.assign({ from: j.from, to: j.to, job: j.id }, base));
-    j.status = 'accepted'; j.by = pilotId; j.reg = reg; p.status = 'flying';
+    jobLegsStart(j, p, a, base);
     return 'ok';
+  },
+  /** A pilot who was flying when you gave them a job has landed: they go to the job's aircraft and fly it.
+   *  Returns the first leg (null when nothing is waiting for them). */
+  queuedAfterLanding(pilotId: string, at: string, landedAt: number, spd: number, dutyMin: number): any {
+    const j = jobsState().list.filter(x => x.queued && x.by === pilotId && x.status === 'accepted')[0]; if (!j) return null;
+    const p: any = pilot(pilotId), a = plane(j.reg), c = company(j.companyId);
+    j.queued = false; if (a) delete (a as any).jobHold;
+    if (!p || !a || a.status !== 'parked' || State.live.some(f => f.reg === a.reg)) { j.status = 'open'; j.by = undefined; j.reg = undefined;
+      State.notices.unshift({ id: uid(), kind: 'pilot', title: `Job back on the board: ${j.title}`, body: `${j.reg || 'The aircraft'} was no longer free when ${p ? p.name : 'the pilot'} landed, so ${j.from} to ${j.to} is open again.`, time: 'Now', at: landedAt, read: false } as any); return null; }
+    // travel to the aircraft (on the next flight out, or across the apron), and rest first if the duty day is used up
+    const A = apt(at), B = apt(a.location), nm = A && B && at !== a.location ? gcDistanceNm(A.pos, B.pos) : 0;
+    const travelMin = nm ? Math.round(90 + nm / 420 * 60) : AI_TURN_MIN;
+    const maxDuty = ((p.rules && p.rules.maxDutyHrs) || 10) * 60, rest = dutyMin + travelMin > maxDuty - 120;
+    const depAt = landedAt + ((rest ? AI_REST_H * 60 : 0) + travelMin) * 60e3 / spd;
+    p.status = 'flying';
+    State.notices.unshift({ id: uid(), kind: 'pilot', title: `${p.name} is on the way to ${a.reg}`, body: `${p.name} landed at ${at}${nm ? ` and travels to ${a.location} (about ${Math.round(travelMin / 60 * 10) / 10} h)` : ''}${rest ? ' after a rest' : ''} to fly ${j.title}: ${j.from} to ${j.to}.`, time: 'Now', at: landedAt, read: false } as any);
+    const t = acType(a.typeId), callsign = c.icao + (8000 + (_hashStr(j.id) % 1000));
+    return jobLegsStart(j, p, a, { reg: a.reg, pilotId, spd, depAt, dutyMin: 0, leg: 0, callsign, paxMax: cabinSeats(t, a) }, true);
   },
   release(id: string) { const j = jobById(id); if (j && j.status === 'accepted' && j.by === 'you') { j.status = 'open'; j.by = undefined; j.reg = undefined; } },
 
@@ -241,3 +264,12 @@ noticesAt(Date.now());
     if (!quiet) try { toast(`Weekly challenge done: ${c.name}, ${money(c.reward, { sign: true })}`, 'ok'); } catch (e) { /* ignore */ }
   },
 };
+
+/** The job's first leg for an AI pilot: a ferry to the job's airport when the aircraft is elsewhere. */
+function jobLegsStart(j: Job, p: any, a: Aircraft, base: any, ret?: boolean): any {
+  const S: any = State; S.aiNext = S.aiNext || [];
+  const leg = a.location !== j.from ? Object.assign({ from: a.location, to: j.from, ferry: true, jobNext: j.id }, base) : Object.assign({ from: j.from, to: j.to, job: j.id }, base);
+  j.status = 'accepted'; j.by = p.id; j.reg = a.reg; j.queued = false; p.status = 'flying';
+  if (ret) return leg;
+  S.aiNext.push(leg); return leg;
+}

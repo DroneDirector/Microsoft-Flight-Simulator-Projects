@@ -271,6 +271,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       if (jn) { if (p) p.status = 'flying'; S.aiNext.push(jn); continue; }
       // after a diversion (medical or weather) the same flight carries on to where it was going
       const dv = F.medical || F.wxDivert;
+      if (!dv) { const qn = Jobs.queuedAfterLanding(f.pilotId, f.to, at, spd, dutyMin); if (qn) { S.aiNext.push(qn); continue; } }
       const next = dv ? dv.orig : aiNextLeg(f.pilotId, F.routeFrom || f.from, f.to), a = plane(f.reg);
       // no route of yours to fly next: the pilot waits on the ground until you assign one
       if (!next) { if (p) p.status = 'standby'; continue; }
@@ -457,7 +458,7 @@ function aiDayBlocks(reg: string, day?: number): { from: string; to: string; sta
 function aiStartRoute(pilotId: string, r: RouteDef): string {
   const S: any = State, p: any = pilot(pilotId); if (!p || !r) return '';
   if (State.live.some(f => f.pilotId === pilotId) || (S.aiNext || []).some((n: any) => n.pilotId === pilotId)) return 'flying';
-  const busy = (reg: string) => State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg);
+  const busy = (reg: string) => State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg) || !!(plane(reg) as any || {}).jobHold;
   const c = company(r.companyId), mine = S.myReg[r.companyId];
   if (!Ratings.rated(p, r.typeId)) return 'not-rated';
   if (!r.test && routeRunwayProblem(r.typeId, r.legs)) return 'runway';

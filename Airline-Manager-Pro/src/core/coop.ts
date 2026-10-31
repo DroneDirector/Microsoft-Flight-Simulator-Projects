@@ -13,7 +13,7 @@ interface CoopMember {
   id: string; name: string; role: 'owner' | 'pilot'; you?: boolean; sex: 'm' | 'f'; nat: string; base: string;
   flights: number; hoursMin: number; revenue: number; rating: number; joined: number; lastSeen: number; look?: any;
 }
-interface CoopEvent { id: string; at: number; by: string; type: 'start' | 'join' | 'flight' | 'buy' | 'leave' | 'rule' | 'pirep' | 'sell'; text: string; amount?: number; tx?: string }
+interface CoopEvent { id: string; at: number; by: string; type: 'start' | 'join' | 'flight' | 'buy' | 'leave' | 'rule' | 'pirep' | 'sell' | 'offer' | 'offer-reply'; text: string; amount?: number; tx?: string }
 interface CoopState {
   on: boolean; backend: 'demo' | 'supabase'; code: string; companyId: string; started: number;
   members: CoopMember[]; feed: CoopEvent[]; applied: { [id: string]: 1 };
@@ -80,6 +80,7 @@ const CoopDemo: CoopBackend = {
       coopDepart(m, Math.max(c.next[m.id], now - 6 * 3600e3));
     }
     for (const f of State.live) if ((f as any).coop) coopUpdate(f, now);
+    try { coopJobsTick(now); } catch (e) { /* ignore */ }
   },
 };
 
@@ -132,6 +133,8 @@ function coopLand(f: any, at: number) {
   const fpm = Math.round(-(90 + Math.random() * 260));
   const pr: CoopPirep = { id: 'pr-' + f.id, at, by: f.pilotId, name: m ? m.name : 'A co-op pilot', callsign: f.callsign, from: f.from, to: f.to, reg: f.reg || '', typeId: f.typeId,
     blockMin, fpm, g: Math.round((1.08 + Math.random() * .35) * 100) / 100, pax: f.pax, cargoKg: f.cargoKg || 0, fuelKg: Math.round(blockMin / 60 * (BURN_KG_H[(acType(f.typeId) || AIRCRAFT[0]).cls] || 2000) * (0.88 + Math.random() * 0.1)), status: 'pending' };
+  // a job leg: the client pays and the job is delivered
+  if (f.job) { try { const j = jobById(f.job); if (j) { payTxn(co.id, `Charter: ${j.title} (${m ? m.name : 'co-op'})`, j.pay, 'charter', [[`${j.client} pays for ${j.from} to ${j.to}`, j.pay]], at); Jobs.delivered(j.id, at, j.pay, ''); } } catch (e) { /* ignore */ } }
   // the aircraft and the pilot are back on the ground either way
   const a = f.reg ? plane(f.reg) : null;
   if (a) { a.status = 'parked'; a.location = f.to; }
