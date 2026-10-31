@@ -70,8 +70,30 @@ function av3Studio(r: any): { scene: any; stage: any } {
   return { scene, stage };
 }
 
+/** The figures' renderer. Android may take its graphics surface away (the 3D view needs the memory):
+ *  then nothing is drawn or kept until it comes back, or a new one is made, and every figure is drawn again. */
+let _av3LostAt = 0;
+function av3Lost(): boolean {
+  const lost = !Av3.renderer || (Av3.renderer.getContext && Av3.renderer.getContext().isContextLost && Av3.renderer.getContext().isContextLost());
+  if (!lost) { _av3LostAt = 0; return false; }
+  if (!_av3LostAt) _av3LostAt = Date.now();
+  // still gone after a while (and the 3D view closed): start a new renderer
+  if (Date.now() - _av3LostAt > 8000 && !(typeof V3d !== 'undefined' && V3d.open)) { try { Av3.renderer.dispose(); } catch (e) { /* gone */ } Av3.renderer = null; _av3LostAt = 0; av3MakeRenderer(); av3Redraw(); }
+  setTimeout(av3Loop, 1500);
+  return true;
+}
+/** Draw every figure on screen again (after the renderer came back). */
+function av3Redraw() { document.querySelectorAll('canvas.av3').forEach(c => { if (Av3.queue.indexOf(c as HTMLCanvasElement) < 0) Av3.queue.push(c as HTMLCanvasElement); }); av3Loop(); }
+/** A picture with nothing on it (drawn while the renderer was gone): never kept. */
+function av3Blank(c: HTMLCanvasElement): boolean {
+  try { const t = document.createElement('canvas'); t.width = t.height = 12; const g = t.getContext('2d'); g.drawImage(c, 0, 0, 12, 12); const d = g.getImageData(0, 0, 12, 12).data; for (let i = 3; i < d.length; i += 4) if (d[i] > 8) return false; return true; } catch (e) { return false; }
+}
 function av3Init() {
   if (Av3.renderer) return;
+  av3MakeRenderer();
+  av3Watch();
+}
+function av3MakeRenderer() {
   const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false, powerPreference: 'low-power' });
   r.setPixelRatio(1);
   r.setClearColor(0x000000, 0);
@@ -81,11 +103,14 @@ function av3Init() {
   r.shadowMap.enabled = true;
   r.shadowMap.type = THREE.PCFSoftShadowMap;
   r.domElement.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); });
+  r.domElement.addEventListener('webglcontextrestored', () => { _av3LostAt = 0; av3Redraw(); });
   Av3.renderer = r;
   const st = av3Studio(r); const scene = st.scene;
   Av3.stage = st.stage;
   Av3.scene = scene;
   Av3.camera = new THREE.PerspectiveCamera(20, 1, 0.1, 30);
+}
+function av3Watch() {
   // find avatars as they appear in the page, and keep sizes in step
   new MutationObserver(muts => {
     let found = false;
@@ -247,7 +272,7 @@ function av3FromDisk(el: HTMLCanvasElement, pk: string) {
     if (bmp) {
       const pic = document.createElement('canvas'); pic.width = bmp.width; pic.height = bmp.height;
       pic.getContext('2d').drawImage(bmp, 0, 0); if (bmp.close) bmp.close();
-      Av3.pics.set(pk, pic);
+      if (av3Blank(pic)) AvDisk.missed.add(pk); else Av3.pics.set(pk, pic);
     } else AvDisk.missed.add(pk);
     for (const e of els) if (e.isConnected) av3Attach(e);
     av3Pump();
@@ -286,6 +311,7 @@ function av3Loop() {
 }
 function av3Tick(now: number) {
   Av3.raf = 0;
+  if (av3Lost()) return;
   const t0 = performance.now();
   // pending pictures
   while (Human.ready && Av3.queue.length && performance.now() - t0 < 24) {
@@ -301,6 +327,7 @@ function av3Tick(now: number) {
       av3Draw(model, view, w, h);
       pic = document.createElement('canvas'); pic.width = w; pic.height = h;
       pic.getContext('2d').drawImage(Av3.renderer.domElement, 0, 0, w, h, 0, 0, w, h);
+      if (av3Lost() || av3Blank(pic)) { Av3.queue.push(el); break; }
       Av3.pics.set(pk, pic);
       if (el.clientHeight < 230) AvDisk.put(pk, pic);
       if (Av3.pics.size > 160) Av3.pics.delete(Av3.pics.keys().next().value);
