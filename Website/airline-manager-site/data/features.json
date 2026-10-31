@@ -373,6 +373,54 @@
   "title": "Interface",
   "items": [
    {
+    "t": "Search everything (Ctrl+K or the magnifier): aircraft, pilots, staff, airports, routes, flights, logs, news, settings",
+    "n": ""
+   },
+   {
+    "t": "\"While you were away\" summary after 3 hours or more",
+    "n": ""
+   },
+   {
+    "t": "Reopens on the same screen, tabs, filters and scroll position, also after an update",
+    "n": ""
+   },
+   {
+    "t": "Sort and search the fleet, pilots, crew, flight logs and routes (remembered)",
+    "n": ""
+   },
+   {
+    "t": "Undo for closing a route, dismissing staff, buying stock and clearing messages",
+    "n": ""
+   },
+   {
+    "t": "Notifications per type (show, inbox only, off), quiet hours, repeats grouped",
+    "n": ""
+   },
+   {
+    "t": "Swipe from the edge to go back, swipe a message away, pull down to refresh",
+    "n": ""
+   },
+   {
+    "t": "Android home screen widget: balance, next flight, aircraft in the air",
+    "n": ""
+   },
+   {
+    "t": "Battery saver (automatic below 20%), text size, reduced motion",
+    "n": ""
+   },
+   {
+    "t": "Keyboard shortcuts (? shows them)",
+    "n": ""
+   },
+   {
+    "t": "First-run tour and screen tips (phone and PC)",
+    "n": ""
+   },
+   {
+    "t": "Export flight logs and finances as CSV or PDF",
+    "n": ""
+   },
+   {
     "t": "Main navigation: Overview, Fleet, Routes, Schedule, Maintenance, Finance, Flight logs, Pilots, Settings",
     "n": ""
    },
