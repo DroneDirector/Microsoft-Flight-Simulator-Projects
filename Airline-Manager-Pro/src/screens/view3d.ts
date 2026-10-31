@@ -179,7 +179,7 @@ function v3dCentre(f: LiveFlight, pos: number[]): { pos: number[]; icao: string 
 }
 
 /** Where a flight is, in lon/lat with heading and altitude above the sea (m), from the airport scene when close. */
-function v3dWhere(f: LiveFlight): { lon: number; lat: number; hdg: number; altM: number; onGround: boolean; phase: string; vs?: number; turn?: number; smooth?: boolean } {
+function v3dWhere(f: LiveFlight, nowIn?: number): { lon: number; lat: number; hdg: number; altM: number; onGround: boolean; phase: string; vs?: number; turn?: number; smooth?: boolean } {
   const sc = V3d.aptScene;
   if (sc && sc.L && sc.planes) {
     const p: ApvPlane = sc.planes.filter((x: ApvPlane) => x.id === f.id)[0];
@@ -206,7 +206,13 @@ function v3dWhere(f: LiveFlight): { lon: number; lat: number; hdg: number; altM:
           if (a2 && b2) { const h1 = geoBrg(a2.pos, pos), h2 = geoBrg(pos, b2.pos); turn = (((h2 - h1) + 540) % 360 - 180) / 8; }   // degrees a second
         }
       } catch (e) { /* the once-a-second values */ }
-    } else { const A = apt(f.from), B = apt(f.noDest ? f.from : f.to); pos = gcInterpolate(A.pos, B.pos, f.t); hdg = geoBrg(A.pos, B.pos); }
+    } else {
+      const A = apt(f.from), B = apt(f.noDest ? f.from : f.to);
+      // no drawn path: along the great circle, still worked out every frame from the flight's profile
+      let fr = f.t;
+      if (F.depAt && !f.noDest) { try { const prof = aiProfile(F), q = profileAt(prof, flightEl(F, now).el); fr = prof.routeNm > 0 ? clamp(q.d / prof.routeNm, 0, 1) : f.t; altFt = q.alt; smooth = true; } catch (e) { /* the once-a-second values */ } }
+      pos = gcInterpolate(A.pos, B.pos, fr); hdg = geoBrg(gcInterpolate(A.pos, B.pos, Math.max(0, fr - 0.002)), gcInterpolate(A.pos, B.pos, Math.min(1, fr + 0.002)));
+    }
   }
   return { lon: pos[0], lat: pos[1], hdg, altM: altFt * 0.3048, onGround: altFt < 50, phase: String(f.phase || ''), vs, turn, smooth };
 }
@@ -327,7 +333,22 @@ function v3dLoop(now: number) {
     if (!P.pos) P.pos = P.tgt.clone();
     // a hired pilot's flight is worked out every frame, so it is placed exactly; your own flight's position
     // comes from the simulator a few times a second, so it glides to each new one
-    if (w.smooth || P.pos.distanceTo(P.tgt) > 3000) P.pos.copy(P.tgt); else P.pos.lerp(P.tgt, Math.min(1, dt * 4));
+    if (w.smooth || P.pos.distanceTo(P.tgt) > 3000) P.pos.copy(P.tgt);
+    else {
+      // a new position arrives about once a second: work out the speed between updates and carry the
+      // aircraft on at that speed, so it glides evenly instead of jumping to each update
+      const PP: any = P, tnow = now / 1000;
+      if (!PP.lastTgt || PP.lastTgt.distanceTo(P.tgt) > 0.3) {
+        if (PP.lastTgt && PP.lastT && tnow - PP.lastT > 0.05 && tnow - PP.lastT < 5) {
+          const v = P.tgt.clone().sub(PP.lastTgt).divideScalar(tnow - PP.lastT);
+          PP.vel = PP.vel ? PP.vel.lerp(v, 0.5) : v;
+        }
+        PP.lastTgt = P.tgt.clone(); PP.lastT = tnow;
+      }
+      const ahead = PP.vel && PP.lastT ? Math.min(2, tnow - PP.lastT) : 0;
+      const want = PP.vel ? P.tgt.clone().add(PP.vel.clone().multiplyScalar(ahead)) : P.tgt;
+      P.pos.lerp(want, Math.min(1, dt * 6));
+    }
     let dh = ((w.hdg - P.hdg + 540) % 360) - 180;
     P.hdg = w.smooth ? (P.hdg + dh * Math.min(1, dt * 6) + 360) % 360 : (P.hdg + dh * Math.min(1, dt * 2.5) + 360) % 360;
     // bank from the rate of turn (a standard-rate turn, 3° a second, is about 25° of bank in an airliner)
@@ -448,19 +469,21 @@ function v3dLoaderHtml(): string {
       <div class="spl-bar"><i class="spl-fill"><span class="spl-sheen"></span></i><span class="spl-tip"><svg viewBox="0 0 24 24"><path d="M21 15.5v-1.8l-8-5V3.6a1.5 1.5 0 0 0-3 0v5.1l-8 5v1.8l8-2.5v5l-2 1.5V21l3.5-1 3.5 1v-1.5L13 18v-5z"/></svg></span></div>
     </div></div>`;
 }
+const V3D_SPLASH_MS = 5000;   // the 3D loading screen shows at least this long
 function v3dLoaderTick(now: number) {
   const L = V3d.root && V3d.root.querySelector('.v3d-load') as HTMLElement; if (!L || V3d.loaded) return;
   const pr = V3dTerrain.prog, k = clamp(pr.got / Math.max(1, pr.want), 0, 1);
-  // shown at least a moment; done when the near ground (and the airport) are built, or after 20 s
+  // shown at least 5 seconds; done when the near ground (and the airport) are built, or after 20 s
   const near = V3dTerrain.rings.length > 0 && (!V3d.icao || V3d.aptReady), t = now - V3d.loadT0;
-  const shown = near ? 1 : Math.min(0.97, k * 0.9 + Math.min(0.08, t / 40000));
+  // the loading screen stays at least 5 seconds; its bar never runs ahead of that, so it fills smoothly
+  const shown = Math.min(near ? 1 : Math.min(0.97, k * 0.9 + Math.min(0.08, t / 40000)), t / V3D_SPLASH_MS);
   V3d.shown = Math.max(V3d.shown || 0, shown);
   const fill = L.querySelector('.spl-fill') as HTMLElement, tip = L.querySelector('.spl-tip') as HTMLElement, pct = L.querySelector('.spl-pct') as HTMLElement, step = L.querySelector('.spl-step') as HTMLElement;
   if (fill) fill.style.width = (V3d.shown * 100).toFixed(1) + '%';
   if (tip) tip.style.left = (V3d.shown * 100).toFixed(1) + '%';
   if (pct) pct.textContent = Math.round(V3d.shown * 100) + '%';
   if (step) step.textContent = V3d.shown < 0.5 ? 'Loading the mountains and the sea…' : V3d.shown < 0.9 ? (V3d.icao ? `Building ${V3d.icao}…` : 'Painting the coastlines…') : 'Ready';
-  if ((near && t > 900) || t > 20000) {
+  if ((near && t >= V3D_SPLASH_MS) || t > 20000) {
     V3d.loaded = true; L.classList.add('out'); setTimeout(() => L.remove(), 800);
   }
 }

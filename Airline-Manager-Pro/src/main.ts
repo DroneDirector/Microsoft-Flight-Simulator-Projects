@@ -29,15 +29,14 @@
   bindActions();
   bindBack();
   // Used in the last 12 hours (minimised, swiped away, exited, or closed by Android to free memory):
-  // open right where it was, without the start-up screen. After a longer break: the start-up screen
-  // and the Overview.
+  // after the start-up screen, back right where it was. After a longer break: the Overview.
   let resume: any = null;
   try { resume = JSON.parse(localStorage.getItem('amp-resume') || 'null'); localStorage.removeItem('amp-resume'); } catch (e) { /* none */ }
   if (resume && Date.now() - resume.at > 12 * 3600e3) resume = null;
   const back = resume && SCREENS[resume.screen] ? resume.screen : null;
   State.screen = back || 'ops';
   renderShell();
-  if (!Store.wasEmpty) setTimeout(checkBirthday, back ? 1500 : SPLASH_MS + 400);   // after the start-up screen (not over the first-start choice)
+  if (!Store.wasEmpty) setTimeout(checkBirthday, SPLASH_MS + 400);   // after the start-up screen (not over the first-start choice)
   scheduleBirthdayNotification();
   startConductClock();
   startCourtClock();
@@ -59,6 +58,8 @@
   if ((State as any).linkedOnce) State.live = State.live.filter(f => !(f.you && !f.real));
   // Start-up screen for five seconds, then the Overview
   // the voices download on the start-up screen the first time, also when the app reopens where it was
+  // the start-up screen on every start: at least five seconds, longer while files download; afterwards the
+  // Overview, or (opened again within 12 hours) right where it was
   if (!back) showSplash(() => { if (State.screen !== 'ops' && !_layers.length) go('ops', true); });
-  else if (voicesWanted()) showSplash(() => { /* stays where it was */ });
+  else showSplash(() => { /* stays where it was */ });
 })();

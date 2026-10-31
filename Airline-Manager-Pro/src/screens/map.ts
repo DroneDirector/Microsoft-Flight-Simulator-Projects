@@ -1,6 +1,8 @@
 // Full-screen live map with every company flight and a details panel.
 let _bigMap: WorldMap = null;
 
+/** Truly in the air, or still on the ground (boarding, taxiing, delayed at the gate, taxiing in). */
+function flightInAir(f: any): boolean { return f.airborne != null && !f.real ? !!f.airborne : (f.alt || 0) > 50 && !/taxi|gate|pushback|boarding|parked/i.test(String(f.phase || '')); }
 function mapListHtml(sel: string): string {
   const live = liveOf();
   return live.map(f => {
@@ -9,7 +11,7 @@ function mapListHtml(sel: string): string {
       <span class="mf-cs">${fav ? '<i class="mf-fav">★</i>' : ''}${esc(f.callsign)}</span>
       <span class="mf-rt">${esc(f.from)}<i></i>${esc(f.to)}</span>
       <span class="mf-pg"><i style="width:${(f.t * 100).toFixed(0)}%"></i></span>
-      <small>${f.you ? 'You' : esc(p ? p.name : 'Pilot')}${(f as any).coop ? ' (co-op)' : ''}, ${esc(t.model)}</small>
+      <small><em class="mf-ph ${flightInAir(f) ? 'air' : 'gnd'}">${esc(String(f.phase || (flightInAir(f) ? 'In the air' : 'On the ground')))}</em> ${f.you ? 'You' : esc(p ? p.name : 'Pilot')}${(f as any).coop ? ' (co-op)' : ''}, ${esc(t.model)}</small>
     </button>`;
   }).join('') || emptyState('No flights in the air', 'Assign routes to your pilots and their flights show up here live.', 'Plan routes', 'go-routes');
 }
@@ -20,7 +22,7 @@ SCREENS.map = {
     return `<div class="bigmap">
       <div class="map-host" id="big-map"></div>
       <button class="back-btn on-map" data-act="go" data-screen="ops">${icon('chevron', 'flip')}<span>Overview</span></button>
-      <div class="mf-panel"><div class="mf-h"><b>In the air</b><small>${liveOf().length} flights</small></div><div class="mf-list" id="mf-list">${mapListHtml(null)}</div></div>
+      <div class="mf-panel"><div class="mf-h"><b>Active flights</b><small>${liveOf().filter(flightInAir).length} in the air · ${liveOf().filter(f => !flightInAir(f)).length} on the ground</small></div><div class="mf-list" id="mf-list">${mapListHtml(null)}</div></div>
       <div class="map-zoom"><button class="icon-btn" data-act="map-zoom" data-f="1.6" aria-label="Zoom in">${icon('plus')}</button><button class="icon-btn" data-act="map-zoom" data-f="0.625" aria-label="Zoom out"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12h14"/></svg></button><button class="icon-btn" data-act="map-fit" aria-label="Show all flights">${icon('focus')}</button>${mapSearchBtn()}${layerBtn()}${wxBtn()}${view3dBtn()}</div>${wxPanelHtml()}
       <div class="map-detail" id="map-detail"></div>
     </div>`;

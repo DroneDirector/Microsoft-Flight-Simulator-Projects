@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.9 (2026-10-31)
+
+- Hold short at a holding point 50 m before the runway edge; line up when cleared
+- 3D: velocity-predicted motion for flights updated about once a second (your own flight); profile-based fallback path; loading screen at least 5 s
+- Start-up screen on every start (5 s minimum, longer for downloads)
+- Active flights: in the air vs on the ground with phases; phase tags in the map list
+- Passenger list jump chips (records, pets, pets left behind, celebrity)
+- Avatars painted from cache appear without fading (no flicker)
+
 ## 0.9.8 (2026-10-30)
 
 - Courts: choices (lawyer, stance, suspension, plea, settlement, recommendations, appeal), jury/lay/judges by country, investigation reports, airline cases with your record, civil claims, sentence card with time served and release, second chances, whistleblowers, case types after real prosecutions

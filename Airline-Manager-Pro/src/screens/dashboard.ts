@@ -114,8 +114,16 @@ SCREENS.ops = {
         ${widget('fleet', 'Fleet size', `<span class="w-big">${fl.length}<small>aircraft owned</small></span>
           <span class="w-stack"><i class="flight" style="width:${pct(nFlight)}%"></i><i class="avail" style="width:${pct(nAvail)}%"></i><i class="maint" style="width:${pct(nMaint)}%"></i></span>
           <span class="w-legend"><span><i class="flight"></i>${nFlight} in flight</span><span><i class="avail"></i>${nAvail} available</span><span><i class="maint"></i>${nMaint} maintenance</span></span>`, 'w-fleet', 0)}
-        ${widget('map', 'Active flights', `<span class="w-big">${live.length}<small>in the air now</small></span>
-          <span class="w-sub"><i class="live-dot"></i>${mine ? 'You and ' + (live.length - 1) + ' pilot' + (live.length - 1 === 1 ? '' : 's') : live.length + ' pilot' + (live.length === 1 ? '' : 's') + ' flying'}</span>`, 'w-active', 1)}
+        ${(() => {
+          // truly in the air, or still on the ground (boarding, taxiing, holding at the gate, taxiing in), with the phase
+          const isAir = flightInAir;
+          const air = live.filter(isAir), gnd = live.filter((f: any) => !isAir(f));
+          const phases: { [k: string]: number } = {};
+          gnd.forEach((f: any) => { const k = String(f.phase || 'On the ground').replace(/^Delayed: .*/, 'Delayed at the gate').replace(/^Holding short: .*/, 'Holding short'); phases[k] = (phases[k] || 0) + 1; });
+          const gTxt = Object.keys(phases).map(k => `${phases[k]} ${k.toLowerCase()}`).join(', ');
+          return widget('map', 'Active flights', `<span class="w-big">${air.length}<small>in the air now</small></span>
+          <span class="w-sub">${gnd.length ? `<i class="gnd-dot"></i>${gnd.length} on the ground: ${esc(gTxt)}` : `<i class="live-dot"></i>${mine ? 'You and ' + (live.length - 1) + ' pilot' + (live.length - 1 === 1 ? '' : 's') : live.length + ' pilot' + (live.length === 1 ? '' : 's') + ' flying'}`}</span>`, 'w-active', 1);
+        })()}
         ${widget('maint', 'Fleet availability', `<span class="w-ring">${ring(avail)}<b class="${avail >= 100 ? 'w3' : ''}">${avail}<small>%</small></b></span>
           <span class="w-sub">${fl.length - nMaint} of ${fl.length} ready to fly</span>`, 'w-avail', 2)}
         ${widget('finance', 'Profit', `

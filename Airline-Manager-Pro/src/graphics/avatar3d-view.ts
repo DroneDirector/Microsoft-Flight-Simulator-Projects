@@ -268,7 +268,8 @@ function av3Attach(el: HTMLCanvasElement, resized?: boolean) {
   if (el.width !== w || el.height !== h) { el.width = w; el.height = h; }
   const pk = key + '|' + el.getAttribute('data-view') + '|' + w + 'x' + h;
   const pic = Av3.pics.get(pk);
-  if (pic) { const g = el.getContext('2d'); g.clearRect(0, 0, w, h); g.drawImage(pic, 0, 0); el.classList.add('in'); }
+  // already painted before (a card redrawn, a list refreshed): shown at once, no fade, so it never flickers
+  if (pic) { const g = el.getContext('2d'); g.clearRect(0, 0, w, h); g.drawImage(pic, 0, 0); el.classList.add('nofade', 'in'); }
   else if (!AvDisk.missed.has(pk) && el.clientHeight < 230 && window.indexedDB) av3FromDisk(el, pk);
   else if (Av3.queue.indexOf(el) < 0) Av3.queue.push(el);
   void resized;
