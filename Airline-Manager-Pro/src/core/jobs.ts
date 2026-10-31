@@ -44,7 +44,12 @@ const CHALLENGES = [
   { id: 'streak', name: 'Steady hands', desc: 'Three landings in a row under 250 fpm.', target: 3, reward: 30000 },
 ];
 
-function jobsState(): JobsState { const S: any = State; if (!S.jobs) S.jobs = { list: [], next: {}, tours: {}, weekly: {} }; return S.jobs; }
+function jobsState(): JobsState {
+  const S: any = State; if (!S.jobs) S.jobs = {};
+  // a save started from scratch (or a new co-op airline) can have an empty jobs record: fill in what's missing
+  const J = S.jobs; J.list = J.list || []; J.next = J.next || {}; J.tours = J.tours || {}; J.weekly = J.weekly || {};
+  return J;
+}
 function jobById(id: string): Job { return jobsState().list.filter(j => j.id === id)[0] || null; }
 function jobPayFor(id: string): { pay: number; title: string } { const j = jobById(id); return j ? { pay: j.pay, title: j.title + ' ' + j.from + '–' + j.to } : undefined; }
 
