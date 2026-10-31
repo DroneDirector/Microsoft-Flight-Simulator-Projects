@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.40 (2026-10-31)
+
+- Cabin and cockpit window lights; landing/taxi/turn-off/logo lights by phase (v3dPlaneLightsSet), ground light pool (SPOT_GLSL), beams in mist
+- ErrorLog: repeats within a minute counted (n, last)
+
 ## 0.9.39 (2026-10-31)
 
 - 3D: Forward camera (cockpit view of the followed aircraft); battery after the camera buttons
