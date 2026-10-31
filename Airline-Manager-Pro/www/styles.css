@@ -2461,3 +2461,17 @@ html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
 @media (max-width: 600px) { .fc-speed input { width: 110px; } .fc-stick { width: 104px; height: 104px; } }
 /* 3D at an airport: only the free camera, no flight card */
 .v3d-aptonly .v3d-modes, .v3d-aptonly .v3d-info { display: none; }
+
+/* free camera on the PC: mouse and keyboard only */
+.v3d-pc .fc-stick, .v3d-pc .fc-ud { display: none !important; }
+.v3d-pc .fc-help-btn { left: 24px; }
+.v3d-pc .fc-help { bottom: calc(80px + env(safe-area-inset-bottom)); }
+.fc-pc-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 10px 18px; border-radius: 12px; background: rgba(8,20,36,.6); color: #fff; font-size: 13.5px; pointer-events: none; z-index: 4; transition: opacity .3s; }
+.fc-locked .fc-pc-hint { opacity: 0; }
+.fc-locked .v3d-cv { cursor: none; }
+.v3d-pc .fc-speed small::after { content: ' (wheel)'; text-transform: none; }
+
+.fc-esc { display: none; position: absolute; left: 66px; top: calc(14px + env(safe-area-inset-top)); align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 12px; background: rgba(8,20,36,.55); color: #fff; font-size: 12.5px; z-index: 5; }
+.v3d-free.v3d-pc .fc-esc { display: inline-flex; }
+.fc-esc kbd { font: 700 11px Inter, sans-serif; padding: 4px 7px; border-radius: 6px; background: linear-gradient(#F4F6F8, #CDD3DA); color: #1A2230; box-shadow: 0 2px 0 #8A95A3, inset 0 -1px 0 rgba(0,0,0,.15); }
+.v3d-free.v3d-pc .v3d-modes { margin-left: 190px; }
