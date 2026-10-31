@@ -182,6 +182,7 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'staff' && n.ref && /^wb-/.test(n.ref)) whistlePopup();
   else if (n.kind === 'staff' && n.ref && /^ty-/.test(n.ref)) thanksPopup(n.ref);
   else if (n.ref && /^news-/.test(n.ref)) newsOpen(n.ref);
+  else if (n.kind === 'staff' && n.ref && /^wo-/.test(n.ref)) warnOutcomePopup(n.id);
   else if (n.kind === 'staff' && n.ref) incidentPopup(n.ref);
   else if (n.kind === 'birthday') ACTIONS['bday-preview'](null, null);
   else {
