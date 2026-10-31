@@ -372,6 +372,7 @@ function aiScheduleNotifications() {
     for (const f of State.live) {
       const F: any = f; if (!aiOn(f) || !F.depAt) continue;
       const at = aiEndAt(F); if (at <= now + 60e3 || at > horizon) continue;
+      try { if (quietAt(at) || ntRule('flight') === 'off') continue; } catch (e) { /* ignore */ }
       const p = pilot(f.pilotId);
       out.push({ id: AI_NOTIFY_BASE + out.length, title: `${p ? p.name : f.callsign} is at the gate in ${f.to}`, body: `${f.callsign} from ${f.from}, ${f.pax} passengers.`, schedule: { at: new Date(at), allowWhileIdle: true } });
       if (out.length >= 60) break;

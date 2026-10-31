@@ -95,6 +95,7 @@ const Sound = {
   /** Two-tone chime when a new message arrives. */
   chime() {
     if (!State.settings.uiSounds) return;
+    try { if (quietAt(Date.now())) return; } catch (e) { /* ignore */ }
     const ctx = audio(); if (!ctx) return;
     const t = ctx.currentTime;
     tone(ctx, 880, t, 0.35, 0.08); tone(ctx, 1318.5, t + 0.12, 0.5, 0.08);

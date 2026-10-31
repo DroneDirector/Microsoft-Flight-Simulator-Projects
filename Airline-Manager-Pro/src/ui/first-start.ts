@@ -69,7 +69,7 @@ function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: 
   ['aiNext', 'aiDay', 'payNext', 'poolNext', 'condTick', 'lastTouchdown'].forEach(k => { if (S[k] && !Array.isArray(S[k]) && typeof S[k] === 'object') S[k] = {}; else if (typeof S[k] === 'number') S[k] = 0; });
   S.scratch = true; S.difficulty = _fsDiff; S.mkt = null; S.stock = {};
   Store.save(); Store.flushNative();
-  try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: 'ops' })); } catch (e) { /* ignore */ }
+  try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: 'ops' })); localStorage.setItem('amp-tour', '1'); localStorage.removeItem('amp-ui'); } catch (e) { /* ignore */ }
   location.reload();
 }
 

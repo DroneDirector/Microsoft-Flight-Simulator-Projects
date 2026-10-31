@@ -40,7 +40,8 @@ SCREENS.fleet = {
     <div class="filter-row">${classes.map(c => `<button class="fchip ${_fleetFilter === c[0] || (c[0] === 'types' && acType(_fleetFilter)) ? 'on' : ''}" data-act="fleet-filter" data-f="${c[0]}">${c[1]}</button>`).join('')}</div>
     ${_fleetFilter === 'types' ? fleetTypesHtml(all)
       : `${acType(_fleetFilter) ? `<p class="fine-print">${icon('fleet')}${esc(acType(_fleetFilter).maker + ' ' + acType(_fleetFilter).model)}: ${list.length} in the fleet. <button class="text-btn" data-act="fleet-filter" data-f="types">All aircraft types</button></p>` : ''}
-    <div class="ac-grid">${list.map(fleetCard).join('') || emptyState('No aircraft yet', 'Buy your first aircraft to start flying routes.', 'Buy aircraft', 'go-market')}</div>`}`;
+    ${sortBar('fleet', FLEET_SORTS, 'Find an aircraft')}
+    <div class="ac-grid">${sortList('fleet', list, FLEET_SORTS, (a: any) => `${a.reg} ${acType(a.typeId).maker} ${acType(a.typeId).model} ${a.location} ${a.status}`).map(fleetCard).join('') || emptyState('No aircraft yet', 'Buy your first aircraft to start flying routes.', 'Buy aircraft', 'go-market')}</div>`}`;
   },
 };
 

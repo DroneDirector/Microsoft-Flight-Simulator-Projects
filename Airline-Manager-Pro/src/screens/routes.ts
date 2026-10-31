@@ -19,7 +19,8 @@ SCREENS.routes = {
       <div><h1>Routes</h1><p class="sub">${rs.length} routes to ${Object.keys(countries).length} countries</p></div>
       <button class="btn primary" data-act="new-route">${icon('plus')}New route</button>
     </div>
-    <div class="route-list">${rs.map((r, i) => {
+    ${sortBar('routes', ROUTE_SORTS, 'Find a route')}
+    <div class="route-list">${sortList('routes', rs, ROUTE_SORTS, (r: any) => `${r.code} ${r.legs.join(' ')} ${acType(r.typeId).model}`).map((r, i) => {
       const t = acType(r.typeId), p = r.pilotId ? pilot(r.pilotId) : null;
       const dist = routeDistance(r.legs);
       const dem = routeDemandPct(r), fa = r.legs.length > 1 && !r.test ? classFares(r.typeId, r.legs[0], r.legs[1], r).y : 0, comp = r.test ? 0 : competitorsOn(r.legs[0], r.legs[1]).length;

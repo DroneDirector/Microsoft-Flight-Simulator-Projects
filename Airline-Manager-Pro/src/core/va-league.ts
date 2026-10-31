@@ -118,6 +118,7 @@ function vaNoticeOpen(ref: string) {
   if (/^va-potm-/.test(ref)) potmBonusPopup(ref.slice(8));
   else if (/^va-report-/.test(ref)) reportPopup(ref.slice(10));
   else if (/^va-award-/.test(ref)) awardPopup(ref.slice(9));
+  else if (ref === 'va-tour') ACTIONS['tour-start'](null, null);
 }
 function awardPopup(id: string) {
   const a = vaAwards().filter(x => x.id === id)[0]; if (!a) return;

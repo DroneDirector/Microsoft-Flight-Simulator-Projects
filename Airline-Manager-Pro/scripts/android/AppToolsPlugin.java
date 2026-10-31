@@ -494,4 +494,24 @@ public class AppToolsPlugin extends Plugin {
             statusReceiver = null;
         }
     }
+
+    /* ---------- Home screen widget ---------- */
+
+    /** The figures for the home screen widget (balance, next flight, aircraft in the air). */
+    @PluginMethod
+    public void widget(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            ctx.getSharedPreferences(StatusWidget.PREFS, Context.MODE_PRIVATE).edit()
+                .putString("title", call.getString("title", ""))
+                .putString("balance", call.getString("balance", ""))
+                .putString("next", call.getString("next", ""))
+                .putString("flying", call.getString("flying", ""))
+                .apply();
+            StatusWidget.refresh(ctx);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(String.valueOf(e.getMessage()));
+        }
+    }
 }

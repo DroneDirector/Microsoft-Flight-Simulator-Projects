@@ -80,12 +80,15 @@ function dismissStaff(id: string, incId?: string) {
     toast(`${p.name} dismissed. ${np ? np.name + ' is your new co-pilot.' : ''}`, 'warn');
     return;
   }
-  if (S.staff.indexOf(p) >= 0) S.staff.splice(S.staff.indexOf(p), 1);
-  else State.pilots.splice(State.pilots.indexOf(p), 1);
-  if (incId) { const inc = S.incidents.filter((x: Incident) => x.id === incId)[0]; if (inc) inc.status = 'dismissed'; }
+  const inStaff = S.staff.indexOf(p) >= 0, idx = inStaff ? S.staff.indexOf(p) : State.pilots.indexOf(p);
+  if (inStaff) S.staff.splice(idx, 1);
+  else State.pilots.splice(idx, 1);
+  const inc0 = incId ? S.incidents.filter((x: Incident) => x.id === incId)[0] : null, incSt = inc0 ? inc0.status : '';
+  if (inc0) inc0.status = 'dismissed';
+  const goneN = State.notices.filter(n => incId && n.ref === incId);
   State.notices = State.notices.filter(n => n.ref !== incId);
   closeAll(); Haptics.pulse(30); Store.save(); refresh();
-  toast(`${p.name} dismissed. Hire a replacement under Pilots → Hire staff.`, 'warn', { label: 'Hire', act: 'go-hire', data: personRole(p) });
+  undoToast(`${p.name} dismissed. Hire a replacement under Crew → Hire staff.`, () => { if (inStaff) S.staff.splice(Math.min(idx, S.staff.length), 0, p); else State.pilots.splice(Math.min(idx, State.pilots.length), 0, p); if (inc0) inc0.status = incSt; State.notices = State.notices.concat(goneN); }, 'warn');
 }
 ACTIONS['go-hire'] = el => { const t = el.closest('.toast'); if (t) t.remove(); _pilotTab = 'hire'; _hireRole = el.getAttribute('data-id') || 'all'; closeAll(); go('pilots'); };
 

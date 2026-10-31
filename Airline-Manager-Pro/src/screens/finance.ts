@@ -48,7 +48,7 @@ SCREENS.finance = {
     const unit: { [k: string]: string } = { day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Yearly' };
     return `
     <div class="screen-head"><div><h1>Finance</h1><p class="sub">${esc(c.name)}, ${sim ? 'simulated years' : 'real-world calendar'}</p></div>
-      <div class="seg">${['day', 'week', 'month', 'year'].map(k => `<button class="${_finPeriod === k ? 'on' : ''}" data-act="fin-period" data-p="${k}">${unit[k]}</button>`).join('')}</div></div>
+      ${expButtons('tx')}<div class="seg">${['day', 'week', 'month', 'year'].map(k => `<button class="${_finPeriod === k ? 'on' : ''}" data-act="fin-period" data-p="${k}">${unit[k]}</button>`).join('')}</div></div>
     ${marketsCardHtml()}
     <div class="fin">
       <div class="card fin-chart">

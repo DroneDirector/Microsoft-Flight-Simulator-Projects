@@ -156,6 +156,18 @@ Only damage the simulator can actually detect.
 
 | Feature | Status |
 |---|---|
+| Search everything (Ctrl+K or the magnifier): aircraft, pilots, staff, airports, routes, flights, logs, news, settings | Built |
+| "While you were away" summary after 3 hours or more | Built |
+| Reopens on the same screen, tabs, filters and scroll position, also after an update | Built |
+| Sort and search the fleet, pilots, crew, flight logs and routes (remembered) | Built |
+| Undo for closing a route, dismissing staff, buying stock and clearing messages | Built |
+| Notifications per type (show, inbox only, off), quiet hours, repeats grouped | Built |
+| Swipe from the edge to go back, swipe a message away, pull down to refresh | Built |
+| Android home screen widget: balance, next flight, aircraft in the air | Built |
+| Battery saver (automatic below 20%), text size, reduced motion | Built |
+| Keyboard shortcuts (? shows them) | Built |
+| First-run tour and screen tips (phone and PC) | Built |
+| Export flight logs and finances as CSV or PDF | Built |
 | Main navigation: Overview, Fleet, Routes, Schedule, Maintenance, Finance, Flight logs, Pilots, Settings | Built |
 | Notification bell with unread count and grouped inbox | Built |
 | Modular settings with toggles, easy to extend | Built |

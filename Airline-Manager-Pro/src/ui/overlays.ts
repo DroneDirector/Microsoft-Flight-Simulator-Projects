@@ -128,24 +128,25 @@ const NOTICE_META: { [k: string]: { label: string; icon: string } } = {
 let _inboxTab = 'all';
 
 function inboxHtml(): string {
-  pruneNotices(); stampNotices();
+  pruneNotices(); stampNotices(); try { ntApply(); } catch (e) { /* ignore */ }
   const tabs = ['all', 'mechanic', 'staff', 'authority', 'flight', 'pilot', 'finance'];
   // newest first, by when each one really happened
   const list = State.notices.filter(n => _inboxTab === 'all' || n.kind === _inboxTab).slice().sort((a: any, b: any) => (b.at || 0) - (a.at || 0));
   return `
     <div class="drawer-head"><h2>Notifications</h2>
       <button class="text-btn" data-act="mark-read">Mark all read</button>
+      <button class="text-btn" data-act="nt-clear">Clear read</button>
       <button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="tabs" role="tablist">${tabs.map(t => {
       const n = State.notices.filter(x => !x.read && (t === 'all' || x.kind === t)).length;
       return `<button class="tab ${_inboxTab === t ? 'on' : ''}" data-act="inbox-tab" data-tab="${t}">${t === 'all' ? 'All' : NOTICE_META[t].label}${n ? `<i>${n}</i>` : ''}</button>`;
     }).join('')}</div>
-    <div class="notice-list">${list.length ? list.map(n => `
+    <div class="notice-list">${list.length ? noticeListHtml(list, (n: any) => `
       <button class="notice ${n.read ? '' : 'unread'} k-${n.kind}" data-act="open-notice" data-id="${n.id}">
         <span class="n-ic">${icon(NOTICE_META[n.kind].icon)}</span>
         <span class="n-t"><b>${esc(n.title)}</b><small>${esc(n.body)}</small></span>
         <span class="n-time" data-at="${(n as any).at || ''}" title="${(n as any).at ? esc(receivedText((n as any).at)) : ''}">${esc((n as any).at ? agoText((n as any).at) : n.time)}${n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref) ? `<i class="n-map">${icon('pin')}Map</i>` : ''}</span>
-      </button>`).join('') : emptyState('Nothing here', 'New messages from your mechanic, pilots and the authorities show up here.')}</div>`;
+      </button>`) : emptyState('Nothing here', 'New messages from your mechanic, pilots and the authorities show up here.')}</div>`;
 }
 
 ACTIONS.inbox = () => { Sound.tick(); openLayer('drawer', inboxHtml(), { cls: 'inbox' }); };

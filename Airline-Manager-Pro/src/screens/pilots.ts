@@ -36,7 +36,7 @@ SCREENS.pilots = {
         <span class="co-txt"><small>Your co-pilot in ${esc(myA ? myA.reg : '')}</small><b>${esc(co.name)}</b><small>First officer, ${natLabel(co.nat)}, ${ageOf(co.dob)}</small>
           <span class="btn-row"><button class="btn ghost sm" data-act="copilot-sex">${icon('swap')}Male or female</button><button class="btn ghost sm" data-act="staff-detail" data-id="${co.id}">Details</button></span></span>
       </div>` : myA ? `<p class="fine-print">${icon('info')}${esc(acType(myA.typeId).model)} is flown by one pilot, so you don't need a co-pilot.</p>` : ''}
-      ${coopOn() ? coopPlayersCrewHtml() : ''}<div class="crew-list">${crew.map((p: any, i) => {
+      ${coopOn() ? coopPlayersCrewHtml() : ''}${sortBar('pilots', PILOT_SORTS, 'Find a pilot')}<div class="crew-list">${sortList('pilots', crew, PILOT_SORTS, (p: any) => `${p.name} ${p.base} ${(p.types || []).join(' ')} ${p.status}`).map((p: any, i) => {
         const f = State.live.filter(x => x.pilotId === p.id)[0];
         const route = State.routes.filter(r => r.pilotId === p.id)[0];
         return `<div class="crew-row" style="--i:${i}">
@@ -49,10 +49,10 @@ SCREENS.pilots = {
       }).join('') || emptyState('No pilots hired yet', 'Hire pilots to fly your other aircraft while you fly your own trips.', 'Hire staff', 'pilot-hire')}</div>`;
     else if (_pilotTab === 'cabin') body = `
       <div class="need-row">${needChip('Flight attendants', cc.faHave, cc.faNeed, 'fa')}<p class="fine-print">${icon('info')}Real-world rule: aircraft with 20 or more seats need one flight attendant per 50 seats. Bush planes and small props need none.</p></div>
-      <div class="staff-grid">${fa.map((p, i) => staffCard(p, i)).join('') || emptyState('No cabin crew yet', 'Hire flight attendants to fly passenger airliners.', 'Hire staff', 'pilot-hire')}</div>`;
+      ${sortBar('staff', STAFF_SORTS, 'Find someone')}<div class="staff-grid">${sortList('staff', fa, STAFF_SORTS, (p: any) => `${p.name} ${p.base}`).map((p, i) => staffCard(p, i)).join('') || emptyState('No cabin crew yet', 'Hire flight attendants to fly passenger airliners.', 'Hire staff', 'pilot-hire')}</div>`;
     else if (_pilotTab === 'mech') body = `
       <div class="need-row">${needChip('Mechanics', cc.mechHave, cc.mechNeed, 'mech')}<p class="fine-print">${icon('info')}Every base needs a licensed mechanic, plus line-maintenance staff for your fleet's size and type. No mechanic, no flights.</p></div>
-      <div class="staff-grid">${mech.map((p, i) => staffCard(p, i)).join('') || emptyState('No mechanics yet', 'You need at least one mechanic before any aircraft can fly.', 'Hire staff', 'pilot-hire')}</div>`;
+      ${sortBar('staff', STAFF_SORTS, 'Find someone')}<div class="staff-grid">${sortList('staff', mech, STAFF_SORTS, (p: any) => `${p.name} ${p.base}`).map((p, i) => staffCard(p, i)).join('') || emptyState('No mechanics yet', 'You need at least one mechanic before any aircraft can fly.', 'Hire staff', 'pilot-hire')}</div>`;
     else if (_pilotTab === 'ground') body = `
       <p class="fine-print">${icon('info')}The people on the ramp: baggage handlers, push-back, fuel, catering and de-icing drivers, apron buses, stairs and ramp agents. They load every flight within the loadsheet's limits.</p>
       ${GROUND_JOBS.map(j => { const ps = ground.filter((p: any) => p.job === j[0]); return ps.length ? `<h4 class="grp-h">${esc(j[1])} · ${ps.length}</h4><div class="staff-grid">${ps.map((p, i) => staffCard(p, i)).join('')}</div>` : ''; }).join('') || emptyState('No ground staff yet', 'Hire baggage handlers, drivers and ramp agents under Hire staff.', 'Hire staff', 'pilot-hire')}`;

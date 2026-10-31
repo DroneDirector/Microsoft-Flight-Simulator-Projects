@@ -218,7 +218,9 @@ ACTIONS['mkt-buy'] = el => {
     closeTop(); const from = c.balance;
     if (k === 'fuel') { s.fuelKg += q; s.fuelPaid += cost; } else { s.parts += q; s.partsPaid += cost; }
     payTxn(c.id, k === 'fuel' ? `Jet fuel for stock: ${num(q / 1000)} t` : 'Spare parts for stock', -cost, k === 'fuel' ? 'fuel' : 'maint', [[k === 'fuel' ? `${num(q)} kg × $${fuelPrice(c.hub).toFixed(2)}` : `Parts at ${Math.round(marketIdx('parts') * 100)}% of normal prices`, -cost]]);
-    Sound.purchase(); try { animateBalance(from, c.balance); } catch (e) { /* ignore */ } Store.save(); refresh(); toast('Bought and stored', 'ok');
+    const tx0: any = State.txns[0];
+    Sound.purchase(); try { animateBalance(from, c.balance); } catch (e) { /* ignore */ } Store.save(); refresh();
+    undoToast('Bought and stored', () => { if (k === 'fuel') { s.fuelKg = Math.max(0, s.fuelKg - q); s.fuelPaid = Math.max(0, s.fuelPaid - cost); } else { s.parts = Math.max(0, s.parts - q); s.partsPaid = Math.max(0, s.partsPaid - cost); } c.balance += cost; State.txns = State.txns.filter(t => t !== tx0); }, 'ok');
   }, () => closeTop());
 };
 

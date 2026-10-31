@@ -12,7 +12,7 @@ const Desk = {
     if (!DESKTOP) return;
     document.documentElement.classList.add('desktop');
     const fit = () => {
-      const k = +(State.settings as any).uiSize || 1;
+      const k = (+(State.settings as any).uiSize || 1) * (+(State.settings as any).textSize || 1);
       const z = clamp(Math.min(innerHeight / 560, innerWidth / 900), 0.8, 6) * k;
       (window as any).__uiZoom = z;
       (document.documentElement.style as any).zoom = String(z);

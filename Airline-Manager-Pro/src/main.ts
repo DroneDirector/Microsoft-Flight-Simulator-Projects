@@ -32,10 +32,13 @@
   // after the start-up screen, back right where it was. After a longer break: the Overview.
   let resume: any = null;
   try { resume = JSON.parse(localStorage.getItem('amp-resume') || 'null'); localStorage.removeItem('amp-resume'); } catch (e) { /* none */ }
-  if (resume && Date.now() - resume.at > 12 * 3600e3) resume = null;
+  if (resume && Date.now() - resume.at > 12 * 3600e3 && (State.settings as any).rememberUi === false) resume = null;
+  let _ui: any = null; try { _ui = uiMemRestore(); } catch (e) { /* ignore */ }
+  if (!resume && _ui && SCREENS[_ui.screen]) resume = { screen: _ui.screen };
   const back = resume && SCREENS[resume.screen] ? resume.screen : null;
   State.screen = back || 'ops';
   renderShell();
+  try { if (_ui && _ui.scroll && _ui.screen === State.screen) setTimeout(() => { const v = $('#view'); if (v) v.scrollTop = _ui.scroll; }, 60); } catch (e) { /* ignore */ }
   if (!Store.wasEmpty) setTimeout(checkBirthday, SPLASH_MS + 400);   // after the start-up screen (not over the first-start choice)
   scheduleBirthdayNotification();
   startConductClock();
@@ -53,6 +56,7 @@
   try { startNewsWatch(); startWarnClock(); } catch (e) { /* ignore */ }
   try { applyDifficultyPrices(); startMarkets(); } catch (e) { /* ignore */ }
   try { startVa(); } catch (e) { /* ignore */ }
+  try { startQol(); } catch (e) { /* ignore */ }
   try { v3dCrashCheck(); } catch (e) { /* ignore */ }
   startCoopClock();
   startBases();
