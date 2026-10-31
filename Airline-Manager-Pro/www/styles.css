@@ -2459,3 +2459,5 @@ html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
 .fc-help { display: none; position: absolute; left: 24px; bottom: calc(170px + env(safe-area-inset-bottom)); width: min(360px, 80vw); padding: 14px 16px; border-radius: 14px; background: rgba(8,20,36,.88); color: #fff; z-index: 6; flex-direction: column; gap: 7px; font-size: 13px; }
 .fc-help.on { display: flex; } .fc-help span { display: grid; grid-template-columns: 110px 1fr; gap: 8px; } .fc-help i { font-style: normal; color: var(--cyan); font-weight: 600; }
 @media (max-width: 600px) { .fc-speed input { width: 110px; } .fc-stick { width: 104px; height: 104px; } }
+/* 3D at an airport: only the free camera, no flight card */
+.v3d-aptonly .v3d-modes, .v3d-aptonly .v3d-info { display: none; }
