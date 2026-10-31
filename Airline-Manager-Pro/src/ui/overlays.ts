@@ -168,6 +168,7 @@ ACTIONS['open-notice'] = el => {
   else if ((n as any).txs) flightsMoneyPopup((n as any).txs);
   else if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
+  else if (n.kind === 'flight' && n.ref && /^scan-/.test(n.ref)) scanPopup(n.ref.slice(5));
   else if (n.kind === 'flight' && n.ref) crashPopup(n.ref);
   else if (n.kind === 'pilot' && n.ref && /^cjo-/.test(n.ref)) coopOfferPopup(n.ref);
   else if (n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref)) showFlightOnMap(n.ref);
