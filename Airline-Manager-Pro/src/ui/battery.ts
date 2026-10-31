@@ -35,5 +35,8 @@ const Battery = {
       <b>${b.level}%</b>${b.charging ? `<svg class="batt-bolt" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 5 13.5h6L10 22l9-12h-6.2z" fill="currentColor"/></svg>` : ''}${how === 'wireless' ? `<svg class="batt-wl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="12" r="5.6"/><circle cx="12" cy="12" r="9"/></svg>` : ''}</span>`;
   },
 
-  paint() { const el = document.querySelector('.topbar .batt-slot'); if (el) el.innerHTML = this.html(); },
+  paint() {
+    const el = document.querySelector('.topbar .batt-slot'); if (el) el.innerHTML = this.html();
+    const v = document.querySelector('.v3d .v3d-batt'); if (v) v.innerHTML = this.html();   // in the 3D view too, after the camera buttons
+  },
 };
