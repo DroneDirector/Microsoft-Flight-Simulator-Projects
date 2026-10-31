@@ -2,7 +2,7 @@
 // ready to copy or share. The log is kept on the device (separately from the airline) and
 // listed in Settings → Updates and errors.
 
-interface ErrEntry { id: string; time: string; where: string; title: string; message: string; detail?: string }
+interface ErrEntry { id: string; time: string; where: string; title: string; message: string; detail?: string; n?: number; last?: string }
 
 const ERR_KEY = 'airline-manager-pro.errors';
 const ERR_MAX = 60;
@@ -56,6 +56,11 @@ const ErrorLog = {
   /** Saves an error and, unless popup is false, shows it. The same message only pops up once per session. */
   add(where: string, title: string, message: string, detail?: string, popup?: boolean): ErrEntry {
     const d = new Date();
+    // the same error again within a minute (say, every frame of the map): counted on the entry, not repeated
+    const top = this.list[0], msg = String(message || 'Unknown error'), det = detail ? String(detail).slice(0, 8000) : '';
+    if (top && top.where === where && top.message === msg && top.detail === det && Date.now() - new Date((top.last || top.time).replace(' ', 'T') + 'Z').getTime() < 60000) {
+      top.n = (top.n || 1) + 1; top.last = d.toISOString().slice(0, 19).replace('T', ' '); this.save(); return top;
+    }
     const e: ErrEntry = { id: uid(), time: d.toISOString().slice(0, 19).replace('T', ' '), where, title, message: String(message || 'Unknown error'), detail: detail ? String(detail).slice(0, 8000) : '' };
     this.list.unshift(e);
     if (this.list.length > ERR_MAX) this.list.length = ERR_MAX;
@@ -83,7 +88,7 @@ const ErrorLog = {
   },
 
   entryText(e: ErrEntry): string {
-    return `[${e.time}] ${e.title} (${e.where})\n${e.message}${e.detail ? '\n' + e.detail : ''}`;
+    return `[${e.time}] ${e.title} (${e.where})${e.n && e.n > 1 ? ` · ${e.n} times, last ${e.last}` : ''}\n${e.message}${e.detail ? '\n' + e.detail : ''}`;
   },
 
   report(entries?: ErrEntry[]): string {

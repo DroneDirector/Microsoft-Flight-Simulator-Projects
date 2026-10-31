@@ -301,6 +301,7 @@ function v3dBuildAirport(L: AirportLayout) {
     g.add(m);
   }
   if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }
+  try { g.traverse((o: any) => { if (o.isMesh && o.material && o.material.isMeshBasicMaterial) v3dSpotHook(o.material); }); } catch (e) { /* plain */ }
   V3d.airport = g; V3d.scene.add(g);
   try { v3dAirportPatch(); } catch (x) { /* never stop the view */ }
 }
@@ -497,7 +498,7 @@ function v3dLoop(now: number) {
     P.pitch += (clamp(Math.atan2(vs / 196.85, gs * 0.5144) / D2R + (w.onGround ? 0 : 2.5), -6, 15) - P.pitch) * Math.min(1, dt * 1.5);
     // flaps and gear by phase (the type's own speeds in flight-configs when available)
     const ph = w.phase.toLowerCase();
-    try { v3dPlaneLightsSet(P.model, ph, (w.altM - ground) / 0.3048, w.onGround); } catch (e) { /* no lights */ }
+    try { v3dPlaneLightsSet(P.model, ph, (w.altM - ground) / 0.3048, w.onGround, w.altM / 0.3048, g.gs); } catch (e) { /* no lights */ }
     const cfg = flightConfig(P.type, ph, (g as any).ias || g.gs || 0, (w.altM - ground) / 0.3048, w.onGround);
     // your own flight: the flaps and gear as they are in the simulator
     const simCfg = g.you && g.real && Link.sim && Link.sim.lat ? { f: clamp((Link.sim.flapsIndex || 0) / Math.max(1, (configSpec(P.type) || { flaps: [1, 2, 3, 4] } as any).flaps.length), 0, 1), g: Link.sim.gearDown ? 1 : 0 } : null;
