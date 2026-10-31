@@ -43,7 +43,10 @@ const Traffic = {
       }
       out.push(A);
     });
-    this.lines = out; this.fleet = fleet; return out;
+    // airlines you took over fly under your name now
+    const taken: string[] = ((State as any).biz && (State as any).biz.taken) || [];
+    const keep = out.filter(A => taken.indexOf(A.name) < 0);
+    this.lines = keep; this.fleet = fleet.filter(c => taken.indexOf(c.airline) < 0); return keep;
   },
   build(): TrafficCraft[] { this.airlines(); return this.fleet || []; },
   /** Destinations an aircraft type can fly from its hub. */

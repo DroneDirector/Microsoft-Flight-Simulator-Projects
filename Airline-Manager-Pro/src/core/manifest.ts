@@ -129,6 +129,7 @@ function paxRowHtml(fid: string, p: PaxSeat, i: number): string {
     <span class="pax-face" data-face="${esc(fid)}|${esc(p.key)}" data-i="${i}"></span>
     <span class="pax-who"><b>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small>${p.pet ? `<span class="pax-pet ${p.pet.left ? 'left' : ''}" role="button" data-act="pet-visit" data-f="${esc(fid)}" data-key="${esc(p.key)}" title="${esc(p.pet.left || 'Visit ' + p.pet.name)}">${petSvg(p.pet)}<small>${esc(p.pet.name)}, ${p.pet.kind}, ${p.pet.left ? 'stayed behind' : p.pet.where === 'cabin' ? 'under the seat' : 'in the hold'}</small></span>` : ''}</span>
     <span class="pax-seat">${esc(p.seat)}</span>
+    ${(() => { try { const f: any = State.live.filter(x => x.id === fid)[0]; return f ? moodChip(f, p, manifestOf(f)) : ''; } catch (e) { return ''; } })()}
     ${rec ? `<button class="pax-rec ${banned ? 'ban' : ''}" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}${banned ? 'Banned' : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</button>` : '<span class="pax-clean">Clean</span>'}
   </div>`;
 }
@@ -179,6 +180,7 @@ ACTIONS['pax-card'] = el => {
         ${p.pet ? kv('Pet', `${petSvg(p.pet)} ${esc(p.pet.name)}, ${p.pet.kind}${p.pet.left ? ', left behind' : p.pet.where === 'cabin' ? ', under the seat' : ', in the hold'}`) : ''}
         ${kv('Conduct', rec ? `<span class="${banned ? 'red' : 'amber'}">${banned ? (paxBan(rec) ? esc(banText(paxBan(rec)).replace(/^b/, 'B')) : 'Banned') : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</span>` : '<span class="green">Clean record</span>')}
       </div>
+      ${(() => { try { return moodCardHtml(f, p); } catch (e) { return ''; } })()}
       <div class="modal-actions">${rec ? `<button class="btn ghost" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}Conduct record</button>` : ''}
         ${p.pet ? `<button class="btn ghost" data-act="pet-visit" data-f="${esc(fid)}" data-key="${esc(p.key)}">${petSvg(p.pet)}Visit ${esc(p.pet.name)}</button>` : ''}
         ${ownBanUntil(p.key) !== undefined ? '' : `<button class="btn danger" data-act="pax-ban" data-key="${esc(p.key)}" data-f="${esc(fid)}">${icon('shield')}Ban from your airline</button>`}</div></div></div>`, { cls: 'wide pax-card-pop' });

@@ -217,6 +217,7 @@ const WxLayer = {
     if (!this.on()) return;
     const S: any = State.settings;
     c.save();
+    if (S.wxClouds !== false) { if (degPx >= 1.5) this.fetchView(m); try { clouds2dDraw(c, m, degPx); } catch (e) { /* never stop the map */ } }
     if (S.wxSigmet !== false) for (const s of Sigmets.active()) {
       const st = WX_HAZ[s.hazard] || WX_HAZ.TS;
       c.beginPath(); let first = true, cx = 0, cy = 0, n = 0;
@@ -273,7 +274,7 @@ ACTIONS['wx-menu'] = el => {
   const S: any = State.settings, r = el.getBoundingClientRect();
   const row = (k: string, label: string, sub: string, on: boolean) => `<button class="ly-opt wx-opt ${on ? 'on' : ''}" data-act="wx-toggle" data-k="${k}"><b>${label}</b><small>${sub}</small><span class="tg ${on ? 'on' : ''}"><i></i></span></button>`;
   const wrap = openLayer('pop', `<div class="ly-head"><b>Weather</b><small>Real-world weather from the Aviation Weather Center. Your hired pilots always fly in it; this only shows or hides it.</small></div>
-    <div class="ly-opts wx-opts">${row('wxLayer', 'Weather on the map', 'Show the weather layer', !!S.wxLayer)}${row('wxSigmet', 'Storms and hazards', 'Thunderstorms, severe turbulence and icing, volcanic ash, cyclones', S.wxSigmet !== false)}${row('wxMetar', 'Airport weather', 'Flight category, thunderstorms, rain, snow, fog, strong wind', S.wxMetar !== false)}</div>`, { cls: 'layer-pick' });
+    <div class="ly-opts wx-opts">${row('wxLayer', 'Weather on the map', 'Show the weather layer', !!S.wxLayer)}${row('wxClouds', 'Clouds', 'Cloud layers from the airport reports, as see-through layers', S.wxClouds !== false)}${row('wxSigmet', 'Storms and hazards', 'Thunderstorms, severe turbulence and icing, volcanic ash, cyclones', S.wxSigmet !== false)}${row('wxMetar', 'Airport weather', 'Flight category, thunderstorms, rain, snow, fog, strong wind', S.wxMetar !== false)}</div>`, { cls: 'layer-pick' });
   const p = wrap.querySelector('.panel') as HTMLElement, w = 320;
   p.style.width = w + 'px'; p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
   const ph = p.offsetHeight || 220; p.style.top = Math.max(8, r.bottom + 6 + ph <= window.innerHeight - 8 ? r.bottom + 6 : r.top - ph - 6) + 'px';

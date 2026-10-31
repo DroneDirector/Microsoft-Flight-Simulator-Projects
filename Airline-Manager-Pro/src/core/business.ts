@@ -99,7 +99,7 @@ function competitorsOn(from: string, to: string, d?: Date): Competitor[] {
     const startM = month - (h % 30);
     out.push({ name, fare: 0.82 + ((h >>> 4) % 31) / 100, quality: 40 + ((h >>> 9) % 46), daily: s >= 4 ? 2 + ((h >>> 13) % 5) : 1 + ((h >>> 13) % 2), since: `${Math.floor(startM / 12)}-${String(startM % 12 + 1).padStart(2, '0')}` });
   }
-  return out;
+  return rivalApply(k, out);
 }
 
 /* ---------- Demand ---------- */

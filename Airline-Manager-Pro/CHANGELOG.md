@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.35 (2026-10-31)
+
+- Clouds: v3d-clouds.ts (3D instanced billboards from METAR layers, 2D see-through layer), cloudKm/cloudDetail settings, METAR cloud layers kept (metarClouds)
+- Passenger mood during flight (pax-mood.ts)
+- biz-more.ts: hubs, ETOPS, curfews/slots, SAF/ETS (both); takeover, shares, rival reactions, scenarios (solo); profit sharing, radio, co-op league, live positions (co-op)
+
 ## 0.9.34 (2026-10-31)
 
 - Back to the restore point (amp-restore-before-faa-taxiways): FAA dimensions removed, ICAO everywhere

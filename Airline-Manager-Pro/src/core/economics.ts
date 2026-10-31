@@ -131,6 +131,7 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
   if (svcCost) svc.extraLines.forEach(l => lines.push(l));
   lines.push(['Crew allowances and hotels', -crewTrip], ['Overheads: offices and IT', -overhead]);
   if (A2 && tankKg) { A2.tankKg = tankKg; A2.tankAt = tankNext; }
+  try { bizEmissionLines(cid, from, to, burn, price, lines, !!x.book); } catch (e) { /* ignore */ }
   // difficulty: what flights earn and cost
   const dd = diff();
   if (dd.income !== 1 || dd.cost !== 1) for (const l of lines) l[1] = Math.round(l[1] * (l[1] > 0 ? dd.income : dd.cost));

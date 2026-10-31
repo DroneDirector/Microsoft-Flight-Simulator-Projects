@@ -57,6 +57,7 @@
   try { applyDifficultyPrices(); startMarkets(); } catch (e) { /* ignore */ }
   try { startVa(); } catch (e) { /* ignore */ }
   try { startQol(); } catch (e) { /* ignore */ }
+  try { startBiz(); } catch (e) { /* ignore */ }
   try { v3dCrashCheck(); } catch (e) { /* ignore */ }
   startCoopClock();
   startBases();
