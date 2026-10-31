@@ -82,6 +82,7 @@ const CoopDemo: CoopBackend = {
     for (const f of State.live) if ((f as any).coop) coopUpdate(f, now);
     try { coopJobsTick(now); } catch (e) { /* ignore */ }
     try { coopConnTick(now); } catch (e) { /* ignore */ }
+    try { coopPlusTick(); } catch (e) { /* ignore */ }
   },
 };
 
@@ -142,7 +143,10 @@ function coopLand(f: any, at: number) {
   const p = pilot(f.pilotId); if (p) p.status = 'standby';
   if (m) { m.lastSeen = at; m.base = f.to; }
   c.pireps = c.pireps || [];
-  if (c.rules.reviewPireps && !(m && m.role === 'owner')) {
+  try { coopChatOnLanding(m, f.from, f.to, fpm); eventsAfterLeg(f.pilotId, f.from, f.to); } catch (e) { /* ignore */ }
+  const autoWhy = (() => { try { const r = autoRules(); return r.on ? pirepCheck(pr) : 'review'; } catch (e) { return 'review'; } })();
+  if (c.rules.reviewPireps && !(m && m.role === 'owner') && autoWhy) {
+    (pr as any).why = autoWhy === 'review' ? '' : autoWhy;
     c.pireps.unshift(pr); c.pireps = c.pireps.slice(0, 200);
     coopRecord({ id: 'pr-' + f.id, at, by: f.pilotId, type: 'pirep', text: `${pr.name} filed a flight report: ${f.from} to ${f.to}, ${Math.abs(fpm)} fpm. Waiting for your review.` });
     State.notices.unshift({ id: uid(), kind: 'pilot', title: `Flight report to review: ${pr.name}`, body: `${f.callsign} ${f.from} to ${f.to}, ${hours(blockMin)} block, landing ${Math.abs(fpm)} fpm, ${f.pax} passengers. Accept or reject it under Co-op.`, time: at > Date.now() - 120e3 ? 'Now' : dateStr(new Date(at)).slice(11), read: false } as any);
@@ -156,7 +160,7 @@ interface CoopPirep { id: string; at: number; by: string; name: string; callsign
 /** Book an accepted flight report: money, logbook, hours, the pilot's record. */
 function coopBook(pr: CoopPirep, live: boolean) {
   const co = company(), m = coopMember(pr.by);
-  const money0 = legEconomics(pr.typeId, pr.from, pr.to, pr.pax, pr.cargoKg, pr.blockMin, pr.fuelKg, false, { book: true, reg: pr.reg || undefined });
+  const money0 = legEconomics(pr.typeId, pr.from, pr.to, Math.round(pr.pax * (1 + codeshareBoost())), pr.cargoKg, pr.blockMin, pr.fuelKg, false, { book: true, reg: pr.reg || undefined });
   const d = new Date(pr.at), day = dateStr(d).slice(0, 10), time = dateStr(d).slice(11);
   const txId = uid(); pr.tx = txId;
   State.txns.unshift({ id: txId, companyId: co.id, date: day, time, label: `${pr.callsign} ${pr.from} to ${pr.to} (${pr.name})`, amount: money0.net, kind: money0.net >= 0 ? 'revenue' : 'fees',

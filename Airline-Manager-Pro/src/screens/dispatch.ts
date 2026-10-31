@@ -32,6 +32,7 @@ SCREENS.dispatch = {
     const ours = Network.ours(), me = Network.me();
     return `<div class="screen-head"><div><h1>Dispatch</h1><p class="sub">Your next flight: plan, flight plan for the simulator, weather${netChoices().length > 1 ? ', networks' : ''}${svcOk('hoppie') ? ', messages' : ''}</p></div>
       <button class="btn ghost" data-act="settings" data-section="online">${icon('gear')}Online services</button></div>
+    ${briefingHtml([leg.from, leg.to, ofp && ofp.altn])}
     <div class="disp">
       <div class="card disp-leg">
         <div class="card-h"><b>Next flight</b><small>${a ? esc(a.reg) + ', ' + esc(acType(a.typeId).model) : 'No aircraft chosen'}</small></div>

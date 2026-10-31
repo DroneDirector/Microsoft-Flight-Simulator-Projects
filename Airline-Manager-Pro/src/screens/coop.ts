@@ -15,6 +15,12 @@ SCREENS.coop = {
         <div class="card coop-note">${icon('coop')}<span><b>Co-op runs for ${esc(other ? other.name : 'another airline')}</b><small>Switch to that airline to see its co-op pilots. One airline at a time can be flown in co-op.</small></span>
         ${other ? `<button class="btn primary sm" data-act="coop-switch" data-id="${esc(other.id)}">Switch</button>` : ''}</div>`;
     }
+    const head = `<div class="screen-head"><div><h1>Co-op</h1><p class="sub">${esc(co.name)} · ${c.members.length} pilots</p></div></div>${coopTabsHtml()}`;
+    if (_coopTab === 'board') return head + flightBoardHtml();
+    if (_coopTab === 'chat') return head + coopChatHtml();
+    if (_coopTab === 'events') return head + eventsHtml();
+    if (_coopTab === 'staff') return head + coopStaffHtml();
+    if (_coopTab === 'rules') return head + coopRulesHtml();
     const week = Date.now() - 7 * 864e5;
     const flightsWeek = c.feed.filter(e => e.type === 'flight' && e.at > week);
     const earned = flightsWeek.reduce((s, e) => s + (e.amount || 0), 0);
@@ -25,6 +31,7 @@ SCREENS.coop = {
     return `
     <div class="screen-head"><div><h1>Co-op</h1><p class="sub">${esc(co.name)} · ${c.members.length} pilots flying for the same airline</p></div>
       <span class="coop-backend ${c.backend}">${icon(c.backend === 'supabase' ? 'wifi' : 'info')}${c.backend === 'supabase' ? 'Online' : 'Demo'}</span></div>
+    ${coopTabsHtml()}
     <div class="coop-top">
       <div class="card coop-code"><small>Invite code</small><b>${esc(c.code)}</b>
         <span class="coop-code-btns"><button class="btn ghost sm" data-act="coop-copy">${icon('copy')}Copy</button><button class="btn ghost sm" data-act="coop-share">${icon('share')}Share</button></span>
