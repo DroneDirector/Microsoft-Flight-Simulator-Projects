@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.42 (2026-10-31)
+
+- Flight card fixed layout (fc-ph, fc-vs, three-line on-board items)
+- warnOutcomePopup: full warning outcome report (notice ref wo-)
+- newsCrash for AI, own (on register) and court crashes; crashArt (broken aircraft)
+
 ## 0.9.41 (2026-10-31)
 
 - Landing lights in the wing leading edge; approach lighting (full/short, flashers, red side bars); PAPI/VASI (light kind 6, angle by viewer); dimmer cabin windows
