@@ -5,6 +5,7 @@
 - data/airports-major.ts (scripts/make-major-airports.py, OurAirports): 3,886 well-known airports built in
 - bushApt/airlineApt replace the 'P' prefix test; new-route grid limited to the nearest 60
 - aptSize: seaplane bases (size 3) not major; ETOPS alternates only land airports
+- 3D splash waits for all terrain rings, satellite rings, airport, nearby flight airports (layouts) and clouds; ground loads when no layout
 
 ## 0.9.36 (2026-10-31)
 

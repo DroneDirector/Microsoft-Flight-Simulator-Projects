@@ -37,7 +37,7 @@ function v3dRange(lat?: number): { rings: number[]; fog: number[]; far: number }
 function v3dCurve(x: number, z: number): number { return (x * x + z * z) / (2 * EARTH_R); }
 
 const V3dTerrain = {
-  rings: [] as V3dRing[], gen: 0, origin: null as number[], prog: { got: 0, want: 1, sat: 0 } as any, _satBusy: false, _satQ: [] as V3dRing[],
+  rings: [] as V3dRing[], done: false, gen: 0, origin: null as number[], prog: { got: 0, want: 1, sat: 0 } as any, _satBusy: false, _satQ: [] as V3dRing[],
 
   /** Load the rings around a point (the view's origin), finest first, so the near ground shows quickly. */
   load(centre: number[]) {
@@ -45,9 +45,10 @@ const V3dTerrain = {
     this.clear(); this.origin = centre.slice();
     const zs = v3dRange(centre[1]).rings;
     this.prog = { got: 0, want: 27 + (V3d.icao ? 1 : 0), sat: 0 }; this._satQ = []; this._satBusy = false;
-    let prev: V3dRing = null;
+    let prev: V3dRing = null; this.done = false;
     const next = (i: number) => {
-      if (i >= zs.length || gen !== this.gen || !V3d.open) return;
+      if (gen !== this.gen || !V3d.open) return;
+      if (i >= zs.length) { this.done = true; return; }   // every ring within the view distance is in
       this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; if (this.rings.length === 1 && (V3d as any).lastL && V3d.icao && (V3d as any).lastL.icao === V3d.icao) { try { v3dBuildAirport((V3d as any).lastL); } catch (e) { /* ignore */ } } } next(i + 1); });
     };
     next(0);
