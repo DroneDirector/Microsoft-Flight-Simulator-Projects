@@ -9,7 +9,7 @@
 //  - Track an aircraft and the view follows it; when it leaves the airport, the world map takes over
 //    and keeps following it.
 
-interface ApvPlane { id: string; x: number; y: number; hdg: number; alt: number; phase: string; label: string; you: boolean; span: number; prop: boolean; parked?: boolean; kt?: number; rwy?: string; stype?: number; reg?: string }
+interface ApvPlane { id: string; x: number; y: number; hdg: number; alt: number; phase: string; label: string; you: boolean; span: number; prop: boolean; nose?: number; parked?: boolean; kt?: number; rwy?: string; stype?: number; reg?: string }
 
 const APV_RANGE = 14000;       // metres from the airport within which aircraft are shown
 
@@ -387,7 +387,7 @@ class AirportView {
     const spanOf = (t: AircraftType) => t.cls === 'ga' || t.cls === 'bush' ? 12 : t.cls === 'turboprop' ? 27 : t.seats > 300 ? 64 : t.seats > 200 ? 58 : t.seats > 100 ? 35 : 26;
     for (const f of liveOf()) {
       const F: any = f, t = typeOf(f), big = t.seats >= 60, prop = t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga';
-      const base = { id: f.id, label: f.callsign, you: !!f.you, span: spanOf(t), prop };
+      const base = { id: f.id, label: f.callsign, you: !!f.you, span: spanOf(t), prop, nose: noseWheelAhead(t.id) };
       // your flight: where the simulator has it
       if (f.you && f.real && Link.sim && Link.sim.lat) {
         const p = this.xy(Link.sim.lat, Link.sim.lon);
@@ -483,7 +483,7 @@ class AirportView {
       if (a.location !== icao || a.status === 'flying' || State.live.some(f => f.reg === a.reg)) continue;
       const j0 = this.runwayJoins()[0], t = acType(a.typeId), st = this.standFor(a.reg, t.seats >= 60, j0 ? j0.k : undefined) || this.standFor(a.reg, t.seats >= 60); if (!st) continue;
       const k = this.nodeXY(st), park = g.parks[+st.slice(1)];
-      out.push({ reg: a.reg, stype: park ? park[4] : 0, id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? park[2] : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
+      out.push({ reg: a.reg, stype: park ? park[4] : 0, id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? park[2] : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), nose: noseWheelAhead(t.id), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
     }
     this.planes = out;
     // stands are freed when their aircraft has left (taken off) or isn't here any more
@@ -593,6 +593,8 @@ class AirportView {
     // aircraft
     for (const p of this.planes) {
       const q = this.scr(p.x, p.y), size = Math.max(p.parked ? 14 : 19, p.span * s * 1.05);
+      // on the ground the point is the nose wheel: the aircraft's middle is behind it
+      if (p.nose && p.alt < 30) { const h = p.hdg * Math.PI / 180, f = this.scr(p.x + Math.sin(h) * p.nose, p.y + Math.cos(h) * p.nose); q[0] -= f[0] - q[0]; q[1] -= f[1] - q[1]; }
       const tracked = p.id === this.track;
       if (tracked) { const pulse = (now / 1000) % 1.6 / 1.6; c.beginPath(); c.arc(q[0], q[1], size * 0.7 + 6 + pulse * 14, 0, Math.PI * 2); c.strokeStyle = col.mag; c.globalAlpha = 0.6 * (1 - pulse); c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }
       if (p.alt > 50) { c.globalAlpha = 0.25; drawPlaneGlyph(c, q[0] + Math.min(18, p.alt / 120), q[1] + Math.min(18, p.alt / 120), p.hdg, size, p.prop, '#000', 'transparent'); c.globalAlpha = 1; }
@@ -770,6 +772,8 @@ class AirportView {
     const s = this.s, col = this.col;
     for (const p of this.planes) {
       const q = this.scr(p.x, p.y), size = Math.max(p.parked ? 14 : 19, p.span * s * 1.05);
+      // on the ground the point is the nose wheel: the aircraft's middle is behind it
+      if (p.nose && p.alt < 30) { const h = p.hdg * Math.PI / 180, f = this.scr(p.x + Math.sin(h) * p.nose, p.y + Math.cos(h) * p.nose); q[0] -= f[0] - q[0]; q[1] -= f[1] - q[1]; }
       if (q[0] < -60 || q[1] < -60 || q[0] > this.map.w + 60 || q[1] > this.map.h + 60) continue;
       const tracked = p.id === this.track;
       if (tracked) { const pulse = (now / 1000) % 1.6 / 1.6; c.beginPath(); c.arc(q[0], q[1], size * 0.7 + 6 + pulse * 14, 0, Math.PI * 2); c.strokeStyle = col.mag; c.globalAlpha = 0.6 * (1 - pulse); c.lineWidth = 1.5; c.stroke(); c.globalAlpha = 1; }

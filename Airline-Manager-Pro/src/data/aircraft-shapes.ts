@@ -282,6 +282,9 @@ const SHAPES: { [typeId: string]: ShapeSpec } = {
 };
 
 /** The shape for a type; aircraft from the simulator that the app doesn't list use the closest type of their class. */
+/** Metres from the middle of the fuselage forward to the nose wheel. On the ground an aircraft is placed by
+ *  its nose wheel (on the taxiway line, on the stand's stop mark), as pilots steer it. */
+function noseWheelAhead(typeId: string): number { const S = shapeOf(typeId); return S && S.gear && S.gear.nose < S.L / 2 ? S.L / 2 - S.gear.nose : 0; }
 function shapeOf(typeId: string): ShapeSpec {
   if (SHAPES[typeId]) return SHAPES[typeId];
   const t = acType(typeId) || AIRCRAFT[0];

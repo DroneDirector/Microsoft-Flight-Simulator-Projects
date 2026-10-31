@@ -450,7 +450,7 @@ function v3dLoop(now: number) {
       const a = plane(g.reg), c: any = a ? company(a.companyId) : (g as any).tfc ? { color: (g as any).tfc.color, color2: (g as any).tfc.color2, id: (g as any).tfc.airline } : company();
       // the model is built from its nose; a pivot in its middle places and turns it
       const body = buildAircraftModel(typeId, liveryFor(c.color, c.color2, c.id)), model = new T.Group();
-      body.position.x = -shapeOf(typeId).L / 2; model.add(body);
+      body.position.x = -shapeOf(typeId).L / 2; model.add(body); model.userData.body = body;
       body.traverse((o: any) => { o.renderOrder = 10; });   // after the airport's ground paint
       model.userData.flightId = g.id; model.userData.set = body.userData.set;
       V3d.scene.add(model);
@@ -498,7 +498,12 @@ function v3dLoop(now: number) {
     const wantG = simCfg ? simCfg.g : cfg ? cfg.gear : w.onGround || /final|landing|touchdown|lift-?off|take-?off/.test(ph) || (w.altM - ground < 600 && !/cruise|climb/.test(ph)) ? 1 : 0;
     P.flaps += (wantF - P.flaps) * Math.min(1, dt * 0.35); P.gear += (wantG - P.gear) * Math.min(1, dt * 0.25);
     if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18 });
-    // place it: nose (−x of the model) along the heading, centre of the fuselage at the right height
+    // on the ground the aircraft is placed by its nose wheel (on the line, on the stand's stop mark), in the
+    // air by the middle of the fuselage; between the two it blends over the last 30 m, so nothing jumps
+    const PG: any = P, gwT = w.onGround ? 1 : clamp(1 - (w.altM - ground) / 30, 0, 1);
+    PG.gw = PG.gw == null ? gwT : PG.gw + (gwT - PG.gw) * Math.min(1, dt * 3);
+    const bodyO = P.model.userData.body; if (bodyO) bodyO.position.x = -s.L / 2 + noseWheelAhead(P.type) * PG.gw;
+    // place it: nose (−x of the model) along the heading, at the right height
     P.model.position.copy(P.pos);
     P.model.rotation.set(0, 0, 0);
     P.model.rotateY(-(P.hdg + 90) * D2R);
