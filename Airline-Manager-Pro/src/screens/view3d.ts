@@ -448,19 +448,21 @@ function v3dLoaderHtml(): string {
       <div class="spl-bar"><i class="spl-fill"><span class="spl-sheen"></span></i><span class="spl-tip"><svg viewBox="0 0 24 24"><path d="M21 15.5v-1.8l-8-5V3.6a1.5 1.5 0 0 0-3 0v5.1l-8 5v1.8l8-2.5v5l-2 1.5V21l3.5-1 3.5 1v-1.5L13 18v-5z"/></svg></span></div>
     </div></div>`;
 }
+const V3D_SPLASH_MS = 5000;   // the 3D loading screen shows at least this long
 function v3dLoaderTick(now: number) {
   const L = V3d.root && V3d.root.querySelector('.v3d-load') as HTMLElement; if (!L || V3d.loaded) return;
   const pr = V3dTerrain.prog, k = clamp(pr.got / Math.max(1, pr.want), 0, 1);
-  // shown at least a moment; done when the near ground (and the airport) are built, or after 20 s
+  // shown at least 5 seconds; done when the near ground (and the airport) are built, or after 20 s
   const near = V3dTerrain.rings.length > 0 && (!V3d.icao || V3d.aptReady), t = now - V3d.loadT0;
-  const shown = near ? 1 : Math.min(0.97, k * 0.9 + Math.min(0.08, t / 40000));
+  // the loading screen stays at least 5 seconds; its bar never runs ahead of that, so it fills smoothly
+  const shown = Math.min(near ? 1 : Math.min(0.97, k * 0.9 + Math.min(0.08, t / 40000)), t / V3D_SPLASH_MS);
   V3d.shown = Math.max(V3d.shown || 0, shown);
   const fill = L.querySelector('.spl-fill') as HTMLElement, tip = L.querySelector('.spl-tip') as HTMLElement, pct = L.querySelector('.spl-pct') as HTMLElement, step = L.querySelector('.spl-step') as HTMLElement;
   if (fill) fill.style.width = (V3d.shown * 100).toFixed(1) + '%';
   if (tip) tip.style.left = (V3d.shown * 100).toFixed(1) + '%';
   if (pct) pct.textContent = Math.round(V3d.shown * 100) + '%';
   if (step) step.textContent = V3d.shown < 0.5 ? 'Loading the mountains and the sea…' : V3d.shown < 0.9 ? (V3d.icao ? `Building ${V3d.icao}…` : 'Painting the coastlines…') : 'Ready';
-  if ((near && t > 900) || t > 20000) {
+  if ((near && t >= V3D_SPLASH_MS) || t > 20000) {
     V3d.loaded = true; L.classList.add('out'); setTimeout(() => L.remove(), 800);
   }
 }
