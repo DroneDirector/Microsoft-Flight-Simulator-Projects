@@ -3,12 +3,29 @@
 // later version are merged in with their defaults, so an older save always keeps working.
 
 const STORE_KEY = 'airline-manager-pro.save';
+// Two worlds, each with its own save: your own airline with hired (AI) pilots, and co-op, where the airline
+// is flown by real players. Switching loads the other world; neither touches the other's aircraft, money,
+// staff or logs. Settings and the like belong to the device and are the same in both.
+const MODE_KEY = 'amp-mode', DEVICE_KEY = 'airline-manager-pro.device';
+const DEVICE_KEYS = ['settings', 'birthdayGreeted', 'seenVersion', 'wnClosed', 'licence', 'knownAirports', 'simInstalled', 'linkPc', 'linkedOnce', 'favs'];
+const Mode = {
+  _cur: null as boolean,   // the world this run of the app opened (fixed until it restarts)
+  coop(): boolean { if (this._cur === null) { try { this._cur = localStorage.getItem(MODE_KEY) === 'coop'; } catch (e) { this._cur = false; } } return this._cur; },
+  switching: false,
+  key(): string { return this.coop() ? STORE_KEY + '.coop' : STORE_KEY; },
+  /** Save this world and open the other one (the app restarts into it). */
+  set(coop: boolean) {
+    Store.save(); Store.flushNative(); this.switching = true;
+    try { localStorage.setItem(MODE_KEY, coop ? 'coop' : 'solo'); localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: coop ? 'coop' : 'ops' })); } catch (e) { /* ignore */ }
+    location.reload();
+  },
+};
 const SAVE_VERSION = 1;
 // Parts of State that are saved. Screen position and the like start fresh each launch.
 const SAVED_KEYS = ['companyId', 'divisionId', 'myReg', 'settings', 'profiles', 'companies', 'pilots', 'candidates',
   'fleet', 'live', 'today', 'routes', 'logbook', 'issues', 'notices', 'txns', 'fines',
   'staff', 'staffCandidates', 'incidents', 'coPilot', 'birthdayGreeted', 'simDate', 'myLoad', 'salaryV2',
-  'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown', 'aiNext', 'aiDay', 'cases', 'screen', 'badges', 'progress', 'popLog', 'ratingDay', 'condTick', 'groundedUntil', 'payNext', 'poolNext', 'conductPausedAt', 'seenVersion', 'wnClosed', 'coop', 'favs', 'licence', 'bank', 'jobs', 'landRecs', 'ofp', 'acars', 'simInstalled', 'usedMarket', 'payV3', 'unions', 'moraleNext', 'paxRecords', 'noFly', 'paxReviews', 'groundV1', 'groundWarned', 'news', 'whistle', 'wbDay'];
+  'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown', 'aiNext', 'aiDay', 'cases', 'screen', 'badges', 'progress', 'popLog', 'ratingDay', 'condTick', 'groundedUntil', 'payNext', 'poolNext', 'conductPausedAt', 'seenVersion', 'wnClosed', 'coop', 'favs', 'licence', 'bank', 'jobs', 'landRecs', 'ofp', 'acars', 'simInstalled', 'usedMarket', 'payV3', 'unions', 'moraleNext', 'paxRecords', 'noFly', 'paxReviews', 'groundV1', 'groundWarned', 'news', 'whistle', 'wbDay', 'thanksDue', 'thanks', 'newsSeen', 'newsCool', 'newsWatchV1', 'newsWx', 'conductDrama'];
 
 // Changes between save versions go here, e.g. MIGRATIONS[2] = data => { ...; return data; }
 const MIGRATIONS: { [v: number]: (d: any) => any } = {};
@@ -21,8 +38,8 @@ const Store = {
   load() {
     this._defaults = JSON.parse(JSON.stringify(State.settings));
     let raw: string = null;
-    try { raw = localStorage.getItem(STORE_KEY); } catch (e) { return; }
-    if (!raw) { this.wasEmpty = true; return; }
+    try { raw = localStorage.getItem(Mode.key()); } catch (e) { return; }
+    if (!raw) { this.wasEmpty = true; this.loadDevice(); return; }
     let data: any;
     try { data = JSON.parse(raw); } catch (e) { this.backupBroken(raw); return; }
     if (!data || typeof data !== 'object' || !data.state) return;
@@ -34,14 +51,26 @@ const Store = {
       if (k === 'settings' || k === 'myReg') S[k] = Object.assign({}, S[k], st[k]); // keep new defaults
       else S[k] = st[k];
     }
+    this.loadDevice();
+  },
+  /** Settings and other device things, shared by both worlds. */
+  loadDevice() {
+    let d: any = null; try { d = JSON.parse(localStorage.getItem(DEVICE_KEY) || 'null'); } catch (e) { /* none yet */ }
+    if (!d) return;   // first time: they are in the solo save already
+    const S: any = State;
+    for (const k of DEVICE_KEYS) if (k in d) S[k] = k === 'settings' ? Object.assign({}, S[k], d[k]) : d[k];
   },
 
   save() {
+    if (Mode.switching) return;   // the other world is opening: this one is saved already
     const out: any = {};
     for (const k of SAVED_KEYS) out[k] = (State as any)[k];
     const json = JSON.stringify({ v: SAVE_VERSION, app: APP.version, savedAt: Date.now(), state: out });
-    try { localStorage.setItem(STORE_KEY, json); }
+    try { localStorage.setItem(Mode.key(), json); }
     catch (e) { /* storage full or unavailable: keep running from memory */ }
+    try { const d: any = {}; for (const k of DEVICE_KEYS) d[k] = (State as any)[k]; localStorage.setItem(DEVICE_KEY, JSON.stringify(d)); } catch (e) { /* ignore */ }
+    // the phone's own copy and the backup folder hold your own airline; the co-op airline lives online
+    if (Mode.coop()) return;
     // and a second copy in the app's own files on the phone
     // (at most every few seconds, and straight away when the app goes to the background)
     this._native = json;
@@ -64,7 +93,7 @@ const Store = {
     let has = false;
     try { has = !!localStorage.getItem(STORE_KEY); } catch (e) { /* storage unavailable */ }
     const T = this.native();
-    if (has || !T || !T.backupRead) return;
+    if (has || Mode.coop() || !T || !T.backupRead) return;
     T.backupRead().then((r: any) => {
       if (!r || !r.data) return;
       try { JSON.parse(r.data); localStorage.setItem(STORE_KEY, r.data); location.reload(); } catch (e) { /* broken copy: start fresh */ }
@@ -76,7 +105,7 @@ const Store = {
 
   backupBroken(raw: string) { try { localStorage.setItem(STORE_KEY + '.broken', raw); } catch (e) { /* ignore */ } },
 
-  reset() { try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignore */ } location.reload(); },
+  reset() { try { localStorage.removeItem(Mode.key()); } catch (e) { /* ignore */ } location.reload(); },
 
   bind() {
     // after every tap that does something, when leaving the app, and every half minute for flight progress

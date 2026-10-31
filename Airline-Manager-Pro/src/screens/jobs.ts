@@ -17,7 +17,7 @@ function jobCard(j: Job, i: number): string {
     <span class="job-k"><small>Pays</small><b class="green">${money(j.pay, { compact: true })}</b></span>
     <span class="job-k"><small>${st === 'open' ? 'Take it within' : st === 'accepted' || st === 'flying' ? 'Deliver within' : 'Finished'}</small><b>${st === 'open' ? untilTxt(j.expires) : st === 'accepted' || st === 'flying' ? untilTxt(j.due) : esc(dateStr(new Date(j.doneAt || Date.now())).slice(5, 16))}</b></span>
     <span class="job-btns">${st === 'open' ? `<button class="btn ghost sm" data-act="job-mine" data-id="${j.id}">${icon('user')}Fly it myself</button><button class="btn primary sm" data-act="job-pilot" data-id="${j.id}">${icon('pilots')}Give to a pilot</button>`
-      : st === 'accepted' || st === 'flying' ? `<span class="chip">${st === 'flying' ? 'Flying' : 'Accepted'}: ${esc(by)}${j.reg ? ', ' + esc(j.reg) : ''}</span>${j.by === 'you' ? `<button class="text-btn" data-act="job-release" data-id="${j.id}">Give it back</button><button class="text-btn" data-act="sb-plan" data-from="${esc(j.from)}" data-to="${esc(j.to)}">SimBrief</button>` : ''}`
+      : st === 'accepted' || st === 'flying' ? `<span class="chip">${st === 'flying' ? 'Flying' : (j as any).queued ? 'After current flight' : 'Accepted'}: ${esc(by)}${j.reg ? ', ' + esc(j.reg) : ''}</span>${j.by === 'you' ? `<button class="text-btn" data-act="job-release" data-id="${j.id}">Give it back</button><button class="text-btn" data-act="sb-plan" data-from="${esc(j.from)}" data-to="${esc(j.to)}">SimBrief</button>` : ''}`
       : `<span class="chip ${st === 'done' ? 'ok' : st === 'late' ? '' : 'bad'}">${st === 'done' ? 'Delivered' : st === 'late' ? 'Delivered late' : (j as any).expired ? 'Taken by someone else' : 'Not delivered'}</span>${j.tx ? `<button class="text-btn" data-act="tx-detail" data-id="${j.tx}">Money</button>` : ''}`}</span>
   </div>`;
 }
@@ -78,14 +78,14 @@ function jobPilotHtml(): string {
   const S: any = State, c = company(j.companyId), mine = S.myReg[c.id];
   const busyReg = (reg: string) => State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg);
   const busyPilot = (id: string) => State.live.some(f => f.pilotId === id) || (S.aiNext || []).some((n: any) => n.pilotId === id);
-  const acs = fleetOf(c.id).filter(a => a.reg !== mine && a.status === 'parked' && !busyReg(a.reg) && !jobFits(j, a) && !(a as any).noBase);
+  const acs = fleetOf(c.id).filter(a => a.reg !== mine && a.status === 'parked' && !busyReg(a.reg) && !(a as any).jobHold && !jobFits(j, a) && !(a as any).noBase);
   const a = plane(_ja.reg);
   const pilots = a ? crewOf().filter((p: any) => Ratings.rated(p, a.typeId)) : [];
-  return `<div class="modal-head"><div><h2>Give the job to a pilot</h2><small>${esc(j.title)}: ${esc(j.from)} to ${esc(j.to)}, ${j.kind === 'cargo' ? num(j.kg) + ' kg' : j.pax + ' passengers'}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+  return `<div class="modal-head"><div><h2>${coopOn() ? 'Give the job to a co-op pilot' : 'Give the job to a pilot'}</h2><small>${esc(j.title)}: ${esc(j.from)} to ${esc(j.to)}, ${j.kind === 'cargo' ? num(j.kg) + ' kg' : j.pax + ' passengers'}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
   <div class="modal-body">
     <h3>Aircraft</h3><p class="fine-print">${icon('info')}About what the job leaves after fuel, fees, crew and maintenance, with the ferry flight if needed.</p>
     <div class="route-pick">${acs.map(x => { const e = jobEstimate(j, x); return `<button class="rp ${_ja.reg === x.reg ? 'on' : ''}" data-act="ja-ac" data-reg="${esc(x.reg)}"><span class="chain"><b>${esc(x.reg)}</b><em class="${e >= 0 ? 'green' : 'red'}">${money(e, { sign: true, compact: true })}</em></span><small>${esc(acType(x.typeId).model)} at ${esc(x.location)}${x.location !== j.from ? ', ferried to ' + esc(j.from) + ' first' : ''}</small></button>`; }).join('') || `<p class="fine-print">${icon('info')}No free aircraft can do this job: it needs ${j.kind === 'cargo' ? num(j.kg) + ' kg of cargo room' : j.pax + ' seats'} and ${num(j.nm)} nm of range.</p>`}</div>
-    ${a ? `<h3>Pilot</h3><div class="route-pick">${pilots.map((p: any) => `<button class="rp ${busyPilot(p.id) || p.status === 'training' ? 'off' : ''}" data-act="ja-go" data-id="${esc(p.id)}" ${busyPilot(p.id) || p.status === 'training' ? 'disabled' : ''}><span class="chain"><b>${esc(p.name)}</b></span><small>${p.status === 'training' ? 'On a course' : busyPilot(p.id) ? 'Flying a route' : 'Free'}${State.routes.some(r => r.pilotId === p.id && !r.test) ? ', goes back to the route after' : ''}</small></button>`).join('') || `<p class="fine-print">${icon('info')}None of your pilots is rated on the ${esc(acType(a.typeId).model)}. Send one on a course under Pilots.</p>`}</div>` : ''}
+    ${a && coopOn() ? coopJobPilotsHtml(j, a.reg) : a ? `<h3>Pilot</h3><div class="route-pick">${pilots.map((p: any) => `<button class="rp ${p.status === 'training' ? 'off' : ''}" data-act="ja-go" data-id="${esc(p.id)}" ${p.status === 'training' ? 'disabled' : ''}><span class="chain"><b>${esc(p.name)}</b></span><small>${p.status === 'training' ? 'On a course' : State.live.some(f => f.pilotId === p.id) ? 'In the air: takes the job after landing' : busyPilot(p.id) ? 'Between route legs: the job comes first' : 'Free'}${State.routes.some(r => r.pilotId === p.id && !r.test) ? ', goes back to the route after' : ''}</small></button>`).join('') || `<p class="fine-print">${icon('info')}None of your pilots is rated on the ${esc(acType(a.typeId).model)}. Send one on a course under Pilots.</p>`}</div>` : ''}
   </div>`;
 }
 /** About what the job leaves after costs with this aircraft, ferry flight included. */
@@ -96,12 +96,12 @@ function jobEstimate(j: Job, a: Aircraft): number {
   if (a.location !== j.from && apt(a.location) && apt(j.from)) { const nm = gcDistanceNm(apt(a.location).pos, apt(j.from).pos); ferry = -legEconomics(a.typeId, a.location, j.from, 0, 0, block(nm), undefined, false, { ferry: true }).net; }
   return Math.round(m.net - ferry);
 }
-function rerenderJa() { const p = $('.ja-pop .panel'); if (p) p.innerHTML = jobPilotHtml(); }
+function rerenderJa() { const p = $('.ja-pop .panel'); if (p) patchHtml(p, jobPilotHtml()); }
 ACTIONS['job-pilot'] = el => { _ja = { id: el.getAttribute('data-id'), reg: '' }; Sound.tick(); openLayer('modal', jobPilotHtml(), { cls: 'wide ja-pop' }); };
 ACTIONS['ja-ac'] = el => { _ja.reg = el.getAttribute('data-reg'); Sound.tick(); rerenderJa(); };
 ACTIONS['ja-go'] = el => {
   const r = Jobs.acceptPilot(_ja.id, el.getAttribute('data-id'), _ja.reg);
-  if (r !== 'ok') { toast(r, 'warn'); return; }
+  if (r !== 'ok' && r !== 'queued') { toast(r, 'warn'); return; }
   Store.save(); closeAll(); Sound.tick(); _jobsTab = 'accepted'; refresh();
-  toast(`${pilot(el.getAttribute('data-id')).name} takes the job in ${_ja.reg}`, 'ok');
+  toast(r === 'queued' ? `${pilot(el.getAttribute('data-id')).name} flies it after landing, in ${_ja.reg}` : `${pilot(el.getAttribute('data-id')).name} takes the job in ${_ja.reg}`, 'ok');
 };

@@ -3,15 +3,15 @@ SCREENS.logbook = {
   title: 'Flight logs', icon: 'logbook',
   render() {
     const me = myPilot();
-    const rows = State.logbook.filter(l => plane(l.reg) && plane(l.reg).companyId === State.companyId);
+    const rows = State.logbook.filter(l => (plane(l.reg) && plane(l.reg).companyId === State.companyId || (l as any).coopBy) && coopMineFilter(l));
     const counted = rows.filter(l => l.decision !== 'disregarded' && l.result !== 'crash' || l.decision === 'registered');
     const landings = counted.filter(l => l.result !== 'crash');
     const avg = landings.length ? landings.reduce((s, l) => s + Math.abs(l.landingFpm), 0) / landings.length : 0;
     const best = landings.length ? Math.min.apply(null, landings.map(l => Math.abs(l.landingFpm))) : 0;
     return `
     <div class="screen-head">
-      <div><h1>Flight logs</h1><p class="sub">${esc(me.name)}</p></div>
-    </div>
+      <div><h1>Flight logs</h1><p class="sub">${esc(me.name)}${coopOn() ? ' · co-op' : ''}</p></div>
+    </div>${coopWhoChips(true)}
     <div class="log-totals">
       <div class="stat"><small>Total hours</small><b>${hours(me.hoursMin)}</b></div>
       <div class="stat"><small>Landings</small><b>${num(me.landings)}</b></div>

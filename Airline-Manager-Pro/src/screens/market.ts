@@ -99,7 +99,7 @@ ACTIONS['new-base'] = el => {
   const k = el.getAttribute('data-k');
   openBasePicker('Base for the new aircraft', 'Where it is delivered and parked', icao => { if (k === 'lease') { _lease.base = icao; rerenderLease(); } else if (k === 'used') { _used.base = icao; rerenderUsed(); } else { _buy.base = icao; rerenderBuy(); } });
 };
-function rerenderBuy() { const p = $('.buy-pop .panel'); if (p) p.innerHTML = buySheetHtml(); }
+function rerenderBuy() { const p = $('.buy-pop .panel'); if (p) patchHtml(p, buySheetHtml()); }
 ACTIONS['buy-qty'] = el => { _buy.qty = clamp(_buy.qty + parseInt(el.getAttribute('data-d'), 10), 1, 12); Sound.tick(); rerenderBuy(); };
 ACTIONS['buy-eng'] = el => { (_buy as any).eng = el.getAttribute('data-e'); Sound.tick(); rerenderBuy(); };
 ACTIONS['buy-div'] = el => { _buy.div = el.getAttribute('data-div'); Sound.tick(); rerenderBuy(); };
@@ -109,7 +109,7 @@ ACTIONS['buy-confirm'] = () => {
   if (noStandsFor(_buy.base || company().hub, _buy.qty)) { toast('Not enough free stands there: choose another base', 'warn'); return; }
   const t = acType(_buy.id), c = company();
   try { coopAfterBuy(`${_buy.qty}× ${t.maker} ${t.model}`, Math.round(t.price * ((engineOptions(t.id).filter(e => e.id === (_buy as any).eng)[0] || { price: 1 } as any).price)) * _buy.qty); } catch (e) { /* ignore */ }
-  const regs = nextRegs(c, _buy.qty);
+  const regs = nextRegs(c, _buy.qty), _firstEver = !fleetOf(c.id).length, _newType = !fleetOf(c.id).some(a => a.typeId === t.id);
   const from = c.balance, eng = (engineOptions(t.id).filter(e => e.id === (_buy as any).eng)[0] || engineOptions(t.id)[0]);
   const unit = Math.round(t.price * (eng ? eng.price : 1));
   c.balance -= unit * _buy.qty;
@@ -120,6 +120,7 @@ ACTIONS['buy-confirm'] = () => {
   Bases.ensure();
   try { Online.discord('fleet', `New aircraft: ${regs.join(', ')}`, `${c.name} bought ${_buy.qty > 1 ? _buy.qty + ' new ' + t.maker + ' ' + t.model + 's' : 'a new ' + t.maker + ' ' + t.model}, based at ${_buy.base || c.hub}.`); } catch (e) { /* ignore */ }
   Sound.purchase(); Haptics.success();
+  try { newsDelivery(c, t.id, regs, _firstEver, _newType); } catch (e) { /* ignore */ }
   animateBalance(from, c.balance);
   // delivery celebration
   openLayer('modal', `
@@ -130,8 +131,22 @@ ACTIONS['buy-confirm'] = () => {
       <p class="muted">${money(Math.round(t.price * ((engineOptions(t.id).filter(e => e.id === (_buy as any).eng)[0] || { price: 1 } as any).price)) * _buy.qty)} paid. ${_buy.qty > 1 ? 'They are' : 'It is'} ready to assign to routes.</p>
       <div class="modal-actions center">
         <button class="btn ghost" data-act="close-layer">Keep shopping</button>
-        <button class="btn primary" data-act="see-fleet">See it in the fleet</button>
+        <button class="btn primary" data-act="see-fleet" data-regs="${esc(regs.join(','))}">See it in the fleet</button>
       </div>
     </div>`, { cls: 'narrow celebrate' });
 };
-ACTIONS['see-fleet'] = () => { closeAll(); go('fleet'); };
+ACTIONS['see-fleet'] = el => { const t = el.closest('.toast'); if (t) t.remove(); closeAll(); fleetSpotlight((el.getAttribute('data-regs') || el.getAttribute('data-id') || '').split(',').filter(Boolean)); };
+/** Open the fleet at the new aircraft: scrolled to it, and its card flashes three times. */
+function fleetSpotlight(regs: string[]) {
+  const a = plane(regs[0]);
+  // a filter that hides it (or the types overview) gives way to the whole fleet
+  if (a && !(_fleetFilter === 'all' || _fleetFilter === a.typeId || acType(a.typeId).cls === _fleetFilter)) _fleetFilter = 'all';
+  go('fleet');
+  const spot = (tries: number) => {
+    const cards = regs.map(r => document.querySelector(`.ac-card[data-reg="${r}"]`) as HTMLElement).filter(Boolean);
+    if (!cards.length) { if (tries < 10) setTimeout(() => spot(tries + 1), 150); return; }
+    cards[0].scrollIntoView({ behavior: State.settings.reduceMotion ? 'auto' : 'smooth', block: 'center' });
+    setTimeout(() => cards.forEach(c => { c.classList.remove('spot'); void c.offsetWidth; c.classList.add('spot'); setTimeout(() => c.classList.remove('spot'), 2600); }), State.settings.reduceMotion ? 0 : 450);
+  };
+  setTimeout(() => spot(0), 250);
+}

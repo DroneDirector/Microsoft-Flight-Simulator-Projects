@@ -4,7 +4,7 @@ interface AppScreen { title: string; icon: string; render: () => string; mount?:
 const SCREENS: { [k: string]: AppScreen } = {};
 const ACTIONS: { [k: string]: (el: HTMLElement, ev: Event) => void } = {};
 
-const NAV_ORDER = ['ops', 'fleet', 'routes', 'jobs', 'schedule', 'dispatch', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'coop'];
+const NAV_ORDER = ['ops', 'fleet', 'routes', 'jobs', 'schedule', 'dispatch', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'news', 'coop'];
 // Pages opened from inside other pages, shown under their parent in the rail
 const SUB_PAGES: { [k: string]: string } = { map: 'ops', market: 'fleet' };
 
@@ -13,16 +13,19 @@ function renderShell() {
   app.innerHTML = `
     <nav class="rail" aria-label="Main">
       <div class="rail-brand" title="${esc(APP.name)}">${brandMark()}</div>
+      <button class="rail-more up" data-act="rail-scroll" data-d="-1" aria-label="Scroll the menu up">${icon('down')}</button>
       <div class="rail-items">${NAV_ORDER.map(k => `
         <button class="rail-btn" data-act="go" data-screen="${k}" aria-label="${esc(SCREENS[k].title)}">
           ${icon(SCREENS[k].icon)}<span>${esc(SCREENS[k].title)}</span>${k === 'maint' ? `<i class="rail-dot" data-maint-dot></i>` : ''}
         </button>`).join('')}
       </div>
+      <button class="rail-more down" data-act="rail-scroll" data-d="1" aria-label="More in the menu below">${icon('down')}</button>
       <button class="rail-btn rail-set" data-act="settings" aria-label="Settings">${icon('gear')}<span>Settings</span></button>
       <div class="rail-ver" title="${esc(APP.name)} version ${esc(APP.version)}">v${esc(APP.version)}</div>
     </nav>
     <header class="topbar"></header>
     <main class="view" id="view"></main>`;
+  setTimeout(railScrollBind, 0);
   renderTopbar();
   go(State.screen, true);
 }
@@ -40,12 +43,13 @@ function renderTopbar() {
   const linkTxt = st === 'connected' ? (Link.sim && !Link.sim.connected ? 'Linked, sim not running' : DESKTOP ? 'Linked on this PC' : Link.via === 'wifi' ? 'Linked over Wi-Fi' : Link.via === 'usb' ? 'Linked over USB' : 'Linked via hotspot')
     : st === 'unpaired' ? ((State as any).linkedOnce ? 'Link your PC' : 'Demo, link your PC') : 'Looking for your PC';
   const n = unreadCount();
-  $('.topbar').innerHTML = `
+  patchHtml($('.topbar'), `
     <button class="co-switch" data-act="switcher" aria-label="Switch company">
       <span class="co-badge" style="--co:${c.color};--co2:${c.color2}">${esc(c.icao)}</span>
       <span class="co-text"><b>${esc(c.name)}</b><small>${div ? esc(div.name) + ' division' : (c.divisions.length ? 'All divisions' : esc(myPilot().name))}</small></span>
       ${icon('down', 'co-chev')}
     </button>
+    ${Mode.coop() ? `<button class="mode-chip" data-act="go" data-screen="coop" aria-label="Co-op mode. Open Co-op">${icon('coop')}<span>Co-op</span><em>${coopState() ? coopState().members.filter((m: any) => m.online || m.you).length : 1}</em></button>` : ''}
     <button class="link-pill ${b.pc === 'connected' ? 'ok' : 'warn'}" data-act="link-panel" aria-label="${linkTxt}. Open connection details">
       <i class="link-led"></i>${icon(st === 'connected' && Link.via !== 'wifi' ? 'cell' : 'wifi')}<span>${linkTxt}</span><em>${b.pc === 'connected' && Link.latency ? Link.latency + ' ms' : ''}</em>
     </button>
@@ -55,7 +59,7 @@ function renderTopbar() {
     <button class="icon-btn sound-btn ${State.settings.muteAll ? 'muted-btn' : ''}" data-act="sound-toggle" aria-label="${State.settings.muteAll ? 'Sounds are muted. Tap to turn sounds on' : 'Sounds are on. Tap to mute all sounds'}">${icon(State.settings.muteAll ? 'mute' : 'volume')}</button>
     <button class="icon-btn bell ${n ? 'has' : ''}" data-act="inbox" aria-label="Notifications, ${n} unread">${icon('bell')}${n ? `<span class="badge">${n}</span>` : ''}</button>
     <button class="icon-btn" data-act="settings" aria-label="Settings">${icon('gear')}</button>
-    <button class="icon-btn power-btn" data-act="exit" aria-label="Exit ${esc(APP.name)}">${icon('power')}</button>`;
+    <button class="icon-btn power-btn" data-act="exit" aria-label="Exit ${esc(APP.name)}">${icon('power')}</button>`);
   const dot = $('[data-maint-dot]');
   if (dot) dot.style.display = State.issues.some(i => i.status === 'open' && plane(i.reg) && plane(i.reg).companyId === State.companyId) ? '' : 'none';
 }
@@ -85,14 +89,95 @@ function go(screen: string, instant?: boolean) {
 }
 
 /** Re-render the current screen in place (after data changes). */
+/** The menu scrolls when it is taller than the screen: arrows and a fade show there is more above or below. */
+function railScrollState() {
+  const r = $('.rail-items'), nav = $('.rail'); if (!r || !nav) return;
+  const more = r.scrollHeight - r.clientHeight > 4;
+  nav.classList.toggle('can-up', more && r.scrollTop > 4);
+  nav.classList.toggle('can-down', more && r.scrollTop + r.clientHeight < r.scrollHeight - 4);
+}
+function railScrollBind() {
+  const r = $('.rail-items'); if (!r) return;
+  r.addEventListener('scroll', railScrollState, { passive: true }); window.addEventListener('resize', railScrollState);
+  setTimeout(railScrollState, 50); setTimeout(railScrollState, 800);
+  // a gentle nudge the first time, so it is clear the menu moves
+  setTimeout(() => { if (r.scrollHeight - r.clientHeight > 4 && !State.settings.reduceMotion) { r.scrollTo({ top: 28, behavior: 'smooth' }); setTimeout(() => r.scrollTo({ top: 0, behavior: 'smooth' }), 650); } }, 6500);
+}
+ACTIONS['rail-scroll'] = el => { const r = $('.rail-items'); if (r) r.scrollBy({ top: +el.getAttribute('data-d') * r.clientHeight * 0.6, behavior: 'smooth' }); };
 function refresh() {
   renderTopbar();
   const view = $('#view');
-  const st = view.scrollTop;
-  view.innerHTML = `<section class="screen screen-${State.screen}">${SCREENS[State.screen].render()}</section>`;
+  const st = view.scrollTop, cur = view.firstElementChild as HTMLElement, html = `<section class="screen screen-${State.screen}">${SCREENS[State.screen].render()}</section>`;
+  // the same screen again: change only what changed (text, numbers, a new row), so nothing flashes or
+  // animates in again. Screens with live maps or drawings are built afresh, without the entrance animations.
+  if (cur && cur.classList.contains('screen-' + State.screen) && !SCREENS[State.screen].mount) { patchHtml(view, html); view.scrollTop = st; return; }
+  const again = !!(cur && cur.classList.contains('screen-' + State.screen));
+  view.innerHTML = html;
   const root = view.firstElementChild as HTMLElement;
   if (SCREENS[State.screen].mount) SCREENS[State.screen].mount(root);
+  if (again) settleAnimations(root);
   view.scrollTop = st;
+}
+
+/** Put new HTML into an element by changing only the parts that differ: unchanged elements stay as they
+ *  are (no flash, no animation starting over, pictures not drawn again). */
+function patchHtml(el: Element, html: string) {
+  const t = document.createElement(el.tagName === 'TBODY' ? 'tbody' : 'div'); t.innerHTML = html;
+  patchChildren(el, t);
+}
+function patchChildren(from: Node, to: Node) {
+  const a = Array.from(from.childNodes), b = Array.from(to.childNodes);
+  for (let i = 0; i < b.length; i++) {
+    const n = b[i], o = a[i];
+    if (!o) { from.appendChild(n); continue; }
+    // text that flipped last time (wrapped for the animation) compared as the text it shows
+    if (n.nodeType === 3 && (o as Element).classList && (o as Element).classList.contains('flap-w')) {
+      const t = document.createTextNode(o.textContent); from.replaceChild(t, o); if (t.nodeValue !== n.nodeValue) flapText(t, n.nodeValue); continue;
+    }
+    if (o.nodeType !== n.nodeType || o.nodeName !== n.nodeName) { from.replaceChild(n, o); continue; }
+    if (o.nodeType === 3) { if (o.nodeValue !== n.nodeValue) flapText(o as Text, n.nodeValue); continue; }
+    if (o.nodeType === 8) { if (o.nodeValue !== n.nodeValue) o.nodeValue = n.nodeValue; continue; }
+    patchNode(o as Element, n as Element);
+  }
+  for (let i = b.length; i < a.length; i++) if (a[i].parentNode === from) from.removeChild(a[i]);
+}
+const PATCH_KEEP = ['spot', 'tick-fade', 'shake'];
+function patchNode(o: Element, n: Element) {
+  // a different item in this place (another id): swap it rather than reshape it
+  const ko = o.getAttribute('data-id'), kn = n.getAttribute('data-id');
+  if (ko !== kn && ko && kn) { o.parentNode.replaceChild(n, o); return; }
+  const na = n.attributes, oa = o.attributes;
+  for (let i = oa.length - 1; i >= 0; i--) if (!n.hasAttribute(oa[i].name)) o.removeAttribute(oa[i].name);
+  for (let i = 0; i < na.length; i++) {
+    let v = na[i].value;
+    // short effects on the page (a card flashing, text fading in) carry on through an update
+    if (na[i].name === 'class') PATCH_KEEP.forEach(k => { if (o.classList.contains(k) && !n.classList.contains(k)) v += ' ' + k; });
+    if (o.getAttribute(na[i].name) !== v) o.setAttribute(na[i].name, v);
+  }
+  if (o.tagName === 'INPUT' || o.tagName === 'TEXTAREA' || o.tagName === 'SELECT') { if (document.activeElement !== o && 'value' in n) (o as any).value = (n as any).value; return; }
+  if (o.tagName === 'CANVAS') return;   // drawn by code
+  if (o.innerHTML !== n.innerHTML) patchChildren(o, n);
+}
+/** Changed text turns over like a split-flap departure board: only the characters that changed flip, one
+ *  after the other. Long text fades across instead; with reduced motion it simply changes. */
+function flapText(o: Text, txt: string) {
+  const par = o.parentElement, old = o.nodeValue || '';
+  if (!par || State.settings.reduceMotion || par.closest('svg, option, select, textarea, title') || !txt.trim()) { o.nodeValue = txt; return; }
+  if (txt.length > 32) { o.nodeValue = txt; par.classList.remove('tick-fade'); void par.offsetWidth; par.classList.add('tick-fade'); return; }
+  const w = document.createElement('span'); w.className = 'flap-w';
+  // characters are lined up from the right for numbers (so 9→10 flips the right digits), from the left otherwise
+  const num = /^[\s\d.,:%+\-−€$£kKmMh]+$/.test(txt) && /\d/.test(txt), off = num ? old.length - txt.length : 0;
+  let k = 0;
+  for (let i = 0; i < txt.length; i++) {
+    const ch = txt[i], was = old[i + off];
+    if (ch === was || ch === ' ') { w.appendChild(document.createTextNode(ch)); continue; }
+    const s = document.createElement('span'); s.className = 'fl'; s.textContent = ch; s.style.setProperty('--d', (k++ * 28) + 'ms'); w.appendChild(s);
+  }
+  par.replaceChild(w, o);
+}
+/** Entrance animations of a rebuilt screen jump to their end; animations that loop keep going. */
+function settleAnimations(root: HTMLElement) {
+  try { (root as any).getAnimations({ subtree: true }).forEach((a: any) => { const t = a.effect && a.effect.getTiming(); if (t && t.iterations !== Infinity) a.finish(); }); } catch (e) { /* older browser */ }
 }
 
 function bindActions() {
@@ -125,6 +210,23 @@ function animateBalance(from: number, to: number) {
 }
 
 // Shared bits of markup used by several screens
+/** The status of an aircraft that is flying, with its real phase (in the air, or taxiing, boarding…);
+ *  tap it to see the aircraft on the map. Not flying: the plain status chip. */
+function liveChip(reg: string, status?: string): string {
+  const f: any = State.live.filter(x => x.reg === reg)[0];
+  if (!f) return statusChip(status || 'parked');
+  const air = typeof flightInAir === 'function' ? flightInAir(f) : (f.alt || 0) > 50;
+  const ph = String(f.phase || '').replace(/^Delayed: .*/, 'Delayed at the gate').replace(/^Holding short.*/, 'Holding short').replace(/^Lining up.*/, 'Lining up');
+  const label = air ? (/climb/i.test(ph) ? 'Climbing' : /descent|approach|final/i.test(ph) ? 'Descending' : /hold/i.test(ph) ? 'Holding' : 'In flight') : (ph || 'On the ground');
+  const dv = flightDiverted(f);
+  return `<span class="chip chip-${air ? 'flight' : 'amber'} chip-link" role="button" tabindex="0" data-act="show-flight" data-id="${esc(f.id)}" title="Show on the map">${esc(label)}${icon('map')}</span>${dv ? `<span class="chip chip-divert chip-link" role="button" tabindex="0" data-act="show-flight" data-id="${esc(f.id)}" title="${esc(dv.why)}">${icon('alert')}Diverted to ${esc(dv.to)}</span>` : ''}`;
+}
+/** A flight that diverted (medical or weather): where it went instead, from where, and why. */
+function flightDiverted(f: any): { to: string; orig: string; why: string } | null {
+  const d = f.medical || f.wxDivert; if (!d) return null;
+  return { to: f.to, orig: d.orig || '', why: f.medical ? `Medical emergency: diverted to ${f.to} instead of ${d.orig || 'its destination'}` : `Weather at ${d.orig || 'its destination'}${d.why ? ' (' + d.why + ')' : ''}: diverted to ${f.to}` };
+}
+ACTIONS['show-flight'] = el => showFlightOnMap(el.getAttribute('data-id'));
 function statusChip(s: string): string {
   const map: { [k: string]: string[] } = {
     flying: ['In flight', 'flight'], parked: ['Available', 'avail'], grounded: ['Maintenance', 'maint'], maintenance: ['Maintenance', 'maint'],

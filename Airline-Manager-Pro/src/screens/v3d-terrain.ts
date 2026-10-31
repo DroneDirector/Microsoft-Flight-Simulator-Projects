@@ -13,6 +13,8 @@
 function v3dKm(): number { return clamp(+(State.settings as any).v3dKm || 150, 20, 800); }
 const EARTH_R = 6371000;
 const SAT_URL = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/';
+/** Satellite detail, 0 (standard) to 3 (highest); Settings → 3D view. */
+function v3dSatQ(): number { const v = (State.settings as any).v3dSatQ; return v == null ? 1 : clamp(Math.round(+v), 0, 3); }
 
 interface V3dRing { z: number; x0: number; y0: number; N: number; size: number; H: Float32Array; mask: Uint8ClampedArray; mesh: any; mapTex: any; satTex: any; inner: V3dRing; ok: boolean }
 
@@ -127,7 +129,15 @@ const V3dTerrain = {
   /** The mesh and the map-look paint of a ring. */
   build(r: V3dRing) {
     const T = THREE, size = r.size, n = 1 << r.z, H = r.H, M = r.mask;
-    const water = (i: number) => M ? M[i * 4] > 110 : H[i] <= 0.5;
+    // water from the map outlines, checked against the ground: the sea is at (or near) sea level; a lake is
+    // level ground higher up; "water" on clearly sloping land is a mismatch between the two sources, and is
+    // drawn and shaped as the land it really is (never flattened, so the coastline keeps its shape)
+    const mapWater = (i: number) => M ? M[i * 4] > 110 : H[i] <= 0.5;
+    const level = (i: number) => { const x = i % size, y = (i / size) | 0, h = H[i]; let d = 0;
+      if (x > 0) d = Math.max(d, Math.abs(H[i - 1] - h)); if (x < size - 1) d = Math.max(d, Math.abs(H[i + 1] - h));
+      if (y > 0) d = Math.max(d, Math.abs(H[i - size] - h)); if (y < size - 1) d = Math.max(d, Math.abs(H[i + size] - h)); return d < 4; };
+    const sea = (i: number) => mapWater(i) && H[i] <= 8;
+    const water = (i: number) => mapWater(i) && (H[i] <= 8 || level(i));
     const river = (i: number) => M ? M[i * 4 + 1] > 110 && M[i * 4] <= 110 : false;
     // the map look: dark blue land shaded by its slopes, the sea darker, cyan along the coasts
     const cv = document.createElement('canvas'); cv.width = cv.height = size; const c = cv.getContext('2d'), img = c.createImageData(size, size), D = img.data;
@@ -135,8 +145,8 @@ const V3dTerrain = {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const i = y * size + x; let R = 11, G = 29, B = 51;
       if (water(i)) {
-        const sea = H[i] <= 2;
-        R = sea ? 4 : 6; G = sea ? 11 : 18; B = sea ? 22 : 34;
+        const isSea = sea(i);
+        R = isSea ? 4 : 6; G = isSea ? 11 : 18; B = isSea ? 22 : 34;
       } else if (river(i)) { R = 18; G = 60; B = 92; }
       else {
         const hx = H[i + (x < size - 1 ? 1 : 0)] - H[i - (x > 0 ? 1 : 0)], hy = H[i + (y < size - 1 ? size : 0)] - H[i - (y > 0 ? size : 0)];
@@ -160,13 +170,15 @@ const V3dTerrain = {
     const sample = (px: number, py: number) => {
       const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
       const h = H[i] * (1 - fx) * (1 - fy) + H[i + 1] * fx * (1 - fy) + H[i + size] * (1 - fx) * fy + H[i + size + 1] * fx * fy;
-      return { h, wet: water(Math.round(y) * size + Math.round(x)) };
+      const k = Math.round(y) * size + Math.round(x);
+      return { h, wet: sea(k), lake: !sea(k) && water(k) ? H[k] : null };
     };
     for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
       const px = i / G * size, py = j / G * size, lon = lonOf(px), lat = latOf(py);
       const s = sample(px, py);
       let h = Math.max(0, s.h);
-      if (s.wet && s.h < 3) h = 0;                       // the sea is at sea level
+      if (s.wet) h = 0;                                  // the sea: perfectly flat, at sea level
+      else if (s.lake != null) h = Math.max(0, s.lake);  // a lake: flat at its own level
       if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
       const p = v3dXY(lon, lat), o = j * (G + 1) + i;
       // outer rings sit a little lower so the finer ring always shows where they meet
@@ -193,10 +205,21 @@ const V3dTerrain = {
   /** Satellite imagery for a ring (loaded once, when first wanted). */
   loadSat(r: V3dRing) {
     if (r.satTex) { if (r.mesh) r.mesh.material.map = r.satTex, r.mesh.material.needsUpdate = true; return; }
-    const z = Math.min(r.z, 14);
-    this.tiles(SAT_URL, z, r.x0, r.y0, r.N, 'jpg').then(cv => {
-      if (!cv || !V3d.open) return;
-      const T = THREE; r.satTex = new T.CanvasTexture(cv); r.satTex.colorSpace = T.SRGBColorSpace; r.satTex.anisotropy = 8;
+    // finer imagery than the terrain tiles: up to three zoom levels more near you (Settings → Satellite
+    // detail), one less for each ring further out, never past zoom 15 (the imagery is about 10 m a pixel),
+    // and never a bigger picture than the device's graphics can take
+    const q = v3dSatQ(), maxTex = Math.min(8192, (V3d.r && V3d.r.capabilities && V3d.r.capabilities.maxTextureSize) || 4096);
+    let k = Math.max(0, q - (r.z >= 12 ? 0 : r.z >= 10 ? 1 : 2));
+    while (k > 0 && (r.z + k > 15 || 256 * r.N * (1 << k) > maxTex * 1.25)) k--;
+    const z = r.z + k, N = r.N << k;
+    this.tiles(SAT_URL, z, r.x0 << k, r.y0 << k, N, 'jpg').then(cv0 => {
+      if (!cv0 || !V3d.open) return;
+      let cv = cv0;
+      if (cv0.width > maxTex) { cv = document.createElement('canvas'); cv.width = cv.height = maxTex; const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(cv0, 0, 0, maxTex, maxTex); }
+      const T = THREE; r.satTex = new T.CanvasTexture(cv); r.satTex.colorSpace = T.SRGBColorSpace;
+      // the sharpest filtering the device has, so the ground stays crisp at a low angle from high up
+      r.satTex.anisotropy = (V3d.r && V3d.r.capabilities && V3d.r.capabilities.getMaxAnisotropy) ? V3d.r.capabilities.getMaxAnisotropy() : 8;
+      r.satTex.generateMipmaps = true; r.satTex.minFilter = T.LinearMipmapLinearFilter;
       if ((State.settings as any).v3dSat && r.mesh) { r.mesh.material.map = r.satTex; r.mesh.material.needsUpdate = true; }
     });
   },

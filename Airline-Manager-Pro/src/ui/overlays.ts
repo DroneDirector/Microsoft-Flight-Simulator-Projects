@@ -159,7 +159,7 @@ setInterval(() => {
 }, 20000);
 ACTIONS['inbox-tab'] = el => { _inboxTab = el.getAttribute('data-tab'); Sound.tick(); rerenderInbox(); };
 ACTIONS['mark-read'] = () => { State.notices.forEach(n => n.read = true); rerenderInbox(); renderTopbar(); };
-function rerenderInbox() { const p = $('.layer-drawer.inbox .panel'); if (p) p.innerHTML = inboxHtml(); }
+function rerenderInbox() { const p = $('.layer-drawer.inbox .panel'); if (p) patchHtml(p, inboxHtml()); }
 
 ACTIONS['open-notice'] = el => {
   const n = State.notices.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!n) return;
@@ -169,6 +169,7 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref) crashPopup(n.ref);
+  else if (n.kind === 'pilot' && n.ref && /^cjo-/.test(n.ref)) coopOfferPopup(n.ref);
   else if (n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref)) showFlightOnMap(n.ref);
   else if (n.kind === 'staff' && n.ref === 'badges') { closeAll(); go('ranking'); }
   else if (n.kind === 'staff' && n.ref && /^case-/.test(n.ref)) courtPopup(n.ref);
@@ -176,6 +177,7 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'staff' && n.ref && /^sk-/.test(n.ref)) strikePopup(n.ref.slice(3));
   else if (n.kind === 'staff' && n.ref && /^si-/.test(n.ref)) sickPopup(n.ref.slice(3));
   else if (n.kind === 'staff' && n.ref && /^wb-/.test(n.ref)) whistlePopup();
+  else if (n.kind === 'staff' && n.ref && /^ty-/.test(n.ref)) thanksPopup(n.ref);
   else if (n.ref && /^news-/.test(n.ref)) newsOpen(n.ref);
   else if (n.kind === 'staff' && n.ref) incidentPopup(n.ref);
   else if (n.kind === 'birthday') ACTIONS['bday-preview'](null, null);
@@ -335,6 +337,7 @@ ACTIONS['fine-contest'] = el => {
 /* ---------- Crash: register or disregard ---------- */
 function crashPopup(logId: string) {
   const l = State.logbook.filter(x => x.id === logId)[0]; if (!l) return;
+  try { setTimeout(() => newsIncident(logId), 4000); } catch (e) { /* ignore */ }
   const a = plane(l.reg), c = company(a.companyId);
   openLayer('modal', `
     <div class="modal-head crash"><span class="crash-ic">${icon('alert')}</span><div><h2>Crash detected</h2><small>${esc(l.from)} to ${esc(l.to)}, ${esc(l.reg)}, ${esc(l.date)}</small></div>
@@ -383,7 +386,7 @@ ACTIONS['create-company'] = el => {
   closeAll();
   if (asDivision) {
     cur.divisions.push({ id: uid(), name: kind === 'bush' ? 'Bush' : kind === 'regional' ? 'Regional' : 'Division ' + (cur.divisions.length + 1), color: '#5FD4A0' });
-    Store.save(); renderTopbar(); toast(`New division added to ${cur.name}`, 'ok'); return;
+    Store.save(); renderTopbar(); toast(`New division added to ${cur.name}`, 'ok'); try { newsDivision(cur, cur.divisions[cur.divisions.length - 1].name); } catch (e) { /* ignore */ } return;
   }
   const make = (profileId: string, hub?: string) => {
     if (!hub) { openBasePicker('Home base for the new company', 'Required: where the company is based, its aircraft delivered and its hub crew work.', icao => make(profileId, icao)); return; }
@@ -396,6 +399,7 @@ ACTIONS['create-company'] = el => {
     (State as any).coPilot[id] = { sex: 'f', id: '' };
     State.companyId = id; State.divisionId = 'all';
     applyCompanyTheme(true); Store.save(); go('ops'); renderTopbar();
+    try { newsFounded(id, 'new'); } catch (e) { /* ignore */ }
     toast(`${n[0]} founded. Buy your first aircraft and hire a mechanic to start flying.`, 'ok');
   };
   if (ownPilot) { make(profileOfCompany(cur.id).id); return; }

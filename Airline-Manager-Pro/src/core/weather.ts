@@ -186,6 +186,7 @@ function wxAlternate(typeId: string, from: string, dest: string, pax: number): s
 }
 function wxDivertNote(f: any) {
   const d = f.wxDivert; if (!d || d.noted) return; d.noted = true;
+  try { newsWxDiverted(f); } catch (e) { /* ignore */ }
   State.notices.unshift({ id: uid(), kind: 'pilot', title: `${f.callsign} diverting to ${f.to}: ${d.why} at ${d.orig}`, body: `The weather at ${d.orig} is below what ${f.callsign} may land in (${d.why}). The crew divert to ${f.to}, the planned alternate, and carry on to ${d.orig} once it clears.`, time: 'Now', read: false, ref: f.id } as any);
   try { renderTopbar(); } catch (e) { /* not ready */ }
 }

@@ -9,7 +9,7 @@
 //  - Track an aircraft and the view follows it; when it leaves the airport, the world map takes over
 //    and keeps following it.
 
-interface ApvPlane { id: string; x: number; y: number; hdg: number; alt: number; phase: string; label: string; you: boolean; span: number; prop: boolean; parked?: boolean; kt?: number; rwy?: string }
+interface ApvPlane { id: string; x: number; y: number; hdg: number; alt: number; phase: string; label: string; you: boolean; span: number; prop: boolean; parked?: boolean; kt?: number; rwy?: string; stype?: number; reg?: string }
 
 const APV_RANGE = 14000;       // metres from the airport within which aircraft are shown
 
@@ -483,7 +483,7 @@ class AirportView {
       if (a.location !== icao || a.status === 'flying' || State.live.some(f => f.reg === a.reg)) continue;
       const j0 = this.runwayJoins()[0], t = acType(a.typeId), st = this.standFor(a.reg, t.seats >= 60, j0 ? j0.k : undefined) || this.standFor(a.reg, t.seats >= 60); if (!st) continue;
       const k = this.nodeXY(st), park = g.parks[+st.slice(1)];
-      out.push({ id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? park[2] : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
+      out.push({ reg: a.reg, stype: park ? park[4] : 0, id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? park[2] : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
     }
     this.planes = out;
     // stands are freed when their aircraft has left (taken off) or isn't here any more
@@ -604,6 +604,7 @@ class AirportView {
         c.fillStyle = p.you ? col.cyan : tracked ? col.mag : p.parked ? col.dim : col.ink; c.fillText(text, lx, ly + 1);
       }
     }
+    try { this.drawWalkersTo(c, now); } catch (e) { /* never stop the drawing */ }
     if (this.embedded) return;
     // scale bar
     const m = [50, 100, 200, 500, 1000, 2000, 5000].filter(v => v * s >= 50)[0] || 5000;
@@ -723,6 +724,47 @@ class AirportView {
     }
   }
 
+  /** Passengers walking across the apron between the terminal and the aircraft door (boarding or
+   *  deboarding), where there is no jet bridge: small airports such as Vágar, propeller and regional
+   *  aircraft, ramp stands, and stands away from the terminal. Each wears the colours of their passenger
+   *  card; dogs and cats walk beside their owners. At a jet bridge they are inside, out of sight. */
+  drawWalkersTo(c: CanvasRenderingContext2D, now: number) {
+    const s = this.s; if (s < 0.45 || !this.L) return;
+    const L = this.L, terms = (L.areas || []).filter(a => a.k === 'terminal'), big = (typeof aptSize === 'function' ? aptSize(this.icao) : 1) >= 2;
+    for (const p of this.planes) {
+      if (!p.parked || !p.reg) continue;
+      const a = plane(p.reg); if (!a) continue;
+      const o = typeof onBoardParked === 'function' ? onBoardParked(a, Date.now()) : null; if (!o || !/^(Boarding|Deboarding)$/.test(o.stage)) continue;
+      const t = acType(a.typeId), h = p.hdg * D2R, fx = Math.sin(h), fy = Math.cos(h), lx = -Math.cos(h), ly = Math.sin(h);
+      const len = Math.max(8, p.span * 0.95), door = [p.x + fx * len * 0.36 + lx * 3.2, p.y + fy * len * 0.36 + ly * 3.2];
+      // the terminal door: the nearest terminal edge, or ahead of the aircraft's nose
+      let term: number[] = null, td = 1e9;
+      for (const ar of terms) for (let i = 0; i < ar.pts.length; i++) {
+        const A0 = ar.pts[i], B0 = ar.pts[(i + 1) % ar.pts.length], vx = B0[0] - A0[0], vy = B0[1] - A0[1], k = clamp(((door[0] - A0[0]) * vx + (door[1] - A0[1]) * vy) / (vx * vx + vy * vy || 1), 0, 1);
+        const q = [A0[0] + vx * k, A0[1] + vy * k], d = Math.hypot(q[0] - door[0], q[1] - door[1]); if (d < td) { td = d; term = q; }
+      }
+      const gate = [8, 9, 10, 15].indexOf(p.stype || 0) >= 0, jetSize = t && (t.cls === 'airliner' || t.cls === 'widebody');
+      if (big && gate && jetSize && (!term || td < 45)) continue;   // a jet bridge: inside, out of sight
+      if (!term || td > 260) { if (big) continue; term = [door[0] + fx * 70 + lx * 25, door[1] + fy * 70 + ly * 25]; td = 75; }   // far: a bus at big airports
+      // a stream along door → foot of the stairs → terminal, walking at about 1.3 m/s, 2.5 m apart
+      const foot = [door[0] + lx * 4, door[1] + ly * 4], path = o.stage === 'Boarding' ? [term, foot, door] : [door, foot, term];
+      const seg = [Math.hypot(path[1][0] - path[0][0], path[1][1] - path[0][1]), Math.hypot(path[2][0] - path[1][0], path[2][1] - path[1][1])], total = seg[0] + seg[1];
+      const at = (d: number) => d <= seg[0] ? [path[0][0] + (path[1][0] - path[0][0]) * d / seg[0], path[0][1] + (path[1][1] - path[0][1]) * d / seg[0]] : [path[1][0] + (path[2][0] - path[1][0]) * (d - seg[0]) / (seg[1] || 1), path[1][1] + (path[2][1] - path[1][1]) * (d - seg[0]) / (seg[1] || 1)];
+      const people = typeof walkersFor === 'function' ? walkersFor(a, o.stage) : [];
+      if (!people.length) continue;
+      const left = o.stage === 'Boarding' ? Math.max(0, people.length - o.pax) : o.pax;   // still to walk
+      const shown = Math.min(left, Math.ceil(total / 2.5) + 1), head = (now / 1000) * 1.3;
+      const r = Math.max(1.6, 0.32 * s);
+      for (let i = 0; i < shown; i++) {
+        const d = ((head - i * 2.5) % (total + 6) + total + 6) % (total + 6); if (d > total) continue;
+        const pt = at(d), q = this.scr(pt[0], pt[1]), w = people[(Math.floor((head - i * 2.5) / (total + 6)) * shown + i) % people.length & 0xffff] || people[i % people.length];
+        const bob = Math.sin(now / 160 + i) * 0.15 * r;
+        c.beginPath(); c.ellipse(q[0], q[1] + bob, r * 1.05, r * 0.8, -h, 0, Math.PI * 2); c.fillStyle = w.cloth; c.fill();
+        c.beginPath(); c.arc(q[0], q[1] + bob, r * 0.48, 0, Math.PI * 2); c.fillStyle = w.skin; c.fill();
+        if (w.pet) { const pq = this.scr(pt[0] + lx * 0.9, pt[1] + ly * 0.9); c.beginPath(); c.ellipse(pq[0], pq[1] + bob * 0.5, r * 0.75, r * 0.42, -h, 0, Math.PI * 2); c.fillStyle = w.pet; c.fill(); }
+      }
+    }
+  }
   /** The aircraft at the airport: always drawn, at full strength, whatever the zoom. */
   drawAircraftTo(c: CanvasRenderingContext2D, now: number) {
     const s = this.s, col = this.col;
@@ -740,6 +782,7 @@ class AirportView {
         c.fillStyle = p.you ? col.cyan : tracked ? col.mag : p.parked ? col.dim : col.ink; c.fillText(text, lx, ly + 1);
       }
     }
+    try { this.drawWalkersTo(c, now); } catch (e) { /* never stop the drawing */ }
   }
 
   renderList() {

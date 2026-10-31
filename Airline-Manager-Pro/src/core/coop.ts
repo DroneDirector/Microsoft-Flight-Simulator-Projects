@@ -13,7 +13,7 @@ interface CoopMember {
   id: string; name: string; role: 'owner' | 'pilot'; you?: boolean; sex: 'm' | 'f'; nat: string; base: string;
   flights: number; hoursMin: number; revenue: number; rating: number; joined: number; lastSeen: number; look?: any;
 }
-interface CoopEvent { id: string; at: number; by: string; type: 'start' | 'join' | 'flight' | 'buy' | 'leave' | 'rule' | 'pirep' | 'sell'; text: string; amount?: number; tx?: string }
+interface CoopEvent { id: string; at: number; by: string; type: 'start' | 'join' | 'flight' | 'buy' | 'leave' | 'rule' | 'pirep' | 'sell' | 'offer' | 'offer-reply'; text: string; amount?: number; tx?: string }
 interface CoopState {
   on: boolean; backend: 'demo' | 'supabase'; code: string; companyId: string; started: number;
   members: CoopMember[]; feed: CoopEvent[]; applied: { [id: string]: 1 };
@@ -80,6 +80,8 @@ const CoopDemo: CoopBackend = {
       coopDepart(m, Math.max(c.next[m.id], now - 6 * 3600e3));
     }
     for (const f of State.live) if ((f as any).coop) coopUpdate(f, now);
+    try { coopJobsTick(now); } catch (e) { /* ignore */ }
+    try { coopConnTick(now); } catch (e) { /* ignore */ }
   },
 };
 
@@ -132,6 +134,8 @@ function coopLand(f: any, at: number) {
   const fpm = Math.round(-(90 + Math.random() * 260));
   const pr: CoopPirep = { id: 'pr-' + f.id, at, by: f.pilotId, name: m ? m.name : 'A co-op pilot', callsign: f.callsign, from: f.from, to: f.to, reg: f.reg || '', typeId: f.typeId,
     blockMin, fpm, g: Math.round((1.08 + Math.random() * .35) * 100) / 100, pax: f.pax, cargoKg: f.cargoKg || 0, fuelKg: Math.round(blockMin / 60 * (BURN_KG_H[(acType(f.typeId) || AIRCRAFT[0]).cls] || 2000) * (0.88 + Math.random() * 0.1)), status: 'pending' };
+  // a job leg: the client pays and the job is delivered
+  if (f.job) { try { const j = jobById(f.job); if (j) { payTxn(co.id, `Charter: ${j.title} (${m ? m.name : 'co-op'})`, j.pay, 'charter', [[`${j.client} pays for ${j.from} to ${j.to}`, j.pay]], at); Jobs.delivered(j.id, at, j.pay, ''); } } catch (e) { /* ignore */ } }
   // the aircraft and the pilot are back on the ground either way
   const a = f.reg ? plane(f.reg) : null;
   if (a) { a.status = 'parked'; a.location = f.to; }
@@ -164,7 +168,7 @@ function coopBook(pr: CoopPirep, live: boolean) {
   if (a) { a.hoursMin += pr.blockMin; a.cycles += 1; try { conditionAfterFlight(a, pr.blockMin); } catch (e) { /* ignore */ } }
   const p = pilot(pr.by); if (p) { p.hoursMin += pr.blockMin; p.landings += 1; }
   try { crewAfterLeg(co.id, { typeId: pr.typeId, from: pr.from, to: pr.to, blockMin: pr.blockMin }); } catch (e) { /* ignore */ }
-  if (m) { m.flights++; m.hoursMin += pr.blockMin; m.revenue += money0.net; }
+  if (m) { m.flights++; m.hoursMin += pr.blockMin; m.revenue += money0.net; try { newsCoopMilestone(m); } catch (e) { /* ignore */ } }
   try { Progress.popularity(pr.fpm > -250 ? 0.2 : 0, 'A good co-op flight'); } catch (e) { /* ignore */ }
   try { Ratings.record({ who: pr.by, name: pr.name, fpm: Math.abs(pr.fpm), g: pr.g, at: pr.at, from: pr.from, to: pr.to, typeId: pr.typeId, kind: 'coop' }); } catch (e) { /* ignore */ }
   coopRecord({ id: 'fl-' + pr.id, at: pr.at, by: pr.by, type: 'flight', text: `${pr.name} landed at ${pr.to} from ${pr.from}`, amount: money0.net, tx: txId });

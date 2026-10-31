@@ -52,6 +52,7 @@ function uid(): string { return Math.random().toString(36).slice(2, 9); }
 // Great-circle helpers (degrees in, degrees out)
 const D2R = Math.PI / 180;
 function gcDistanceNm(a: number[], b: number[]): number {
+  if (!a || !b || a.length < 2 || b.length < 2) return 0;   // a position not known yet
   const [lon1, lat1] = a, [lon2, lat2] = b;
   const p1 = lat1 * D2R, p2 = lat2 * D2R, dl = (lon2 - lon1) * D2R;
   const d = Math.acos(clamp(Math.sin(p1) * Math.sin(p2) + Math.cos(p1) * Math.cos(p2) * Math.cos(dl), -1, 1));

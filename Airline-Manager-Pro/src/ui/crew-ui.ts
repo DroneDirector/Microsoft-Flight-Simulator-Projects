@@ -140,7 +140,7 @@ function maybeIncident() {
     if (!pool.length) continue;
     const who: any = pool[Math.floor(Math.random() * pool.length)];
     // well-rated staff behave: the chance falls as their rating rises, and with every warning they learned from
-    if (Math.random() > conductFactor(workRating(who)) * Math.pow(0.6, who.learned || 0)) continue;   // unhappy people slip more
+    if (Math.random() > conductFactor(workRating(who)) * Math.pow(0.6, who.learned || 0) * (1 + 0.5 * (who.stubborn || 0))) continue;   // unhappy people slip more
     // very rarely it's a crime: police, the aviation authority and a court case
     if (maybeCriminal(who, r)) return;
     const t = INCIDENTS[r === 'pilot' ? 'fo' : r][Math.floor(Math.random() * INCIDENTS[r === 'pilot' ? 'fo' : r].length)];
@@ -174,7 +174,8 @@ function incidentPopup(id: string) {
         <div class="inc-who"><b>${esc(p.name)}</b><small>${ROLE_NAMES[role]}, ${natLabel(p.nat)}, ${ageOf(p.dob)}, base ${esc(p.base)}</small><small class="${p.warnings ? 'amber' : ''}">${p.warnings ? `Already ${p.warnings} warning${p.warnings > 1 ? 's' : ''} on record: ${esc(warnSummary(p))}` : 'No earlier warnings'}</small><small>This report: <b class="sev-${inc.sev || 'moderate'}">${esc(inc.sev || 'moderate')}</b></small></div>
         ${warnHistory(p)}
         ${inc.status === 'open' ? `<div class="decide">
-          <button class="decide-card" data-act="discipline" data-id="${inc.id}"><b>Discipline</b><small>A formal warning on their record. They stay on the team.</small></button>
+          ${(inc as any).revolt || (p.warnings || 0) >= 1 ? `<button class="decide-card" data-act="discipline" data-id="${inc.id}" data-strong="1"><b>${(inc as any).revolt ? 'Stronger warning' : 'Final warning'}</b><small>A final written warning. More likely to sink in, but ${(p.warnings || 0) >= 2 ? 'passengers and staff notice when someone stays on after warning after warning' : 'some people push back'}.</small></button>` : ''}
+          ${(inc as any).revolt ? '' : `<button class="decide-card" data-act="discipline" data-id="${inc.id}"><b>Discipline</b><small>A formal warning on their record. They stay on the team.${(p.warnings || 0) >= 2 ? ' Passengers start to notice repeated warnings.' : ''}</small></button>`}
           <button class="decide-card bad" data-act="dismiss-inc" data-id="${inc.id}"><b>Dismiss</b><small>They leave the company. You'll need to hire a replacement.</small></button>
         </div>` : `<p class="lede">${icon('check')}Handled: ${inc.status}.</p>`}
       </div>
@@ -189,13 +190,14 @@ ACTIONS.discipline = el => {
     p.xp = Math.round((p.xp || 0) - ({ light: 400, moderate: 1500, severe: 5000 } as any)[inc.sev || 'moderate']);
     p.warnLog = (p.warnLog || []).concat([{ date: inc.date, title: inc.title, sev: inc.sev || 'moderate', text: inc.text, inc: inc.id, given: Date.now() }]);
     p.rating = clamp(Math.round(((p.rating || 3.5) - (inc.sev === 'severe' ? 0.4 : inc.sev === 'light' ? 0.1 : 0.25)) * 100) / 100, 1, 5);
-    // most people take a warning to heart and become more careful; some don't, and it gets less likely with each warning
-    if (Math.random() < 0.75 - 0.12 * (p.warnings - 1)) p.learned = (p.learned || 0) + 1; else p.stubborn = (p.stubborn || 0) + 1;
+    // whether it sinks in shows over the next hours (see warnings.ts)
+    if (el.getAttribute('data-strong') === '1') p.warnLog[p.warnLog.length - 1].final = true;
+    try { warnGiven(p, inc, el.getAttribute('data-strong') === '1'); } catch (e) { /* ignore */ }
   }
   inc.status = 'disciplined';
   State.notices = State.notices.filter(n => n.ref !== inc.id);
   closeAll(); Sound.tick(); Store.save(); refresh();
-  toast(`${p ? p.name : 'Staff member'} has been given a formal warning`, 'ok');
+  toast(`${p ? p.name : 'Staff member'} has been given a ${el.getAttribute('data-strong') === '1' ? 'final' : 'formal'} warning`, 'ok');
 };
 ACTIONS['dismiss-inc'] = el => {
   const inc = (State as any).incidents.filter((x: Incident) => x.id === el.getAttribute('data-id'))[0]; if (!inc) return;
@@ -502,6 +504,8 @@ ACTIONS['commend-do'] = el => {
   const recent = (p.commends || []).filter((x: any) => x.id === c.id).length;
   staffMoodAdd(p, c.mood / Math.max(1, recent * 0.7), title);
   p.loyalty = clamp((p.loyalty || 50) + c.mood / 2, 0, 100);
+  // they come back to you with their thanks a little later
+  try { const d = $('.commend-dest') as HTMLSelectElement, k = d ? d.value : ''; thanksQueue(p, c.id, title, k && apt(k) ? apt(k).city : ''); } catch (e) { /* ignore */ }
   closeAll(); Sound.tick(); Store.save(); refresh();
   toast(`${p.name}: ${title.toLowerCase()}${cost ? ', ' + money(cost) : ''}. Mood up.`, 'ok');
 };

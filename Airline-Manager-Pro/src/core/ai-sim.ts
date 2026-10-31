@@ -184,7 +184,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   for (const i of State.issues as any[]) if (i.reg === a.reg && i.status === 'scheduled') { i.startedAt = at; a.status = 'maintenance'; }
   try { FlightTrace.arrived(f, at); } catch (e) { /* ignore */ }
   // for the turnaround at the gate: when it got there, who got off, the fuel left
-  (a as any).lastGateAt = at; (a as any).lastPax = f.pax || 0;
+  (a as any).lastGateAt = at; (a as any).lastPax = f.pax || 0; (a as any).lastFlightId = f.id; (a as any).lastFrom = f.from; (a as any).lastPaxJ = (f as any).paxJ || 0; (a as any).lastPaxF = (f as any).paxF || 0;
   try { (a as any).lastFuelKg = legFuel(a.typeId, f.pax || 0, f.from, f.to).land; } catch (e) { /* ignore */ }
   // real-world fares, on-board sales and costs (economics.ts)
   const burnH = (BURN_KG_H[t.cls] || 2000) * engineBurn(a.reg);
@@ -271,6 +271,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       if (jn) { if (p) p.status = 'flying'; S.aiNext.push(jn); continue; }
       // after a diversion (medical or weather) the same flight carries on to where it was going
       const dv = F.medical || F.wxDivert;
+      if (!dv) { const qn = Jobs.queuedAfterLanding(f.pilotId, f.to, at, spd, dutyMin); if (qn) { S.aiNext.push(qn); continue; } }
       const next = dv ? dv.orig : aiNextLeg(f.pilotId, F.routeFrom || f.from, f.to), a = plane(f.reg);
       // no route of yours to fly next: the pilot waits on the ground until you assign one
       if (!next) { if (p) p.status = 'standby'; continue; }
@@ -336,9 +337,14 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
           f.delayS = after; f.durMs = prof.totalS * 1000 + after * 1000;
         } catch (e) { /* the weather never stops the simulation */ }
       }
+      // diverted soon after take-off: too heavy to land, so the crew hold to dump or burn off fuel first
+      if (!test && (f.medical || f.wxDivert)) {
+        try { heavyLandingHold(f, a, prof, (f.medical || f.wxDivert).orig); const hs = (f.holds || []).reduce((s2: number, h: Hold) => s2 + h.s, 0); f.delayS = hs; f.durMs = prof.totalS * 1000 + hs * 1000; } catch (e) { /* lands as planned */ }
+      }
       a.status = 'flying'; if (!isSick(p)) p.status = 'flying';
       if (sickCovered) f.coverBy = 'Contract pilot (covering ' + p.name + ')';
       State.live.push(f);
+      try { loadsheetOf(f); } catch (e) { /* the loaders keep it within the limits before boarding */ }
     }
   }
   for (const f of State.live) if (aiOn(f)) aiUpdate(f, now);
@@ -380,10 +386,10 @@ function aiRefreshCards() {
     if (!f) { const pop = el.closest('.sel-pop'); if (pop) pop.remove(); continue; }
     if (f.real) continue;
     const tmp = document.createElement('div'); tmp.innerHTML = flightCard(f).trim();
-    el.replaceWith(tmp.firstElementChild);
+    patchNode(el, tmp.firstElementChild);
   }
   // aircraft at the gate: the turnaround counts on
-  for (const el of $all('[data-ob]')) { const a = plane(el.getAttribute('data-ob')), o = a ? onBoardParked(a) : null; if (o) el.innerHTML = onBoardHtml(o); }
+  for (const el of $all('[data-ob]')) { const a = plane(el.getAttribute('data-ob')), o = a ? onBoardParked(a) : null; if (o) patchHtml(el, onBoardHtml(o)); }
 }
 
 function startAiClock() {
@@ -452,7 +458,7 @@ function aiDayBlocks(reg: string, day?: number): { from: string; to: string; sta
 function aiStartRoute(pilotId: string, r: RouteDef): string {
   const S: any = State, p: any = pilot(pilotId); if (!p || !r) return '';
   if (State.live.some(f => f.pilotId === pilotId) || (S.aiNext || []).some((n: any) => n.pilotId === pilotId)) return 'flying';
-  const busy = (reg: string) => State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg);
+  const busy = (reg: string) => State.live.some(f => f.reg === reg) || (S.aiNext || []).some((n: any) => n.reg === reg) || !!(plane(reg) as any || {}).jobHold;
   const c = company(r.companyId), mine = S.myReg[r.companyId];
   if (!Ratings.rated(p, r.typeId)) return 'not-rated';
   if (!r.test && routeRunwayProblem(r.typeId, r.legs)) return 'runway';

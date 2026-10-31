@@ -58,9 +58,10 @@ SCREENS.ranking = {
 function staffRankHtml(): string {
   const S: any = State, cid = State.companyId;
   let list: any[];
-  if (_rkWho === 'pilots') list = State.pilots.filter((p: any) => !p.you).concat((S.staff || []).filter((p: any) => p.role === 'fo'));
+  // real players are in the ranking only in co-op mode
+  if (_rkWho === 'pilots') list = State.pilots.filter((p: any) => !p.you && (coopOn() || !/^coop:/.test(p.companyId || ''))).concat((S.staff || []).filter((p: any) => p.role === 'fo'));
   else list = (S.staff || []).filter((p: any) => p.role === _rkWho && (_rkWho !== 'ground' || _rkJob === 'all' || p.job === _rkJob));
-  if (!_rkAllCos && State.companies.length > 1) list = list.filter((p: any) => (p.companyId || cid) === cid);
+  if (!_rkAllCos && State.companies.length > 1) list = list.filter((p: any) => (p.companyId || cid) === cid || p.companyId === 'coop:' + cid);
   list = list.slice().sort((a, b) => (b.xp || 0) - (a.xp || 0) || (b.rating || 0) - (a.rating || 0));
   const jobs = _rkWho === 'ground' ? `<div class="filter-row sub">${[['all', 'All jobs']].concat(GROUND_JOBS as any).map((r: any) => `<button class="fchip ${_rkJob === r[0] ? 'on' : ''}" data-act="rk-job" data-j="${r[0]}">${esc(r[1])}</button>`).join('')}</div>` : '';
   const cos = State.companies.length > 1 ? `<span class="seg"><button class="${!_rkAllCos ? 'on' : ''}" data-act="rk-cos" data-v="0">${esc(company().name)}</button><button class="${_rkAllCos ? 'on' : ''}" data-act="rk-cos" data-v="1">All your airlines</button></span>` : '';
@@ -69,7 +70,7 @@ function staffRankHtml(): string {
     const l = levelOf(p.xp || 0);
     return `<button class="lb-row rk-staff" data-act="staff-detail" data-id="${esc(p.id)}"><b class="lb-n">${i + 1}</b>
       <span class="rk-sav">${p.look ? avatarSvg(p.look, (personRole(p) || role) as any, { view: 'bust', accent: company(p.companyId || cid).color, still: true }) : ''}</span>
-      <span class="lb-who"><b>${esc(p.name)}</b>${levelChip(p)}<small>${esc(levelTitle(p))} · ${esc(p.base || '')}${_rkAllCos ? ' · ' + esc(company(p.companyId || cid).name) : ''}${p.job && typeof groundJobName === 'function' ? ' · ' + esc(groundJobName(p)) : ''}</small>
+      <span class="lb-who"><b>${esc(p.name)}</b>${/^coop:/.test(p.companyId || '') ? '<span class="chip coop">Real player</span>' : levelChip(p)}<small>${esc(levelTitle(p))} · ${esc(p.base || '')}${_rkAllCos ? ' · ' + esc(company(p.companyId || cid).name) : ''}${p.job && typeof groundJobName === 'function' ? ' · ' + esc(groundJobName(p)) : ''}</small>
         <span class="lvl-bar"><i style="width:${(l.p * 100).toFixed(0)}%"></i></span></span>
       <span class="lb-v"><b>Level ${l.level}</b><small>${num(p.xp || 0)} XP · ${(p.rating || 4).toFixed(1)} ★</small></span></button>`;
   }).join('');
