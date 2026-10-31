@@ -10,7 +10,7 @@ interface Pilot {
 interface Aircraft {
   engine?: string;   // the engine option (data/engines.ts); the type's first when not set
   reg: string; typeId: string; companyId: string; divisionId?: string; base: string; location: string;
-  hoursMin: number; cycles: number; condition: number; status: 'parked' | 'flying' | 'grounded' | 'maintenance';
+  hoursMin: number; cycles: number; condition: number; status: 'parked' | 'flying' | 'grounded' | 'maintenance' | 'leased';
   delivered: string; name?: string;
 }
 interface LiveFlight {

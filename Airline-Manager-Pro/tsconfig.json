@@ -80,6 +80,7 @@
     "src/screens/market.ts",
     "src/screens/leasing.ts",
     "src/screens/trade.ts",
+    "src/screens/lease-out.ts",
     "src/screens/pilots.ts",
     "src/screens/ranking.ts",
     "src/screens/coop.ts",

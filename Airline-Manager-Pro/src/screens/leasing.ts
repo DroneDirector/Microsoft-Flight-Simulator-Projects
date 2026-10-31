@@ -43,6 +43,7 @@ function leaseAdvance(quiet?: boolean) {
     if (now >= L.endAt && a.status !== 'flying' && !State.live.some(f => f.reg === a.reg)) { leaseHandBack(a, 0, 'The lease has ended'); changed = true; }
   }
   if (changed) { Store.save(); try { renderTopbar(); } catch (e) { /* ignore */ } }
+  try { leaseOutAdvance(); } catch (e) { /* ignore */ }
 }
 
 /** The aircraft goes back to the leasing company; the deposit comes back, less any fee. */

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.12 (2026-10-31)
+
+- Lease out owned aircraft to other airlines (offers, 1–5 year terms, monthly rent, wear on return, early recall fee); new 'leased' status
+- Close routes (with confirmation, cancelled pending legs, popularity and newspaper story)
+
 ## 0.9.11 (2026-10-31)
 
 - Other airlines' traffic: fixed fleet of 140 aircraft on deterministic shuttles between scheduled airports; 2D map (decluttered labels) and 3D (frustum-culled); on/off switch; own airline only

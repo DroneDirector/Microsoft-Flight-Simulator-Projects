@@ -146,7 +146,7 @@ function routeDetailHtml(): string {
     }).join('')}</div>
     <label class="tg-row"><span><b>Tanker fuel</b><small>Where the next stop's fuel costs more, carry the next leg's fuel from here. It costs about 3.5% extra burn per hour to carry the weight, so the app only does it when it saves money.</small></span><button class="tg ${(r as any).tanker ? 'on' : ''}" role="switch" aria-checked="${!!(r as any).tanker}" data-act="rd-tanker"><i></i></button></label>
     <div class="rd-mk"><span>${icon('star')}<b>${boost ? `Marketing running: about ${Math.round(boost * 100)}% more passengers` : 'No marketing on this route'}</b><small>A route campaign brings extra passengers while it runs.</small></span><button class="btn ghost sm" data-act="mk-campaign" data-route="${r.id}">Promote</button></div>
-    <div class="modal-actions"><button class="btn ghost" data-act="sb-plan" data-from="${esc(r.legs[0])}" data-to="${esc(r.legs[1] || r.legs[0])}">${icon('routes')}Plan on SimBrief</button><button class="btn primary" data-act="close-layer">Done</button></div>
+    <div class="modal-actions"><button class="btn ghost danger" data-act="rd-close">${icon('trash')}Close route</button><button class="btn ghost" data-act="sb-plan" data-from="${esc(r.legs[0])}" data-to="${esc(r.legs[1] || r.legs[0])}">${icon('routes')}Plan on SimBrief</button><button class="btn primary" data-act="close-layer">Done</button></div>
   </div>`;
 }
 function rerenderRd() { const p = $('.rd-pop .panel'); if (p) patchHtml(p, routeDetailHtml()); }

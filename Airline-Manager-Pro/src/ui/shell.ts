@@ -229,7 +229,7 @@ function flightDiverted(f: any): { to: string; orig: string; why: string } | nul
 ACTIONS['show-flight'] = el => showFlightOnMap(el.getAttribute('data-id'));
 function statusChip(s: string): string {
   const map: { [k: string]: string[] } = {
-    flying: ['In flight', 'flight'], parked: ['Available', 'avail'], grounded: ['Maintenance', 'maint'], maintenance: ['Maintenance', 'maint'],
+    flying: ['In flight', 'flight'], parked: ['Available', 'avail'], leased: ['Leased out', 'dim'], grounded: ['Maintenance', 'maint'], maintenance: ['Maintenance', 'maint'],
     resting: ['Resting', 'dim'], standby: ['Standby', 'cyan'], off: ['Available', 'green'], training: ['On a course', 'amber'],
     ok: ['Normal', 'green'], hard: ['Hard landing', 'amber'], crash: ['Crash', 'red'], incident: ['Incident', 'amber'],
     open: ['Open', 'amber'], scheduled: ['Scheduled', 'cyan'], fixed: ['Fixed', 'green'],
