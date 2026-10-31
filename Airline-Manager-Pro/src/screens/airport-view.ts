@@ -373,11 +373,14 @@ class AirportView {
   timedCache: any = null;
   /** Where along a timed route the aircraft is after `s` seconds: [x, y, heading], and its speed. */
   timedAt(r: { p: number[][]; t: number[]; v: number[]; total: number }, s: number): { pos: number[]; kt: number } {
-    const p = r.p; if (!p.length) return null;
+    const p = r.p; if (!p || !p.length) return null;
+    // a path of a single point (a stand right on the taxiway): standing there
+    if (p.length === 1 || !r.t || r.t.length < 2) return { pos: [p[0][0], p[0][1], 0], kt: 0 };
     if (s <= 0) { const h = p.length > 1 ? Math.atan2(p[1][0] - p[0][0], p[1][1] - p[0][1]) * 180 / Math.PI : 0; return { pos: [p[0][0], p[0][1], h], kt: 0 }; }
-    let i = 1; while (i < r.t.length - 1 && r.t[i] < s) i++;
+    const last = Math.min(r.t.length, p.length) - 1;
+    let i = 1; while (i < last && r.t[i] < s) i++;
     const k = clamp((s - r.t[i - 1]) / ((r.t[i] - r.t[i - 1]) || 1), 0, 1), a = p[i - 1], b = p[i];
-    return { pos: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI], kt: s >= r.total ? 0 : Math.round(r.v[i - 1] + (r.v[i] - r.v[i - 1]) * k) };
+    return { pos: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI], kt: s >= r.total || !r.v || r.v[i] == null ? 0 : Math.round(r.v[i - 1] + (r.v[i] - r.v[i - 1]) * k) };
   }
 
   computePlanes(now: number) {

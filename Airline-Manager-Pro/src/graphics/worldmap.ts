@@ -441,7 +441,7 @@ class WorldMap {
       for (const icao of Object.keys(this.scenes)) {
         const sc = this.scenes[icao]; if (!sc.L || !sc.graph) continue;
         sc.ctx = c; sc.s = ppm; sc.track = this.following || this.selected;
-        sc.computePlanes(Date.now());
+        try { sc.computePlanes(Date.now()); } catch (e) { continue; }   // one airport's trouble never stops the map
         if (fade > 0) sc.drawLayoutEmbedded(c, fade);
         for (const pl of sc.planes) if (!pl.parked) this.inScene[pl.id] = sc.lonLat(pl.x, pl.y);
       }
