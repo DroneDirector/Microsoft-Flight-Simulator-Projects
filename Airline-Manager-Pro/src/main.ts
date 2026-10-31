@@ -51,6 +51,7 @@
   startAiClock();
   try { modeStart(); } catch (e) { /* ignore */ }
   try { startNewsWatch(); startWarnClock(); } catch (e) { /* ignore */ }
+  try { applyDifficultyPrices(); startMarkets(); } catch (e) { /* ignore */ }
   startCoopClock();
   startBases();
   Battery.init();

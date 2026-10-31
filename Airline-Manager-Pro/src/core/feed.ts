@@ -303,7 +303,7 @@ function finishLeg(e: FlightEvent) {
   // money
   // real-world fares, on-board sales and costs (economics.ts), with the fuel actually burned in the sim
   const job = Jobs.forMyLeg(from, to, a.reg);
-  const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg, gsxTakeLegFlag() && !!(State.settings as any).gsx, { reg: a.reg, job: job ? jobPayFor(job.id) : undefined });
+  const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg, gsxTakeLegFlag() && !!(State.settings as any).gsx, { book: true, reg: a.reg, job: job ? jobPayFor(job.id) : undefined });
   const now = new Date(), day = dateStr(now).slice(0, 10), time = dateStr(now).slice(11);
   const flight = c.icao + (100 + (_hashStr(a.reg) % 800));
   const rev = m.revenue, fuel = m.costs, fees = 0;

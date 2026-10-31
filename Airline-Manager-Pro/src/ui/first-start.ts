@@ -22,6 +22,7 @@ ACTIONS['fs-scratch'] = () => {
       <div class="field"><span>Home base (required)</span><button class="btn ghost fs-hub-btn ${_fsHub ? '' : 'need'}" data-act="fs-hub">${icon('pin')}${_fsHub && apt(_fsHub) ? `${esc(_fsHub)} · ${esc(apt(_fsHub).name)}` : 'Choose your home base'}</button></div>
       <label class="field"><span>Your pilot name</span><input class="le-in fs-pilot" maxlength="40" value="${esc(myPilot().name)}"></label>
     </div>
+    <div class="field fs-diff"><span>Difficulty</span>${difficultyPickHtml(_fsDiff, 'fs-diff')}</div>
     <p class="fine-print">${icon('alert')}This removes the demo airlines, aircraft, staff, routes, flights, money and logs. Your settings are kept.</p>
     <div class="modal-actions"><button class="btn ghost" data-act="fs-back">Back</button><button class="btn danger" data-act="fs-wipe">${icon('trash')}Wipe and start</button></div>`, { cls: 'wide fs-modal' });
 };
@@ -59,13 +60,13 @@ function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: 
   Object.assign(S, fresh);
   const id = 'co-' + uid();
   S.companies = [{ id, profileId: 'p1', name: o.name, icao: o.icao, callsign: o.callsign, hub: o.hub, color: '#2C8CFF', color2: '#0B2A55',
-    balance: o.kind === 'bush' ? 1500000 : o.kind === 'regional' ? 12000000 : 25000000, reputation: 50, founded: dateStr(new Date()).slice(0, 10), kind: o.kind, divisions: [] }];
+    balance: Math.round((o.kind === 'bush' ? 1500000 : o.kind === 'regional' ? 12000000 : 25000000) * DIFFICULTY[_fsDiff].start / 100000) * 100000, reputation: 50, founded: dateStr(new Date()).slice(0, 10), kind: o.kind, divisions: [] }];
   S.profiles = [{ id: 'p1', pilotId: 'you', label: 'Main profile' }];
   S.pilots = [Object.assign(me, { id: 'you', name: o.pilot || me.name, hoursMin: 0, landings: 0, base: o.hub, profileId: 'p1', status: 'standby', types: [], rating: 4, xp: 0 })];
   S.companyId = id; S.divisionId = 'all'; S.myReg = {}; S.coPilot = { [id]: { sex: 'f', id: '' } };
   S.badges = {}; S.progress = {}; S.myLoad = Object.assign({}, S.myLoad, { pax: 0, cargoKg: 0, mailKg: 0, bagsKg: 0 });
   ['bank', 'jobs', 'coop', 'ofp', 'acars', 'usedMarket', 'cases', 'landRecs', 'aiNext', 'aiDay', 'groundedUntil', 'payNext', 'poolNext', 'ratingDay', 'condTick', 'lastTouchdown', 'popLog'].forEach(k => { if (S[k] && !Array.isArray(S[k]) && typeof S[k] === 'object') S[k] = {}; else if (typeof S[k] === 'number') S[k] = 0; });
-  S.scratch = true;
+  S.scratch = true; S.difficulty = _fsDiff; S.mkt = null; S.stock = {};
   Store.save(); Store.flushNative();
   try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: 'ops' })); } catch (e) { /* ignore */ }
   location.reload();

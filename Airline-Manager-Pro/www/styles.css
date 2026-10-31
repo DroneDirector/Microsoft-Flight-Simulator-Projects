@@ -2402,3 +2402,22 @@ html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
 .v3d-lab.tfc { opacity: .75; font-weight: 500; }
 .v3d-tfc { top: calc(102px + env(safe-area-inset-top)); }
 @media (max-width: 600px) { .v3d-tfc { top: calc(190px + env(safe-area-inset-top)); } }
+.v3d-tfc.on { color: #04202A; }
+
+/* difficulty */
+.diff-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 8px; }
+.diff-opt { text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line, rgba(255,255,255,.1)); background: var(--panel-2); color: var(--ink); display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+.diff-opt small { color: var(--ink-2); font-size: 11.5px; line-height: 1.3; }
+.diff-opt.on { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan) inset; }
+.fs-diff { margin-top: 12px; }
+/* markets */
+.mkt { margin-bottom: 14px; } .mkt .card-h { display: flex; justify-content: space-between; align-items: center; }
+.mkt-row { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 16px; align-items: center; margin: 10px 0; }
+.mkt-now b { display: block; font-size: 26px; } .mkt-now b small { font-size: 13px; color: var(--ink-2); margin-left: 3px; } .mkt-now em { font-style: normal; font-size: 12.5px; }
+.mkt-spark { display: flex; flex-direction: column; gap: 3px; } .mkt-spark svg { width: 100%; height: 46px; }
+.mkt-stock b { display: block; font-size: 20px; } .mkt-bar { display: block; height: 6px; border-radius: 4px; background: rgba(255,255,255,.08); margin: 5px 0; overflow: hidden; } .mkt-bar i { display: block; height: 100%; background: var(--cyan); border-radius: 4px; }
+.mkt-warn { color: #FFAA6B; display: flex; gap: 6px; align-items: flex-start; font-size: 13px; } .mkt-why { color: var(--ink-2); display: flex; gap: 6px; font-size: 13px; }
+.mkt-warn .ic, .mkt-why .ic { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+.mkt .btn small { margin-left: 6px; color: var(--ink-2); font-weight: 500; }
+.mkt-hist summary { cursor: pointer; color: var(--ink-2); font-size: 12.5px; margin-top: 6px; } .mkt-hist div { font-size: 12.5px; padding: 3px 0; } .mkt-hist em { font-style: normal; margin-left: 4px; }
+@media (max-width: 700px) { .mkt-row { grid-template-columns: 1fr; } }
