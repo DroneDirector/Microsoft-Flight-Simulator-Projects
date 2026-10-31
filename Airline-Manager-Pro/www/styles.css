@@ -2523,3 +2523,4 @@ html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
 .bdr.calm .bdr-beams, .bdr.calm .bdr-sparks, .bdr.calm .bdr-tier { display: none; }
 .bdr.calm .bdr-card { transform: none; opacity: 1; animation: none !important; } .bdr.calm .bdr-in { transform: rotateY(180deg); animation: none !important; }
 .bdg.have { cursor: pointer; } .bdg.have:hover { transform: translateY(-2px); }
+.mkt-real { color: #7FD8E8; display: flex; gap: 6px; font-size: 12.5px; } .mkt-real .ic { width: 15px; height: 15px; flex: none; margin-top: 1px; }

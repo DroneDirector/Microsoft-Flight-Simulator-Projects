@@ -1,0 +1,29 @@
+name: Airline Manager Pro – market data
+
+# Once a day: the real jet fuel price and aircraft parts price index, published for the app on the
+# amp-market-data branch (not main, so no app build is started).
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the prices
+        run: python3 Airline-Manager-Pro/tools/market/fetch.py /tmp/amp-market.json
+      - name: Publish on the amp-market-data branch
+        run: |
+          git config user.name "DroneDirector"
+          git config user.email "simon@dronedirector.fo"
+          git fetch origin amp-market-data || true
+          if git rev-parse --verify origin/amp-market-data >/dev/null 2>&1; then git checkout -B amp-market-data origin/amp-market-data; else git checkout --orphan amp-market-data; git rm -rf . >/dev/null; fi
+          cp /tmp/amp-market.json amp-market.json
+          git add amp-market.json
+          git commit -m "Market data $(date -u +%Y-%m-%d)" || exit 0
+          git push origin amp-market-data
