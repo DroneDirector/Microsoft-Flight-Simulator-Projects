@@ -131,8 +131,22 @@ ACTIONS['buy-confirm'] = () => {
       <p class="muted">${money(Math.round(t.price * ((engineOptions(t.id).filter(e => e.id === (_buy as any).eng)[0] || { price: 1 } as any).price)) * _buy.qty)} paid. ${_buy.qty > 1 ? 'They are' : 'It is'} ready to assign to routes.</p>
       <div class="modal-actions center">
         <button class="btn ghost" data-act="close-layer">Keep shopping</button>
-        <button class="btn primary" data-act="see-fleet">See it in the fleet</button>
+        <button class="btn primary" data-act="see-fleet" data-regs="${esc(regs.join(','))}">See it in the fleet</button>
       </div>
     </div>`, { cls: 'narrow celebrate' });
 };
-ACTIONS['see-fleet'] = () => { closeAll(); go('fleet'); };
+ACTIONS['see-fleet'] = el => { const t = el.closest('.toast'); if (t) t.remove(); closeAll(); fleetSpotlight((el.getAttribute('data-regs') || el.getAttribute('data-id') || '').split(',').filter(Boolean)); };
+/** Open the fleet at the new aircraft: scrolled to it, and its card flashes three times. */
+function fleetSpotlight(regs: string[]) {
+  const a = plane(regs[0]);
+  // a filter that hides it (or the types overview) gives way to the whole fleet
+  if (a && !(_fleetFilter === 'all' || _fleetFilter === a.typeId || acType(a.typeId).cls === _fleetFilter)) _fleetFilter = 'all';
+  go('fleet');
+  const spot = (tries: number) => {
+    const cards = regs.map(r => document.querySelector(`.ac-card[data-reg="${r}"]`) as HTMLElement).filter(Boolean);
+    if (!cards.length) { if (tries < 10) setTimeout(() => spot(tries + 1), 150); return; }
+    cards[0].scrollIntoView({ behavior: State.settings.reduceMotion ? 'auto' : 'smooth', block: 'center' });
+    setTimeout(() => cards.forEach(c => { c.classList.remove('spot'); void c.offsetWidth; c.classList.add('spot'); setTimeout(() => c.classList.remove('spot'), 2600); }), State.settings.reduceMotion ? 0 : 450);
+  };
+  setTimeout(() => spot(0), 250);
+}

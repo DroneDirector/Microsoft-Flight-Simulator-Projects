@@ -101,7 +101,7 @@ ACTIONS['buy-used-go'] = () => {
   try { coopAfterBuy(`used ${t.maker} ${t.model}`, total); } catch (e) { /* ignore */ }
   try { Online.discord('fleet', `New aircraft: ${reg}`, `${company().name} bought a used ${t.maker} ${t.model} (ex ${u.was}), based at ${base}.`); } catch (e) { /* ignore */ }
   closeAll(); Bases.ensure(); Sound.purchase(); Haptics.success(); animateBalance(from, c.balance); Store.save(); refresh();
-  toast(`${reg} is yours and on its way to ${base}`, 'ok');
+  toast(`${reg} is yours and on its way to ${base}`, 'ok', { label: 'See it in the fleet', act: 'see-fleet', data: reg });
 };
 
 /* ---------- Selling ---------- */
@@ -185,3 +185,32 @@ ACTIONS['cab-save'] = () => {
   closeAll(); Sound.payOut(); animateBalance(from, c.balance); Store.save(); refresh();
   toast(`${a.reg}: ${cabinText((a as any).cabin)}`, 'ok');
 };
+
+/* ---------- the final step of buying, leasing or selling an aircraft: are you sure? ---------- */
+function confirmTrade(act: string, ask: (el: HTMLElement) => [string, string, string] | null) {
+  const run = ACTIONS[act];
+  ACTIONS[act] = (el, ev) => {
+    if (!canTrade()) return;
+    const q = ask(el); if (!q) { run(el, ev); return; }
+    Sound.tick();
+    confirmChange(q[0], q[1], q[2], 'Not yet', () => { closeTop(); run(el, ev); }, () => closeTop());
+  };
+}
+confirmTrade('buy-confirm', () => {
+  const t = acType(_buy.id); if (!t) return null;
+  const eng = engineOptions(t.id).filter(e => e.id === (_buy as any).eng)[0] || engineOptions(t.id)[0], unit = Math.round(t.price * (eng ? eng.price : 1));
+  return [`Buy ${_buy.qty > 1 ? _buy.qty + ' ' + t.model + 's' : 'the ' + t.maker + ' ' + t.model}?`, `${money(unit * _buy.qty)} is paid now from ${company().name}'s account${eng ? `, with ${eng.name} engines` : ''}. Delivered to ${_buy.base || company().hub}.`, `Yes, buy for ${money(unit * _buy.qty, { compact: true })}`];
+});
+confirmTrade('lease-confirm', () => {
+  const t = acType(_lease.id); if (!t) return null;
+  const monthly = leaseMonthly(t.price, _lease.years);
+  return [`Lease ${_lease.qty > 1 ? _lease.qty + ' ' + t.model + 's' : 'the ' + t.maker + ' ' + t.model}?`, `${money(monthly * _lease.qty)} a month for ${_lease.years} year${_lease.years > 1 ? 's' : ''}, plus a deposit of two months' rent paid now. Returning it early costs three months' rent.`, 'Yes, sign the lease'];
+});
+confirmTrade('buy-used-go', () => {
+  const u = usedList().filter(x => x.id === _used.id)[0]; if (!u) return null; const t = acType(u.typeId);
+  return [`Buy this used ${t.model}?`, `${money(u.price)} for the aircraft, plus the ferry flight to ${_used.base || company().hub}. Used aircraft are sold as they are.`, `Yes, buy for ${money(u.price, { compact: true })}`];
+});
+confirmTrade('ac-sell-go', el => {
+  const a = plane(el.getAttribute('data-reg')); if (!a) return null;
+  return [`Sell ${a.reg}?`, `${acType(a.typeId).maker} ${acType(a.typeId).model}, for ${money(sellPrice(a))}. Once it's sold it's gone: its history stays in your logs.`, `Yes, sell ${a.reg}`];
+});

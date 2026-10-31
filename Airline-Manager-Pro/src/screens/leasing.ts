@@ -132,7 +132,7 @@ ACTIONS['lease-confirm'] = () => {
       <p class="muted">From ${esc(lessor)} for ${_lease.years} year${_lease.years > 1 ? 's' : ''}, ${money(monthly)} a month${_lease.qty > 1 ? ' each' : ''}. Ready to assign to routes.</p>
       <div class="modal-actions center">
         <button class="btn ghost" data-act="close-layer">Keep looking</button>
-        <button class="btn primary" data-act="see-fleet">See it in the fleet</button>
+        <button class="btn primary" data-act="see-fleet" data-regs="${esc(regs.join(','))}">See it in the fleet</button>
       </div>
     </div>`, { cls: 'narrow celebrate' });
 };

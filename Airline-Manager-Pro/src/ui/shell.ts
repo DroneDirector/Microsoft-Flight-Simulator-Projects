@@ -141,13 +141,19 @@ function patchChildren(from: Node, to: Node) {
   }
   for (let i = b.length; i < a.length; i++) if (a[i].parentNode === from) from.removeChild(a[i]);
 }
+const PATCH_KEEP = ['spot', 'tick-fade', 'shake'];
 function patchNode(o: Element, n: Element) {
   // a different item in this place (another id): swap it rather than reshape it
   const ko = o.getAttribute('data-id'), kn = n.getAttribute('data-id');
   if (ko !== kn && ko && kn) { o.parentNode.replaceChild(n, o); return; }
   const na = n.attributes, oa = o.attributes;
   for (let i = oa.length - 1; i >= 0; i--) if (!n.hasAttribute(oa[i].name)) o.removeAttribute(oa[i].name);
-  for (let i = 0; i < na.length; i++) if (o.getAttribute(na[i].name) !== na[i].value) o.setAttribute(na[i].name, na[i].value);
+  for (let i = 0; i < na.length; i++) {
+    let v = na[i].value;
+    // short effects on the page (a card flashing, text fading in) carry on through an update
+    if (na[i].name === 'class') PATCH_KEEP.forEach(k => { if (o.classList.contains(k) && !n.classList.contains(k)) v += ' ' + k; });
+    if (o.getAttribute(na[i].name) !== v) o.setAttribute(na[i].name, v);
+  }
   if (o.tagName === 'INPUT' || o.tagName === 'TEXTAREA' || o.tagName === 'SELECT') { if (document.activeElement !== o && 'value' in n) (o as any).value = (n as any).value; return; }
   if (o.tagName === 'CANVAS') return;   // drawn by code
   if (o.innerHTML !== n.innerHTML) patchChildren(o, n);

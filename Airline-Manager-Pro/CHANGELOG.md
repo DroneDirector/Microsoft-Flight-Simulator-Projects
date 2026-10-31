@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.10 (2026-10-31)
+
+- Co-op mode as a separate world (own save; device settings shared); co-op setup, mode chip, switch back
+- Co-op player connections (joined/connecting/connected/failed/left) with error-log entries for app-side failures
+- Co-op job requests to real players with accept/decline; AI and co-op pilots in the air take jobs after landing
+- Per-player filters in logbook and finance; real players in crew and rankings (co-op only)
+- Newspaper section, many new story types, Settings → News (popup / inbox animated / inbox plain)
+- Warning outcomes (learn / ignore / push back), final warnings, repeat-warning passenger and press effects, mechanic error risk
+- In-place screen updates (no flashing) with split-flap text changes; scrolling left menu
+- Diverted status chips; fleet spotlight after purchase; confirmation before buying, leasing and selling
+- Thank-you replies, tappable status badges, flat sea, satellite quality, passenger cards and clothes, loadsheet trim and live weight, fuel dump holds, walking passengers, ban lengths, pet visits
+- Fix: map flight card crash for flights without a position
+
 ## 0.9.9 (2026-10-31)
 
 - Hold short at a holding point 50 m before the runway edge; line up when cleared

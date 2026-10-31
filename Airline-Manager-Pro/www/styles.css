@@ -2392,3 +2392,8 @@ html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
 .chip-divert { background: rgba(255, 140, 60, .16); color: #FFAA6B; margin-left: 4px; gap: 4px; }
 .chip-divert .ic { width: 13px; height: 13px; }
 .w-divert { flex-wrap: wrap; gap: 5px; margin-top: 6px; } .w-divert .chip-divert { margin-left: 0; }
+
+/* the aircraft just bought, leased or rented: its card flashes three times */
+.ac-card.spot { animation: acSpot .8s ease-in-out 3; position: relative; z-index: 2; }
+@keyframes acSpot { 0%, 100% { box-shadow: 0 0 0 0 rgba(63, 208, 232, 0); } 45% { box-shadow: 0 0 0 3px rgba(63, 208, 232, .95), 0 0 28px 6px rgba(63, 208, 232, .55); transform: translateY(-2px) scale(1.015); } }
+.calm .ac-card.spot { animation: none; box-shadow: 0 0 0 3px rgba(63, 208, 232, .95); }
