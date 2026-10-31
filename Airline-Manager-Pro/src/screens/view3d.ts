@@ -50,7 +50,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = id.indexOf('apt:') === 0 ? 'free' : 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0; (V3d as any).fc = null; (V3d as any).fcStart = id.indexOf('apt:') === 0;
-  const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '');
+  const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
       <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
@@ -64,10 +64,10 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
       <div class="fc-speed"><small>Speed</small><input type="range" class="fc-spd" min="0" max="100" value="${Math.round((Math.log((State.settings as any).v3dFreeSpeed || 1) / Math.log(8) + 1) * 50)}"><b class="fc-spd-v">${((State.settings as any).v3dFreeSpeed || 1).toFixed(1)}×</b></div>
       <button class="fc-help-btn" data-act="fc-help" aria-label="Controls">?</button>
       <div class="fc-help"><b>Free camera</b>
-        <span><i>One finger</i>Look around</span><span><i>Left stick</i>Move forward, back and sideways</span><span><i>Height buttons</i>Climb and sink</span>
-        <span><i>Two fingers</i>Slide, or pinch to fly forward and back</span><span><i>Speed</i>How fast you move (faster the higher you fly)</span>
-        <span><i>PC</i>Mouse drag looks, wheel flies forward. W A S D move, Q and E sink and climb, arrows look, Shift is faster</span>
+        ${DESKTOP ? `<span><i>Click</i>Capture the mouse</span><span><i>Esc</i>Exit the free camera, back to the map</span><span><i>Mouse</i>Look around</span><span><i>W A S D</i>Forward, back and sideways</span><span><i>Space / C</i>Climb and sink (also E and Q)</span><span><i>Shift</i>Faster while held</span><span><i>Wheel</i>Movement speed</span><span><i>Arrows</i>Look around without the mouse</span>`
+          : `<span><i>One finger</i>Look around</span><span><i>Left stick</i>Move forward, back and sideways</span><span><i>Height buttons</i>Climb and sink</span><span><i>Two fingers</i>Slide, or pinch to fly forward and back</span><span><i>Speed</i>How fast you move (faster the higher you fly)</span>`}
         <span><i>Close</i>Back to the Overview</span></div>
+      ${DESKTOP ? '<div class="fc-pc-hint">Click to look around with the mouse · W A S D to move</div><div class="fc-esc"><kbd>Esc</kbd><span>Exit the free camera</span></div>' : ''}
     </div>
     ${Mode.coop() ? '' : `<button class="v3d-sat v3d-tfc tfc-btn ${Traffic.on() ? 'on' : ''}" data-act="tfc-toggle">${icon('fleet')}Other airlines</button>`}
     <small class="v3d-credit">Terrain: Terrain Tiles on AWS · water: © OpenStreetMap contributors · imagery: Sentinel-2 cloudless 2016 by EOX (see Settings → About)</small>
@@ -104,6 +104,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
 function v3dClose() {
   if (!V3d.open) return;
   V3d.open = false; cancelAnimationFrame(V3d.raf); document.body.classList.remove('v3d-on');
+  try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ }
   v3dCrashGuard(false);
   removeEventListener('resize', v3dSize);
   try {
@@ -115,10 +116,11 @@ function v3dClose() {
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
 // closing from the free camera: back to the normal Overview
-ACTIONS['v3d-close'] = () => { const free = V3d.mode === 'free'; v3dClose(); if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } };
+ACTIONS['v3d-close'] = () => { const free = V3d.mode === 'free'; (V3d as any).fcLeaving = true; v3dClose(); (V3d as any).fcLeaving = false; if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } };
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
+  else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
   V3d.root.classList.toggle('v3d-free', V3d.mode === 'free');
   V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
@@ -170,7 +172,18 @@ function v3dBind() {
   };
   cv.addEventListener('pointerup', up);
   cv.addEventListener('pointercancel', (e: PointerEvent) => { delete V3d.ptrs[e.pointerId]; });
-  cv.addEventListener('wheel', (e: WheelEvent) => { e.preventDefault(); if (V3d.mode === 'free') { v3dFreePush(0, 0, (e.deltaY > 0 ? -1 : 1) * 2.2); return; } V3d.dist = clamp(v3dDist() * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 8, 30000); }, { passive: false } as any);
+  if (DESKTOP) {
+    cv.addEventListener('click', () => { if (V3d.mode === 'free' && document.pointerLockElement !== cv) { try { (cv as any).requestPointerLock(); } catch (e) { /* not allowed */ } } });
+    document.addEventListener('mousemove', (e: MouseEvent) => { const F = fc(); if (!F || V3d.mode !== 'free' || document.pointerLockElement !== cv) return; F.yaw += e.movementX * 0.0025; F.pitch = clamp(F.pitch - e.movementY * 0.0025, -1.5, 1.4); });
+    document.addEventListener('pointerlockchange', () => {
+      const locked = document.pointerLockElement === cv; if (V3d.root) V3d.root.classList.toggle('fc-locked', locked);
+      if (!locked && V3d.open && V3d.mode === 'free' && !(V3d as any).fcLeaving) setTimeout(() => { if (V3d.open && V3d.mode === 'free' && document.hasFocus() && !document.hidden) ACTIONS['v3d-close'](null as any, null as any); }, 120);
+    });
+    document.addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Escape' && V3d.open && V3d.mode === 'free') { e.preventDefault(); ACTIONS['v3d-close'](null as any, null as any); } });
+  }
+  cv.addEventListener('wheel', (e: WheelEvent) => { e.preventDefault(); if (V3d.mode === 'free') {
+    if (DESKTOP) { const S: any = State.settings, m = clamp((S.v3dFreeSpeed || 1) * (e.deltaY > 0 ? 1 / 1.25 : 1.25), 0.125, 8); S.v3dFreeSpeed = Math.round(m * 100) / 100; const o = V3d.root.querySelector('.fc-spd-v'), sp = V3d.root.querySelector('.fc-spd') as HTMLInputElement; if (o) o.textContent = m.toFixed(1) + '×'; if (sp) sp.value = String(Math.round((Math.log(m) / Math.log(8) + 1) * 50)); Store.soon(); return; }
+    v3dFreePush(0, 0, (e.deltaY > 0 ? -1 : 1) * 2.2); return; } V3d.dist = clamp(v3dDist() * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 8, 30000); }, { passive: false } as any);
 }
 function v3dDist(): number { const p = V3d.planes[V3d.target]; const span = p ? shapeOf(p.type).span : 35; return V3d.dist || (V3d.mode === 'tower' ? 0 : span * 1.9 + 25); }
 
@@ -559,7 +572,7 @@ function v3dFreeStart() {
   if (V3d.cam.fov !== 60) { V3d.cam.fov = 60; V3d.cam.updateProjectionMatrix(); }
   if (!(V3d as any).fcKeys) {
     (V3d as any).fcKeys = true;
-    const set = (e: KeyboardEvent, on: boolean) => { if (!V3d.open || V3d.mode !== 'free' || (e.target as HTMLElement).closest('input, textarea')) return; const k = e.key.toLowerCase(); if ('wasdqerf'.indexOf(k) >= 0 || /^arrow/.test(k) || k === 'shift') { fc().keys[k] = on; e.preventDefault(); } };
+    const set = (e: KeyboardEvent, on: boolean) => { if (!V3d.open || V3d.mode !== 'free' || (e.target as HTMLElement).closest('input, textarea')) return; const k = e.key.toLowerCase(); if ('wasdqerfc'.indexOf(k) >= 0 || /^arrow/.test(k) || k === 'shift' || k === ' ') { fc().keys[k] = on; e.preventDefault(); } };
     document.addEventListener('keydown', e => set(e, true)); document.addEventListener('keyup', e => set(e, false));
   }
 }
@@ -586,7 +599,7 @@ function v3dFreeGesture(e: PointerEvent, p: any, ids: string[]) {
 function v3dFreeStep(dt: number) {
   const F = fc(); if (!F || !dt) return; const T = THREE, k = F.keys;
   // keys: steady thrust while held
-  const kx = (k.d ? 1 : 0) - (k.a ? 1 : 0), ky = ((k.e || k.r) ? 1 : 0) - ((k.q || k.f) ? 1 : 0), kz = (k.w ? 1 : 0) - (k.s ? 1 : 0);
+  const kx = (k.d ? 1 : 0) - (k.a ? 1 : 0), ky = ((k.e || k.r || k[' ']) ? 1 : 0) - ((k.q || k.f || k.c) ? 1 : 0), kz = (k.w ? 1 : 0) - (k.s ? 1 : 0);
   const st: any = (V3d as any).fcStick || { x: 0, y: 0 }, hb = (V3d as any).fcHeight || 0;
   if (st.x || st.y || hb) v3dFreePush(st.x * dt * 3, hb * dt * 2.5, -st.y * dt * 3);
   if (kx || ky || kz) v3dFreePush(kx * dt * 3 * (k.shift ? 3 : 1), ky * dt * 3, kz * dt * 3 * (k.shift ? 3 : 1));
