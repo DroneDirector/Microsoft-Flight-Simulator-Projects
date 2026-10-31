@@ -2315,3 +2315,6 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 @keyframes pax-flash { 0%, 30% { box-shadow: 0 0 0 2px #3FD0E8, 0 0 18px rgba(63,208,232,.45); background: rgba(63,208,232,.12); } 100% { box-shadow: none; } }
 .pax-pet .pet-svg { width: 30px; height: 30px; background: rgba(255,255,255,.08); border-radius: 8px; padding: 2px; }
 canvas.av3.nofade { transition: none; }
+.chip-link { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: filter .15s, transform .15s; }
+.chip-link svg { width: 11px; height: 11px; opacity: .8; }
+.chip-link:hover, .chip-link:focus-visible { filter: brightness(1.25); transform: translateY(-1px); }

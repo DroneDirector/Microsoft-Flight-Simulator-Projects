@@ -125,6 +125,17 @@ function animateBalance(from: number, to: number) {
 }
 
 // Shared bits of markup used by several screens
+/** The status of an aircraft that is flying, with its real phase (in the air, or taxiing, boarding…);
+ *  tap it to see the aircraft on the map. Not flying: the plain status chip. */
+function liveChip(reg: string, status?: string): string {
+  const f: any = State.live.filter(x => x.reg === reg)[0];
+  if (!f) return statusChip(status || 'parked');
+  const air = typeof flightInAir === 'function' ? flightInAir(f) : (f.alt || 0) > 50;
+  const ph = String(f.phase || '').replace(/^Delayed: .*/, 'Delayed at the gate').replace(/^Holding short.*/, 'Holding short').replace(/^Lining up.*/, 'Lining up');
+  const label = air ? (/climb/i.test(ph) ? 'Climbing' : /descent|approach|final/i.test(ph) ? 'Descending' : /hold/i.test(ph) ? 'Holding' : 'In flight') : (ph || 'On the ground');
+  return `<span class="chip chip-${air ? 'flight' : 'amber'} chip-link" role="button" tabindex="0" data-act="show-flight" data-id="${esc(f.id)}" title="Show on the map">${esc(label)}${icon('map')}</span>`;
+}
+ACTIONS['show-flight'] = el => showFlightOnMap(el.getAttribute('data-id'));
 function statusChip(s: string): string {
   const map: { [k: string]: string[] } = {
     flying: ['In flight', 'flight'], parked: ['Available', 'avail'], grounded: ['Maintenance', 'maint'], maintenance: ['Maintenance', 'maint'],

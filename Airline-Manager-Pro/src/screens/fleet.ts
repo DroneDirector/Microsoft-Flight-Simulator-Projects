@@ -10,7 +10,7 @@ function fleetCard(a: Aircraft, i: number): string {
     <div class="ac-stage">${aircraftArt(a.typeId, { color: div ? div.color : c.color, color2: c.color2, reg: a.reg })}</div>
     <div class="ac-info">
       ${_blocked[a.reg] ? `<span class="crew-short">${icon('pilots')}${esc(_blocked[a.reg].join(', '))}</span>` : ''}
-      <div class="ac-row1"><b class="ac-reg">${esc(a.reg)}</b>${State.myReg[a.companyId] === a.reg ? '<span class="you-tag">You fly this</span>' : ''}${(a as any).lease ? '<span class="lease-tag">Leased</span>' : ''}${(a as any).noBase ? '<span class="nostand-tag">No stand</span>' : ''}${statusChip(a.status)}</div>
+      <div class="ac-row1"><b class="ac-reg">${esc(a.reg)}</b>${State.myReg[a.companyId] === a.reg ? '<span class="you-tag">You fly this</span>' : ''}${(a as any).lease ? '<span class="lease-tag">Leased</span>' : ''}${(a as any).noBase ? '<span class="nostand-tag">No stand</span>' : ''}${liveChip(a.reg, a.status)}</div>
       <div class="ac-type">${esc(t.maker)} ${esc(t.model)}</div>
       <div class="ac-dev"><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span>${div ? `<span class="div-tag" style="--dc:${div.color}">${esc(div.name)}</span>` : ''}</div>
       <div class="ac-meta">
@@ -80,7 +80,7 @@ ACTIONS['ac-detail'] = el => {
   const log = State.logbook.filter(l => l.reg === a.reg).slice(0, 4);
   const f = State.live.filter(x => x.reg === a.reg)[0];
   openLayer('modal', `
-    <div class="modal-head"><div><h2>${esc(a.reg)}</h2><small>${esc(t.maker)} ${esc(t.variant)}, ${esc(t.dev)}</small></div>${statusChip(a.status)}
+    <div class="modal-head"><div><h2>${esc(a.reg)}</h2><small>${esc(t.maker)} ${esc(t.variant)}, ${esc(t.dev)}</small></div>${liveChip(a.reg, a.status)}
       <button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body ac-detail">
       ${focus ? flightLogHtml(focus) : ''}

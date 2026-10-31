@@ -32,7 +32,7 @@ function flightCard(f: LiveFlight): string {
   const fuelOk = (State as any).myLoad.fuelKg >= (State as any).myLoad.tripFuelKg + (State as any).myLoad.reserveKg;
   return `
   <div class="card flight-card" data-fc="${esc(f.id)}">
-    <div class="fc-top"><span class="fc-cs">${esc(f.callsign)}</span>${statusChip('flying')}<span class="fc-ac">${esc(f.reg)}, ${esc(t.model)}</span></div>
+    <div class="fc-top"><span class="fc-cs">${esc(f.callsign)}</span>${liveChip(f.reg, 'flying')}<span class="fc-ac">${esc(f.reg)}, ${esc(t.model)}</span></div>
     <div class="fc-route">
       <div><b>${esc(f.from)}</b><small>${esc(A.city)}</small></div>
       <div class="fc-track"><i class="fc-fill" style="width:${(f.t * 100).toFixed(1)}%"></i><i class="fc-plane" style="left:${(f.t * 100).toFixed(1)}%">${icon('fleet')}</i></div>
@@ -221,7 +221,7 @@ ACTIONS['pick-my-ac'] = () => {
         const can = !flyingMine && st === 'avail';
         return `<button class="pick-ac st-${st} ${sel ? 'on' : ''}" data-act="set-my-ac" data-reg="${a.reg}" ${can || sel ? '' : 'disabled'}>
           <span class="pa-art">${aircraftArt(a.typeId, { color: c.color, color2: c.color2, ground: false })}</span>
-          <b>${esc(a.reg)}</b><small>${esc(acType(a.typeId).model)}</small>${statusChip(a.status)}</button>`;
+          <b>${esc(a.reg)}</b><small>${esc(acType(a.typeId).model)}</small>${liveChip(a.reg, a.status)}</button>`;
       }).join('')}</div>
     </div>`, { cls: 'wide' });
 };

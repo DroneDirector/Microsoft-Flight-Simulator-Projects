@@ -42,7 +42,7 @@ SCREENS.pilots = {
         return `<div class="crew-row" style="--i:${i}">
           <button class="avatar av-btn" data-act="staff-detail" data-id="${p.id}" aria-label="${esc(p.name)}">${avatarSvg(p.look, personRole(p), { view: 'bust', accent: c.color })}</button>
           <span class="cr-name"><b>${esc(p.name)} ${levelChip(p)}</b><small>${esc(levelTitle(p))}, ${flag(p.nat)} ${ageOf(p.dob)}, ${num(p.hoursMin / 60)} h, ${esc(p.base)}</small></span>
-          <span class="cr-now">${f ? `${statusChip('flying')}<small>${esc(f.callsign)} ${esc(f.from)} to ${esc(f.to)}, ${Math.round(f.t * 100)}%</small>` : `${statusChip(p.status)}<small>${route ? 'Next: ' + esc(route.code) : 'No route assigned'}</small>`}</span>
+          <span class="cr-now">${f ? `${liveChip(f.reg, 'flying')}<small>${esc(f.callsign)} ${esc(f.from)} to ${esc(f.to)}, ${Math.round(f.t * 100)}%</small>` : `${statusChip(p.status)}<small>${route ? 'Next: ' + esc(route.code) : 'No route assigned'}</small>`}</span>
           <span class="cr-rules">${(p.types || []).map((t: string) => acType(t) ? `<i class="rating">${esc(acType(t).model)}</i>` : '').join('')}${p.status === 'training' && p.training ? `<i class="rating training">${esc(acType(p.training.typeId).model)} course until ${esc(dateStr(new Date(p.training.until)).slice(5, 16))}</i>` : ''}${p.rules ? `<i>${p.rules.maxDutyHrs} h duty</i>` : ''}</span>
           <span class="cr-btns">${f ? `<button class="btn ghost sm" data-act="watch-pilot" data-id="${f.id}">${icon('map')}Watch</button>` : ''}<button class="btn sm" data-act="pilot-rules" data-id="${p.id}">Assign</button></span>
         </div>`;
