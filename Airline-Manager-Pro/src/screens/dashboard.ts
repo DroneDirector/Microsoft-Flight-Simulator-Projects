@@ -165,7 +165,7 @@ SCREENS.ops = {
     // tapping a flight (yours, a hired pilot's or a co-op pilot's) opens its bubble: follow, favourite, details
     _opsMap = new WorldMap(host, { interactive: true, memoKey: 'ops', onSelect: id => { if (!id) showSel(null); } });
     const pts: number[][] = [];
-    liveOf().forEach(f => { pts.push(apt(f.from).pos); if (!f.noDest) pts.push(apt(f.to).pos); if (f.pos) pts.push(f.pos); });
+    liveOf().forEach(f => { const A = apt(f.from), B = f.noDest ? null : apt(f.to); if (A) pts.push(A.pos); if (B) pts.push(B.pos); if (f.pos) pts.push(f.pos); });   // an airport not loaded yet is skipped
     if (!pts.length) pts.push(apt(company().hub).pos, [apt(company().hub).pos[0] + 8, apt(company().hub).pos[1] + 4]);
     if (!_opsMap.resumeFollow()) _opsMap.fit(pts, 40);
     const mine = yourFlight(); if (mine && !_opsMap.following) _opsMap.selected = mine.id;

@@ -90,7 +90,8 @@ function arrivesIn(f: LiveFlight): string {
   // your flight and co-op flights: from distance and ground speed once airborne
   if (f.alt < 50 && !(f.gs > 60)) return '0:00';
   const B = apt(f.to); if (!B) return '—';
-  const left = f.real && f.pos ? gcDistanceNm(f.pos, B.pos) : gcDistanceNm(apt(f.from).pos, B.pos) * (1 - f.t);
+  const A0 = apt(f.from);
+  const left = f.real && f.pos ? gcDistanceNm(f.pos, B.pos) : A0 ? gcDistanceNm(A0.pos, B.pos) * (1 - f.t) : 0;
   return countdown(left / Math.max(60, f.gs || acType(flightTypeId(f)).cruiseKt) * 3600);
 }
 

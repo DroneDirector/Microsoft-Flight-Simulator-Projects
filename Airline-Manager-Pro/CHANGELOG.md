@@ -8,6 +8,7 @@
 - Active flights: in the air vs on the ground with phases; phase tags in the map list
 - Passenger list jump chips (records, pets, pets left behind, celebrity)
 - Avatars painted from cache appear without fading (no flicker)
+- Fix: start-up crash when a live flight's airport is not loaded yet (map fit, world map, airport view, arrival time)
 
 ## 0.9.8 (2026-10-30)
 
