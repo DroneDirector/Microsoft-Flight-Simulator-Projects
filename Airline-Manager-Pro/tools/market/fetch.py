@@ -82,6 +82,7 @@ def steo_jet_fuel():
             for r in rows[:12]:
                 if r and sum(1 for c in r if str(c).strip()[:3] in months) >= 12: mrow = r
                 if r and sum(1 for c in r if isinstance(c, (int, float)) and 1990 < c < 2100) >= 2: yrow = r
+            print(f"::notice::STEO {ws.title}: row {[str(c) for c in row[:4]]}, header rows: {[str(c) for c in (mrow or [])[:8]]} / {[str(c) for c in (yrow or [])[:8]]}")
             if not mrow: continue
             out, year = [], None
             for i, c in enumerate(mrow):
@@ -89,7 +90,9 @@ def steo_jet_fuel():
                 m = months.get(str(c).strip()[:3])
                 if m and year and i < len(row) and isinstance(row[i], (int, float)):
                     out.append([f"{year}-{m:02d}", round(float(row[i]), 2)])
+            print(f"::notice::STEO points {len(out)}, last {out[-3:]}")
             return out
+        print("::notice::STEO: JKTCUUS not found in " + ", ".join(w.title for w in wb.worksheets))
     except Exception as e:
         print(f"::warning::outlook not read: {e}")
     return []
