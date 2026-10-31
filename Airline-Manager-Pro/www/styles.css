@@ -2318,3 +2318,6 @@ canvas.av3.nofade { transition: none; }
 .chip-link { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: filter .15s, transform .15s; }
 .chip-link svg { width: 11px; height: 11px; opacity: .8; }
 .chip-link:hover, .chip-link:focus-visible { filter: brightness(1.25); transform: translateY(-1px); }
+/* while the 3D view is open, pop-ups (passenger list, loadsheet, …) and messages show on top of it */
+body.v3d-on .layer { z-index: 1000; }
+body.v3d-on .toast { z-index: 1010; }

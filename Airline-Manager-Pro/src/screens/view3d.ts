@@ -38,6 +38,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
   V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false;
+  document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0;
   const root = document.createElement('div'); root.className = 'v3d';
@@ -81,7 +82,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
 
 function v3dClose() {
   if (!V3d.open) return;
-  V3d.open = false; cancelAnimationFrame(V3d.raf);
+  V3d.open = false; cancelAnimationFrame(V3d.raf); document.body.classList.remove('v3d-on');
   removeEventListener('resize', v3dSize);
   try {
     V3d.scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); } });

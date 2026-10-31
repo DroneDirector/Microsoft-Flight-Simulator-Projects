@@ -127,7 +127,15 @@ const V3dTerrain = {
   /** The mesh and the map-look paint of a ring. */
   build(r: V3dRing) {
     const T = THREE, size = r.size, n = 1 << r.z, H = r.H, M = r.mask;
-    const water = (i: number) => M ? M[i * 4] > 110 : H[i] <= 0.5;
+    // water from the map outlines, checked against the ground: the sea is at (or near) sea level; a lake is
+    // level ground higher up; "water" on clearly sloping land is a mismatch between the two sources, and is
+    // drawn and shaped as the land it really is (never flattened, so the coastline keeps its shape)
+    const mapWater = (i: number) => M ? M[i * 4] > 110 : H[i] <= 0.5;
+    const level = (i: number) => { const x = i % size, y = (i / size) | 0, h = H[i]; let d = 0;
+      if (x > 0) d = Math.max(d, Math.abs(H[i - 1] - h)); if (x < size - 1) d = Math.max(d, Math.abs(H[i + 1] - h));
+      if (y > 0) d = Math.max(d, Math.abs(H[i - size] - h)); if (y < size - 1) d = Math.max(d, Math.abs(H[i + size] - h)); return d < 4; };
+    const sea = (i: number) => mapWater(i) && H[i] <= 8;
+    const water = (i: number) => mapWater(i) && (H[i] <= 8 || level(i));
     const river = (i: number) => M ? M[i * 4 + 1] > 110 && M[i * 4] <= 110 : false;
     // the map look: dark blue land shaded by its slopes, the sea darker, cyan along the coasts
     const cv = document.createElement('canvas'); cv.width = cv.height = size; const c = cv.getContext('2d'), img = c.createImageData(size, size), D = img.data;
@@ -135,8 +143,8 @@ const V3dTerrain = {
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const i = y * size + x; let R = 11, G = 29, B = 51;
       if (water(i)) {
-        const sea = H[i] <= 2;
-        R = sea ? 4 : 6; G = sea ? 11 : 18; B = sea ? 22 : 34;
+        const isSea = sea(i);
+        R = isSea ? 4 : 6; G = isSea ? 11 : 18; B = isSea ? 22 : 34;
       } else if (river(i)) { R = 18; G = 60; B = 92; }
       else {
         const hx = H[i + (x < size - 1 ? 1 : 0)] - H[i - (x > 0 ? 1 : 0)], hy = H[i + (y < size - 1 ? size : 0)] - H[i - (y > 0 ? size : 0)];
@@ -160,13 +168,15 @@ const V3dTerrain = {
     const sample = (px: number, py: number) => {
       const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
       const h = H[i] * (1 - fx) * (1 - fy) + H[i + 1] * fx * (1 - fy) + H[i + size] * (1 - fx) * fy + H[i + size + 1] * fx * fy;
-      return { h, wet: water(Math.round(y) * size + Math.round(x)) };
+      const k = Math.round(y) * size + Math.round(x);
+      return { h, wet: sea(k), lake: !sea(k) && water(k) ? H[k] : null };
     };
     for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
       const px = i / G * size, py = j / G * size, lon = lonOf(px), lat = latOf(py);
       const s = sample(px, py);
       let h = Math.max(0, s.h);
-      if (s.wet && s.h < 3) h = 0;                       // the sea is at sea level
+      if (s.wet) h = 0;                                  // the sea: perfectly flat, at sea level
+      else if (s.lake != null) h = Math.max(0, s.lake);  // a lake: flat at its own level
       if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
       const p = v3dXY(lon, lat), o = j * (G + 1) + i;
       // outer rings sit a little lower so the finer ring always shows where they meet
