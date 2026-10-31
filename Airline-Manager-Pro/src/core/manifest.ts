@@ -6,7 +6,7 @@
 // conduct record: warnings from earlier flights, or a ban. Your own flight is never given passengers:
 // the list only puts names to the number the simulator (or GSX) reports.
 
-interface PaxRecord { key: string; name: string; nat: string; sex: 'm' | 'f'; notes: { date: string; title: string; text: string; sev: 'warning' | 'ban' }[]; banned?: boolean; bannedBy?: string }
+interface PaxRecord { key: string; name: string; nat: string; sex: 'm' | 'f'; notes: { date: string; title: string; text: string; sev: 'warning' | 'ban' }[]; banned?: boolean; bannedBy?: string; authUntil?: number | null }
 interface PaxSeat { key: string; name: string; nat: string; sex: 'm' | 'f'; age: number; seat: string; cls: 'F' | 'J' | 'Y'; look: any; record: PaxRecord; famous?: string; pet?: PaxPet }
 
 // now and then (about one flight in 20) someone well known is on board; all made-up people
@@ -22,7 +22,23 @@ const PAX_PAST: [string, string, 'warning' | 'ban'][] = [
 ];
 
 function paxStore(): { [key: string]: PaxRecord } { const S: any = State; return S.paxRecords || (S.paxRecords = {}); }
-function noFly(): { [key: string]: string } { const S: any = State; return S.noFly || (S.noFly = {}); }
+function noFly(): { [key: string]: any } { const S: any = State; return S.noFly || (S.noFly = {}); }
+/** Your airline's ban on a passenger: when it ends (null: for life), or undefined when there is none or it has run out. */
+function ownBanUntil(k: string): number | null | undefined {
+  const v = noFly()[k]; if (!v) return undefined;
+  if (typeof v === 'string') return null;   // bans from before ban lengths: for life
+  return v.until == null || v.until > Date.now() ? v.until : undefined;
+}
+/** Is this passenger banned right now, by you or by the authorities, and until when? */
+function paxBan(rec: PaxRecord): { by: string; until: number | null } | null {
+  if (!rec) return null;
+  const own = ownBanUntil(rec.key);
+  if (own !== undefined) return { by: 'your airline', until: own };
+  if (rec.notes.some(n => n.sev === 'ban' && !/your airline/.test(n.title)) && (rec.authUntil == null || rec.authUntil > Date.now())) return { by: 'the authorities', until: rec.authUntil == null ? null : rec.authUntil };
+  return null;
+}
+function banText(b: { by: string; until: number | null }): string { return b.until == null ? `banned for life by ${b.by}` : `banned by ${b.by} until ${dateStr(new Date(b.until)).slice(0, 10)}`; }
+const BAN_LENGTHS: [string, number][] = [['3 months', 91], ['6 months', 182], ['1 year', 365], ['2 years', 730], ['5 years', 1826], ['For life', 0]];
 
 /** The passengers of a flight (cached per flight). */
 const _manifests = new Map<string, PaxSeat[]>();
@@ -60,10 +76,12 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
         const past = PAX_PAST[rr < 1 / 1500 ? 3 + Math.floor(seeded(pkey)() * 2) : Math.floor(seeded(pkey)() * 3)];
         const d = new Date(Date.now() - (30 + Math.floor(seeded(pkey + 'd')() * 700)) * 864e5);
         rec = { key: pkey, name: p.name, nat: p.nat, sex: p.sex, notes: [{ date: dateStr(d).slice(0, 10), title: past[0], text: past[1], sev: past[2] }], banned: past[2] === 'ban', bannedBy: past[2] === 'ban' ? 'the authorities' : '' };
+        // an authorities' ban: for life (about half), or two to five years from the incident
+        if (past[2] === 'ban') { const rb = seeded(pkey + 'ban')(); rec.authUntil = rb < 0.5 ? null : d.getTime() + Math.round((2 + rb * 6) / 1) * 182 * 864e5; rec.notes[0].text += rec.authUntil == null ? ' Banned from flying for life.' : ` Banned from flying until ${dateStr(new Date(rec.authUntil)).slice(0, 10)}.`; }
         paxStore()[pkey] = rec;
       }
     }
-    if (noFly()[pkey] && rec) { rec.banned = true; rec.bannedBy = 'your airline'; }
+    if (rec) { const b = paxBan(rec); rec.banned = !!b; rec.bannedBy = b ? b.by : ''; }   // bans run out
     out.push({ key: pkey, name: p.name, nat: p.nat, sex: p.sex, age: clamp(age, 2, 92), seat, cls, look: p.look, record: rec, pet: age >= 18 ? paxPet(pkey, f) : null });
   }
   // a celebrity on about one flight in 20: in first or business if there is one, otherwise up front in economy
@@ -133,8 +151,8 @@ function paxFacesLazy() {
 ACTIONS['pax-record'] = el => {
   const rec = paxStore()[el.getAttribute('data-key')]; if (!rec) return;
   Sound.tick();
-  const mine = noFly()[rec.key];
-  openLayer('modal', `<div class="modal-head"><div><h2>${esc(rec.name)}</h2><small>${natLabel(rec.nat)}${rec.banned ? ` · banned by ${esc(rec.bannedBy || 'an airline')}` : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+  const mine = ownBanUntil(rec.key) !== undefined;
+  openLayer('modal', `<div class="modal-head"><div><h2>${esc(rec.name)}</h2><small>${natLabel(rec.nat)}${rec.banned && paxBan(rec) ? ` · ${esc(banText(paxBan(rec)))}` : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body warn-list">${rec.notes.map(n => `<div class="warn-item sev-${n.sev === 'ban' ? 'severe' : 'moderate'}"><div class="wi-h"><span class="wi-sev">${n.sev === 'ban' ? 'Ban' : 'Warning'}</span><b>${esc(n.title)}</b><time>${esc(n.date)}</time></div><p>${esc(n.text)}</p></div>`).join('')}
       <div class="modal-actions">${mine ? `<button class="btn ghost" data-act="pax-unban" data-key="${esc(rec.key)}">Lift your airline's ban</button>` : `<button class="btn danger" data-act="pax-ban" data-key="${esc(rec.key)}">${icon('shield')}Ban from your airline</button>`}</div></div>`, { cls: 'narrow' });
 };
@@ -159,21 +177,30 @@ ACTIONS['pax-card'] = el => {
         ${kv('Flight', `${esc(f.callsign)}, ${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)}`)}${kv('Seat', `${esc(p.seat)}, ${cls}`)}${kv('Travelling for', esc(why))}
         ${kv('Checked bags', String(bags))}${kv('Meal', esc(meal))}${kv('Frequent flyer', tier === 'None' ? 'Not a member' : `${tier}, ${flights} flights with you`)}
         ${p.pet ? kv('Pet', `${petSvg(p.pet)} ${esc(p.pet.name)}, ${p.pet.kind}${p.pet.left ? ', left behind' : p.pet.where === 'cabin' ? ', under the seat' : ', in the hold'}`) : ''}
-        ${kv('Conduct', rec ? `<span class="${banned ? 'red' : 'amber'}">${banned ? 'Banned by ' + esc(rec.bannedBy || 'an airline') : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</span>` : '<span class="green">Clean record</span>')}
+        ${kv('Conduct', rec ? `<span class="${banned ? 'red' : 'amber'}">${banned ? (paxBan(rec) ? esc(banText(paxBan(rec)).replace(/^b/, 'B')) : 'Banned') : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</span>` : '<span class="green">Clean record</span>')}
       </div>
       <div class="modal-actions">${rec ? `<button class="btn ghost" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}Conduct record</button>` : ''}
-        ${noFly()[p.key] ? '' : `<button class="btn danger" data-act="pax-ban" data-key="${esc(p.key)}" data-f="${esc(fid)}">${icon('shield')}Ban from your airline</button>`}</div></div></div>`, { cls: 'wide pax-card-pop' });
+        ${ownBanUntil(p.key) !== undefined ? '' : `<button class="btn danger" data-act="pax-ban" data-key="${esc(p.key)}" data-f="${esc(fid)}">${icon('shield')}Ban from your airline</button>`}</div></div></div>`, { cls: 'wide pax-card-pop' });
 };
 ACTIONS['pax-ban'] = el => {
   const k = el.getAttribute('data-key'); let rec = paxStore()[k];
   // a passenger with a clean record can be banned too: a record is started for them
   if (!rec) { const f = State.live.filter(x => x.id === el.getAttribute('data-f'))[0], p = f ? manifestOf(f).filter(x => x.key === k)[0] : null; if (!p) return;
     rec = paxStore()[k] = { key: k, name: p.name, nat: p.nat, sex: p.sex, notes: [] }; p.record = rec; }
-  noFly()[k] = dateStr(new Date()).slice(0, 10); rec.banned = true; rec.bannedBy = 'your airline';
-  rec.notes.push({ date: dateStr(new Date()).slice(0, 10), title: 'Banned by your airline', text: `${rec.name} may no longer fly with ${company().name}.`, sev: 'ban' });
-  Store.save(); closeAll(); toast(`${rec.name} is on your no-fly list`, 'ok');
+  const days = el.getAttribute('data-days');
+  if (days == null) {
+    // first choose how long
+    openLayer('modal', `<div class="modal-head"><div><h2>Ban ${esc(rec.name)}</h2><small>From flying with ${esc(company().name)}. How long?</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+      <div class="modal-body"><div class="ban-len">${BAN_LENGTHS.map(([t, d]) => `<button class="btn ${d ? 'ghost' : 'danger'}" data-act="pax-ban" data-key="${esc(k)}" data-f="${esc(el.getAttribute('data-f') || '')}" data-days="${d}">${esc(t)}</button>`).join('')}</div>
+      <p class="fine-print">${icon('info')}A time ban lifts on its own when it runs out. You can lift any ban early from their record.</p></div>`, { cls: 'narrow' });
+    return;
+  }
+  const d = +days, until = d ? Date.now() + d * 864e5 : null;
+  noFly()[k] = { since: Date.now(), until }; rec.banned = true; rec.bannedBy = 'your airline';
+  rec.notes.push({ date: dateStr(new Date()).slice(0, 10), title: 'Banned by your airline', text: `${rec.name} may not fly with ${company().name} ${until ? 'until ' + dateStr(new Date(until)).slice(0, 10) : 'ever again (a lifetime ban)'}.`, sev: 'ban' });
+  Store.save(); closeAll(); toast(`${rec.name} is ${until ? 'banned until ' + dateStr(new Date(until)).slice(0, 10) : 'banned for life'}`, 'ok');
 };
-ACTIONS['pax-unban'] = el => { const k = el.getAttribute('data-key'), rec = paxStore()[k]; delete noFly()[k]; if (rec) { rec.banned = rec.notes.some(n => n.sev === 'ban' && !/your airline/.test(n.title)); rec.bannedBy = rec.banned ? 'the authorities' : ''; } Store.save(); closeAll(); toast('Ban lifted', 'ok'); };
+ACTIONS['pax-unban'] = el => { const k = el.getAttribute('data-key'), rec = paxStore()[k]; delete noFly()[k]; if (rec) { const b = paxBan(rec); rec.banned = !!b; rec.bannedBy = b ? b.by : ''; } Store.save(); closeAll(); toast('Ban lifted', 'ok'); };
 
 /* ---------- boarding: passports and boarding passes scanned at the gate ---------- */
 const _scanned: { [flightId: string]: boolean } = {};

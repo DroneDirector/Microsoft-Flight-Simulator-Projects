@@ -153,3 +153,18 @@ function heavyLandingHold(f: any, a: any, prof: FlightProfile, origTo: string) {
   (f.holds = f.holds || []).push({ at, s: Math.round(min * 60), kind: 'air', why });
   f.holds.sort((x: Hold, y: Hold) => x.at - y.at);
 }
+
+/* ---------- the people walking to and from the aircraft ---------- */
+const _walkers = new Map<string, { cloth: string; skin: string; pet: string }[]>();
+/** The passengers of the flight that is boarding (the next one) or deboarding (the one that just landed),
+ *  with the colours of their clothes and skin from their passenger card, and their dog or cat. */
+function walkersFor(a: any, stage: string): { cloth: string; skin: string; pet: string }[] {
+  const S: any = State, next = (S.aiNext || []).filter((n: any) => n.reg === a.reg)[0];
+  const f: any = stage === 'Boarding' && next ? { id: `${a.reg}-${next.depAt}`, reg: a.reg, from: next.from, to: next.to, pax: aiPlannedLoad(next).pax, paxJ: 0, paxF: 0 }
+    : a.lastFlightId ? { id: a.lastFlightId, reg: a.reg, from: a.lastFrom || a.location, to: a.location, pax: a.lastPax || 0, paxJ: a.lastPaxJ || 0, paxF: a.lastPaxF || 0 } : null;
+  if (!f || !f.pax) return [];
+  const key = f.id + '|' + f.pax, hit = _walkers.get(key); if (hit) return hit;
+  const list = manifestOf(f).map(p => ({ cloth: UNIFORM_COLORS[(p.look && p.look.uniform) || 0] || '#2F5D8C', skin: SKIN_TONES[(p.look && p.look.skin) || 2] || '#D9A07A', pet: p.pet && !p.pet.left && p.pet.where === 'cabin' ? p.pet.color : '' }));   // pets for the hold go with the bags
+  _walkers.set(key, list); if (_walkers.size > 30) _walkers.delete(_walkers.keys().next().value);
+  return list;
+}

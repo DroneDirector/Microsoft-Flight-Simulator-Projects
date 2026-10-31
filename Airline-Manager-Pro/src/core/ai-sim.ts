@@ -184,7 +184,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   for (const i of State.issues as any[]) if (i.reg === a.reg && i.status === 'scheduled') { i.startedAt = at; a.status = 'maintenance'; }
   try { FlightTrace.arrived(f, at); } catch (e) { /* ignore */ }
   // for the turnaround at the gate: when it got there, who got off, the fuel left
-  (a as any).lastGateAt = at; (a as any).lastPax = f.pax || 0;
+  (a as any).lastGateAt = at; (a as any).lastPax = f.pax || 0; (a as any).lastFlightId = f.id; (a as any).lastFrom = f.from; (a as any).lastPaxJ = (f as any).paxJ || 0; (a as any).lastPaxF = (f as any).paxF || 0;
   try { (a as any).lastFuelKg = legFuel(a.typeId, f.pax || 0, f.from, f.to).land; } catch (e) { /* ignore */ }
   // real-world fares, on-board sales and costs (economics.ts)
   const burnH = (BURN_KG_H[t.cls] || 2000) * engineBurn(a.reg);

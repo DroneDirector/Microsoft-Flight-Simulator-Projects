@@ -2330,3 +2330,4 @@ body.v3d-on .toast { z-index: 1010; }
 .loadsheet tr.now td { color: #3FD0E8; font-weight: 600; border-top: 1px dashed var(--line); }
 .loadsheet tr.tot.good td { color: #3DDC97; } .loadsheet tr.tot.good small { color: rgba(61,220,151,.75); }
 .loadsheet tr.tot.bad td { color: #FF5A5F; } .loadsheet tr.tot.bad small { color: rgba(255,90,95,.8); }
+.ban-len { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 10px; }
