@@ -298,6 +298,8 @@ function flightPathPos(f: any, now?: number): { pos: number[]; hdg: number; d: n
   if (!fp) { fp = flightPathFor(f.from, f.noDest ? null : f.to); if (!fp) return null; _flightPaths[pk] = fp; }
   now = now || Date.now();
   const prof: FlightProfile = f.coop || f.tfc ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
+  // the simulator's procedures much longer than the trip the times are worked out for: the app's own ones instead
+  if ((fp as any).sim && prof.routeNm > 0 && fp.len > prof.routeNm * 1.4 + 40) { const own = flightPathFor(f.from, f.noDest ? null : f.to, true); if (own) fp = _flightPaths[pk] = own; }
   const fe = flightEl(f, now), q = profileAt(prof, fe.el);
   // the profile's distance (along airways) mapped onto this path
   const d = prof.routeNm > 0 ? q.d / prof.routeNm * fp.len : 0;
