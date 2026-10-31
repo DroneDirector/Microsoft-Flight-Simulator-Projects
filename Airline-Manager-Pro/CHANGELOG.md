@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.34 (2026-10-31)
+
+- Back to the restore point (amp-restore-before-faa-taxiways): FAA dimensions removed, ICAO everywhere
+
 ## 0.9.33 (2026-10-31)
 
 - layoutGenerate: FAA AC 150/5300-13B separations and taxiway widths at US airports (faaAirport/faaTaxiDims), ICAO elsewhere
