@@ -2331,3 +2331,19 @@ body.v3d-on .toast { z-index: 1010; }
 .loadsheet tr.tot.good td { color: #3DDC97; } .loadsheet tr.tot.good small { color: rgba(61,220,151,.75); }
 .loadsheet tr.tot.bad td { color: #FF5A5F; } .loadsheet tr.tot.bad small { color: rgba(255,90,95,.8); }
 .ban-len { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 10px; }
+/* a visit with a pet */
+.pet-visit { display: grid; grid-template-columns: 220px 1fr; gap: 18px; align-items: center; }
+.pv-fig { background: radial-gradient(circle at 50% 40%, rgba(63,208,232,.15), transparent 70%); border-radius: 18px; }
+.pet-portrait { width: 100%; height: auto; display: block; }
+.pet-portrait .pp-tail { transform-origin: 118px 110px; animation: pp-wag 1.6s ease-in-out infinite; }
+.pet-portrait.happy .pp-tail { animation-duration: .28s; }
+.pet-portrait .pp-eyes { transform-origin: 80px 55px; animation: pp-blink 4.5s infinite; }
+.pet-portrait.cat.happy .pp-eyes { transform: scaleY(.15); animation: none; transition: transform .3s; }
+.pet-portrait.happy { animation: pp-bounce .5s ease-out 2; }
+@keyframes pp-wag { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(10deg); } }
+@keyframes pp-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes pp-bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+.pv-say { font-size: 15px; line-height: 1.5; min-height: 66px; } .pv-say.pop { animation: np-in .4s ease-out; }
+.pv-words { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.calm .pet-portrait * { animation: none !important; }
+@media (max-width: 640px) { .pet-visit { grid-template-columns: 1fr; } .pv-fig { max-width: 200px; margin: 0 auto; } }

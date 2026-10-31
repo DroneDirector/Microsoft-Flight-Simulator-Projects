@@ -127,7 +127,7 @@ function paxRowHtml(fid: string, p: PaxSeat, i: number): string {
   const rec = p.record, banned = rec && rec.banned;
   return `<div role="button" tabindex="0" data-act="pax-card" data-f="${esc(fid)}" data-key="${esc(p.key)}" class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''} ${p.famous ? 'famous' : ''} ${p.pet ? (p.pet.left ? 'has-petleft' : 'has-pet') : ''} ${rec ? 'has-rec' : ''} ${p.famous ? 'has-star' : ''}">
     <span class="pax-face" data-face="${esc(fid)}|${esc(p.key)}" data-i="${i}"></span>
-    <span class="pax-who"><b>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small>${p.pet ? `<span class="pax-pet ${p.pet.left ? 'left' : ''}" title="${esc(p.pet.left || '')}">${petSvg(p.pet)}<small>${esc(p.pet.name)}, ${p.pet.kind}, ${p.pet.left ? 'stayed behind' : p.pet.where === 'cabin' ? 'under the seat' : 'in the hold'}</small></span>` : ''}</span>
+    <span class="pax-who"><b>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small>${p.pet ? `<span class="pax-pet ${p.pet.left ? 'left' : ''}" role="button" data-act="pet-visit" data-f="${esc(fid)}" data-key="${esc(p.key)}" title="${esc(p.pet.left || 'Visit ' + p.pet.name)}">${petSvg(p.pet)}<small>${esc(p.pet.name)}, ${p.pet.kind}, ${p.pet.left ? 'stayed behind' : p.pet.where === 'cabin' ? 'under the seat' : 'in the hold'}</small></span>` : ''}</span>
     <span class="pax-seat">${esc(p.seat)}</span>
     ${rec ? `<button class="pax-rec ${banned ? 'ban' : ''}" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}${banned ? 'Banned' : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</button>` : '<span class="pax-clean">Clean</span>'}
   </div>`;
@@ -180,6 +180,7 @@ ACTIONS['pax-card'] = el => {
         ${kv('Conduct', rec ? `<span class="${banned ? 'red' : 'amber'}">${banned ? (paxBan(rec) ? esc(banText(paxBan(rec)).replace(/^b/, 'B')) : 'Banned') : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</span>` : '<span class="green">Clean record</span>')}
       </div>
       <div class="modal-actions">${rec ? `<button class="btn ghost" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}Conduct record</button>` : ''}
+        ${p.pet ? `<button class="btn ghost" data-act="pet-visit" data-f="${esc(fid)}" data-key="${esc(p.key)}">${petSvg(p.pet)}Visit ${esc(p.pet.name)}</button>` : ''}
         ${ownBanUntil(p.key) !== undefined ? '' : `<button class="btn danger" data-act="pax-ban" data-key="${esc(p.key)}" data-f="${esc(fid)}">${icon('shield')}Ban from your airline</button>`}</div></div></div>`, { cls: 'wide pax-card-pop' });
 };
 ACTIONS['pax-ban'] = el => {
