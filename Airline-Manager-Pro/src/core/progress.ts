@@ -159,7 +159,10 @@ const Progress = {
     try {
       const top = fresh.sort((a, b) => b.tier - a.tier)[0];
       State.notices.unshift({ id: uid(), kind: 'staff' as any, title: fresh.length === 1 ? `Badge earned: ${top.title}` : `${fresh.length} badges earned`, body: fresh.slice(0, 4).map(b => `${b.title} (${TIER_NAMES[b.tier]})`).join(', ') + (fresh.length > 4 ? ' and more' : '') + '.', time: 'Now', read: false, ref: 'badges' } as any);
-      renderTopbar(); toast(fresh.length === 1 ? `Badge earned: ${top.title}` : `${fresh.length} badges earned`, 'ok', { label: 'See', act: 'go-ranking' });
+      renderTopbar();
+      // revealed like a special card as soon as nothing else is open
+      let tries = 0; const show = () => { if (document.hidden || document.querySelector('.layer.open') || document.body.classList.contains('v3d-on')) { if (++tries < 40) setTimeout(show, 2500); else toast(fresh.length === 1 ? `Badge earned: ${top.title}` : `${fresh.length} badges earned`, 'ok', { label: 'See', act: 'go-ranking' }); return; } badgeReveal(fresh); };
+      setTimeout(show, 900);
     } catch (e) { /* interface not ready */ }
   },
 

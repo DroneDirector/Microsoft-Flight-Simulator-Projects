@@ -46,7 +46,7 @@ SCREENS.ranking = {
         ${list.length > 120 ? `<button class="text-btn" data-act="rk-all">${_rkShowAll ? 'Show the newest' : 'Show all ' + num(list.length)}</button>` : ''}</div>
       <div class="bdg-grid">${shown.map((b, i) => {
         const have = earned[b.id];
-        return `<div class="bdg t${b.tier} have" style="--i:${Math.min(i, 30)}" title="${esc(b.desc)}">
+        return `<div class="bdg t${b.tier} have" style="--i:${Math.min(i, 30)}" title="${esc(b.desc)}" data-act="badge-open" data-id="${esc(b.id)}" role="button" tabindex="0">
           <span class="bdg-ic">${icon(b.icon)}</span><span class="bdg-t"><b>${esc(b.title)}</b><small>${esc(b.desc)}</small>
           <em>${TIER_NAMES[b.tier]} · earned ${esc(dateStr(new Date(have)).slice(0, 10))}</em></span></div>`;
       }).join('') || `<p class="fine-print rk-empty">${icon('trophy')}No badges yet. They appear here as you earn them by flying yourself.</p>`}</div>

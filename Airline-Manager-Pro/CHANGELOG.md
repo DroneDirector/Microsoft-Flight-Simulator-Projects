@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.22 (2026-10-31)
+
+- Real-world markets (EIA jet fuel spot, BLS aircraft parts PPI via FRED) from a daily workflow; EIA STEO jet fuel outlook and parts trend with notices
+- Badge card reveal; My career world map; aerial photos over all rings
+
 ## 0.9.21 (2026-10-31)
 
 - Ground lookups follow the drawn mesh triangles (levelled airport, flat sea); aircraft, sheet, runways and patch placed on it

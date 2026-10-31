@@ -185,6 +185,28 @@ ACTIONS['brf-save'] = () => {
 ACTIONS['brf-del'] = el => { delete briefings()[el.getAttribute('data-k')]; Store.save(); refresh(); };
 
 /* ---------- profile ---------- */
+/** The world, with every route you flew and every airport you've been to. */
+let _pfZoom = false;
+function worldFlightsSvg(log: any[]): string {
+  const W = 1000, H = 470, top = 84, bot = -58;   // latitudes shown
+  const P = (q: number[]) => [(q[0] + 180) / 360 * W, (top - q[1]) / (top - bot) * H];
+  const land = LAND.map(poly => 'M' + poly.map(q => P(q).map(v => v.toFixed(1)).join(' ')).join('L') + 'Z').join('');
+  const seen: { [k: string]: number } = {}, apts: { [k: string]: number } = {};
+  log.forEach((l: any) => { if (!apt(l.from) || !apt(l.to) || l.from === l.to) return; const k = [l.from, l.to].sort().join('|'); seen[k] = (seen[k] || 0) + 1; apts[l.from] = (apts[l.from] || 0) + 1; apts[l.to] = (apts[l.to] || 0) + 1; });
+  const arcs = Object.keys(seen).map(k => {
+    const [a, b] = k.split('|'), A = apt(a).pos, B = apt(b).pos, pts: number[][] = [];
+    for (let i = 0; i <= 32; i++) pts.push(P(gcInterpolate(A, B, i / 32)));
+    // a route across the date line is cut where it wraps
+    let d = 'M' + pts[0].map(v => v.toFixed(1)).join(' ');
+    for (let i = 1; i < pts.length; i++) d += (Math.abs(pts[i][0] - pts[i - 1][0]) > W / 2 ? 'M' : 'L') + pts[i].map(v => v.toFixed(1)).join(' ');
+    return `<path d="${d}" stroke="var(--cyan)" stroke-opacity="${Math.min(0.95, 0.35 + seen[k] * 0.12)}" stroke-width="${Math.min(3.5, 1.2 + seen[k] * 0.25)}" fill="none" stroke-linecap="round"/>`;
+  }).join('');
+  const dots = Object.keys(apts).map(k => { const p = P(apt(k).pos), r = Math.min(6, 2.6 + Math.sqrt(apts[k]) * 0.6); return `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" stroke="var(--cyan)" stroke-width="1.2"><title>${esc(k)}${apt(k) ? ' · ' + esc(apt(k).name) : ''}: ${apts[k]} visit${apts[k] > 1 ? 's' : ''}</title></circle>`; }).join('');
+  const labels = Object.keys(apts).sort((a, b) => apts[b] - apts[a]).slice(0, 12).map(k => { const p = P(apt(k).pos); return `<text x="${(p[0] + 6).toFixed(1)}" y="${(p[1] - 6).toFixed(1)}" font-size="11" fill="var(--ink-2)">${esc(k)}</text>`; }).join('');
+  const grat = [-30, 0, 30, 60].map(la => { const y = P([0, la])[1]; return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.05)"/>`; }).join('') + [-120, -60, 0, 60, 120].map(lo => { const x = P([lo, 0])[0]; return `<line y1="0" y2="${H}" x1="${x}" x2="${x}" stroke="rgba(255,255,255,.05)"/>`; }).join('');
+  return `<svg class="pf-map pf-world" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${grat}<path d="${land}" fill="rgba(120,160,200,.16)" stroke="rgba(150,190,230,.28)" stroke-width=".6"/>${arcs}${dots}${labels}</svg>`;
+}
+ACTIONS['pf-zoom'] = () => { _pfZoom = !_pfZoom; Sound.tick(); refresh(); };
 function flightsMapSvg(log: any[]): string {
   const pts: number[][][] = []; log.slice(0, 300).forEach(l => { const A = apt(l.from), B = apt(l.to); if (A && B && l.from !== l.to) pts.push([A.pos, B.pos]); });
   if (!pts.length) return '<p class="muted pad">Your flights show up here as a map.</p>';
@@ -205,7 +227,8 @@ function profileHtml(): string {
   return `<div class="card pf"><div class="pf-head"><span class="pf-av">${avatarSvg(me.look, 'captain', { view: 'bust', accent: c.color, still: true })}</span>
       <span><h2>${esc(me.name)}</h2><small>${esc(levelTitle(me))}${coopOn() ? ' · co-op rank: ' + esc(myRankName()) : ''} · ${natLabel(me.nat)}</small></span></div>
     <div class="kv-row"><div><small>Flights</small><b>${num(log.length)}</b></div><div><small>Hours</small><b>${hours(me.hoursMin || 0)}</b></div><div><small>Average landing</small><b>${avg} fpm</b></div><div><small>Favourite aircraft</small><b>${favT ? esc(acType(favT).model) : '—'}</b></div><div><small>Wallet</small><b class="${k.wallet >= 0 ? 'green' : 'red'}">${money(k.wallet)}</b></div><div><small>Pay</small><b>${money(myPayRate())}/h</b></div></div>
-    ${flightsMapSvg(log)}
+    <div class="pf-map-h"><b>Where you've flown</b><small>${Object.keys(log.reduce((m: any, l: any) => { m[l.from] = 1; m[l.to] = 1; return m; }, {})).length} airports, ${new Set(log.map((l: any) => apt(l.to) ? apt(l.to).country : '')).size} countries</small><span class="seg"><button class="${_pfZoom ? '' : 'on'}" data-act="pf-zoom">World</button><button class="${_pfZoom ? 'on' : ''}" data-act="pf-zoom">My area</button></span></div>
+    ${_pfZoom ? flightsMapSvg(log) : worldFlightsSvg(log)}
     <h3>Licence</h3><div class="lic">${lic.map(t => acType(t) ? `<span class="chip chip-green">${icon('check')}${esc(acType(t).model)}</span>` : '').join('') || '<small class="muted">No type ratings yet. Your first flight on a type is your check ride: land under 400 fpm and 1.6 g without damage.</small>'}</div>
     <h3>Where you are</h3><div class="ev-row"><span><b>${esc(myLoc())}${apt(myLoc()) ? ' · ' + esc(apt(myLoc()).name) : ''}</b><small>${locRealism() ? 'Your next flight starts here; flying from elsewhere means a jumpseat ride first, paid from your wallet.' : 'Pilot location is off (Settings → Economy): you can start anywhere.'}</small></span>
       ${locRealism() ? `<button class="btn ghost sm" data-act="js-open">${icon('swap')}Jumpseat</button>` : ''}</div>

@@ -46,11 +46,84 @@ function marketsState(): { [k in MarketId]: Market } {
   return S.mkt;
 }
 function marketIdx(k: MarketId): number { const m = marketsState()[k]; return m ? m.idx : 1; }
+/* ---------- real-world prices ---------- */
+// Jet fuel follows the real US Gulf Coast jet fuel spot price (U.S. Energy Information Administration),
+// spare parts the real US producer price index for aircraft parts (U.S. Bureau of Labor Statistics); both
+// public domain, fetched once a day by the app's own update service. Offline or switched off (Settings →
+// Economy): the simulated market.
+const MARKET_REAL_URL = 'https://raw.githubusercontent.com/DroneDirector/Microsoft-Flight-Simulator-Projects/amp-market-data/amp-market.json';
+const FUEL_NORMAL_USD_GAL = 2.58;   // the app's normal fuel price (0.85 $/kg) in dollars a gallon
+function realMarkets(): any { const S: any = State; const d = S.mktReal; return (State.settings as any).realMarkets !== false && d && d.fuel && Date.now() - Date.parse(d.updated) < 14 * 864e5 ? d : null; }
+function fetchRealMarkets() {
+  if ((State.settings as any).realMarkets === false) return;
+  fetch(MARKET_REAL_URL + '?t=' + Math.floor(Date.now() / 3600e3), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(d => {
+    if (!d || !d.fuel || !d.parts) return;
+    const S: any = State, was = S.mktReal && S.mktReal.updated; S.mktReal = d;
+    if (was !== d.updated) { marketsAdvance(); Store.soon(); try { if (State.screen === 'finance') refresh(); } catch (e) { /* ignore */ } }
+  }).catch(() => { /* offline: the simulated market carries on */ });
+}
+/** One market from the real figures: its level against normal, its last months, and what moved it. */
+function marketFromReal(k: MarketId, m: Market, d: any, vol: number) {
+  const s: [string, number][] = (k === 'fuel' ? d.fuel.series : d.parts.series) || []; if (s.length < 2) return;
+  const base = k === 'fuel' ? FUEL_NORMAL_USD_GAL : s.slice(-36).reduce((a, x) => a + x[1], 0) / Math.min(36, s.length);
+  const idxOf = (v: number) => clamp(1 + (v / base - 1) * vol, 0.4, 3);
+  const last = s[s.length - 1];
+  m.idx = m.target = idxOf(last[1]); m.last = Date.now(); m.pending = undefined;
+  m.hist = s.slice(k === 'fuel' ? -90 : -36).map(x => ({ d: x[0], v: Math.round(idxOf(x[1]) * 1000) / 1000 }));
+  // what moved it: the week's change for fuel, the month's for parts (each reported once)
+  const back = k === 'fuel' ? s[Math.max(0, s.length - 6)] : s[s.length - 2], ch = (last[1] - back[1]) / back[1];
+  const key = k + ':' + last[0];
+  if ((m as any).realKey !== key) {
+    (m as any).realKey = key; m.events = m.events.filter(e => (e as any).real);
+    const pct = Math.round(Math.abs(ch) * 1000) / 10, up = ch > 0;
+    if (Math.abs(ch) >= (k === 'fuel' ? 0.02 : 0.002)) {
+      const text = k === 'fuel'
+        ? `Jet fuel ${up ? 'rose' : 'fell'} ${pct}% in a week on the world market: the US Gulf Coast spot price is $${last[1].toFixed(2)} a gallon (EIA, ${last[0]})`
+        : `Aircraft parts prices ${up ? 'rose' : 'fell'} ${pct}% in a month (US producer price index for aircraft parts, BLS, ${last[0].slice(0, 7)})`;
+      const ev: any = { at: Date.parse(last[0]) || Date.now(), text, delta: ch, kind: 'news', real: true };
+      m.events.unshift(ev);
+      if (Math.abs(ch) >= (k === 'fuel' ? 0.05 : 0.01)) marketNotice(k, `${MARKET_NAME[k]} prices ${up ? 'up' : 'down'} ${pct}%`, `${text}. ${marketStockText(k)}`, Date.now());
+    } else m.events.unshift({ at: Date.parse(last[0]) || Date.now(), text: k === 'fuel' ? `Jet fuel steady on the world market: $${last[1].toFixed(2)} a gallon on the US Gulf Coast (EIA, ${last[0]})` : `Aircraft parts prices steady (US producer price index, BLS, ${last[0].slice(0, 7)})`, delta: ch, kind: 'news', real: true } as any);
+    if (m.events.length > 40) m.events.length = 40;
+  }
+  marketOutlook(k, m, d, s);
+}
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** What's coming: the EIA's forecast for jet fuel; for parts, where the last year's trend leads (not a forecast). */
+function marketOutlook(k: MarketId, m: Market, d: any, s: [string, number][]) {
+  let o: any = null;
+  if (k === 'fuel') {
+    const f: [string, number][] = (d.outlook && d.outlook.series) || [], now = new Date().toISOString().slice(0, 7);
+    const i = f.map(x => x[0]).lastIndexOf(f.filter(x => x[0] <= now).map(x => x[0]).pop() || '');
+    if (i >= 0 && f[i][1] > 0) {
+      const j = Math.min(f.length - 1, i + 3);
+      if (j > i) {
+        const ch = f[j][1] / f[i][1] - 1, mon = MONTH_NAMES[Number(f[j][0].slice(5, 7)) - 1] || f[j][0];
+        const at = s[s.length - 1][1] * (1 + ch);
+        o = { ch, key: 'fuel:' + f[f.length - 1][0] + ':' + f[j][0] + ':' + Math.round(ch * 100), forecast: true,
+          text: Math.abs(ch) < 0.02 ? `The EIA expects jet fuel to stay about where it is through ${mon} (Short-Term Energy Outlook).`
+            : `The EIA expects jet fuel about ${ch > 0 ? '+' : ''}${Math.round(ch * 100)}% by ${mon}, around $${at.toFixed(2)} a gallon (Short-Term Energy Outlook).` };
+      }
+    }
+  } else if (s.length >= 13) {
+    const back = s[s.length - 13][1], last = s[s.length - 1][1];
+    if (back > 0) {
+      const rate = Math.pow(last / back, 1 / 12) - 1, ch = Math.pow(1 + rate, 3) - 1;
+      o = { ch, key: 'parts:' + s[s.length - 1][0], forecast: false,
+        text: Math.abs(ch) < 0.003 ? 'Parts prices have been flat over the last year (trend, not a forecast).'
+          : `At the last year's pace, parts prices would be about ${ch > 0 ? '+' : ''}${(Math.round(ch * 1000) / 10).toFixed(1)}% in three months (trend, not a forecast).` };
+    }
+  }
+  const was = (m as any).outlook; (m as any).outlook = o;
+  if (o && (!was || was.key !== o.key) && Math.abs(o.ch) >= (k === 'fuel' ? 0.05 : 0.01))
+    marketNotice(k, `${MARKET_NAME[k]} prices expected to ${o.ch > 0 ? 'rise' : 'fall'}`, `${o.text} ${o.ch > 0 ? 'Buying stock now could pay off. ' : 'Holding off on stock could save money. '}${marketStockText(k)}`, Date.now());
+}
 /** Run the markets up to now (also after the app was closed for a while). */
 function marketsAdvance() {
-  const ms = marketsState(), now = Date.now(), vol = diff().vol;
+  const ms = marketsState(), now = Date.now(), vol = diff().vol, real = realMarkets();
   for (const k of ['fuel', 'parts'] as MarketId[]) {
     const m = ms[k];
+    if (real) { marketFromReal(k, m, real, vol); continue; }
     let t = Math.max(m.last || now, now - 60 * 864e5);
     while (t < now) {
       const step = Math.min(3600e3, now - t); t += step; const h = step / 3600e3;
@@ -90,7 +163,7 @@ function marketNotice(k: MarketId, title: string, body: string, t: number) {
   if (t < Date.now() - 2 * 864e5) return;   // long-past news (the app was closed): only in the market history
   State.notices.unshift({ id: uid(), kind: 'finance' as any, title, body, time: t > Date.now() - 120e3 ? 'Now' : dateStr(new Date(t)).slice(5, 16), at: t, read: false } as any);
 }
-function startMarkets() { marketsAdvance(); setInterval(() => { if (!document.hidden) marketsAdvance(); }, 60000); }
+function startMarkets() { marketsAdvance(); fetchRealMarkets(); setInterval(() => { if (!document.hidden) marketsAdvance(); }, 60000); setInterval(() => { if (!document.hidden) fetchRealMarkets(); }, 6 * 3600e3); }
 
 /* ---------- stock ---------- */
 interface Stock { fuelKg: number; fuelPaid: number; parts: number; partsPaid: number }
@@ -126,7 +199,9 @@ function marketsCardHtml(): string {
       <div class="mkt-spark">${trend.length > 1 ? sparkline(trend, 220, 46) : ''}<small>Last ${trend.length} days</small></div>
       <div class="mkt-stock"><small>In stock</small><b>${k === 'fuel' ? num(Math.round(have / 1000)) + ' t' : money(have, { compact: true })}</b><span class="mkt-bar"><i style="width:${Math.min(100, have / cap * 100).toFixed(0)}%"></i></span><small>room for ${k === 'fuel' ? num(Math.round(cap / 1000)) + ' t' : money(cap, { compact: true })}</small></div>
     </div>
-    ${warn ? `<p class="mkt-warn">${icon('alert')}${esc(warn.text)} (expected by ${esc(dateStr(new Date(warn.due)).slice(5, 10))}).</p>` : ''}
+    ${realMarkets() ? `<p class="mkt-real">${icon('wifi')}Real-world prices: ${esc(k === 'fuel' ? realMarkets().fuel.name : realMarkets().parts.name)}, ${esc(k === 'fuel' ? realMarkets().fuel.source : realMarkets().parts.source)}. Updated ${esc(String(realMarkets().updated).slice(0, 10))}.</p>` : ''}
+    ${realMarkets() && (m as any).outlook ? `<p class="mkt-warn mkt-outlook">${icon(Math.abs((m as any).outlook.ch) >= 0.05 ? 'alert' : 'info')}Outlook: ${esc((m as any).outlook.text)}</p>` : ''}
+    ${warn && !realMarkets() ? `<p class="mkt-warn">${icon('alert')}${esc(warn.text)} (expected by ${esc(dateStr(new Date(warn.due)).slice(5, 10))}).</p>` : ''}
     ${last ? `<p class="mkt-why">${icon('info')}Latest: ${esc(last.text)} (${last.delta > 0 ? '+' : ''}${Math.round(last.delta * 100)}%, ${esc(dateStr(new Date(last.at)).slice(5, 10))}).</p>` : `<p class="mkt-why">${icon('info')}A calm market for now.</p>`}
     <div class="btn-row">${buys.map(q => { const cost = k === 'fuel' ? Math.round(q * price) : Math.round(q * m.idx); return `<button class="btn ghost sm" data-act="mkt-buy" data-k="${k}" data-q="${q}" ${have + q > cap ? 'disabled' : ''}>${icon('plus')}${k === 'fuel' ? num(q / 1000) + ' t' : money(q, { compact: true })}<small>${money(cost, { compact: true })}</small></button>`; }).join('')}</div>
     <p class="fine-print">${k === 'fuel' ? 'Flights leaving your bases use the stored fuel first; elsewhere, and when it runs out, fuel is bought at the day\'s price.' : 'Maintenance uses parts from stock first; when it runs out, parts are bought at the day\'s price.'} Difficulty: ${esc(diff().name)}.</p>
