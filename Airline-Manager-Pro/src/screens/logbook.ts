@@ -20,7 +20,7 @@ SCREENS.logbook = {
       <div class="stat"><small>Crashes</small><b>${rows.filter(l => l.decision === 'registered').length}<span> registered</span></b></div>
     </div>
     <div class="log-table" role="table">
-      <div class="lt-head" role="row"><span>Date</span><span>Route</span><span>Aircraft</span><span>Block</span><span>Landing</span><span>Load</span><span>ATC</span><span>Result</span></div>
+      <div class="lt-head" role="row"><span>Date</span><span>Route</span><span>Aircraft</span><span>Block</span><span>Landing</span><span>Load</span><span>ATC</span><span>Score</span><span>Result</span></div>
       ${rows.map((l, i) => {
         const t = acType(plane(l.reg).typeId);
         const fpmCls = l.result === 'crash' ? 'red' : Math.abs(l.landingFpm) > 300 ? 'amber' : Math.abs(l.landingFpm) < 150 ? 'green' : '';
@@ -32,6 +32,7 @@ SCREENS.logbook = {
           <span class="${fpmCls}">${num(l.landingFpm)} fpm<small>${l.g.toFixed(2)} g</small></span>
           <span>${l.pax} pax</span>
           <span>${esc(l.atc)}</span>
+          <span class="${(l as any).score == null ? '' : (l as any).score >= 90 ? 'green' : (l as any).score >= 75 ? '' : (l as any).score >= 60 ? 'amber' : 'red'}">${(l as any).score != null ? (l as any).score : '—'}</span>
           <span>${l.result === 'crash' && l.decision === 'pending'
             ? `<button class="btn danger sm" data-act="open-crash" data-id="${l.id}">Decide</button>`
             : l.decision === 'disregarded' ? '<span class="chip chip-dim">Disregarded</span>' : statusChip(l.result)}${l.notes ? `<small>${esc(l.notes)}</small>` : ''}</span>
@@ -71,7 +72,9 @@ function flightLogHtml(l: LogEntry): string {
       ${tx ? `<div><small>Result</small><b class="${tx.amount >= 0 ? 'green' : 'red'}">${money(tx.amount, { sign: true, compact: true })}</b></div>` : ''}
     </div>
     ${l.notes ? `<p class="fine-print">${icon('info')}${esc(l.notes)}</p>` : ''}
+    ${flightScoreHtml(l)}
+    ${photoStrip(l.id)}
     ${issues.length ? `<div class="flog-iss"><small>Found after this flight</small>${issues.map(i => `<button class="mini-row" data-act="open-issue" data-id="${i.id}">${statusChip(i.severity)}<span>${esc(i.title)}</span><small>${money(i.cost, { compact: true })}</small></button>`).join('')}</div>` : ''}
-    <div class="btn-row">${l.result === 'crash' && l.decision === 'pending' ? `<button class="btn danger sm" data-act="open-crash" data-id="${l.id}">Decide about the crash</button>` : ''}${tx ? `<button class="btn ghost sm" data-act="tx-detail" data-id="${tx.id}">${icon('finance')}Money in and out</button>` : ''}</div>
+    <div class="btn-row">${replayBtn(l)}${l.result === 'crash' && l.decision === 'pending' ? `<button class="btn danger sm" data-act="open-crash" data-id="${l.id}">Decide about the crash</button>` : ''}${tx ? `<button class="btn ghost sm" data-act="tx-detail" data-id="${tx.id}">${icon('finance')}Money in and out</button>` : ''}</div>
   </div>`;
 }

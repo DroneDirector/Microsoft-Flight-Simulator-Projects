@@ -115,6 +115,9 @@
     "src/core/markets.ts",
     "src/core/career.ts",
     "src/core/coop-plus.ts",
+    "src/core/va-track.ts",
+    "src/core/va-crew.ts",
+    "src/core/va-league.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/main.ts"

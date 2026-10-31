@@ -166,6 +166,7 @@ ACTIONS['open-notice'] = el => {
   n.read = true; rerenderInbox(); renderTopbar(); Sound.tick();
   if ((n as any).tx) ACTIONS['tx-detail']({ getAttribute: () => (n as any).tx } as any, null);
   else if ((n as any).txs) flightsMoneyPopup((n as any).txs);
+  else if (n.ref && /^va-/.test(String(n.ref))) vaNoticeOpen(String(n.ref));
   else if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref && /^scan-/.test(n.ref)) scanPopup(n.ref.slice(5));

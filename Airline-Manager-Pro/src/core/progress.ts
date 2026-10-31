@@ -76,6 +76,9 @@ function badgeDefs(): BadgeDef[] {
   ladder('airline', 'Operations', 'a.pax', LADDERS.pax, 'pax', v => `${_fmtN(v)} passengers`, v => `Carry ${_fmtN(v)} passengers for your airline on your own flights.`);
   ladder('airline', 'Staff', 'a.staff', [1, 5, 10, 25, 50, 100, 250, 500, 1000], 'pilots', v => `${v} ${v === 1 ? 'employee' : 'employees'}`, v => `Employ ${v} people.`);
   ladder('airline', 'Staff', 'a.pilots', [1, 2, 3, 5, 10, 20, 50, 100], 'pilots', v => `${v} hired ${v === 1 ? 'pilot' : 'pilots'}`, v => `Hire ${v} ${v === 1 ? 'pilot' : 'pilots'}.`);
+  ladder('airline', 'Awards', 'a.aotm', [1, 2, 3, 5, 10, 12, 24], 'trophy', v => v === 1 ? 'Airline of the Month' : `Airline of the Month ×${v}`, v => `Be named Airline of the Month ${v} ${v === 1 ? 'time' : 'times'}: the best airline of the league that month.`);
+  ladder('airline', 'Awards', 'a.aoty', [1, 2, 3, 5, 10], 'trophy', v => v === 1 ? 'Airline of the Year' : `Airline of the Year ×${v}`, v => `Be named Airline of the Year ${v} ${v === 1 ? 'time' : 'times'}.`);
+  ladder('pilot', 'Flight score', 'p.perfect', LADDERS.count, 'check', v => v === 1 ? 'Perfect flight' : `${_fmtN(v)} perfect flights`, v => `Fly ${_fmtN(v)} ${v === 1 ? 'flight' : 'flights'} with a flight score of 100.`);
   ladder('airline', 'Popularity', 'a.pop', LADDERS.pop, 'star', v => v === 100 ? 'Everyone\'s favourite' : `Popularity ${v}`, v => `Reach a popularity of ${v} out of 100.`);
   // ---- the crew
   ladder('crew', 'Crew', 'c.topRated', [1, 3, 5, 10, 25, 50, 100], 'star', v => `${v} top-rated crew`, v => `Have ${v} flight attendants or mechanics rated 4.5 or higher.`);
@@ -125,6 +128,7 @@ const Progress = {
     const staff = staffOf(c.id), pilots = State.pilots.filter((p: any) => p.companyId === c.id && !p.you);
     st['a.staff'] = staff.length + pilots.length; st['a.pilots'] = pilots.filter((p: any) => !p.coPilotFor).length;
     st['a.pop'] = Math.round(c.reputation || 0);
+    { const aw: any[] = (S.airlineAwards || []); st['a.aotm'] = aw.filter(x => x.kind === 'month').length; st['a.aoty'] = aw.filter(x => x.kind === 'year').length; st['p.perfect'] = State.logbook.filter((l: any) => !l.coopBy && l.score === 100).length; }
     const crew = staff.filter(x => x.role === 'fa' || x.role === 'mech');
     st['c.topRated'] = crew.filter(x => (x.rating || 0) >= 4.5).length;
     st['c.avgRating'] = crew.length ? Math.floor(crew.reduce((s, x) => s + (x.rating || 0), 0) / crew.length * 10) / 10 : 0;

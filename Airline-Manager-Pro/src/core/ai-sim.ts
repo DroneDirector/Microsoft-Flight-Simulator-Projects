@@ -202,6 +202,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   S.aiDay.push({ reg: a.reg, from: f.from, to: f.to, start: F.depAt, end: at, sched: F.sched || F.depAt, schedEnd: F.schedEnd || at, why: aiDelayWhy(F), retry: !!F.retry, callsign: f.callsign });
   summary.legs++; summary.net += net; if (p && summary.names.indexOf(p.name) < 0) summary.names.push(p.name);
   try { Ratings.aiLanding(f, at); } catch (e) { /* ignore */ }
+  try { vaAiLanded(f, at); const rr: any = Ratings.list()[0], own = rr && rr.who === f.pilotId; if (f.from !== f.to && !F.ferry) vaStatLeg({ onTime: !F.sched || F.depAt - F.sched <= 15 * 60e3, pax: f.pax || 0, net, fpm: own ? rr.fpm : 0, score: own ? rr.score : undefined }); } catch (e) { /* ignore */ }
   try { if (F.job) Jobs.delivered(F.job, at, net, txId); } catch (e) { /* ignore */ }
   try { if (f.from !== f.to && !F.ferry) Online.discordAiLanding(f, net); } catch (e) { /* ignore */ }
 }

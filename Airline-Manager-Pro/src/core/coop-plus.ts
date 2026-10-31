@@ -22,7 +22,7 @@ function coopRankAllows(rank: string, typeId: string): boolean {
 }
 
 /* ---------- staff roles ---------- */
-const COOP_ROLES: [string, string, string][] = [['chief', 'Chief pilot', 'Writes briefings, sets ranks and rules'], ['reviewer', 'Report reviewer', 'Accepts or rejects flight reports'], ['trainer', 'Trainer', 'Signs off check rides'], ['events', 'Events manager', 'Plans group flights and events']];
+const COOP_ROLES: [string, string, string][] = [['chief', 'Chief pilot', 'Writes briefings, sets ranks and rules'], ['reviewer', 'Report reviewer', 'Accepts or rejects flight reports'], ['trainer', 'Trainer', 'Instructor: signs off check rides with comments'], ['events', 'Events manager', 'Plans group flights and events']];
 /** Can you do this in the co-op? The owner can do everything. */
 function coopCan(role: string): boolean { const me: any = coopMe(); return !coopOn() || !!(me && (me.role === 'owner' || (me.staff || []).indexOf(role) >= 0)); }
 ACTIONS['coop-staff'] = el => {
@@ -77,6 +77,7 @@ function pirepCheck(pr: CoopPirep): string {
   const r = autoRules(), m: any = coopMember(pr.by), why: string[] = [];
   if (Math.abs(pr.fpm) > r.maxFpm) why.push(`landing ${Math.abs(pr.fpm)} fpm (limit ${r.maxFpm})`);
   if (pr.g > r.maxG) why.push(`${pr.g.toFixed(2)} g (limit ${r.maxG})`);
+  const sc = (pr as any).score; if (sc != null && sc < ((r as any).minScore || 60)) why.push(`flight score ${sc} (limit ${(r as any).minScore || 60})`);
   const A = apt(pr.from), B = apt(pr.to), t = acType(pr.typeId);
   if (A && B && t) { const exp = gcDistanceNm(A.pos, B.pos) / t.cruiseKt * 60 + 20; if (pr.blockMin < exp * 0.6) why.push(`block time ${pr.blockMin} min is too short for the distance (sim rate?)`); }
   if (r.rankGate && m && !coopRankAllows(coopRankOf(m).name, pr.typeId)) why.push(`${coopRankOf(m).name} isn't cleared for the ${t ? t.model : pr.typeId}`);
@@ -86,11 +87,11 @@ function autoRulesHtml(): string {
   const r = autoRules(), can = coopCan('chief');
   const step = (k: string, v: number, d: number, label: string) => `<div class="fare-row"><span><b>${label}</b></span><div class="stepper"><button class="icon-btn" data-act="ar-step" data-k="${k}" data-d="${-d}" ${can ? '' : 'disabled'}>−</button><b>${v}</b><button class="icon-btn" data-act="ar-step" data-k="${k}" data-d="${d}" ${can ? '' : 'disabled'}>+</button></div></div>`;
   return `<div class="ch-row"><span><b>Check flight reports automatically</b><small>Reports within the limits are accepted at once; the rest wait for a reviewer, with the reason.</small></span><button class="tg ${r.on ? 'on' : ''}" data-act="ar-toggle" data-k="on" ${can ? '' : 'disabled'}><i></i></button></div>
-    ${r.on ? step('maxFpm', r.maxFpm, 50, 'Hardest landing (fpm)') + step('maxG', r.maxG, 0.1, 'Highest g-force') : ''}
+    ${r.on ? step('maxFpm', r.maxFpm, 50, 'Hardest landing (fpm)') + step('maxG', r.maxG, 0.1, 'Highest g-force') + step('minScore', (r as any).minScore || 60, 5, 'Lowest flight score') : ''}
     <div class="ch-row"><span><b>Ranks unlock aircraft</b><small>${COOP_RANKS.map(x => `${x.name} (${x.hrs} h)`).join(' → ')}. Cadets fly turboprops; airliners from senior first officer; widebodies from captain.</small></span><button class="tg ${r.rankGate ? 'on' : ''}" data-act="ar-toggle" data-k="rankGate" ${can ? '' : 'disabled'}><i></i></button></div>`;
 }
 ACTIONS['ar-toggle'] = el => { const r: any = autoRules(), k = el.getAttribute('data-k'); r[k] = !r[k]; (coopState().rules as any).rankGate = r.rankGate; Store.save(); Sound.tick(); refresh(); };
-ACTIONS['ar-step'] = el => { const r: any = autoRules(), k = el.getAttribute('data-k'); r[k] = Math.max(k === 'maxG' ? 1.2 : 200, Math.round((r[k] + +el.getAttribute('data-d')) * 10) / 10); Store.save(); Sound.tick(); refresh(); };
+ACTIONS['ar-step'] = el => { const r: any = autoRules(), k = el.getAttribute('data-k'); r[k] = r[k] == null && k === 'minScore' ? 60 : r[k]; r[k] = k === 'minScore' ? clamp(r[k] + +el.getAttribute('data-d'), 30, 100) : Math.max(k === 'maxG' ? 1.2 : 200, Math.round((r[k] + +el.getAttribute('data-d')) * 10) / 10); Store.save(); Sound.tick(); refresh(); };
 
 /* ---------- applications and activity ---------- */
 function coopApps(): any[] { const c: any = coopState(); if (!c) return []; return c.apps || (c.apps = []); }
@@ -134,7 +135,7 @@ ACTIONS['cs-end'] = el => { const c: any = coopState(); c.codeshares = codeshare
 /* ---------- the extra Co-op tabs ---------- */
 let _coopTab = 'home';
 function coopTabsHtml(): string {
-  const tabs: [string, string][] = [['home', 'Overview'], ['board', 'Flight board'], ['chat', 'Chat'], ['events', 'Events'], ['staff', 'Staff and members'], ['rules', 'Rules and codeshares']];
+  const tabs: [string, string][] = [['home', 'Overview'], ['board', 'Flight board'], ['chat', 'Chat'], ['events', 'Events'], ['crew', 'Crew room'], ['staff', 'Staff and members'], ['rules', 'Rules and codeshares']];
   return `<div class="filter-row coop-tabs">${tabs.map(t => `<button class="fchip ${_coopTab === t[0] ? 'on' : ''}" data-act="coop-tab" data-t="${t[0]}">${t[1]}${t[0] === 'chat' && coopChat().length ? ` <em>${coopChat().length}</em>` : t[0] === 'staff' && coopApps().length ? ` <em class="amber">${coopApps().length}</em>` : ''}</button>`).join('')}</div>`;
 }
 ACTIONS['coop-tab'] = el => { _coopTab = el.getAttribute('data-t'); Sound.tick(); refresh(); };

@@ -40,12 +40,13 @@ const _rwyCache: { [k: string]: RunwayEnd } = {};
 /** The runway end in use at an airport (landing and take-off into the wind, longer runways preferred). */
 function activeRunway(icao: string): RunwayEnd {
   const a: any = apt(icao); if (!a) return null;
-  const wind = airportWind(icao, a.pos), key = icao + '|' + Math.round(wind.dir / 10);
+  const wind = airportWind(icao, a.pos), key = icao + '|' + Math.round(wind.dir / 10) + '|' + new Date().toISOString().slice(0, 10);
   if (_rwyCache[key] !== undefined) return _rwyCache[key];
   const rows: any[] = ((World.runways || {})[icao] || []) as any[];
   let best: RunwayEnd = null, bs = -1e9;
   for (const r of rows) {
     const [id1, id2, lenFt, , surf, la1, lo1, la2, lo2, hdg1] = r;
+    try { if (rows.length > 1 && notamRwyClosed(icao, id1, id2)) continue; } catch (e) { /* no NOTAMs yet */ }
     let e1: number[], e2: number[], h: number;
     if (la1 != null && la2 != null) { e1 = [lo1, la1]; e2 = [lo2, la2]; h = geoBrg(e1, e2); }
     else { h = hdg1 != null ? hdg1 : (parseInt(id1, 10) || 0) * 10; const half = (lenFt || 6000) * 0.3048 / 2 / NM; e1 = geoDest(a.pos, h + 180, half); e2 = geoDest(a.pos, h, half); }
@@ -56,7 +57,7 @@ function activeRunway(icao: string): RunwayEnd {
       const score = head * 2 + Math.min(lenM, 4000) / 1500 + (paved ? 0.5 : 0);
       if (score > bs) {
         bs = score;
-        const ils = paved && lenM >= 1800 && (a.size === 2 || (a.size === 1 && lenM >= 2200) || !!AIRPORTS[icao]);
+        const ils = paved && lenM >= 1800 && (a.size === 2 || (a.size === 1 && lenM >= 2200) || !!AIRPORTS[icao]) && !(() => { try { return notamIlsOut(icao, String(dir ? id2 : id1)); } catch (e) { return false; } })();
         best = { icao, name: String(dir ? id2 : id1 || ''), other: String(dir ? id1 : id2 || ''), thr: dir ? e2 : e1, end: dir ? e1 : e2, hdg: hd, lenM, ils };
       }
     }

@@ -2,12 +2,13 @@
 // as you earn them (badges not yet earned stay hidden). Badges are yours only; hired pilots and crew level up without badges.
 
 let _rkGroup = 'all', _rkShowAll = false, _rkWho = 'you', _rkJob = 'all', _rkAllCos = false;
-const RK_TABS: [string, string][] = [['you', 'You'], ['pilots', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground crew'], ['pax', 'Passengers']];
+const RK_TABS: [string, string][] = [['you', 'You'], ['airlines', 'Airline league'], ['pilots', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground crew'], ['pax', 'Passengers']];
 
 SCREENS.ranking = {
   title: 'Ranking', icon: 'trophy',
   render() {
     const tabs = `<div class="filter-row rk-who">${RK_TABS.map(t => `<button class="fchip ${_rkWho === t[0] ? 'on' : ''}" data-act="rk-who" data-w="${t[0]}">${t[1]}</button>`).join('')}</div>`;
+    if (_rkWho === 'airlines') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your airline against the others</p></div></div>${tabs}${leagueHtml()}`;
     if (_rkWho === 'pax') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">What your passengers think</p></div></div>${tabs}${reviewsHtml()}`;
     if (_rkWho !== 'you') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your staff by level and experience</p></div></div>${tabs}${staffRankHtml()}`;
     return this.renderYou(tabs);

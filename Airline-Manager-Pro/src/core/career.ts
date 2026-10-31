@@ -168,7 +168,7 @@ const BRIEFING_SEED: { [k: string]: string } = {
 function briefings(): { [icao: string]: { text: string; by: string; at: number } } { const S: any = State; if (!S.briefings) { S.briefings = {}; Object.keys(BRIEFING_SEED).forEach(k => S.briefings[k] = { text: BRIEFING_SEED[k], by: 'Chief pilot', at: Date.now() }); } return S.briefings; }
 function briefingHtml(icaos: string[]): string {
   const b = briefings(), list = icaos.filter((k, i) => k && icaos.indexOf(k) === i && b[k]);
-  return list.map(k => `<div class="card brief">${icon('alert')}<span><b>Briefing for ${esc(k)}${apt(k) ? ', ' + esc(apt(k).name) : ''}</b><small>${esc(b[k].text)}</small><em>${esc(b[k].by)}</em></span></div>`).join('');
+  return list.map(k => `<div class="card brief">${icon('alert')}<span><b>Briefing for ${esc(k)}${apt(k) ? ', ' + esc(apt(k).name) : ''}</b><small>${esc(b[k].text)}</small><em>${esc(b[k].by)}</em></span></div>`).join('') + notamHtml(icaos);
 }
 let _brf = '';
 function briefingsEditHtml(): string {
@@ -232,6 +232,8 @@ function profileHtml(): string {
     <h3>Licence</h3><div class="lic">${lic.map(t => acType(t) ? `<span class="chip chip-green">${icon('check')}${esc(acType(t).model)}</span>` : '').join('') || '<small class="muted">No type ratings yet. Your first flight on a type is your check ride: land under 400 fpm and 1.6 g without damage.</small>'}</div>
     <h3>Where you are</h3><div class="ev-row"><span><b>${esc(myLoc())}${apt(myLoc()) ? ' · ' + esc(apt(myLoc()).name) : ''}</b><small>${locRealism() ? 'Your next flight starts here; flying from elsewhere means a jumpseat ride first, paid from your wallet.' : 'Pilot location is off (Settings → Economy): you can start anywhere.'}</small></span>
       ${locRealism() ? `<button class="btn ghost sm" data-act="js-open">${icon('swap')}Jumpseat</button>` : ''}</div>
+    ${(() => { const id = coopOn() ? (coopMe() as any).id : me.id, aw = awardsOf(id); return aw.length ? `<h3>Awards</h3>${aw.slice().reverse().map(a => `<div class="ev-row"><span><b>${icon('trophy')} ${esc(a.title)}</b><small>${esc(a.why)} · ${esc(a.by)}</small></span></div>`).join('')}` : ''; })()}
+    <h3>Screenshots</h3>${photoStrip('*')}
   </div>`;
 }
 ACTIONS['js-open'] = () => {

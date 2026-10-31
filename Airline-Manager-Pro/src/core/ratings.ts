@@ -69,6 +69,7 @@ const Ratings = {
     me.types = me.types || [];
     if (me.types.indexOf(typeId) >= 0) return;
     const t = acType(typeId); if (!t) return;
+    try { if (coopMyCheckRide(typeId, fpm, g, damaged)) return; } catch (e) { /* ignore */ }
     if (Math.abs(fpm) < 400 && g < 1.6 && !damaged) {
       me.types.push(typeId);
       State.notices.unshift({ id: uid(), kind: 'pilot', title: `Check ride passed: ${t.maker} ${t.model}`, body: `Landed at ${Math.abs(fpm)} fpm and ${g.toFixed(2)} g. The ${t.model} is on your licence now.`, time: 'Now', read: false } as any);

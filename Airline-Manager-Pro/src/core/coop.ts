@@ -112,6 +112,7 @@ function coopDepart(m: CoopMember, at: number) {
     pax, paxMax: seats, alt: 0, phase: 'Taxi out', real: true, coop: true, typeId, depAt: at, durMs: prof.totalS * 1000 };
   if (a) a.status = 'flying';
   const p = pilot(m.id); if (p) p.status = 'flying';
+  try { f.fo = sharedPairFor(m.id); } catch (e) { /* ignore */ }
   State.live.push(f);
   m.lastSeen = Date.now();
   if (at > Date.now() - 60e3) State.notices.unshift({ id: uid(), kind: 'pilot', title: `${m.name} departed ${from}`, body: `Co-op flight ${f.callsign} to ${to}${a ? ' in ' + a.reg : ''}, ${pax} passengers.`, time: 'Now', read: false } as any);
@@ -135,6 +136,8 @@ function coopLand(f: any, at: number) {
   const fpm = Math.round(-(90 + Math.random() * 260));
   const pr: CoopPirep = { id: 'pr-' + f.id, at, by: f.pilotId, name: m ? m.name : 'A co-op pilot', callsign: f.callsign, from: f.from, to: f.to, reg: f.reg || '', typeId: f.typeId,
     blockMin, fpm, g: Math.round((1.08 + Math.random() * .35) * 100) / 100, pax: f.pax, cargoKg: f.cargoKg || 0, fuelKg: Math.round(blockMin / 60 * (BURN_KG_H[(acType(f.typeId) || AIRCRAFT[0]).cls] || 2000) * (0.88 + Math.random() * 0.1)), status: 'pending' };
+  (pr as any).fo = f.fo || '';
+  try { const mm: any = coopMember(f.pilotId), sc = procScore(f.id, clamp((((mm && mm.rating) || 4) - 2.5) / 2.5, 0, 1), pr.fpm, pr.g); (pr as any).score = sc.score; (pr as any).pens = sc.pens; } catch (e) { /* ignore */ }
   // a job leg: the client pays and the job is delivered
   if (f.job) { try { const j = jobById(f.job); if (j) { payTxn(co.id, `Charter: ${j.title} (${m ? m.name : 'co-op'})`, j.pay, 'charter', [[`${j.client} pays for ${j.from} to ${j.to}`, j.pay]], at); Jobs.delivered(j.id, at, j.pay, ''); } } catch (e) { /* ignore */ } }
   // the aircraft and the pilot are back on the ground either way
@@ -168,6 +171,7 @@ function coopBook(pr: CoopPirep, live: boolean) {
   const before = co.balance; co.balance += money0.net;
   State.logbook.unshift({ id: uid(), date: dateStr(d), from: pr.from, to: pr.to, reg: pr.reg || '—', blockMin: pr.blockMin, landingFpm: pr.fpm, g: pr.g, pax: pr.pax,
     result: pr.fpm < -500 ? 'hard' : 'ok', atc: 'Co-op', notes: `Flown by ${pr.name}`, typeId: pr.typeId, coopBy: pr.by } as any);
+  try { const L0: any = State.logbook[0], P: any = pr; L0.score = P.score; L0.pens = P.pens; const tr = trackFromProfile(pr.typeId, pr.from, pr.to, pr.at - pr.blockMin * 60e3); if (tr) trackSave(L0.id, tr); if (P.fo) { const fo: any = coopMember(P.fo); if (fo) { fo.flights++; fo.hoursMin += pr.blockMin; fo.foMin = (fo.foMin || 0) + pr.blockMin; L0.notes += `, shared cockpit with ${fo.name} (first officer)`; } } vaStatLeg({ onTime: true, pax: pr.pax, net: money0.net, fpm: pr.fpm, score: P.score }); coopMemberCheckRide(pr, L0.id, P.score); } catch (e) { /* ignore */ }
   const a = pr.reg ? plane(pr.reg) : null;
   if (a) { a.hoursMin += pr.blockMin; a.cycles += 1; try { conditionAfterFlight(a, pr.blockMin); } catch (e) { /* ignore */ } }
   const p = pilot(pr.by); if (p) { p.hoursMin += pr.blockMin; p.landings += 1; }
