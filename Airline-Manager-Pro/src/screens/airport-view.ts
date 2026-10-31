@@ -255,6 +255,26 @@ class AirportView {
     const hold = this.nearestNode(A.tx + A.ux * 60, A.ty + A.uy * 60), stand = hold ? this.standFor(seed, big, hold) : null;
     return { path: stand && hold ? this.route(stand, hold).concat([[A.tx, A.ty]]) : [], stand };
   }
+  /** Split a departure path at the holding point: about 50 m before the taxiway reaches the runway's edge
+   *  (the hold-short line). The aircraft waits there, off the runway, until cleared to line up. */
+  holdSplit(path: number[][]): { hold: number[][]; line: number[][] } {
+    const A = this.active; if (!A || path.length < 2) return { hold: path, line: [] };
+    const onRwy = (x: number, y: number) => { const dx = x - A.tx, dy = y - A.ty, al = dx * A.ux + dy * A.uy, ac = Math.abs(dx * A.uy - dy * A.ux); return al > -60 && al < A.len + 60 && ac < A.wid / 2 + 8; };
+    // walk the path in 4 m steps, remembering the distance travelled, until it first touches the runway
+    const pts: number[][] = [], cum: number[] = []; let d = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i], b = path[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(L / 4));
+      for (let j = 0; j < n; j++) { const k = j / n; pts.push([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, i]); cum.push(d + L * k); }
+      d += L;
+    }
+    pts.push([path[path.length - 1][0], path[path.length - 1][1], path.length - 1]); cum.push(d);
+    let e = pts.findIndex(q => onRwy(q[0], q[1]));
+    if (e <= 0) return { hold: path, line: [] };
+    const want = Math.max(0, cum[e] - 50); let h = e; while (h > 0 && cum[h] > want) h--;
+    const hp = pts[h], seg = hp[2];
+    const hold = path.slice(0, seg + 1).concat([[hp[0], hp[1]]]), line = [[hp[0], hp[1]]].concat(path.slice(seg + 1));
+    return { hold, line };
+  }
   nodeXY(k: string): number[] { const g = this.graph, i = +k.slice(1); return k[0] === 'p' ? [g.parks[i][0], g.parks[i][1]] : [g.pts[i][0], g.pts[i][1]]; }
   nearestNode(x: number, y: number): string {
     const g = this.graph; let best: string = null, bd = 1e18;
@@ -394,18 +414,24 @@ class AirportView {
         if (tx && el < tx[1]) {
           const dp = this.departurePath(f.reg, big), stand = dp.stand, path = dp.path;
           const PUSH = 75;   // pushback: about 75 s at 3-5 kt, nose pointing the other way
-          // it waits at the gate and pushes back in time to reach the runway about a minute before its slot
-          const need = path.length > 1 ? PUSH + this.taxiTimed(path, 0, 0).total + 60 : 0, wait = Math.max(0, (tx[1] - tx[0]) - need);
-          const sIn = el - tx[0] - wait;
+          // taxi to the holding point before the runway, hold short until cleared, then line up
+          const sp = this.holdSplit(path), rH = sp.hold.length > 1 ? this.taxiTimed(sp.hold, 0, 0) : null, rL = sp.line.length > 1 ? this.taxiTimed(sp.line, 0, 0) : null;
+          const LINE = rL ? rL.total + 8 : 0, holdPt = sp.hold.length ? sp.hold[sp.hold.length - 1] : null;
+          // it waits at the gate and pushes back in time to reach the holding point about a minute before its slot
+          const need = path.length > 1 ? PUSH + (rH ? rH.total : 0) + 40 + LINE : 0, wait = Math.max(0, (tx[1] - tx[0]) - need);
+          const sIn = el - tx[0] - wait, holdHdg = sp.hold.length > 1 ? Math.atan2(holdPt[0] - sp.hold[sp.hold.length - 2][0], holdPt[1] - sp.hold[sp.hold.length - 2][1]) * 180 / Math.PI : rwyHdg;
+          const runwayHold = fe.hold && fe.hold.kind === 'runway';
           if (path.length > 1 && sIn < 0) { const k = this.nodeXY(stand), pk = g.parks[+stand.slice(1)]; pos = [k[0], k[1], pk ? pk[2] : 0]; phase = 'At the gate, boarding'; kt = 0; }
           else if (path.length > 1 && sIn < PUSH) {
             const r = this.taxiTimed(path, 0, 0), q = this.timedAt(r, 0), back = Math.min(1, sIn / PUSH) * 35;
             const sp = this.along(path, Math.min(0.999, back / Math.max(1, r.p.length * 10)));
             pos = sp ? [sp[0], sp[1], ((sp[2] || q.pos[2]) + 180) % 360] : q.pos; phase = 'Pushback'; kt = sIn < PUSH - 10 ? 4 : 0;
           } else if (path.length > 1) {
-            const r = this.taxiTimed(path, 0, 0), sTaxi = sIn - PUSH;
-            const q = this.timedAt(r, sTaxi + 35 / 4.5);   // continues where the pushback left off
-            pos = q.pos; kt = q.kt; phase = sTaxi + 35 / 4.5 >= r.total ? 'Holding short ' + (A.name || '') : 'Taxi out';
+            const sTaxi = sIn - PUSH + 35 / 4.5;   // continues where the pushback left off
+            const lineAt = (tx[1] - tx[0]) - wait - LINE - PUSH + 35 / 4.5;   // when it is cleared to line up
+            if (rH && sTaxi < rH.total && !runwayHold) { const q = this.timedAt(rH, sTaxi); pos = q.pos; kt = q.kt; phase = 'Taxi out'; }
+            else if (!rL || runwayHold || sTaxi < lineAt) { pos = holdPt ? [holdPt[0], holdPt[1], holdHdg] : [A.tx, A.ty, rwyHdg]; kt = 0; phase = 'Holding short ' + (A.name || ''); }
+            else { const q = this.timedAt(rL, sTaxi - lineAt); pos = q.pos; kt = q.kt; phase = 'Lining up ' + (A.name || ''); }
           } else { pos = [A.tx, A.ty, rwyHdg]; phase = 'Taxi out'; }
         } else if (to && el < to[1]) {
           // take-off roll: accelerate to rotation speed (over the ground: minus the headwind), lift off, climb at V2
