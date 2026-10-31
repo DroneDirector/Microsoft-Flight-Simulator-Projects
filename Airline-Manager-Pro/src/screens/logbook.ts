@@ -3,14 +3,16 @@ SCREENS.logbook = {
   title: 'Flight logs', icon: 'logbook',
   render() {
     const me = myPilot();
-    const rows = State.logbook.filter(l => (plane(l.reg) && plane(l.reg).companyId === State.companyId || (l as any).coopBy) && coopMineFilter(l));
-    const counted = rows.filter(l => l.decision !== 'disregarded' && l.result !== 'crash' || l.decision === 'registered');
+    const rows0 = State.logbook.filter(l => (plane(l.reg) && plane(l.reg).companyId === State.companyId || (l as any).coopBy) && coopMineFilter(l));
+    const rows = sortList('log', rows0, LOG_SORTS, (l: any) => `${l.from} ${l.to} ${l.reg} ${l.date} ${l.notes || ''}`);
+    const counted = rows0.filter(l => l.decision !== 'disregarded' && l.result !== 'crash' || l.decision === 'registered');
     const landings = counted.filter(l => l.result !== 'crash');
     const avg = landings.length ? landings.reduce((s, l) => s + Math.abs(l.landingFpm), 0) / landings.length : 0;
     const best = landings.length ? Math.min.apply(null, landings.map(l => Math.abs(l.landingFpm))) : 0;
     return `
     <div class="screen-head">
       <div><h1>Flight logs</h1><p class="sub">${esc(me.name)}${coopOn() ? ' · co-op' : ''}</p></div>
+      ${expButtons('log')}
     </div>${coopWhoChips(true)}
     <div class="log-totals">
       <div class="stat"><small>Total hours</small><b>${hours(me.hoursMin)}</b></div>
@@ -19,6 +21,7 @@ SCREENS.logbook = {
       <div class="stat"><small>Softest</small><b class="green">${best}<span> fpm</span></b></div>
       <div class="stat"><small>Crashes</small><b>${rows.filter(l => l.decision === 'registered').length}<span> registered</span></b></div>
     </div>
+    ${sortBar('log', LOG_SORTS, 'Find a flight')}
     <div class="log-table" role="table">
       <div class="lt-head" role="row"><span>Date</span><span>Route</span><span>Aircraft</span><span>Block</span><span>Landing</span><span>Load</span><span>ATC</span><span>Score</span><span>Result</span></div>
       ${rows.map((l, i) => {

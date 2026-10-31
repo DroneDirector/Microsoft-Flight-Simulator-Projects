@@ -400,6 +400,7 @@ class WorldMap {
     if (!this.alive) return;
     this.raf = requestAnimationFrame(this.loop);
     if (!this.el.isConnected) { this.destroy(); return; }
+    if (_saverWas && !this.anim) { const T: any = this; if (T._svT && now - T._svT < 100) return; T._svT = now; }
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.1) : 0; this.last = now;
     if (this.anim && !this.ml) {
       const k = clamp((now - this.anim.t0) / this.anim.dur, 0, 1), e = 1 - Math.pow(1 - k, 3);

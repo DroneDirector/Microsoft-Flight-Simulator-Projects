@@ -90,13 +90,16 @@ ACTIONS['rd-close'] = () => {
   const p: any = r.pilotId ? pilot(r.pilotId) : null, flying = State.live.some(f => f.pilotId === r.pilotId);
   confirmChange(`Close ${r.code}?`, `${r.legs.join(' → ')} will no longer be flown.${p ? ` ${p.name} ${flying ? 'finishes the flight in the air, then waits' : 'waits'} for a new assignment.` : ''} Travellers and the airports on the route will notice.`, 'Yes, close the route', 'Keep it', () => {
     closeTop();
+    const ri = State.routes.indexOf(r);
     State.routes = State.routes.filter(x => x !== r);
     // legs not yet flown are cancelled; a flight in the air lands as planned
-    const S: any = State; S.aiNext = (S.aiNext || []).filter((n: any) => !(n.pilotId === r.pilotId && !n.job && !n.jobNext && !n.ferry));
+    const S: any = State, gone = (S.aiNext || []).filter((n: any) => n.pilotId === r.pilotId && !n.job && !n.jobNext && !n.ferry), pst = p ? p.status : '';
+    S.aiNext = (S.aiNext || []).filter((n: any) => gone.indexOf(n) < 0);
     if (p && !flying) p.status = 'standby';
     try { Progress.popularity(-0.5, `Closed route ${r.code}`); } catch (e) { /* ignore */ }
-    try { newsRouteClosed(r); } catch (e) { /* ignore */ }
-    Store.save(); closeAll(); refresh(); toast(`${r.code} closed`, 'info');
+    const news = setTimeout(() => { try { newsRouteClosed(r); Store.soon(); } catch (e) { /* ignore */ } }, 7000);
+    Store.save(); closeAll(); refresh();
+    undoToast(`${r.code} closed`, () => { clearTimeout(news); State.routes.splice(Math.min(ri, State.routes.length), 0, r); S.aiNext = (S.aiNext || []).concat(gone); if (p && pst) p.status = pst; try { Progress.popularity(0.5, `Reopened route ${r.code}`); } catch (e) { /* ignore */ } });
   }, () => closeTop());
 };
 function newsRouteClosed(r: any) {

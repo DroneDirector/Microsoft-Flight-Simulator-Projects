@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.26 (2026-10-31)
+
+- Search, away summary, UI memory (screen/tabs/scroll), sort/filter bars, undo, notification rules/quiet hours/grouping, swipe gestures, battery saver/text size/reduced motion, shortcuts, tour and hints, CSV/PDF export
+- Android home screen widget (StatusWidget, AppTools.widget)
+
 ## 0.9.25 (2026-10-31)
 
 - Flight replay, flight score (sim rules + procedural for AI/co-op), fuel plan/check, screenshots (IndexedDB), recency, NOTAMs (activeRunway respects closures/ILS)

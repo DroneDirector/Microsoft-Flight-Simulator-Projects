@@ -57,6 +57,7 @@ function renderTopbar() {
     <div class="top-spacer"></div>
     <button class="balance" data-balance data-act="go" data-screen="finance" aria-label="Balance ${money(c.balance)}. Open Finance"><small>Balance</small><b data-balance-val>${money(c.balance, { compact: true })}</b></button>
     <button class="icon-btn sound-btn ${State.settings.muteAll ? 'muted-btn' : ''}" data-act="sound-toggle" aria-label="${State.settings.muteAll ? 'Sounds are muted. Tap to turn sounds on' : 'Sounds are on. Tap to mute all sounds'}">${icon(State.settings.muteAll ? 'mute' : 'volume')}</button>
+    <button class="icon-btn search-btn" data-act="search-open" aria-label="Search everything" title="Search (Ctrl+K)">${icon('search')}</button>
     <button class="icon-btn bell ${n ? 'has' : ''}" data-act="inbox" aria-label="Notifications, ${n} unread">${icon('bell')}${n ? `<span class="badge">${n}</span>` : ''}</button>
     <button class="icon-btn" data-act="settings" aria-label="Settings">${icon('gear')}</button>
     <button class="icon-btn power-btn" data-act="exit" aria-label="Exit ${esc(APP.name)}">${icon('power')}</button>`);

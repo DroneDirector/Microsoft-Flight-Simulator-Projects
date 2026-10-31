@@ -44,6 +44,7 @@ const DESKTOP = /^https?:$/.test(location.protocol) && /^(127\.0\.0\.1|localhost
 function uiScale(): number { return (window as any).__uiZoom || 1; }
 
 function reducedMotion(): boolean {
+  try { const S: any = State.settings; if (S && (S.motion === 'reduce' || (typeof saverOn === 'function' && saverOn()))) return true; } catch (e) { /* not ready */ }
   return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 

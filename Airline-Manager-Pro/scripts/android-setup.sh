@@ -21,11 +21,17 @@ APPID=$(node -p "require('./app.config.json').appId")
 JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
 mkdir -p "$JDIR"
 sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
-for J in LanLinkPlugin AppToolsPlugin VoicePlugin UpdatedReceiver; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
+for J in LanLinkPlugin AppToolsPlugin VoicePlugin UpdatedReceiver StatusWidget; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
 # permissions for the Wi-Fi link (network name needs location), notifications and installing updates
 # updates install without asking (Android 12+) only with UPDATE_PACKAGES_WITHOUT_USER_ACTION; after the
 # update the app opens again by itself (UpdatedReceiver)
 grep -q 'UpdatedReceiver' "$MAN" || sed -i 's|</application>|    <receiver android:name=".UpdatedReceiver" android:exported="false"><intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter></receiver>\n    </application>|' "$MAN"
+# the home screen widget (StatusWidget): its layout, look and description
+RES=android/app/src/main/res
+mkdir -p "$RES/layout" "$RES/xml" "$RES/drawable"
+cp scripts/android/res/layout/amp_widget.xml "$RES/layout/"; cp scripts/android/res/xml/amp_widget_info.xml "$RES/xml/"; cp scripts/android/res/drawable/amp_widget_bg.xml "$RES/drawable/"
+grep -q 'amp_widget_desc' "$RES/values/strings.xml" || sed -i 's|</resources>|    <string name="amp_widget_desc">Balance, next flight and aircraft in the air</string>\n</resources>|' "$RES/values/strings.xml"
+grep -q 'StatusWidget' "$MAN" || sed -i 's|</application>|    <receiver android:name=".StatusWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/amp_widget_info" /></receiver>\n    </application>|' "$MAN"
 for P in ACCESS_WIFI_STATE ACCESS_NETWORK_STATE CHANGE_WIFI_MULTICAST_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION; do
   grep -q "android.permission.$P\"" "$MAN" || sed -i "s|</manifest>|    <uses-permission android:name=\"android.permission.$P\" />\n</manifest>|" "$MAN"
 done
