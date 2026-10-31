@@ -88,7 +88,8 @@ const _followMemo: { [key: string]: { id: string; z: number } } = {};
 function flightPos(f: LiveFlight): number[] {
   if (f.pos) return f.pos;
   const fp = flightPathPos(f); if (fp) return fp.pos;   // along its departure, route, arrival and approach
-  return gcInterpolate(apt(f.from).pos, apt(f.to).pos, f.t);
+  const A = apt(f.from), B = apt(f.to); if (!A || !B) return f.pos || (A || B || { pos: [0, 0] } as any).pos;
+  return gcInterpolate(A.pos, B.pos, f.t);
 }
 
 class WorldMap {
@@ -450,7 +451,8 @@ class WorldMap {
     try { if (typeof Network !== 'undefined') Network.drawOnMap(c, this, degPx); } catch (e) { /* never stop the map */ }
     for (const f of liveOf()) {
       // (your demo flight moves on the real clock along its profile: demoUpdate in ai-sim.ts)
-      const a = apt(f.from).pos, b = apt(f.to).pos;
+      const Af = apt(f.from), Bf = apt(f.to); if (!Af || !Bf) continue;   // an airport not loaded yet: drawn once it is
+      const a = Af.pos, b = Bf.pos;
       const N = 48;
       let pts: number[][] = [], cut = -1;
       const fpp = !f.noDest ? flightPathPos(f) : null;

@@ -399,7 +399,7 @@ class AirportView {
       const fe = flightEl(F, now), el = fe.el;
       let pos: number[] = null, alt = 0, phase = '', kt = 0;
       // the speeds of this flight (docs/reference) and the wind along the runway in use
-      const SP = flightSpeeds(flightTypeId(f), f.pax || Math.round(t.seats * 0.8), gcDistanceNm(apt(f.from).pos, apt(f.noDest ? f.from : f.to).pos));
+      const SP = flightSpeeds(flightTypeId(f), f.pax || Math.round(t.seats * 0.8), (() => { const A1 = apt(f.from), B1 = apt(f.noDest ? f.from : f.to); return A1 && B1 ? gcDistanceNm(A1.pos, B1.pos) : 300; })());
       // each flight uses the runway its own departure or approach was planned for (the wind can change the
       // runway in use while it flies; it still lands where its approach leads)
       const fpx = flightPathPos(F, now);
