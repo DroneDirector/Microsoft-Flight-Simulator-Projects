@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.27 (2026-10-31)
+
+- patchNode leaves code-drawn canvases alone (width/height and shown state were wiped on every in-place update)
+- Avatar renderer: lost-context handling, restore redraw, new renderer fallback, blank pictures never cached
+- ATC chips wrap
+
 ## 0.9.26 (2026-10-31)
 
 - Search, away summary, UI memory (screen/tabs/scroll), sort/filter bars, undo, notification rules/quiet hours/grouping, swipe gestures, battery saver/text size/reduced motion, shortcuts, tour and hints, CSV/PDF export

@@ -147,6 +147,9 @@ function patchNode(o: Element, n: Element) {
   // a different item in this place (another id): swap it rather than reshape it
   const ko = o.getAttribute('data-id'), kn = n.getAttribute('data-id');
   if (ko !== kn && ko && kn) { o.parentNode.replaceChild(n, o); return; }
+  // a picture drawn by code (crew figures, charts): left as it is while it shows the same thing; a new one
+  // replaces it (and is drawn by its own code), so updates never wipe a drawing
+  if (o.tagName === 'CANVAS') { if (o.getAttribute('data-k') !== n.getAttribute('data-k') || o.className.replace(/\s*\b(in|nofade|still)\b/g, '') !== n.className.replace(/\s*\b(in|nofade|still)\b/g, '')) o.parentNode.replaceChild(n, o); return; }
   const na = n.attributes, oa = o.attributes;
   for (let i = oa.length - 1; i >= 0; i--) if (!n.hasAttribute(oa[i].name)) o.removeAttribute(oa[i].name);
   for (let i = 0; i < na.length; i++) {
