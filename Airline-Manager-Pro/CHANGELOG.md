@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.18 (2026-10-31)
+
+- 3D airports: ground paint (aprons, taxiways with shoulders and round joins, centre lines, runways, hold lines) drawn over terrain; aircraft and buildings render after it
+- Airport imagery patch (5 km, highest zoom that fits the device), radial edge fade
+- Custom satellite tile URL template setting for airport patch
+
 ## 0.9.17 (2026-10-31)
 
 - PC free camera: pointer-lock mouse look, WASD/Space/C/Shift, wheel speed, Esc exits to the map with Esc badge; touch controls hidden on PC
