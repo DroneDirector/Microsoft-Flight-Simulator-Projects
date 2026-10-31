@@ -65,7 +65,8 @@ function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: 
   S.pilots = [Object.assign(me, { id: 'you', name: o.pilot || me.name, hoursMin: 0, landings: 0, base: o.hub, profileId: 'p1', status: 'standby', types: [], rating: 4, xp: 0 })];
   S.companyId = id; S.divisionId = 'all'; S.myReg = {}; S.coPilot = { [id]: { sex: 'f', id: '' } };
   S.badges = {}; S.progress = {}; S.myLoad = Object.assign({}, S.myLoad, { pax: 0, cargoKg: 0, mailKg: 0, bagsKg: 0 });
-  ['bank', 'jobs', 'coop', 'ofp', 'acars', 'usedMarket', 'cases', 'landRecs', 'aiNext', 'aiDay', 'groundedUntil', 'payNext', 'poolNext', 'ratingDay', 'condTick', 'lastTouchdown', 'popLog'].forEach(k => { if (S[k] && !Array.isArray(S[k]) && typeof S[k] === 'object') S[k] = {}; else if (typeof S[k] === 'number') S[k] = 0; });
+  ['bank', 'jobs', 'coop', 'ofp', 'acars', 'usedMarket', 'cases', 'landRecs', 'groundedUntil', 'ratingDay', 'popLog'].forEach(k => { if (S[k] && !Array.isArray(S[k]) && typeof S[k] === 'object') delete S[k]; });
+  ['aiNext', 'aiDay', 'payNext', 'poolNext', 'condTick', 'lastTouchdown'].forEach(k => { if (S[k] && !Array.isArray(S[k]) && typeof S[k] === 'object') S[k] = {}; else if (typeof S[k] === 'number') S[k] = 0; });
   S.scratch = true; S.difficulty = _fsDiff; S.mkt = null; S.stock = {};
   Store.save(); Store.flushNative();
   try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: 'ops' })); } catch (e) { /* ignore */ }

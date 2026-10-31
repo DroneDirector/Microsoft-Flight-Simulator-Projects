@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.14 (2026-10-31)
+
+- Fix: start from scratch reset jobs, bank, ACARS, cases, landing records and co-op to empty objects; jobsState fills defaults, Store.repair() fixes affected saves, wipe now deletes those records
+
 ## 0.9.13 (2026-10-31)
 
 - My career screen: profile with route map and licence, pay and wallet, pilot location and jumpseat, flight board bookings, weekly pilot challenges, events, airport briefings at dispatch

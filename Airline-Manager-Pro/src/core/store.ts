@@ -52,6 +52,15 @@ const Store = {
       else S[k] = st[k];
     }
     this.loadDevice();
+    this.repair();
+  },
+  /** Saves started from scratch in 0.9.8–0.9.13 could hold empty records where lists were expected: put them right. */
+  repair() {
+    const S: any = State;
+    for (const k of ['acars', 'cases', 'landRecs']) if (S[k] != null && !Array.isArray(S[k])) S[k] = [];
+    if (S.bank && !S.bank.loans) S.bank = Object.assign({ loans: [], insurance: {}, insNext: {}, campaigns: [], rentNext: {} }, S.bank, { loans: [] });
+    if (S.coop && !Array.isArray(S.coop.members)) S.coop = null;
+    if (S.usedMarket && !Array.isArray(S.usedMarket.items)) S.usedMarket = null;
   },
   /** Settings and other device things, shared by both worlds. */
   loadDevice() {
