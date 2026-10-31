@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.30 (2026-10-31)
+
+- 3D view: tyre smoke sprites from the main gear at touchdown (air to ground transition above 50 kt)
+
 ## 0.9.29 (2026-10-31)
 
 - Ground reference point is the nose wheel (noseWheelAhead from shape gear data) in the 3D view and the 2D airport view; blended to the fuselage middle below 30 m
