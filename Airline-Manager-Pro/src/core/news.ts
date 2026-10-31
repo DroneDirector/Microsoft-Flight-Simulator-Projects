@@ -2,7 +2,7 @@
 // (charges, verdicts, appeals), new routes, and other stories. The newspapers, reporters, airport directors
 // and spokespeople are made up; the facts come from your airline.
 
-interface NewsArticle { id: string; at: number; paper: string; section: string; headline: string; standfirst: string; body: string[]; quote?: [string, string]; quote2?: [string, string]; byline: string; place: string; art: { kind: 'aircraft' | 'person' | 'court'; typeId?: string; look?: any; role?: string; color?: string; color2?: string; reg?: string }; companyId: string }
+interface NewsArticle { id: string; at: number; paper: string; section: string; headline: string; standfirst: string; body: string[]; quote?: [string, string]; quote2?: [string, string]; byline: string; place: string; art: { kind: 'aircraft' | 'person' | 'court'; crash?: boolean; typeId?: string; look?: any; role?: string; color?: string; color2?: string; reg?: string }; companyId: string }
 
 const NEWS_PAPERS = ['The Runway Ledger', 'Aerowire News', 'The Skyline Chronicle', 'Flight Deck Gazette', 'The Terminal Courier', 'North Atlantic Wire', 'The Departure Board'];
 function newsList(): NewsArticle[] { const S: any = State; return S.news || (S.news = []); }
@@ -22,10 +22,35 @@ function newsPublish(a: Omit<NewsArticle, 'id' | 'at' | 'byline'> & { byline?: s
 }
 /** Settings → News: 'popup' (opens by itself, animated), 'notify' (inbox only, animated when opened), 'plain' (inbox only, no animation). */
 function newsMode(): string { return (State.settings as any).newsMode || 'popup'; }
+/** The newspaper's picture of a crash: the aircraft broken in two behind the wings, the halves at an angle,
+ * fire and smoke where it broke, debris and a scorched patch on the ground. */
+let _crashSeq = 0;
+function crashArt(typeId: string, o: { color: string; color2: string; reg: string }): string {
+  const svg = aircraftArt(typeId, o); if (!svg) return '';
+  const inner = svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>')), id = 'cr' + (++_crashSeq);
+  const cut = '238,0 232,40 246,62 234,86 250,112 240,150';   // the jagged line where it broke
+  const rnd = (k: number) => { const x = Math.sin(k * 127.1 + _crashSeq * 3.7) * 43758.5453; return x - Math.floor(x); };
+  const smoke = [0, 1, 2, 3, 4, 5, 6].map(k => `<circle cx="${(232 + (rnd(k) - 0.5) * 40 + k * 6).toFixed(0)}" cy="${(110 - k * 15).toFixed(0)}" r="${(14 + k * 5).toFixed(0)}" fill="#5A5650" opacity="${(0.5 - k * 0.05).toFixed(2)}"/>`).join('');
+  const debris = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(k => { const x = 150 + rnd(k + 20) * 170, y = 134 + rnd(k + 40) * 10, s = 2 + rnd(k + 60) * 4; return `<path d="M${x.toFixed(0)} ${y.toFixed(0)}l${s.toFixed(1)} ${(-s * 0.6).toFixed(1)}l${(s * 0.7).toFixed(1)} ${(s * 0.8).toFixed(1)}z" fill="#3A3A3E"/>`; }).join('');
+  return `<svg class="ac-art np-crash" viewBox="0 0 420 150" preserveAspectRatio="xMidYMax meet" role="img" aria-label="The aircraft after the accident">
+    <defs><clipPath id="${id}f"><polygon points="0,0 ${cut} 0,150"/></clipPath><clipPath id="${id}r"><polygon points="${cut} 420,150 420,0"/></clipPath>
+      <filter id="${id}b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7"/></filter>
+      <radialGradient id="${id}g" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#2A241E" stop-opacity=".75"/><stop offset="1" stop-color="#2A241E" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}fire" cx=".5" cy=".6" r=".5"><stop offset="0" stop-color="#FFE38A"/><stop offset=".45" stop-color="#FF8A2B"/><stop offset="1" stop-color="#C2361A" stop-opacity="0"/></radialGradient></defs>
+    <ellipse cx="225" cy="142" rx="170" ry="10" fill="url(#${id}g)"/>
+    <g filter="url(#${id}b)">${smoke}</g>
+    <g clip-path="url(#${id}f)" transform="rotate(-6 236 140) translate(-10 7)">${inner}</g>
+    <g clip-path="url(#${id}r)" transform="rotate(7 244 140) translate(14 5)">${inner}</g>
+    <ellipse cx="240" cy="122" rx="20" ry="16" fill="url(#${id}fire)" opacity=".95"/>
+    <ellipse cx="226" cy="128" rx="11" ry="9" fill="url(#${id}fire)" opacity=".85"/>
+    ${debris}
+  </svg>`;
+}
 function newsOpen(id: string) {
   const a = newsList().filter(x => x.id === id)[0]; if (!a) return;
   const d = new Date(a.at), date = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const art = a.art.kind === 'aircraft' ? aircraftArt(a.art.typeId || 'a320neo', { color: a.art.color || '#2C8CFF', color2: a.art.color2 || '#0B2A55', reg: a.art.reg || '' })
+  const art = a.art.kind === 'aircraft' && a.art.crash ? crashArt(a.art.typeId || 'a320neo', { color: a.art.color || '#2C8CFF', color2: a.art.color2 || '#0B2A55', reg: a.art.reg || '' })
+    : a.art.kind === 'aircraft' ? aircraftArt(a.art.typeId || 'a320neo', { color: a.art.color || '#2C8CFF', color2: a.art.color2 || '#0B2A55', reg: a.art.reg || '' })
     : a.art.kind === 'person' && a.art.look ? avatarSvg(a.art.look, (a.art.role || 'captain') as any, { view: 'bust', accent: a.art.color || '#2C8CFF', still: true })
     : `<svg viewBox="0 0 120 80" class="np-court"><rect width="120" height="80" fill="#E9E2D0"/><path d="M20 66h80M26 62h68M30 30h60l-30-16z" stroke="#3A3428" stroke-width="3" fill="none"/>${[36, 50, 64, 78].map(x => `<path d="M${x + 3} 33v27" stroke="#3A3428" stroke-width="5"/>`).join('')}</svg>`;
   Sound.tick();

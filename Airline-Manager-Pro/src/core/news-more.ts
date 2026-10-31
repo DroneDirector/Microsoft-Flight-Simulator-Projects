@@ -79,7 +79,8 @@ function newsCrash(o: { key: string; c: Company; typeId: string; reg: string; ca
   if (!o.c || !newsOnce('crash:' + o.key, 'crash', 0)) return;
   const t = acType(o.typeId), model = t ? t.model : 'aircraft', at = newsCity(o.to), fl = o.callsign ? `flight ${o.callsign}` : o.reg;
   const onBoard = o.pax ? `On board were ${num(o.pax)} passengers and the crew.` : '';
-  newsPost(o.c, o.to, { section: 'News', art: newsPlaneArt(o.c, o.typeId, o.reg),
+  const art = newsPlaneArt(o.c, o.typeId, o.reg); art.crash = true;
+  newsPost(o.c, o.to, { section: 'News', art,
     headline: o.dead ? `Deaths as ${o.c.name} ${model} crashes at ${at}` : `${o.c.name} ${model} crashes at ${at}: everyone survives`,
     standfirst: `${o.c.name} ${fl}, a ${model} (${o.reg})${o.from ? ` from ${newsCity(o.from)}` : ''}, crashed on arrival at ${at}. ${o.dead ? 'There are fatalities.' : 'Everyone on board got out, some with injuries.'}`,
     body: [
