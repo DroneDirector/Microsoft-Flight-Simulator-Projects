@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.23 (2026-10-31)
+
+- Aerial photos (ortho) removed: satellite rings and the fixed 5 km airport patch as in 0.9.19; settings and credits removed
+- Market data job reads EIA and BLS directly (FRED fallback), STEO row JKTCUUS_$
+
 ## 0.9.22 (2026-10-31)
 
 - Real-world markets (EIA jet fuel spot, BLS aircraft parts PPI via FRED) from a daily workflow; EIA STEO jet fuel outlook and parts trend with notices
