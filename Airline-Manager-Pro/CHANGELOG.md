@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.20 (2026-10-31)
+
+- Open national aerial photos (FO via ArcGIS export, NL, CH, FR, ES, AT, US, JP; FI and DK with keys), detail patch sized by height and following the camera, blank-tile detection, credits
+- Sea: despike near sea level, sea map widened to water surrounded by sea; ground lookups use it
+
 ## 0.9.19 (2026-10-31)
 
 - Fix: aircraft model setter line commented out in 3D (TypeError every frame)

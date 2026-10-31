@@ -66,6 +66,7 @@ const V3dTerrain = {
       if (!cv) return null;
       const d = cv.getContext('2d').getImageData(0, 0, size, size).data, H = new Float32Array(size * size);
       for (let i = 0; i < size * size; i++) H[i] = d[i * 4] * 256 + d[i * 4 + 1] + d[i * 4 + 2] / 256 - 32768;
+      v3dDespike(H, size);
       return H;
     }).catch(() => null);
     const water = this.waterMask(z, x0, y0, N).catch(() => null);
@@ -144,7 +145,8 @@ const V3dTerrain = {
     const level = (i: number) => { const x = i % size, y = (i / size) | 0, h = H[i]; let d = 0;
       if (x > 0) d = Math.max(d, Math.abs(H[i - 1] - h)); if (x < size - 1) d = Math.max(d, Math.abs(H[i + 1] - h));
       if (y > 0) d = Math.max(d, Math.abs(H[i - size] - h)); if (y < size - 1) d = Math.max(d, Math.abs(H[i + size] - h)); return d < 4; };
-    const sea = (i: number) => mapWater(i) && H[i] <= 8;
+    const seaArr = v3dSeaMap(H, size, mapWater); (r as any).sea = seaArr;
+    const sea = (i: number) => seaArr[i] === 1;
     const water = (i: number) => mapWater(i) && (H[i] <= 8 || level(i));
     const river = (i: number) => M ? M[i * 4 + 1] > 110 && M[i * 4] <= 110 : false;
     // the map look: dark blue land shaded by its slopes, the sea darker, cyan along the coasts
@@ -250,7 +252,7 @@ const V3dTerrain = {
       const n = 1 << r.z, px = ((lon + 180) / 360 * n - r.x0) * 256, py = ((1 - Math.log(Math.tan(lat * D2R) + 1 / Math.cos(lat * D2R)) / Math.PI) / 2 * n - r.y0) * 256;
       if (px < 0 || py < 0 || px >= r.size - 1 || py >= r.size - 1) continue;
       const i = Math.floor(py) * r.size + Math.floor(px);
-      if (r.mask && r.mask[i * 4] > 110 && r.H[i] < 3) return 0;
+      if ((r as any).sea ? (r as any).sea[i] : (r.mask && r.mask[i * 4] > 110 && r.H[i] < 3)) return 0;
       return Math.max(0, r.H[i]);
     }
     return V3d.elev || 0;
@@ -265,48 +267,164 @@ ACTIONS['v3d-sat'] = () => {
   Store.save();
 };
 
-/* ---------- the airport patch: the sharpest imagery right at the airport ---------- */
+/* ---------- aerial photos: open national imagery, credit only, commercial use allowed ---------- */
+// Each country's own aerial photos where they are open data (sharper than any satellite: 5 cm to 1 m a
+// pixel). Licences checked: every one allows commercial use with the source credited (Settings → About).
+// Not included: Norway and the United Kingdom (their aerial photos aren't open for commercial use).
+interface OrthoSource { id: string; name: string; countries: string[]; credit: string; max: number; url?: string; arcExport?: string; key?: string; keyNote?: string }
+const ORTHO: OrthoSource[] = [
+  { id: 'fo', name: 'Umhvørvisstovan myndakort', countries: ['Faroe Islands'], credit: 'Aerial photos: data from the Faroese Environment Agency, Umhvørvisstovan: Myndakort, webservice', max: 20, arcExport: 'https://gis02.us.fo/imgserver/rest/services/myndakort/myndakort_fotm/MapServer/export' },
+  { id: 'nl', name: 'PDOK Luchtfoto', countries: ['Netherlands'], credit: 'Aerial photos: Beeldmateriaal.nl, PDOK (CC BY 4.0)', max: 21, url: 'https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg' },
+  { id: 'ch', name: 'swisstopo SWISSIMAGE', countries: ['Switzerland', 'Liechtenstein'], credit: 'Aerial photos: © swisstopo', max: 20, url: 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg' },
+  { id: 'fr', name: 'IGN BD ORTHO', countries: ['France', 'Monaco'], credit: 'Aerial photos: IGN, BD ORTHO (Licence Ouverte 2.0)', max: 19, url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/jpeg' },
+  { id: 'es', name: 'PNOA', countries: ['Spain'], credit: 'Aerial photos: PNOA cedido por © Instituto Geográfico Nacional (CC BY 4.0)', max: 19, url: 'https://www.ign.es/wmts/pnoa-ma?request=GetTile&service=WMTS&VERSION=1.0.0&Layer=OI.OrthoimageCoverage&Style=default&Format=image/jpeg&TileMatrixSet=GoogleMapsCompatible&TileMatrix={z}&TileRow={y}&TileCol={x}' },
+  { id: 'at', name: 'basemap.at Orthofoto', countries: ['Austria'], credit: 'Aerial photos: basemap.at (CC BY 4.0)', max: 19, url: 'https://mapsneu.wien.gv.at/basemap/bmaporthofoto30cm/normal/google3857/{z}/{y}/{x}.jpeg' },
+  { id: 'us', name: 'USGS The National Map', countries: ['United States', 'Puerto Rico'], credit: 'Aerial photos: USGS The National Map (public domain)', max: 16, url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}' },
+  { id: 'jp', name: 'GSI seamless photo', countries: ['Japan'], credit: 'Aerial photos: 地理院タイル, 国土地理院 (maps.gsi.go.jp/development/ichiran.html)', max: 18, url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg' },
+  { id: 'fi', name: 'Maanmittauslaitos ortokuva', countries: ['Finland', 'Åland Islands'], credit: 'Aerial photos: National Land Survey of Finland (CC BY 4.0)', max: 19, key: 'mmlKey', keyNote: 'a free API key from the National Land Survey of Finland', url: 'https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/{z}/{y}/{x}.jpg?api-key={key}' },
+  { id: 'dk', name: 'Dataforsyningen ortofoto', countries: ['Denmark'], credit: 'Aerial photos: contains data from the Danish Agency for Data Supply and Infrastructure (orthophoto, spring)', max: 20, key: 'dfToken', keyNote: 'a free token from Dataforsyningen', url: 'https://api.dataforsyningen.dk/orto_foraar_webm_DAF?service=WMTS&request=GetTile&version=1.0.0&layer=orto_foraar_webm&style=default&format=image/jpeg&tilematrixset=DFD_GoogleMapsCompatible&tilematrix={z}&tilerow={y}&tilecol={x}&token={key}' },
+];
+/** The aerial photos for a country (null where there are none, or the key is missing, or they're switched off). */
+function orthoFor(country: string): OrthoSource {
+  const S: any = State.settings; if (S.v3dOrtho === false || !country) return null;
+  const o = ORTHO.filter(x => x.countries.indexOf(country) >= 0)[0]; if (!o) return null;
+  if (o.key && !String(S[o.key] || '').trim()) return null;
+  return o;
+}
+function orthoUrl(o: OrthoSource): string { return o.url ? o.url.replace('{key}', encodeURIComponent(String((State.settings as any)[o.key] || '').trim())) : ''; }
+/** The country under a point: from the airport you're at, otherwise the nearest airport. */
+function countryAt(ll: number[]): string {
+  if (V3d.icao && apt(V3d.icao)) return apt(V3d.icao).country;
+  let best = 1e9, c = ''; for (const k of Object.keys(AIRPORTS)) { const A = AIRPORTS[k]; if (!A || !A.pos) continue; const d = gcDistanceNm(ll, A.pos); if (d < best) { best = d; c = A.country; } }
+  return best < 120 ? c : '';
+}
+
+/* ---------- the detail patch: the sharpest picture right around you ---------- */
 // The rings cover tens of kilometres each, so their pictures can't be sharper than about 10 m a pixel.
-// Around the airport a separate 5 km patch gets its own picture at the highest zoom the imagery has
-// (zoom 15 for the built-in Sentinel-2 imagery, up to 19 with your own imagery service), laid over the
-// terrain and fading out at its edges.
+// Around the airport (and around you when you're low over the ground) a separate patch gets its own
+// picture: the country's aerial photos where they are open, otherwise the satellite imagery at its full
+// detail; your own imagery service (Settings) comes first when set. The lower you are, the smaller and
+// sharper the patch: 1.5 km near the ground, 3 km below about 1,500 m, 5 km higher up.
 function satCustom(): { url: string; max: number } | null {
   const S: any = State.settings, u = String(S.v3dSatUrl || '').trim();
   return /^https:\/\/.+\{z\}.+\{x\}.+\{y\}|^https:\/\/.+\{z\}.+\{y\}.+\{x\}/.test(u) ? { url: u, max: clamp(+S.v3dSatMax || 19, 15, 20) } : null;
 }
-function v3dAirportPatch(tries?: number) {
-  if (!V3d.open || !V3d.icao || !(State.settings as any).v3dSat || !V3d.origin) return;
-  if (!V3dTerrain.rings.length) { if ((tries || 0) < 15) setTimeout(() => v3dAirportPatch((tries || 0) + 1), 1500); return; }
-  const T = THREE, icao = V3d.icao, ctr = V3d.origin.slice(), cust = satCustom(), cap = v3dTexCap(), size = 5000;
-  const lat = ctr[1], tileKm = (z: number) => 40075 * Math.cos(lat * D2R) / (1 << z);
-  // the highest zoom whose tiles for the patch still fit the device's picture size
-  let z = cust ? cust.max : 15;
-  while (z > 12 && Math.ceil(size / 1000 / tileKm(z)) + 1 > cap / 256) z--;
+const _patch = { busy: false, at: null as number[], size: 0, src: '' };
+function v3dAirportPatch(tries?: number) { v3dDetailPatch(null, tries); }
+/** Build (or rebuild) the detail patch around a point (lon, lat); the airport when none is given. */
+function v3dDetailPatch(centre: number[], tries?: number) {
+  if (!V3d.open || !(State.settings as any).v3dSat || !V3d.origin || _patch.busy) return;
+  if (!V3dTerrain.rings.length) { if ((tries || 0) < 15) setTimeout(() => v3dDetailPatch(centre, (tries || 0) + 1), 1500); return; }
+  const T = THREE, ctr = centre || V3d.origin.slice(), gen = V3dTerrain.gen, icao = V3d.icao;
+  // how big: smaller and sharper the lower you are
+  const cam = V3d.cam ? V3d.cam.position : null, cll = cam ? v3dLonLat(cam.x, cam.z) : ctr, agl = cam ? cam.y - v3dGround(cll[0], cll[1]) : 1e4;
+  const size = agl < 350 ? 1500 : agl < 1500 ? 3000 : 5000;
+  const cust = satCustom(), ortho = cust ? null : orthoFor(countryAt(ctr)), cap = v3dTexCap(), W = cap;
+  // the zoom whose pixels best match the picture's pixels, within what the source has (and at most ~400 tiles)
+  const lat = ctr[1], mpp = size / W, tileM = (z: number) => 40075016 * Math.cos(lat * D2R) / (1 << z);
+  const maxZ = cust ? cust.max : ortho ? ortho.max : 15;
+  let z = 12; while (z < maxZ && tileM(z + 1) / 256 >= mpp * 0.7 && Math.pow(size / tileM(z + 1) + 1, 2) <= 400) z++;
   const n = 1 << z, tx = (lon: number) => (lon + 180) / 360 * n, ty = (la: number) => (1 - Math.log(Math.tan(la * D2R) + 1 / Math.cos(la * D2R)) / Math.PI) / 2 * n;
-  const half = size / 2, ll0 = v3dLonLat(-half, half), ll1 = v3dLonLat(half, -half);
-  const x0 = Math.floor(tx(ll0[0])), y0 = Math.floor(ty(ll1[1])), N = Math.max(Math.ceil(tx(ll1[0])) - x0, Math.ceil(ty(ll0[1])) - y0);
-  const gen = V3dTerrain.gen;
-  V3dTerrain.tiles(cust ? cust.url : SAT_URL, z, x0, y0, N, 'jpg').then(cv => {
-    if (!cv || !V3d.open || V3d.icao !== icao || gen !== V3dTerrain.gen) return;
-    // soft edges, so the sharp patch melts into the ring around it
-    const g = cv.getContext('2d'), W = cv.width, px = (lon: number, la: number) => [(tx(lon) - x0) * 256, (ty(la) - y0) * 256];
-    const c0 = px(ctr[0], ctr[1]), r = (size / 2) / 1000 / tileKm(z) * 256;
-    const grad = g.createRadialGradient(c0[0], c0[1], r * 0.72, c0[0], c0[1], r * 0.98); grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+  // the patch's corners in the 3D view's metres, and on the map
+  const q0 = v3dXY(ctr[0], ctr[1]), half = size / 2, llA = v3dLonLat(q0[0] - half, q0[1] + half), llB = v3dLonLat(q0[0] + half, q0[1] - half);   // south-west, north-east
+  const fx0 = tx(llA[0]), fx1 = tx(llB[0]), fy0 = ty(llB[1]), fy1 = ty(llA[1]);
+  const cv = document.createElement('canvas'); cv.width = cv.height = W; const g = cv.getContext('2d');
+  const px = (fx: number, fy: number) => [(fx - fx0) / (fx1 - fx0) * W, (fy - fy0) / (fy1 - fy0) * W];
+  _patch.busy = true;
+  const done = (credit: string) => {
+    _patch.busy = false;
+    if (!V3d.open || gen !== V3dTerrain.gen || V3d.icao !== icao) return;
+    // soft round edges, so the sharp patch melts into the ground around it
+    const grad = g.createRadialGradient(W / 2, W / 2, W * 0.36, W / 2, W / 2, W * 0.5); grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
     g.globalCompositeOperation = 'destination-in'; g.fillStyle = grad; g.fillRect(0, 0, W, W); g.globalCompositeOperation = 'source-over';
     const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = V3d.r.capabilities.getMaxAnisotropy ? V3d.r.capabilities.getMaxAnisotropy() : 8;
     tex.onUpdate = () => { tex.onUpdate = null; setTimeout(() => { try { cv.width = 1; cv.height = 1; } catch (e) { /* ignore */ } }, 0); };
-    // a grid laid on the terrain, with each corner's picture position from the map projection
     const seg = 64, geo = new T.PlaneGeometry(size, size, seg, seg); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), zz = pos.getZ(i), ll = v3dLonLat(x, zz);
-      pos.setY(i, v3dGround(ll[0], ll[1]) - v3dCurve(x, zz) + 0.08);
-      uv.setXY(i, (tx(ll[0]) - x0) / N, 1 - (ty(ll[1]) - y0) / N);
+      const x = q0[0] + pos.getX(i), zz = q0[1] + pos.getZ(i), ll = v3dLonLat(x, zz);
+      pos.setXYZ(i, x, v3dGround(ll[0], ll[1]) - v3dCurve(x, zz) + 0.08, zz);
+      uv.setXY(i, (tx(ll[0]) - fx0) / (fx1 - fx0), 1 - (ty(ll[1]) - fy0) / (fy1 - fy0));
     }
-    pos.needsUpdate = true; uv.needsUpdate = true;
+    pos.needsUpdate = true; uv.needsUpdate = true; geo.computeBoundingSphere();
     const mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
     mesh.renderOrder = 1;
-    if ((V3d as any).patch) { V3d.scene.remove((V3d as any).patch); try { (V3d as any).patch.geometry.dispose(); (V3d as any).patch.material.map.dispose(); } catch (e) { /* ignore */ } }
-    (V3d as any).patch = mesh; V3d.scene.add(mesh);
+    const VP: any = V3d; if (VP.patch) { V3d.scene.remove(VP.patch); try { VP.patch.geometry.dispose(); VP.patch.material.map.dispose(); } catch (e) { /* ignore */ } }
+    VP.patch = mesh; V3d.scene.add(mesh); _patch.at = ctr.slice(); _patch.size = size; _patch.src = credit;
+    const cr = V3d.root && V3d.root.querySelector('.v3d-credit'); if (cr) { const base = (cr as any).base || ((cr as any).base = cr.textContent); cr.textContent = credit ? base + ' · ' + credit : base; }
+  };
+  // underneath: the satellite imagery (so any gap in the aerial photos is still covered)
+  const sz = Math.min(15, z), sn = 1 << sz, sx0 = Math.floor(fx0 / n * sn), sy0 = Math.floor(fy0 / n * sn), sN = Math.max(Math.ceil(fx1 / n * sn) - sx0, Math.ceil(fy1 / n * sn) - sy0);
+  V3dTerrain.tiles(cust && !ortho ? SAT_URL : SAT_URL, sz, sx0, sy0, sN, 'jpg').then(bg => {
+    if (bg) { const a = px(sx0 * n / sn, sy0 * n / sn), b = px((sx0 + sN) * n / sn, (sy0 + sN) * n / sn); g.drawImage(bg, a[0], a[1], b[0] - a[0], b[1] - a[1]); bg.width = 1; }
+    // on top: your own service, or the country's aerial photos
+    if (ortho && ortho.arcExport) {
+      // one picture for the whole patch, asked for in the web map projection
+      const R = 6378137, mx = (lon: number) => lon * D2R * R, my = (la: number) => R * Math.log(Math.tan(Math.PI / 4 + la * D2R / 2));
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => { try { if (!orthoBlank(im)) g.drawImage(im, 0, 0, W, W); } catch (e) { /* not allowed */ } done(ortho.credit); };
+      im.onerror = () => done('');
+      im.src = `${ortho.arcExport}?bbox=${mx(llA[0])},${my(llA[1])},${mx(llB[0])},${my(llB[1])}&bboxSR=3857&imageSR=3857&size=${Math.min(W, 4096)},${Math.min(W, 4096)}&format=jpg&transparent=false&f=image`;
+      return;
+    }
+    const url = cust ? cust.url : ortho ? orthoUrl(ortho) : '';
+    if (!url) { done(''); return; }
+    const x0 = Math.floor(fx0), y0 = Math.floor(fy0), N = Math.max(Math.ceil(fx1) - x0, Math.ceil(fy1) - y0);
+    let left = N * N, got = 0;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      const fin = () => { if (--left === 0) done(got ? (ortho ? ortho.credit : 'Imagery: your own service') : ''); };
+      im.onload = () => { try { if (!orthoBlank(im)) { const a = px(x0 + i, y0 + j), b = px(x0 + i + 1, y0 + j + 1); g.drawImage(im, a[0], a[1], b[0] - a[0] + 0.5, b[1] - a[1] + 0.5); got++; } } catch (e) { /* skip */ } fin(); };
+      im.onerror = fin;
+      im.src = url.replace('{z}', String(z)).replace('{x}', String((x0 + i + n) % n)).replace('{y}', String(y0 + j));
+    }
   });
+}
+/** A tile with nothing on it (outside the coverage, sent as plain white or black): leave the satellite under it. */
+function orthoBlank(im: HTMLImageElement): boolean {
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 8; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 8, 8);
+    const d = g.getImageData(0, 0, 8, 8).data; let mn = 255, mx = 0;
+    for (let i = 0; i < d.length; i += 4) { const v = (d[i] + d[i + 1] + d[i + 2]) / 3; if (v < mn) mn = v; if (v > mx) mx = v; }
+    return mx - mn < 6 && (mx > 245 || mx < 10);
+  } catch (e) { return false; }
+}
+/** While you fly low or move around: the patch follows (one at a time, when you've moved a good way). */
+function v3dPatchFollow() {
+  if (!V3d.open || !(State.settings as any).v3dSat || _patch.busy || !V3d.cam || !V3dTerrain.rings.length) return;
+  const c = V3d.cam.position, ll = v3dLonLat(c.x, c.z), agl = c.y - v3dGround(ll[0], ll[1]);
+  if (agl > 3000 && V3d.icao) return;   // high up: the airport patch stays
+  const want = agl < 350 ? 1500 : agl < 1500 ? 3000 : 5000;
+  // the ground point the camera looks at (or under it)
+  const dir = new THREE.Vector3(); V3d.cam.getWorldDirection(dir);
+  const t = dir.y < -0.05 ? Math.min(want * 0.4, agl / -dir.y) : want * 0.2, gp = v3dLonLat(c.x + dir.x * t, c.z + dir.z * t);
+  if (!_patch.at || want !== _patch.size || gcDistanceNm(_patch.at, gp) * 1852 > _patch.size * 0.28) v3dDetailPatch(gp);
+}
+
+/** Heights with errors in them show as spikes out of the sea: a point or two standing high where nearly
+ *  everything around is at sea level. Those are lowered to the level around them. Mountains are never
+ *  touched (their neighbours are high too), so real peaks and cliffs stay. */
+function v3dDespike(H: Float32Array, size: number) {
+  const nb: number[] = [];
+  for (let pass = 0; pass < 2; pass++) for (let y = 1; y < size - 1; y++) for (let x = 1; x < size - 1; x++) {
+    const i = y * size + x, h = H[i]; if (h <= 12) continue;
+    let low = 0; nb.length = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const v = H[i + dy * size + dx]; nb.push(v); if (v <= 8) low++; }
+    if (low >= 6) { nb.sort((a, b) => a - b); H[i] = Math.min(h, nb[3]); }   // the middle of its neighbours
+  }
+}
+/** Where the sea is (1) and isn't (0): water on the map that is near sea level, plus water on the map that
+ *  is mostly surrounded by such sea (so a stray high value in the middle of the sea is flattened too).
+ *  Land where the map and the heights disagree over a wide area stays land. */
+function v3dSeaMap(H: Float32Array, size: number, mapWater: (i: number) => boolean): Uint8Array {
+  const s = new Uint8Array(size * size);
+  for (let i = 0; i < size * size; i++) s[i] = mapWater(i) && H[i] <= 8 ? 1 : 0;
+  const out = s.slice(), R = 3;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const i = y * size + x; if (s[i] || !mapWater(i)) continue;
+    let n = 0, t = 0;
+    for (let dy = -R; dy <= R; dy++) { const yy = y + dy; if (yy < 0 || yy >= size) continue; for (let dx = -R; dx <= R; dx++) { const xx = x + dx; if (xx < 0 || xx >= size) continue; t++; n += s[yy * size + xx]; } }
+    if (n >= t * 0.6) out[i] = 1;
+  }
+  return out;
 }
