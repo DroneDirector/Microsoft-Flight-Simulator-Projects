@@ -391,7 +391,7 @@ function v3dRecentre(f: LiveFlight, w: { lon: number; lat: number }) {
   const ctr = v3dCentre(f, [w.lon, w.lat]);
   V3d.origin = ctr.pos.slice(); V3d.icao = ctr.icao; V3d.elev = 0;
   if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport = null; }
-  const VP: any = V3d; if (VP.patch) { V3d.scene.remove(VP.patch); try { VP.patch.geometry.dispose(); VP.patch.material.map.dispose(); } catch (e) { /* ignore */ } VP.patch = null; }
+  const VP: any = V3d; if (VP.patch) { V3d.scene.remove(VP.patch); try { VP.patch.geometry.dispose(); VP.patch.material.map.dispose(); } catch (e) { /* ignore */ } VP.patch = null; } _patch.at = null; _patch.busy = false;
   V3d.aptScene = null;
   if (ctr.icao) {
     const m = V3d.map || _curMap();
@@ -546,6 +546,7 @@ function v3dLoop(now: number) {
     if (on) { Q.label.style.transform = `translate(${((v.x + 1) / 2 * innerWidth).toFixed(0)}px, ${((1 - v.y) / 2 * innerHeight).toFixed(0)}px) translate(-50%, -100%)`; Q.label.classList.toggle('on', id === V3d.target); }
   }
   // the details card keeps up with the flight once a second
+  if (Math.floor(now / 500) !== (V3d as any).patchT) { (V3d as any).patchT = Math.floor(now / 500); try { v3dPatchFollow(); } catch (e) { /* ignore */ } }
   if (Math.floor(now / 1000) !== V3d.infoT && !v3dAptOnly()) { V3d.infoT = Math.floor(now / 1000); v3dRefreshInfo(f); }
 }
 
