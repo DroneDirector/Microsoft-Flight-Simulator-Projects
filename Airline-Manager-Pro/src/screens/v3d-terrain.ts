@@ -92,7 +92,8 @@ const V3dTerrain = {
         const im = new Image(); im.crossOrigin = 'anonymous';
         const done = () => { if (z === 12 && ext === 'png') this.prog.got++; if (--left === 0) ok(got ? cv : null); };
         im.onload = () => { try { c.drawImage(im, i * 256, j * 256); got++; } catch (e) { /* out of memory: skip this tile */ } done(); };
-        im.onerror = done;
+        let tried = false;
+        im.onerror = () => { if (!tried && ext !== 'png') { tried = true; setTimeout(() => { im.src = im.src.indexOf('?') < 0 ? im.src + '?r=1' : im.src + '&r=1'; }, 1200 + Math.random() * 1500); return; } done(); };
         const x = (x0 + i + n) % n, y = y0 + j;
         im.src = base.indexOf('{z}') >= 0 ? base.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y)) : ext === 'png' ? `${base}${z}/${x}/${y}.png` : `${base}${z}/${y}/${x}.jpg`;
       }
@@ -176,7 +177,7 @@ const V3dTerrain = {
     const lonOf = (px: number) => (r.x0 + px / 256) / n * 360 - 180;
     const latOf = (py: number) => { const k = Math.PI - 2 * Math.PI * (r.y0 + py / 256) / n; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
     const aptLL = V3d.icao ? apt(V3d.icao).pos : null, aElev = V3d.elev || 0;
-    const pos = new Float32Array((G + 1) * (G + 1) * 3), uv = new Float32Array((G + 1) * (G + 1) * 2), idx: number[] = [];
+    const pos = new Float32Array((G + 1) * (G + 1) * 3), uv = new Float32Array((G + 1) * (G + 1) * 2), idx: number[] = [], mh = new Float32Array((G + 1) * (G + 1));
     const sample = (px: number, py: number) => {
       const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
       const h = H[i] * (1 - fx) * (1 - fy) + H[i + 1] * fx * (1 - fy) + H[i + size] * (1 - fx) * fy + H[i + size + 1] * fx * fy;
@@ -192,7 +193,8 @@ const V3dTerrain = {
       if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
       const p = v3dXY(lon, lat), o = j * (G + 1) + i;
       // outer rings sit a little lower so the finer ring always shows where they meet
-      pos[o * 3] = p[0]; pos[o * 3 + 1] = h - v3dCurve(p[0], p[1]) - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0); pos[o * 3 + 2] = p[1];
+      mh[o] = h - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0);
+      pos[o * 3] = p[0]; pos[o * 3 + 1] = mh[o] - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
       uv[o * 2] = i / G; uv[o * 2 + 1] = 1 - j / G;
     }
     const inside = (lon: number, lat: number) => {
@@ -206,6 +208,7 @@ const V3dTerrain = {
       if (r.inner && inside(lonOf((i + 0.5) / G * size), latOf((j + 0.5) / G * size))) continue;
       const a = j * (G + 1) + i, b = a + 1, d = a + G + 1, e = d + 1; idx.push(a, d, b, b, d, e);
     }
+    (r as any).mh = mh; (r as any).G = G;
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx);
     r.mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ map: (State.settings as any).v3dSat && r.satTex ? r.satTex : r.mapTex }));
     r.mesh.renderOrder = -r.z;
@@ -251,6 +254,14 @@ const V3dTerrain = {
     for (const r of this.rings) {
       const n = 1 << r.z, px = ((lon + 180) / 360 * n - r.x0) * 256, py = ((1 - Math.log(Math.tan(lat * D2R) + 1 / Math.cos(lat * D2R)) / Math.PI) / 2 * n - r.y0) * 256;
       if (px < 0 || py < 0 || px >= r.size - 1 || py >= r.size - 1) continue;
+      // the height of the surface as drawn: the same triangles the ground is made of (levelled at the
+      // airport, the sea flat), so aircraft, runways, taxiways and photos sit exactly on it
+      const R: any = r;
+      if (R.mh) {
+        const G = R.G, gx = px / r.size * G, gy = py / r.size * G, i0 = Math.min(G - 1, Math.floor(gx)), j0 = Math.min(G - 1, Math.floor(gy)), fx = gx - i0, fy = gy - j0, W = G + 1;
+        const ha = R.mh[j0 * W + i0], hb = R.mh[j0 * W + i0 + 1], hd = R.mh[(j0 + 1) * W + i0], he = R.mh[(j0 + 1) * W + i0 + 1];
+        return fx + fy <= 1 ? ha + (hb - ha) * fx + (hd - ha) * fy : he + (hd - he) * (1 - fx) + (hb - he) * (1 - fy);
+      }
       const i = Math.floor(py) * r.size + Math.floor(px);
       if ((r as any).sea ? (r as any).sea[i] : (r.mask && r.mask[i * 4] > 110 && r.H[i] < 3)) return 0;
       return Math.max(0, r.H[i]);
@@ -339,15 +350,15 @@ function v3dDetailPatch(centre: number[], tries?: number) {
     g.globalCompositeOperation = 'destination-in'; g.fillStyle = grad; g.fillRect(0, 0, W, W); g.globalCompositeOperation = 'source-over';
     const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = V3d.r.capabilities.getMaxAnisotropy ? V3d.r.capabilities.getMaxAnisotropy() : 8;
     tex.onUpdate = () => { tex.onUpdate = null; setTimeout(() => { try { cv.width = 1; cv.height = 1; } catch (e) { /* ignore */ } }, 0); };
-    const seg = 64, geo = new T.PlaneGeometry(size, size, seg, seg); geo.rotateX(-Math.PI / 2);
+    const seg = 128, geo = new T.PlaneGeometry(size, size, seg, seg); geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < pos.count; i++) {
       const x = q0[0] + pos.getX(i), zz = q0[1] + pos.getZ(i), ll = v3dLonLat(x, zz);
-      pos.setXYZ(i, x, v3dGround(ll[0], ll[1]) - v3dCurve(x, zz) + 0.08, zz);
+      pos.setXYZ(i, x, v3dGround(ll[0], ll[1]) - v3dCurve(x, zz) + 0.25, zz);
       uv.setXY(i, (tx(ll[0]) - fx0) / (fx1 - fx0), 1 - (ty(ll[1]) - fy0) / (fy1 - fy0));
     }
     pos.needsUpdate = true; uv.needsUpdate = true; geo.computeBoundingSphere();
-    const mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+    const mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -16 }));
     mesh.renderOrder = 1;
     const VP: any = V3d; if (VP.patch) { V3d.scene.remove(VP.patch); try { VP.patch.geometry.dispose(); VP.patch.material.map.dispose(); } catch (e) { /* ignore */ } }
     VP.patch = mesh; V3d.scene.add(mesh); _patch.at = ctr.slice(); _patch.size = size; _patch.src = credit;
@@ -362,7 +373,7 @@ function v3dDetailPatch(centre: number[], tries?: number) {
       // one picture for the whole patch, asked for in the web map projection
       const R = 6378137, mx = (lon: number) => lon * D2R * R, my = (la: number) => R * Math.log(Math.tan(Math.PI / 4 + la * D2R / 2));
       const im = new Image(); im.crossOrigin = 'anonymous';
-      im.onload = () => { try { if (!orthoBlank(im)) g.drawImage(im, 0, 0, W, W); } catch (e) { /* not allowed */ } done(ortho.credit); };
+      im.onload = () => { try { drawNoWhite(g, im, W); } catch (e) { /* not allowed */ } done(ortho.credit); };
       im.onerror = () => done('');
       im.src = `${ortho.arcExport}?bbox=${mx(llA[0])},${my(llA[1])},${mx(llB[0])},${my(llB[1])}&bboxSR=3857&imageSR=3857&size=${Math.min(W, 4096)},${Math.min(W, 4096)}&format=jpg&transparent=false&f=image`;
       return;
@@ -427,4 +438,18 @@ function v3dSeaMap(H: Float32Array, size: number, mapWater: (i: number) => boole
     if (n >= t * 0.6) out[i] = 1;
   }
   return out;
+}
+
+/** Draw a picture where white means "no photo here" (outside the coverage): the white is left clear, so the
+ *  satellite imagery under it shows. Done in strips, so it never needs much memory at once. */
+function drawNoWhite(g: CanvasRenderingContext2D, im: HTMLImageElement, W: number) {
+  const iw = im.naturalWidth || W, ih = im.naturalHeight || W, rows = 256, strip = document.createElement('canvas'); strip.width = W;
+  for (let y = 0; y < W; y += rows) {
+    const h = Math.min(rows, W - y); strip.height = h; const s = strip.getContext('2d');
+    s.clearRect(0, 0, W, h); s.drawImage(im, 0, y / W * ih, iw, h / W * ih, 0, 0, W, h);
+    const d = s.getImageData(0, 0, W, h), p = d.data;
+    for (let i = 0; i < p.length; i += 4) if (p[i] > 246 && p[i + 1] > 246 && p[i + 2] > 246) p[i + 3] = 0;
+    s.putImageData(d, 0, 0); g.drawImage(strip, 0, y);
+  }
+  strip.width = strip.height = 1;
 }

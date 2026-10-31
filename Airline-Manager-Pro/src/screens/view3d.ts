@@ -273,7 +273,7 @@ function v3dBuildAirport(L: AirportLayout) {
   (V3d as any).lastL = L;
   const loc = (x: number, y: number) => { const ll = [L.lon + x / (111320 * Math.cos(L.lat * D2R)), L.lat + y / 110540]; return v3dXY(ll[0], ll[1]); };
   // the ground's height where it is known (the terrain may still be loading: then the airport's elevation)
-  const gy = (x: number, z: number) => { if (!V3dTerrain.rings.length) return e; const ll = v3dLonLat(x, z); return Math.max(V3dTerrain.ground(ll[0], ll[1]), 0) - v3dCurve(x, z); };
+  const gy = (x: number, z: number) => { if (!V3dTerrain.rings.length) return e; const ll = v3dLonLat(x, z); return V3dTerrain.ground(ll[0], ll[1]) - v3dCurve(x, z); };
   // terminals and other buildings
   const mBuild = new T.MeshLambertMaterial({ color: 0x8C96A3 });
   for (const a of L.areas || []) {
@@ -291,7 +291,7 @@ function v3dBuildAirport(L: AirportLayout) {
     const tex = new T.CanvasTexture(runwayMarkingsCanvas(r)); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = V3d.r ? V3d.r.capabilities.getMaxAnisotropy() : 4;
     const segs = Math.max(2, Math.ceil(r.len / 40)), geo = new T.PlaneGeometry(r.wid || 45, r.len, 2, segs); geo.rotateX(-Math.PI / 2);
     const q = v3dXY(r.lon, r.lat), a = -r.hdg * D2R, cs = Math.cos(a), sn = Math.sin(a), pos = geo.attributes.position;
-    for (let k = 0; k < pos.count; k++) { const x = pos.getX(k), z = pos.getZ(k), wx = q[0] + x * cs + z * sn, wz = q[1] - x * sn + z * cs; pos.setXYZ(k, wx, gy(wx, wz) + 0.3, wz); }
+    for (let k = 0; k < pos.count; k++) { const x = pos.getX(k), z = pos.getZ(k), wx = q[0] + x * cs + z * sn, wz = q[1] - x * sn + z * cs; pos.setXYZ(k, wx, gy(wx, wz) + 0.5, wz); }
     pos.needsUpdate = true; geo.computeBoundingSphere();
     const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 })); m.renderOrder = 4;
     g.add(m);
@@ -377,7 +377,7 @@ function airportSheet(L: AirportLayout, loc: (x: number, y: number) => number[],
   const nx = Math.min(120, Math.ceil(W / 40)), ny = Math.min(120, Math.ceil(H / 40)), pos: number[] = [], uv: number[] = [], idx: number[] = [];
   for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
     const mx = x0 + W * i / nx, my = y0 + H * j / ny, q = loc(mx, my);
-    pos.push(q[0], gy(q[0], q[1]) + 0.12, q[1]); uv.push(i / nx, j / ny);
+    pos.push(q[0], gy(q[0], q[1]) + 0.35, q[1]); uv.push(i / nx, j / ny);
   }
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, d = a + nx + 1, e2 = d + 1; idx.push(a, d, b, b, d, e2); }
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeBoundingSphere();
@@ -450,7 +450,8 @@ function v3dLoop(now: number) {
     }
     const s = shapeOf(P.type);
     // never below the ground (or the runway), wheels on it when rolling
-    const ground = V3d.icao && Math.hypot(q[0], q[1]) < 3500 ? V3d.elev : v3dGround(w.lon, w.lat);
+    // the drawn surface (the runway and taxiways sit half a metre above it), so wheels are on what you see
+    const ground = V3dTerrain.rings.length ? v3dGround(w.lon, w.lat) + 0.5 : (V3d.icao ? V3d.elev : 0);
     const y = w.onGround ? ground : Math.max(ground + 2, w.altM);
     P.tgt.set(q[0], y - v3dCurve(q[0], q[1]), q[1]);
     if (!P.pos) P.pos = P.tgt.clone();
