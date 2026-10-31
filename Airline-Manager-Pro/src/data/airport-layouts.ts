@@ -302,9 +302,9 @@ function layoutGenerate(l: AirportLayout, a: any) {
   const k = Math.cos(l.lat * Math.PI / 180), xy = (lat: number, lon: number) => [(lon - l.lon) * 111320 * k, (lat - l.lat) * 110540];
   const arp = a && a.pos ? xy(a.pos[1], a.pos[0]) : [0, 0];
   paved.slice(0, 3).forEach((r, ri) => {
-    // ICAO aerodrome code by runway size: separation to the parallel taxiway and taxiway width
-    const code = r.wid >= 44 || r.len >= 2800 ? 'E' : r.wid >= 29 || r.len >= 1800 ? 'C' : r.wid >= 22 ? 'B' : 'A';
-    const sep = code === 'E' ? 182.5 : code === 'C' ? 168 : code === 'B' ? 87 : 52, tw = code === 'E' ? 23 : code === 'C' ? 18 : code === 'B' ? 10.5 : 7.5;
+    // separation to the parallel taxiway and taxiway width: the FAA's rules at US airports, ICAO's elsewhere
+    const st = faaAirport(l.icao, a) ? faaTaxiDims(r, size, l.alt || 0) : icaoTaxiDims(r);
+    const sep = st.sep, tw = st.tw;
     const c = xy(r.lat, r.lon), h = r.hdg * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
     // the side towards the reference point (the terminal side); a coin toss when it sits on the runway
     let px = Math.cos(h), py = -Math.sin(h); const side = (arp[0] - c[0]) * px + (arp[1] - c[1]) * py;
@@ -387,3 +387,28 @@ function layoutPrefetch() {
   LayoutDb.keys().then(have => { const list = Object.keys(set).filter(k => have[k] !== 'sim'); if (list.length) linkSend({ type: 'layout-prefetch', list }); });
 }
 setInterval(() => { try { layoutPrefetch(); } catch (e) { /* ignore */ } }, 120e3);
+
+/** Airports built to the FAA's rules: the United States and its territories. */
+function faaAirport(icao: string, a: any): boolean {
+  const c = String(a && a.country || '');
+  return /^(United States|Puerto Rico|Guam|U\.?S\.? Virgin Islands|American Samoa|Northern Mariana Islands)$/i.test(c) || (!c && /^(K|PA|PH|PG|TJ|TI|NS)/.test(icao));
+}
+/** ICAO Annex 14: parallel taxiway distance from an instrument runway and taxiway width, by aerodrome code. */
+function icaoTaxiDims(r: { wid: number; len: number }): { sep: number; tw: number } {
+  const code = r.wid >= 44 || r.len >= 2800 ? 'E' : r.wid >= 29 || r.len >= 1800 ? 'C' : r.wid >= 22 ? 'B' : 'A';
+  return code === 'E' ? { sep: 182.5, tw: 23 } : code === 'C' ? { sep: 168, tw: 18 } : code === 'B' ? { sep: 87, tw: 10.5 } : { sep: 52, tw: 7.5 };
+}
+/** FAA AC 150/5300-13B: runway centre line to parallel taxiway centre line by airplane design group (ADG) and
+ *  approach visibility (big airports instrument approaches lower than 3/4 mile, mid-size not lower than 3/4
+ *  mile, small ones visual), with the elevation adjustment for the large groups; taxiway width by taxiway
+ *  design group (25, 35, 50, 75 and 82 ft). In metres. */
+function faaTaxiDims(r: { wid: number; len: number }, size: number, elevM: number): { sep: number; tw: number } {
+  const ft = 0.3048, wFt = r.wid / ft, elevFt = elevM / ft;
+  const adg = wFt >= 195 ? 6 : wFt >= 145 && r.len >= 2800 ? 5 : wFt >= 145 ? 4 : wFt >= 98 ? 3 : wFt >= 73 ? 2 : 1;
+  const vis = size >= 2 ? 2 : size === 1 ? 1 : 0;   // 0 visual, 1 not lower than 3/4 mile, 2 lower than 3/4 mile
+  const table: { [g: number]: number[] } = { 1: [225, 240, 400], 2: [240, 240, 400], 3: [300, 350, 400], 4: [400, 400, 400], 5: [400, 400, 400], 6: [500, 500, 550] };
+  let sep = table[adg][vis];
+  if ((adg === 4 || adg === 5) && vis === 2) sep = elevFt > 6560 ? 500 : elevFt > 1345 ? 450 : 400;
+  const tw = adg >= 6 ? 82 : adg >= 4 ? 75 : adg === 3 ? 50 : adg === 2 ? 35 : 25;
+  return { sep: sep * ft, tw: tw * ft };
+}

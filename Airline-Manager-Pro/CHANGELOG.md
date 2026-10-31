@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.33 (2026-10-31)
+
+- layoutGenerate: FAA AC 150/5300-13B separations and taxiway widths at US airports (faaAirport/faaTaxiDims), ICAO elsewhere
+
 ## 0.9.32 (2026-10-31)
 
 - layoutGenerate: ICAO-dimensioned taxiways, exits, apron and stands from runway data for unmapped airports (runways source, or OSM without taxiways); airport view uses it
