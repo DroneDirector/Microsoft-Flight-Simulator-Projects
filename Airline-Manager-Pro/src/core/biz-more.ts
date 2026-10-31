@@ -50,7 +50,7 @@ function etopsNeed(typeId: string, legs: string[]): number {
   if (engineCount(typeId) !== 2) return 0;
   const t = acType(typeId); if (!t || t.cls === 'ga' || t.cls === 'bush') return 0;
   const key = typeId + ':' + legs.join('-'); if (_etopsCache[key] != null) return _etopsCache[key];
-  if (!_altList) _altList = World.ready ? (World.list as any[]).filter(w => w.size >= 1 && w.pos) : (Object.keys(AIRPORTS).map(k => AIRPORTS[k]) as any[]);
+  if (!_altList) _altList = World.ready ? (World.list as any[]).filter(w => (w.size === 1 || w.size === 2) && w.pos) : (Object.keys(AIRPORTS).map(k => AIRPORTS[k]) as any[]);
   const kt = t.cls === 'turboprop' ? 230 : 400; let worst = 0;
   for (let i = 1; i < legs.length; i++) {
     const A = apt(legs[i - 1]), B = apt(legs[i]); if (!A || !B) continue;

@@ -45,7 +45,7 @@ function v3dAptOnly(): any { const k = String(V3d.target || ''); if (k.indexOf('
 function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
-  V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false;
+  V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null;
   v3dCrashGuard(true);
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
@@ -407,8 +407,8 @@ function v3dRecentre(f: LiveFlight, w: { lon: number; lat: number }) {
     const m = V3d.map || _curMap();
     try { V3d.aptScene = m ? (m.scenes[ctr.icao] || (m.scenes[ctr.icao] = makeAirportScene(ctr.icao, m))) : null; } catch (e) { V3d.aptScene = null; }
     AirportLayouts.get(ctr.icao, (better: AirportLayout) => { if (better && V3d.open && V3d.icao === ctr.icao) { V3d.elev = better.alt || 0; v3dBuildAirport(better); } })
-      .then((L: AirportLayout) => { if (L && V3d.open && V3d.icao === ctr.icao) { V3d.elev = L.alt || 0; v3dBuildAirport(L); V3d.aptReady = true; V3dTerrain.prog.got++; V3dTerrain.load(V3d.origin); } })
-      .catch(() => V3dTerrain.load(V3d.origin));
+      .then((L: AirportLayout) => { if (!V3d.open || V3d.icao !== ctr.icao) return; if (L) { V3d.elev = L.alt || 0; v3dBuildAirport(L); } V3d.aptReady = true; V3dTerrain.prog.got++; V3dTerrain.load(V3d.origin); })
+      .catch(() => { if (V3d.open && V3d.icao === ctr.icao) { V3d.aptReady = true; V3dTerrain.load(V3d.origin); } });
   } else V3dTerrain.load(V3d.origin);
   // every aircraft moves to the new centre
   for (const id in V3d.planes) V3d.planes[id].pos = null;
@@ -633,22 +633,47 @@ function v3dLoaderHtml(): string {
 const V3D_SPLASH_MS = 5000;   // the 3D loading screen shows at least this long
 function v3dLoaderTick(now: number) {
   const L = V3d.root && V3d.root.querySelector('.v3d-load') as HTMLElement; if (!L || V3d.loaded) return;
-  const pr = V3dTerrain.prog, k = clamp(pr.got / Math.max(1, pr.want), 0, 1);
-  // shown at least 5 seconds; done when the near ground (and the airport) are built, or after 20 s
+  const VL: any = V3d, pr = V3dTerrain.prog, t = now - V3d.loadT0;
+  // the airports of the flight within the view distance: their layouts are loaded before the view opens
+  if (!VL.pre && V3d.origin) {
+    VL.pre = { want: 0, got: 0 };
+    const f: any = v3dAptOnly() || State.live.filter(x => x.id === V3d.target)[0], km = v3dKm();
+    const ids = f ? [f.from, f.noDest ? '' : f.to].filter((k: string, i: number, a: string[]) => k && a.indexOf(k) === i && k !== V3d.icao) : [];
+    for (const k of ids) {
+      const A = apt(k); if (!A || gcDistanceNm(V3d.origin, A.pos) * 1.852 > km) continue;
+      VL.pre.want++;
+      const done = () => { VL.pre.got++; };
+      try { AirportLayouts.get(k, () => { /* kept for later */ }).then(done, done); } catch (e) { done(); }
+    }
+  }
   const satOn = !!(State.settings as any).v3dSat, q = satOn ? v3dSatQ() : 0;
-  // with satellite imagery: the two nearest rings' pictures are loaded too (and on the graphics card)
-  const satReady = !satOn || (pr.sat || 0) >= Math.min(2, V3dTerrain.rings.length || 2);
-  const near = V3dTerrain.rings.length > 0 && (!V3d.icao || V3d.aptReady) && satReady, t = now - V3d.loadT0;
-  const minMs = V3D_SPLASH_MS + q * 1500, maxMs = 20000 + q * 8000;
-  // the loading screen stays at least 5 seconds; its bar never runs ahead of that, so it fills smoothly
-  const shown = Math.min(near ? 1 : Math.min(0.97, k * 0.8 + (satOn ? Math.min(2, pr.sat || 0) * 0.05 : 0.1) + Math.min(0.07, t / 60000)), t / minMs);
+  // everything within range: every ring of ground, its satellite pictures, the airport, the flight's other
+  // airports nearby, and the clouds from the weather reports (a part that fails counts as done)
+  const terrainOk = V3dTerrain.done, nRings = V3dTerrain.rings.length;
+  const satOk = !satOn || (terrainOk && (pr.sat || 0) >= nRings);
+  const aptOk = !V3d.icao || V3d.aptReady;
+  const preOk = !!VL.pre && VL.pre.got >= VL.pre.want;
+  const C: any = V3dClouds, cloudOk = !cloudKm() || (!!C.fetchAt && !C.pending && !!C.key && !!C.mesh);
+  const parts: [number, number][] = [   // [share of the bar, done (0–1)]
+    [satOn ? 0.45 : 0.62, terrainOk ? 1 : clamp(pr.got / Math.max(1, pr.want), 0, 0.97)],
+    [satOn ? 0.25 : 0, satOk ? 1 : clamp((pr.sat || 0) / Math.max(1, nRings || 6), 0, 0.97)],
+    [0.13, aptOk ? 1 : 0], [0.1, preOk ? 1 : VL.pre ? VL.pre.got / Math.max(1, VL.pre.want) : 0], [0.12, cloudOk ? 1 : C.pending ? 0.5 : 0],
+  ];
+  const tot = parts.reduce((s, p) => s + p[0], 0), k = parts.reduce((s, p) => s + p[0] * p[1], 0) / tot;
+  const all = terrainOk && satOk && aptOk && preOk && cloudOk;
+  const minMs = V3D_SPLASH_MS + q * 1500, maxMs = 60000 + q * 20000;   // never stuck: after a minute it opens anyway
+  // the bar never runs ahead of the minimum time, so it fills smoothly, and stays short of 100% until everything is in
+  const shown = Math.min(all ? 1 : Math.min(0.98, k), t / minMs);
   V3d.shown = Math.max(V3d.shown || 0, shown);
   const fill = L.querySelector('.spl-fill') as HTMLElement, tip = L.querySelector('.spl-tip') as HTMLElement, pct = L.querySelector('.spl-pct') as HTMLElement, step = L.querySelector('.spl-step') as HTMLElement;
   if (fill) fill.style.width = (V3d.shown * 100).toFixed(1) + '%';
   if (tip) tip.style.left = (V3d.shown * 100).toFixed(1) + '%';
   if (pct) pct.textContent = Math.round(V3d.shown * 100) + '%';
-  if (step) step.textContent = V3d.shown < 0.45 ? 'Loading the mountains and the sea…' : satOn && !satReady ? `Loading satellite imagery${q >= 3 ? ' (highest detail)' : q >= 2 ? ' (very sharp)' : ''}…` : V3d.shown < 0.9 ? (V3d.icao ? `Building ${V3d.icao}…` : 'Painting the coastlines…') : 'Ready';
-  if ((near && t >= minMs) || t > maxMs) {
+  if (step) step.textContent = !terrainOk ? 'Loading the mountains and the sea…' : !satOk ? `Loading satellite imagery${q >= 3 ? ' (highest detail)' : q >= 2 ? ' (very sharp)' : ''}…`
+    : !aptOk ? `Building ${V3d.icao}…` : !preOk ? 'Loading the airports nearby…' : !cloudOk ? 'Loading the clouds from the weather reports…' : 'Ready';
+  if ((all && t >= minMs) || t > maxMs) {
+    // everything goes onto the graphics card before the view shows, so the first moments don't stutter
+    try { V3d.r.compile(V3d.scene, V3d.cam); } catch (e) { /* ignore */ }
     V3d.loaded = true; L.classList.add('out'); setTimeout(() => L.remove(), 800);
   }
 }

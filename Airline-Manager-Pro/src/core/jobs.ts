@@ -113,7 +113,7 @@ noticesAt(Date.now());
     const starts = [c.hub].concat(fl.map(x => x.base), fl.map(x => x.location)).filter(x => !!apt(x));
     const from = starts[Math.floor(Math.random() * starts.length)]; if (!from) return null;
     const A = apt(from), max = usableRange(t) * 0.9, min = bush ? 15 : 90;
-    let cands: string[] = Object.keys(AIRPORTS).filter(k => k !== from && k !== 'DEP' && (bush ? k[0] === 'P' : k[0] !== 'P' || k === 'PANC'));
+    let cands: string[] = Object.keys(AIRPORTS).filter(k => k !== from && k !== 'DEP' && (bush ? bushApt(k) : airlineApt(k)));
     try { if (World.ready && !bush) cands = cands.concat((World.list as any[]).filter(w => w.size >= 1 && w.sched && Math.abs(w.pos[1] - A.pos[1]) < max / 60).map(w => w.icao).slice(0, 4000)); } catch (e) { /* not loaded */ }
     cands = cands.filter(k => { const B = apt(k); if (!B) return false; const d = gcDistanceNm(A.pos, B.pos); return d >= min && d <= max; });
     if (!cands.length) return null;

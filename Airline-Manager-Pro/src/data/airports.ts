@@ -70,4 +70,9 @@ const AIRPORTS: { [icao: string]: Airport } = {};
   ['MPTO', 'Panama Tocumen', 'Panama City', 'Panama', -79.3835, 9.0714],
 ] as any[]).forEach(r => { AIRPORTS[r[0]] = { icao: r[0], name: r[1], city: r[2], country: r[3], pos: [r[4], r[5]] }; });
 
+// the bush airports in Alaska (bush companies fly between these; airlines only to the bigger ones)
+const BUSH_APTS = ['PANC', 'PALH', 'PATK', 'PAKN', 'PAEN', 'PAHO', 'PAJN', 'PAFA', 'PAOM'];
+function bushApt(k: string): boolean { return BUSH_APTS.indexOf(k) >= 0; }
+function airlineApt(k: string): boolean { return !bushApt(k) || k === 'PANC' || k === 'PAJN' || k === 'PAFA'; }
+
 function apt(icao: string): Airport { return AIRPORTS[icao] || (typeof World !== 'undefined' ? World.get(icao) : null); }

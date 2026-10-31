@@ -79,8 +79,9 @@ function nrGridHtml(): string {
   const c = company(), last = _nr.stops[_nr.stops.length - 1], t = _nr.typeId ? acType(_nr.typeId) : null, max = t ? usableRange(t) : 99999;
   const L = apt(last);
   let list: Airport[] = _nr.q.trim() ? World.search(_nr.q, 36, a => _nr.test || a.icao !== last)
-    : Object.keys(AIRPORTS).map(k => AIRPORTS[k]).filter(a => a.icao !== 'DEP' && (_nr.test || a.icao !== last) && (c.kind === 'bush' ? a.icao[0] === 'P' : a.icao[0] !== 'P'));
+    : Object.keys(AIRPORTS).map(k => AIRPORTS[k]).filter(a => a.icao !== 'DEP' && (_nr.test || a.icao !== last) && (c.kind === 'bush' ? bushApt(a.icao) : airlineApt(a.icao)));
   if (!_nr.q.trim() && L) list = list.slice().sort((a, b) => gcDistanceNm(L.pos, a.pos) - gcDistanceNm(L.pos, b.pos));
+  if (!_nr.q.trim()) list = list.slice(0, 60);   // the nearest ones; the search finds the rest
   return list.map(a => {
     const d = L ? gcDistanceNm(L.pos, a.pos) : 0, far = !!t && d > max && !_nr.test;
     return `<button class="apt-btn ${far ? 'far' : ''}" data-act="nr-add" data-icao="${esc(a.icao)}" ${far ? 'disabled' : ''}><b>${esc(a.icao)}</b><small>${esc(a.name !== a.icao ? a.name : a.city)}${a.country ? ', ' + esc(a.country) : ''}</small><small class="d">${_nr.test ? '' : num(d) + ' nm' + (far ? ', too far' : '')}</small></button>`;

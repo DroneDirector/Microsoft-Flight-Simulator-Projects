@@ -23,7 +23,7 @@ function usedList(): UsedAc[] {
   const S: any = State, wk = weekKey(new Date()), c = company();
   if (S.usedMarket && S.usedMarket.wk === wk && S.usedMarket.cid === c.id) return S.usedMarket.items;
   const types = AIRCRAFT.filter(t => t.installed && (c.kind === 'bush' ? t.cls === 'bush' || t.cls === 'ga' || t.cls === 'turboprop' : t.cls !== 'bush' && t.cls !== 'ga'));
-  const near = Object.keys(AIRPORTS).filter(k => k !== 'DEP' && (c.kind === 'bush' ? k[0] === 'P' : k[0] !== 'P'));
+  const near = Object.keys(AIRPORTS).filter(k => k !== 'DEP' && (c.kind === 'bush' ? bushApt(k) : airlineApt(k)));
   const items: UsedAc[] = [];
   for (let i = 0; i < 12 && types.length; i++) {
     const h = hashMix(wk + c.id + i), t = types[h % types.length];

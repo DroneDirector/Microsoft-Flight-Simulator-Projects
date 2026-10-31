@@ -137,11 +137,12 @@ function v3dCloudFetch(lon: number, lat: number, km: number) {
   const s = Math.floor(lat - r), n = Math.ceil(lat + r), w = Math.floor(lon - r / k), e = Math.ceil(lon + r / k), key = [s, w, n, e].join(',');
   if (key === V3dClouds.fetchKey && Date.now() - V3dClouds.fetchAt < 10 * 60e3) return;
   if (Date.now() - V3dClouds.fetchAt < 15e3) return;
-  V3dClouds.fetchKey = key; V3dClouds.fetchAt = Date.now();
+  V3dClouds.fetchKey = key; V3dClouds.fetchAt = Date.now(); V3dClouds.pending = true;
   Net.json(`https://aviationweather.gov/api/data/metar?bbox=${Math.max(-89, s)},${Math.max(-180, w)},${Math.min(89, n)},${Math.min(180, e)}&format=json`).then((ms: any[]) => {
     for (const x of ms || []) { if (!x || !x.icaoId) continue; LiveWx.store(x, ''); }
     V3dClouds.key = '';   // build again with the new reports
-  }).catch(() => { /* offline: no clouds */ });
+    V3dClouds.pending = false;
+  }).catch(() => { V3dClouds.pending = false; /* offline: no clouds */ });
 }
 
 /** The puffs within reach of the camera: [x, y, z, flat, size, picture, shade, alpha]. */
