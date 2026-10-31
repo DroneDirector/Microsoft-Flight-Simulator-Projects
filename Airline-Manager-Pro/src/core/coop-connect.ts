@@ -54,6 +54,8 @@ function coopConnTick(now: number) {
       const co = company(), hubs = ['EGLL', 'KJFK', 'EDDF', 'LFPG', 'ESSA', 'ENGM', 'BIKF', 'CYYZ', 'YSSY', 'RJTT'], h = hubs[Math.floor(Math.random() * hubs.length)];
       const p = makePerson('coopj-' + uid(), 'captain', '', h);
       const m: any = { id: 'coop-' + uid(), name: p.name, role: 'pilot', sex: p.sex, nat: p.nat, base: co.hub, flights: 0, hoursMin: 0, revenue: 0, rating: Math.round((3.6 + Math.random() * 1.3) * 10) / 10, joined: now, lastSeen: now, look: randomLook('coop' + p.name, p.sex, 'captain') };
+      if (activityRules().approve) { coopApps().push({ id: uid(), m, at: now, note: `From ${m.nat ? countryName(m.nat) : 'abroad'}, ${Math.round(50 + Math.random() * 3000)} hours in the sim. "${['I love regional flying.', 'Looking for a friendly crew.', 'Flying every evening.', 'Ex-airline sim pilot, keen to join.'][Math.floor(Math.random() * 4)]}"` });
+        State.notices.unshift({ id: uid(), kind: 'pilot', title: `${m.name} applied to join`, body: 'Accept or decline under Co-op → Staff and members.', time: 'Now', at: now, read: false } as any); c.joinNext = now + (2 + Math.random() * 6) * 3600e3; return; }
       c.members.push(m); coopEnsurePilot(m); coopConn(m.id, 'joined');
       c.next[m.id] = now + (30 + Math.random() * 90) * 60e3; c.connNext[m.id] = now + 4000;
     }

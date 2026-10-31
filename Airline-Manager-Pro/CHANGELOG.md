@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.13 (2026-10-31)
+
+- My career screen: profile with route map and licence, pay and wallet, pilot location and jumpseat, flight board bookings, weekly pilot challenges, events, airport briefings at dispatch
+- Co-op: tabs (board, chat, events, staff, rules), ranks gating aircraft classes, automatic PIREP checks, staff roles, applications, leave and inactivity rules, chat with announcements and Discord posts, codeshares
+
 ## 0.9.12 (2026-10-31)
 
 - Lease out owned aircraft to other airlines (offers, 1–5 year terms, monthly rent, wear on return, early recall fee); new 'leased' status

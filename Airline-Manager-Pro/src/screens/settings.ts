@@ -98,6 +98,7 @@ const SETTINGS: SetSection[] = [
   ] },
   { id: 'economy', title: 'Economy', icon: 'finance', items: [
     { type: 'html', html: () => difficultySettingsHtml() } as any,
+    { type: 'toggle', key: 'pilotLocation', label: 'Pilot location and jumpseat', hint: 'Your next flight starts where you last landed. Flying from somewhere else means a jumpseat ride first, paid from your wallet. Always on in co-op.' } as any,
   ] },
   { id: 'news', title: 'News', icon: 'news', items: [
     { type: 'choice', key: 'newsMode', label: 'Newspaper articles', hint: 'When your airline makes the papers. Every article is also in the inbox and under Newspaper in the menu.', options: [['popup', 'Open by themselves, animated'], ['notify', 'Only in the inbox, animated when opened'], ['plain', 'Only in the inbox, without animation']] },

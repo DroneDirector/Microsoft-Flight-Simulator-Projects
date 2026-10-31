@@ -318,6 +318,7 @@ function finishLeg(e: FlightEvent) {
   removeMyLiveFlight();
   try { Progress.afterMyLeg(sm.landingFpm, grounded ? 'incident' : hard ? 'hard' : 'ok'); } catch (er) { /* ignore */ }
   try { coopAfterMyLeg(from, to, sm.blockMin, m.net, txId); } catch (er) { /* ignore */ }
+  try { careerAfterMyLeg(from, to, sm.blockMin, sm.landingFpm, a.typeId); } catch (er) { /* ignore */ }
   try { crewAfterLeg(c.id, { coPilot: true, typeId: a.typeId, from, to, blockMin: sm.blockMin }); } catch (er) { /* ignore */ }
   // a charter you flew, the tours, the weekly challenge, a check ride on a new type, and the news
   try { if (job) Jobs.delivered(job.id, Date.now(), m.net, txId); } catch (er) { /* ignore */ }
