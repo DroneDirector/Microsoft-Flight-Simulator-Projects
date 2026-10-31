@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.21 (2026-10-31)
+
+- Ground lookups follow the drawn mesh triangles (levelled airport, flat sea); aircraft, sheet, runways and patch placed on it
+- Faroese export: white no-data made transparent (strip-wise); patch grid 128, higher offset
+- Satellite tile retry
+
 ## 0.9.20 (2026-10-31)
 
 - Open national aerial photos (FO via ArcGIS export, NL, CH, FR, ES, AT, US, JP; FI and DK with keys), detail patch sized by height and following the camera, blank-tile detection, credits
