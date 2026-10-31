@@ -67,14 +67,14 @@ def series(sid):
 
 def steo_jet_fuel():
     """The EIA Short-Term Energy Outlook's monthly jet fuel price (JKTCUUS, refiner price to end users,
-    cents a gallon), history and forecast, from its public spreadsheet. [] if it can't be read."""
+    $ a gallon), history and forecast, from its public spreadsheet. [] if it can't be read."""
     try:
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(get("https://www.eia.gov/outlooks/steo/xls/STEO_m.xlsx", 180)), read_only=True, data_only=True)
         months = {m: i + 1 for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])}
         for ws in wb.worksheets:
             rows = list(ws.iter_rows(values_only=True))
-            hit = [r for r in rows if r and any(str(c).strip() == "JKTCUUS" for c in r[:2] if c is not None)]
+            hit = [r for r in rows if r and any(str(c).strip().startswith("JKTCUUS") for c in r[:2] if c is not None)]
             if not hit: continue
             row = hit[0]
             # the header: a row of years and a row of month names above the data
@@ -92,9 +92,6 @@ def steo_jet_fuel():
                     out.append([f"{year}-{m:02d}", round(float(row[i]), 2)])
             print(f"::notice::STEO points {len(out)}, last {out[-3:]}")
             return out
-        for ws in wb.worksheets[:4]:
-            for r in ws.iter_rows(values_only=True):
-                if r and any(c is not None and ("JKT" in str(c) or "Jet" in str(c)) for c in r): print(f"::notice::STEO {ws.title}: {[str(c) for c in r[:5]]}")
         print("::notice::STEO: JKTCUUS not found in " + ", ".join(w.title for w in wb.worksheets))
     except Exception as e:
         print(f"::warning::outlook not read: {e}")
@@ -107,7 +104,7 @@ if len(fuel) < 20 or len(parts) < 12:
 data = {
     "updated": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"),
     "fuel": {"name": "US Gulf Coast jet fuel spot price", "unit": "$/gal", "source": "U.S. Energy Information Administration (public domain)", "series": fuel},
-    "outlook": {"name": "EIA Short-Term Energy Outlook, jet fuel (monthly, cents a gallon)", "source": "U.S. Energy Information Administration (public domain)", "series": steo_jet_fuel()[-36:]},
+    "outlook": {"name": "EIA Short-Term Energy Outlook, jet fuel (monthly, $ a gallon)", "source": "U.S. Energy Information Administration (public domain)", "series": steo_jet_fuel()[-36:]},
     "parts": {"name": "US producer price index, aircraft parts and equipment", "unit": "index", "source": "U.S. Bureau of Labor Statistics (public domain)", "series": parts},
 }
 json.dump(data, open(sys.argv[1] if len(sys.argv) > 1 else "amp-market.json", "w"), separators=(",", ":"))
