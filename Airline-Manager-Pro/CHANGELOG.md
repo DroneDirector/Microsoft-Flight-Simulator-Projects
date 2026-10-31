@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.15 (2026-10-31)
+
+- 3D free camera (stick, height buttons, speed slider, help card, keyboard), Overview on close from free camera
+- Follow cameras: tilt to ground level, two-finger view slide
+- Runway markings by size (ICAO Annex 14) and hold short lines in 3D
+- Fix: Android closing the app in 3D at high satellite detail (device-sized textures, sequential loading, image memory released after upload); loading screen waits for imagery; crash mark, error log entry and detail step-down; context-loss handling
+
 ## 0.9.14 (2026-10-31)
 
 - Fix: start from scratch reset jobs, bank, ACARS, cases, landing records and co-op to empty objects; jobsState fills defaults, Store.repair() fixes affected saves, wipe now deletes those records
