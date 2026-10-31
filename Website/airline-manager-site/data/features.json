@@ -231,6 +231,50 @@
    {
     "t": "Crashes: choose to register or disregard",
     "n": ""
+   },
+   {
+    "t": "Flight replay: track on a map, altitude and speed chart, take-off, top of climb, top of descent and touchdown, playback",
+    "n": ""
+   },
+   {
+    "t": "Flight score out of 100 with the airline's flying rules (250 kt below 10,000 ft, taxi speed, flap and gear limits, stable approach, landing, centre line, touchdown zone, fuel reserve); lights and stall checks once the PC app reads them",
+    "n": ""
+   },
+   {
+    "t": "Fuel check: planned against used and left at the gate",
+    "n": ""
+   },
+   {
+    "t": "Screenshots added to flights, shown on the flight and your profile",
+    "n": ""
+   },
+   {
+    "t": "Recency: 3 landings on a type in 90 days (recency flight or simulator session otherwise; hired pilots go to the simulator)",
+    "n": ""
+   },
+   {
+    "t": "NOTAMs in the briefings (closed runways and ILS are respected)",
+    "n": ""
+   },
+   {
+    "t": "Airline league against the other airlines, Airline of the Month and of the Year with badges and newspaper stories",
+    "n": ""
+   },
+   {
+    "t": "Monthly report against the month before",
+    "n": ""
+   },
+   {
+    "t": "Pilot of the Month (best hired pilot, or the co-op's vote) and staff awards",
+    "n": ""
+   },
+   {
+    "t": "Co-op crew room: shared cockpit flights, trainers signing off check rides, photo contest, base transfer requests",
+    "n": ""
+   },
+   {
+    "t": "Other airlines fly their own daily schedules from their own hubs, with delays",
+    "n": ""
    }
   ]
  },
