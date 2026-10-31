@@ -114,7 +114,7 @@ function showSplash(done: () => void) {
       if (!calm && now - lastSpark > 55 && p > 0.01 && p < 1) { lastSpark = now; spark(bar.clientWidth * p); }
       requestAnimationFrame(frame); return;
     }
-    if (voiceMode && !finished) { finished = true; sp.classList.add('ready'); setTimeout(close, 700); return; }
+    if (voiceMode && !finished) { finished = true; sp.classList.add('ready'); setTimeout(close, Math.max(700, SPLASH_MS - (now - t0))); return; }
     const k = Math.max(0, Math.min(1, (now - t0) / FILL)), p = Math.max(last, curve(k));
     last = p;
     fill.style.width = (p * 100).toFixed(2) + '%';
