@@ -44,7 +44,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const root = document.createElement('div'); root.className = 'v3d';
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
-      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
+      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
     <div class="v3d-info"></div>
     <div class="v3d-status"></div>
@@ -93,9 +93,12 @@ function v3dClose() {
   try { V3dTerrain.clear(); V3dTerrain.gen++; } catch (e) { /* none */ }
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
-ACTIONS['v3d-close'] = () => v3dClose();
+// closing from the free camera: back to the normal Overview
+ACTIONS['v3d-close'] = () => { const free = V3d.mode === 'free'; v3dClose(); if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } };
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
+  if (V3d.mode === 'free') v3dFreeStart();
+  V3d.root.classList.toggle('v3d-free', V3d.mode === 'free');
   V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : 0.22; V3d.dist = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
 };
@@ -129,18 +132,20 @@ function v3dBind() {
   cv.addEventListener('pointermove', (e: PointerEvent) => {
     const p = V3d.ptrs[e.pointerId]; if (!p) return;
     const ids = Object.keys(V3d.ptrs);
+    if (V3d.mode === 'free') { v3dFreeGesture(e, p, ids); p.x = e.clientX; p.y = e.clientY; return; }
     if (ids.length === 1) { V3d.yaw -= (e.clientX - p.x) * 0.006; V3d.pitch = clamp(V3d.pitch + (e.clientY - p.y) * 0.004, -0.15, 1.45); }
     p.x = e.clientX; p.y = e.clientY;
     if (ids.length === 2) { const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (V3d.pinch0) V3d.dist = clamp(V3d.dist0 * V3d.pinch0 / d, 8, 30000); }
   });
   const up = (e: PointerEvent) => {
     const p = V3d.ptrs[e.pointerId];
-    if (p && Object.keys(V3d.ptrs).length === 1 && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < 6) v3dTap(e.clientX, e.clientY);
+    if (p && V3d.mode !== 'free' && Object.keys(V3d.ptrs).length === 1 && Math.hypot(e.clientX - p.x0, e.clientY - p.y0) < 6) v3dTap(e.clientX, e.clientY);
+    if (V3d.mode === 'free') (V3d as any).fcPinch = 0;
     delete V3d.ptrs[e.pointerId];
   };
   cv.addEventListener('pointerup', up);
   cv.addEventListener('pointercancel', (e: PointerEvent) => { delete V3d.ptrs[e.pointerId]; });
-  cv.addEventListener('wheel', (e: WheelEvent) => { e.preventDefault(); V3d.dist = clamp(v3dDist() * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 8, 30000); }, { passive: false } as any);
+  cv.addEventListener('wheel', (e: WheelEvent) => { e.preventDefault(); if (V3d.mode === 'free') { v3dFreePush(0, 0, (e.deltaY > 0 ? -1 : 1) * 2.2); return; } V3d.dist = clamp(v3dDist() * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 8, 30000); }, { passive: false } as any);
 }
 function v3dDist(): number { const p = V3d.planes[V3d.target]; const span = p ? shapeOf(p.type).span : 35; return V3d.dist || (V3d.mode === 'tower' ? 0 : span * 1.9 + 25); }
 
@@ -306,7 +311,8 @@ function v3dLoop(now: number) {
   const w0 = v3dWhere(f);
   // the centre: follow the aircraft to the next airport, or move with it over open country
   const ctr = v3dCentre(f, [w0.lon, w0.lat]);
-  if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && gcDistanceNm(V3d.origin, [w0.lon, w0.lat]) > 14)) v3dRecentre(f, w0);
+  if (V3d.mode === 'free' && V3d.origin) v3dFreeRecentre();
+  else if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && gcDistanceNm(V3d.origin, [w0.lon, w0.lat]) > 14)) v3dRecentre(f, w0);
   if (V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
   v3dLoaderTick(now);
 
@@ -385,9 +391,10 @@ function v3dLoop(now: number) {
   }
   for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); delete V3d.planes[id]; }
 
-  // the camera follows the aircraft
+  // the camera follows the aircraft (or flies freely)
   const P = V3d.planes[f.id];
-  if (P) {
+  if (V3d.mode === 'free') v3dFreeStep(dt);
+  else if (P) {
     const s = shapeOf(P.type), centre = P.pos.clone().add(new T.Vector3(0, s.ground + s.h / 2, 0));
     const fwd = new T.Vector3(Math.sin(P.hdg * D2R), 0, -Math.cos(P.hdg * D2R));
     if (V3d.mode === 'tower' && V3d.icao) {
@@ -502,4 +509,66 @@ function v3dLoaderTick(now: number) {
 function v3dTrafficSync() {
   if (Traffic.on() || !V3d.planes) return;
   for (const id of Object.keys(V3d.planes)) if (/^tfc-/.test(id)) { const P = V3d.planes[id]; try { V3d.scene.remove(P.model); P.label.remove(); } catch (e) { /* ignore */ } delete V3d.planes[id]; }
+}
+
+/* ---------- free camera: fly around like a drone ---------- */
+// One finger looks around, two fingers move (drag to slide, pinch to fly forward or back), the mouse wheel
+// flies forward and back; on a PC also W A S D to move, Q and E (or R and F) to climb and sink, arrows to look.
+// It moves with a little inertia and goes faster the higher it flies. The scene follows wherever it goes.
+interface FreeCam { pos: any; yaw: number; pitch: number; vel: any; keys: { [k: string]: boolean } }
+function fc(): FreeCam { return (V3d as any).fc; }
+function v3dFreeStart() {
+  const T = THREE, c = V3d.cam, dir = new T.Vector3(); c.getWorldDirection(dir);
+  (V3d as any).fc = { pos: c.position.clone(), yaw: Math.atan2(dir.x, -dir.z), pitch: Math.asin(clamp(dir.y, -1, 1)), vel: new T.Vector3(), keys: {} } as FreeCam;
+  if (V3d.cam.fov !== 60) { V3d.cam.fov = 60; V3d.cam.updateProjectionMatrix(); }
+  if (!(V3d as any).fcKeys) {
+    (V3d as any).fcKeys = true;
+    const set = (e: KeyboardEvent, on: boolean) => { if (!V3d.open || V3d.mode !== 'free' || (e.target as HTMLElement).closest('input, textarea')) return; const k = e.key.toLowerCase(); if ('wasdqerf'.indexOf(k) >= 0 || /^arrow/.test(k) || k === 'shift') { fc().keys[k] = on; e.preventDefault(); } };
+    document.addEventListener('keydown', e => set(e, true)); document.addEventListener('keyup', e => set(e, false));
+  }
+}
+/** Height above the ground: the higher up, the faster it moves. */
+function v3dFreeSpeed(): number { const F = fc(); if (!F) return 20; const ll = v3dLonLat(F.pos.x, F.pos.z), g = v3dGround(ll[0], ll[1]) - v3dCurve(F.pos.x, F.pos.z); return clamp((F.pos.y - g) * 0.9, 12, 2500); }
+/** A push in the camera's own directions: right, up, forward (units of a second at the current speed). */
+function v3dFreePush(right: number, up: number, fwd: number) {
+  const F = fc(); if (!F) return; const T = THREE, s = v3dFreeSpeed();
+  const f = new T.Vector3(Math.sin(F.yaw) * Math.cos(F.pitch), Math.sin(F.pitch), -Math.cos(F.yaw) * Math.cos(F.pitch)), r = new T.Vector3(Math.cos(F.yaw), 0, Math.sin(F.yaw));
+  F.vel.addScaledVector(f, fwd * s).addScaledVector(r, right * s).add(new T.Vector3(0, up * s, 0));
+}
+function v3dFreeGesture(e: PointerEvent, p: any, ids: string[]) {
+  const F = fc(); if (!F) return; const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  if (ids.length === 1) { F.yaw += dx * 0.004; F.pitch = clamp(F.pitch - dy * 0.004, -1.45, 1.2); return; }
+  if (ids.length >= 2) {
+    const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]], d = Math.hypot(a.x - b.x, a.y - b.y), VA: any = V3d;
+    if (VA.fcPinch) v3dFreePush(0, 0, (d - VA.fcPinch) * 0.02);
+    VA.fcPinch = d;
+    // both fingers sliding together: move sideways and up or down
+    v3dFreePush(-dx * 0.006, dy * 0.006, 0);
+  }
+}
+function v3dFreeStep(dt: number) {
+  const F = fc(); if (!F || !dt) return; const T = THREE, k = F.keys;
+  // keys: steady thrust while held
+  const kx = (k.d ? 1 : 0) - (k.a ? 1 : 0), ky = ((k.e || k.r) ? 1 : 0) - ((k.q || k.f) ? 1 : 0), kz = (k.w ? 1 : 0) - (k.s ? 1 : 0);
+  if (kx || ky || kz) v3dFreePush(kx * dt * 3 * (k.shift ? 3 : 1), ky * dt * 3, kz * dt * 3 * (k.shift ? 3 : 1));
+  if (k.arrowleft) F.yaw -= dt * 1.2; if (k.arrowright) F.yaw += dt * 1.2; if (k.arrowup) F.pitch = clamp(F.pitch + dt, -1.45, 1.2); if (k.arrowdown) F.pitch = clamp(F.pitch - dt, -1.45, 1.2);
+  // drift, then ease to a stop like a drone in the air
+  F.pos.addScaledVector(F.vel, dt); F.vel.multiplyScalar(Math.exp(-dt * 2.6));
+  const ll = v3dLonLat(F.pos.x, F.pos.z), gr = v3dGround(ll[0], ll[1]) + 2 - v3dCurve(F.pos.x, F.pos.z);
+  if (F.pos.y < gr) { F.pos.y = gr; if (F.vel.y < 0) F.vel.y = 0; }
+  F.pos.y = Math.min(F.pos.y, 12000);
+  V3d.cam.position.copy(F.pos);
+  V3d.cam.lookAt(F.pos.clone().add(new T.Vector3(Math.sin(F.yaw) * Math.cos(F.pitch), Math.sin(F.pitch), -Math.cos(F.yaw) * Math.cos(F.pitch))));
+}
+/** Flown far from the centre: the scene (terrain, airport, aircraft) moves to where the camera is. */
+function v3dFreeRecentre() {
+  const F = fc(); if (!F) return;
+  const ll = v3dLonLat(F.pos.x, F.pos.z); if (gcDistanceNm(V3d.origin, ll) < 10) return;
+  // the nearest airport within a few miles becomes the centre, so its layout is drawn
+  let icao = '', best = 4;
+  for (const k of Object.keys(AIRPORTS)) { const A = apt(k); if (!A || !A.pos) continue; const d = gcDistanceNm(ll, A.pos); if (d < best) { best = d; icao = k; } }
+  const centre = icao ? apt(icao).pos : ll, oldY = F.pos.y;
+  v3dRecentre({ from: icao || '', to: icao || '', noDest: !icao } as any, { lon: centre[0], lat: centre[1] });
+  if (!icao) { V3d.icao = ''; }
+  const q = v3dXY(ll[0], ll[1]); F.pos.set(q[0], oldY, q[1]);
 }
