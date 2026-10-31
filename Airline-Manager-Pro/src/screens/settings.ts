@@ -31,6 +31,17 @@ const SETTINGS: SetSection[] = [
         <input type="range" class="v3d-range" min="20" max="800" step="10" value="${km}" aria-label="View distance in kilometres">
         <div class="v3d-scale"><span>20 km</span><span>150</span><span>400</span><span>800 km</span></div>${note}</div>`;
     } },
+    { type: 'html', html: () => {
+      const km = cloudKm(), d = cloudDetail();
+      const note = (km >= 200 || d >= 4) ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: more clouds to draw, a warmer device and more battery use.</p>`
+        : (km && km <= 40) || d === 1 ? `<p class="v3d-note ok">${icon('info')}Low settings might improve performance on slower phones and PCs.</p>` : '';
+      return `<div class="set-card col"><div class="sc-h">${icon('wind')}<span><b class="cl-km-h">Cloud distance: ${km ? km + ' km' : 'Off'}</b><small>How far you see clouds in the 3D view. They follow the real-world weather reports around you.</small></span></div>
+        <input type="range" class="cl-km" min="0" max="300" step="10" value="${km}" aria-label="Cloud distance in kilometres">
+        <div class="v3d-scale"><span>Off</span><span>100</span><span>200</span><span>300 km</span></div>
+        <div class="sc-h" style="margin-top:12px">${icon('layers')}<span><b class="cl-d-h">Cloud detail: ${CLOUD_DETAIL_NAMES[d - 1]}</b><small>How many puffs each cloud is made of. Higher looks fuller and softer.</small></span></div>
+        <input type="range" class="cl-d" min="1" max="4" step="1" value="${d}" aria-label="Cloud detail">
+        <div class="v3d-scale"><span>Light</span><span>Normal</span><span>Detailed</span><span>Very detailed</span></div>${note}</div>`;
+    } },
     { type: 'toggle', key: 'v3dSat', label: 'Satellite imagery', hint: 'Shows the real ground from space (Sentinel-2 cloudless by EOX) instead of the map look. Can also be switched in the 3D view.' },
     { type: 'html', html: () => {
       if (!(State.settings as any).v3dSat) return '';
@@ -432,6 +443,20 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-satq')) return;
   (State.settings as any).v3dSatQ = +el.value; Store.save(); rerenderSettingsBody();
+});
+// the cloud sliders: the value shows while dragging, it's kept when let go
+document.addEventListener('input', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList) return;
+  const card = el.closest('.set-card');
+  if (el.classList.contains('cl-km')) { const h = card && card.querySelector('.cl-km-h'); if (h) h.textContent = `Cloud distance: ${+el.value ? el.value + ' km' : 'Off'}`; }
+  if (el.classList.contains('cl-d')) { const h = card && card.querySelector('.cl-d-h'); if (h) h.textContent = `Cloud detail: ${CLOUD_DETAIL_NAMES[+el.value - 1]}`; }
+});
+document.addEventListener('change', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList) return;
+  if (el.classList.contains('cl-km')) (State.settings as any).cloudKm = +el.value;
+  else if (el.classList.contains('cl-d')) (State.settings as any).cloudDetail = +el.value;
+  else return;
+  Store.save(); rerenderSettingsBody();
 });
 // the 3D view distance slider: the value shows while dragging, it's kept when let go
 document.addEventListener('input', e => {

@@ -61,7 +61,7 @@ const State = {
     atcListen: true, atcFines: true, atcTranscripts: true, sttQuality: 'balanced' as 'light' | 'balanced' | 'accurate',
     damage: true, turbulence: true, crashPrompt: true, repairTime: 'auto', gsx: true,
     mechanicVoice: true, voiceEngine: 'neural' as 'clips' | 'neural' | 'device', voicePack: false,
-    muteAll: false, onlyVoices: false, v3dKm: 150, v3dSat: false, v3dSatQ: 1, wxLayer: false, wxSigmet: true, wxMetar: true, groundHandling: 'base', crewStyle: 'balanced' as 'natural' | 'balanced' | 'stylised', mapStyle: 'classic' as 'classic' | 'street' | 'satellite', purchaseSound: true, paySound: true, uiSounds: true, haptics: true, reduceMotion: false, newsMode: 'popup', otherTraffic: true, v3dFreeSpeed: 1, realMarkets: true,
+    muteAll: false, onlyVoices: false, v3dKm: 150, v3dSat: false, v3dSatQ: 1, cloudKm: 80, cloudDetail: 2, wxLayer: false, wxSigmet: true, wxMetar: true, groundHandling: 'base', crewStyle: 'balanced' as 'natural' | 'balanced' | 'stylised', mapStyle: 'classic' as 'classic' | 'street' | 'satellite', purchaseSound: true, paySound: true, uiSounds: true, haptics: true, reduceMotion: false, newsMode: 'popup', otherTraffic: true, v3dFreeSpeed: 1, realMarkets: true,
     units: 'imperial' as 'imperial' | 'metric', clock24: true,
     timeMode: 'real' as 'real' | 'sim', simRate: 'month' as 'week' | 'month' | 'quarter',
     aiSpeed: '1', aiNotify: true, conduct: true,

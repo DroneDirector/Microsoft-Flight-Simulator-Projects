@@ -17,11 +17,11 @@ SCREENS.coop = {
     }
     const head = `<div class="screen-head"><div><h1>Co-op</h1><p class="sub">${esc(co.name)} · ${c.members.length} pilots</p></div></div>${coopTabsHtml()}`;
     if (_coopTab === 'board') return head + flightBoardHtml();
-    if (_coopTab === 'chat') return head + coopChatHtml();
+    if (_coopTab === 'chat') return head + radioHtml() + coopChatHtml();
     if (_coopTab === 'events') return head + eventsHtml();
     if (_coopTab === 'crew') return head + crewRoomHtml();
     if (_coopTab === 'staff') return head + coopStaffHtml();
-    if (_coopTab === 'rules') return head + coopRulesHtml();
+    if (_coopTab === 'rules') return head + profitShareHtml() + coopRulesHtml();
     const week = Date.now() - 7 * 864e5;
     const flightsWeek = c.feed.filter(e => e.type === 'flight' && e.at > week);
     const earned = flightsWeek.reduce((s, e) => s + (e.amount || 0), 0);

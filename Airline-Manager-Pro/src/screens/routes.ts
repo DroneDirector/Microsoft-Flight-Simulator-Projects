@@ -19,6 +19,7 @@ SCREENS.routes = {
       <div><h1>Routes</h1><p class="sub">${rs.length} routes to ${Object.keys(countries).length} countries</p></div>
       <button class="btn primary" data-act="new-route">${icon('plus')}New route</button>
     </div>
+    ${hubCardHtml()}
     ${sortBar('routes', ROUTE_SORTS, 'Find a route')}
     <div class="route-list">${sortList('routes', rs, ROUTE_SORTS, (r: any) => `${r.code} ${r.legs.join(' ')} ${acType(r.typeId).model}`).map((r, i) => {
       const t = acType(r.typeId), p = r.pilotId ? pilot(r.pilotId) : null;
@@ -104,11 +105,13 @@ ACTIONS['nr-save'] = () => {
   // runways: long enough, wide enough and the right surface at every airport on the route
   const rwy = t ? routeRunwayProblem(t.id, _nr.stops) : '';
   if (rwy) { toast(rwy, 'warn'); return; }
+  if (t && !bizRouteGate(t.id, _nr.stops)) return;
   const lim = t ? _nr.stops.map((x, i) => i ? legRunwayCheck(t.id, _nr.stops[i - 1], x) : null).filter(x => x && !x.full)[0] : null;
   if (lim) toast(lim.why, 'info');
   const c = company();
   const code = c.icao + (700 + State.routes.length);
   State.routes.push({ id: uid(), companyId: c.id, code, legs: _nr.stops.slice(), days: 'Daily', typeId: _nr.typeId, demand: 60 + Math.round(Math.random() * 30), yieldPerPax: 140 + Math.round(Math.random() * 200) });
+  try { bizRouteCreated(State.routes[State.routes.length - 1]); } catch (e) { /* ignore */ }
   closeAll(); refresh(); toast(`Route ${code} created`, 'ok');
   // the local paper writes about it
   try { const nr = State.routes[State.routes.length - 1]; setTimeout(() => newsRouteLaunch(nr), 1200); } catch (e) { /* ignore */ }
@@ -126,6 +129,7 @@ function routeDetailHtml(): string {
   const prem = State.fleet.some(a => a.typeId === r.typeId && a.companyId === r.companyId && (cabinOf(a).j || cabinOf(a).f));
   return `<div class="modal-head"><div><h2>${esc(r.code)} ${legChain(r.legs)}</h2><small>${esc(t.maker)} ${esc(t.model)}, ${esc(r.days)}, about ${num(spd)} seats a day each way</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
   <div class="modal-body rdet">
+    ${bizRouteInfo(r)}
     <h3>Your fares</h3>
     <p class="fine-print">${icon('info')}100% is the usual market fare. Lower fares win passengers from your rivals and bring extra travellers; higher fares earn more per seat but fill fewer.</p>
     ${step('y', 'Economy', fr.y)}${prem ? step('j', 'Business', fr.j) + step('f', 'First', fr.f) : ''}

@@ -176,6 +176,7 @@ function coopBook(pr: CoopPirep, live: boolean) {
   if (a) { a.hoursMin += pr.blockMin; a.cycles += 1; try { conditionAfterFlight(a, pr.blockMin); } catch (e) { /* ignore */ } }
   const p = pilot(pr.by); if (p) { p.hoursMin += pr.blockMin; p.landings += 1; }
   try { crewAfterLeg(co.id, { typeId: pr.typeId, from: pr.from, to: pr.to, blockMin: pr.blockMin }); } catch (e) { /* ignore */ }
+  try { coopMonthStat(pr.by, pr.blockMin); } catch (e) { /* ignore */ }
   if (m) { m.flights++; m.hoursMin += pr.blockMin; m.revenue += money0.net; try { newsCoopMilestone(m); } catch (e) { /* ignore */ } }
   try { Progress.popularity(pr.fpm > -250 ? 0.2 : 0, 'A good co-op flight'); } catch (e) { /* ignore */ }
   try { Ratings.record({ who: pr.by, name: pr.name, fpm: Math.abs(pr.fpm), g: pr.g, at: pr.at, from: pr.from, to: pr.to, typeId: pr.typeId, kind: 'coop' }); } catch (e) { /* ignore */ }
@@ -199,6 +200,7 @@ function coopAfterMyLeg(from: string, to: string, blockMin: number, net: number,
   if (!coopOn()) return;
   const me = coopMe(); if (!me) return;
   me.flights++; me.hoursMin += blockMin; me.revenue += net; me.lastSeen = Date.now();
+  try { coopMonthStat(me.id, blockMin); } catch (e) { /* ignore */ }
   const ev: CoopEvent = { id: 'fl-' + txId, at: Date.now(), by: me.id, type: 'flight', text: `${me.name} landed at ${to} from ${from}`, amount: net, tx: txId };
   coopRecord(ev); coopBackend().publish(ev);
 }

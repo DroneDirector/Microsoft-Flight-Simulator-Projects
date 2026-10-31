@@ -168,7 +168,17 @@ function sendPlnToPc(from: string, to: string): Promise<string> {
 function plnSaved(path: string, error?: string) { const w = (window as any).__plnWait; (window as any).__plnWait = null; if (!w) return; if (error) w.bad(new Error(error)); else w.ok(path); }
 
 /* ---------- Live weather: METAR and TAF ---------- */
-interface Metar { icao: string; raw: string; taf: string; dir: number; kt: number; gust: number; vis: string; temp: number; qnh: number; cat: string; at: number; obs: string; wx?: string; ceil?: number }
+/** The cloud layers of one report (base in feet above the station), with towering cumulus and thunderstorm clouds marked. */
+function metarClouds(m: any): { cover: string; base: number; type?: string }[] {
+  const raw = String(m.rawOb || ''), out: { cover: string; base: number; type?: string }[] = [];
+  for (const c of m.clouds || []) {
+    const cov = String(c.cover || ''); if (!/FEW|SCT|BKN|OVC|VV/.test(cov)) continue;
+    const base = +c.base || 0, t = new RegExp(cov.slice(0, 3) + String(Math.round(base / 100)).padStart(3, '0') + '(CB|TCU)').exec(raw);
+    out.push({ cover: cov === 'VV' ? 'OVC' : cov.slice(0, 3), base, type: t ? t[1] : undefined });
+  }
+  return out;
+}
+interface Metar { icao: string; raw: string; taf: string; dir: number; kt: number; gust: number; vis: string; temp: number; qnh: number; cat: string; at: number; obs: string; wx?: string; ceil?: number; clouds?: { cover: string; base: number; type?: string }[]; elev?: number }
 const LiveWx = {
   cache: {} as { [icao: string]: Metar }, pending: {} as { [icao: string]: boolean }, failed: 0,
   on(): boolean { return true; },   // real-world weather is always used
@@ -189,7 +199,8 @@ const LiveWx = {
     const k = m.icaoId, old = this.cache[k];
     const ceil = (m.clouds || []).filter((c: any) => /BKN|OVC|VV/.test(c.cover)).map((c: any) => +c.base).sort((a: number, b: number) => a - b)[0];
     this.cache[k] = { icao: k, raw: m.rawOb || '', taf: taf || (old ? old.taf : ''), dir: typeof m.wdir === 'number' ? m.wdir : -1, kt: +m.wspd || 0, gust: +m.wgst || 0, vis: String(m.visib == null ? '' : m.visib),
-      temp: +m.temp, qnh: Math.round(+m.altim || 0), cat: m.fltCat || metarCat(m), at: Date.now(), obs: m.reportTime || '', wx: m.wxString || '', ceil: ceil == null ? 0 : ceil };
+      temp: +m.temp, qnh: Math.round(+m.altim || 0), cat: m.fltCat || metarCat(m), at: Date.now(), obs: m.reportTime || '', wx: m.wxString || '', ceil: ceil == null ? 0 : ceil,
+      clouds: metarClouds(m), elev: +m.elev || 0 };
   },
   fetch(ids: string[]): Promise<void> {
     ids = ids.filter(k => k && k.length === 4 && !this.pending[k]); if (!ids.length) return Promise.resolve();

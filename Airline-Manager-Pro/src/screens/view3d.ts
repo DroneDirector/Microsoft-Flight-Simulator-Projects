@@ -113,6 +113,7 @@ function v3dClose() {
   } catch (e) { /* gone */ }
   if (V3d.root) V3d.root.remove();
   try { V3dTerrain.clear(); V3dTerrain.gen++; } catch (e) { /* none */ }
+  v3dCloudsClear();
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
 // closing from the free camera: back to the normal Overview
@@ -559,6 +560,7 @@ function v3dLoop(now: number) {
       if (V3d.cam.fov !== 50) { V3d.cam.fov = 50; V3d.cam.updateProjectionMatrix(); }
     }
   }
+  try { v3dCloudsStep(now); } catch (e) { /* no clouds this frame */ }
   V3d.r.render(V3d.scene, V3d.cam);
 
   // callsigns over the aircraft

@@ -7,7 +7,9 @@ const RK_TABS: [string, string][] = [['you', 'You'], ['airlines', 'Airline leagu
 SCREENS.ranking = {
   title: 'Ranking', icon: 'trophy',
   render() {
-    const tabs = `<div class="filter-row rk-who">${RK_TABS.map(t => `<button class="fchip ${_rkWho === t[0] ? 'on' : ''}" data-act="rk-who" data-w="${t[0]}">${t[1]}</button>`).join('')}</div>`;
+    if (_rkWho === 'scen' && !soloMode()) _rkWho = 'you';
+    const tabs = `<div class="filter-row rk-who">${RK_TABS.concat(soloMode() ? [['scen', 'Scenarios'] as [string, string]] : []).map(t => `<button class="fchip ${_rkWho === t[0] ? 'on' : ''}" data-act="rk-who" data-w="${t[0]}">${t[1]}</button>`).join('')}</div>`;
+    if (_rkWho === 'scen') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Challenges with goals and medals</p></div></div>${tabs}${scenariosHtml()}`;
     if (_rkWho === 'airlines') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your airline against the others</p></div></div>${tabs}${leagueHtml()}`;
     if (_rkWho === 'pax') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">What your passengers think</p></div></div>${tabs}${reviewsHtml()}`;
     if (_rkWho !== 'you') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your staff by level and experience</p></div></div>${tabs}${staffRankHtml()}`;

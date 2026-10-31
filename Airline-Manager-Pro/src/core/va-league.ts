@@ -45,7 +45,8 @@ let _lgCache: { k: string; at: number; rows: LeagueRow[] } = null;
 function league(month?: string, upto?: number): LeagueRow[] {
   const m = month || _monthKey(), u = upto || Date.now(), k = m + ':' + company().id + ':' + (upto ? 'end' : '');
   if (!upto && _lgCache && _lgCache.k === k && Date.now() - _lgCache.at < 600e3) { const rows = _lgCache.rows.filter(r => !r.you).concat([myLeagueRow(m)]); return rows.sort((a, b) => (+b.ok - +a.ok) || b.index - a.index); }
-  const ai = Traffic.airlines().map(A => aiAirlineMonth(A, m, u));
+  // co-op: against other co-op airlines; single player: against the computer-run airlines
+  const ai = Mode.coop() ? coopRivalRows(m, u) : Traffic.airlines().map(A => aiAirlineMonth(A, m, u));
   if (!upto) _lgCache = { k, at: Date.now(), rows: ai };
   return ai.concat([myLeagueRow(m)]).sort((a, b) => (+b.ok - +a.ok) || b.index - a.index);
 }
@@ -119,6 +120,7 @@ function vaNoticeOpen(ref: string) {
   else if (/^va-report-/.test(ref)) reportPopup(ref.slice(10));
   else if (/^va-award-/.test(ref)) awardPopup(ref.slice(9));
   else if (ref === 'va-tour') ACTIONS['tour-start'](null, null);
+  else if (/^va-invest-/.test(ref)) investOffer(ref);
 }
 function awardPopup(id: string) {
   const a = vaAwards().filter(x => x.id === id)[0]; if (!a) return;
@@ -153,5 +155,5 @@ ACTIONS['lg-board'] = el => {
   const now = Date.now(), legs = Traffic.board(n, now).slice(0, 80), hm = (t: number) => new Date(t).toISOString().slice(11, 16);
   const st = (l: TrafficLeg) => now >= l.arr ? 'Landed' : now >= l.dep ? 'In the air' : l.delayMin > 15 ? `Delayed ${l.delayMin} min` : now > l.sched - 40 * 60e3 ? 'Boarding' : 'Scheduled';
   openLayer('modal', `<div class="modal-head"><div><h2>${esc(n)}</h2><small>Based at ${esc(A.hub)}${apt(A.hub) ? ', ' + esc(apt(A.hub).city) : ''} · ${A.fleet.length} aircraft · today's schedule (UTC)</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-    <div class="modal-body"><div class="lg-board">${legs.map(l => `<div class="lgb-r"><span>${hm(l.sched)}</span><b>${esc(l.craft.code + l.num)}</b><span>${esc(l.from)} → ${esc(l.to)}</span><small>${esc((acType(l.craft.typeId) || {} as any).model || '')}</small><em class="${/Delayed/.test(st(l)) ? 'amber' : /air/.test(st(l)) ? 'green' : ''}">${esc(st(l))}</em></div>`).join('') || '<p class="muted pad">No flights today.</p>'}</div></div>`, { cls: 'wide' });
+    <div class="modal-body">${takeoverBtnHtml(A)}<div class="lg-board">${legs.map(l => `<div class="lgb-r"><span>${hm(l.sched)}</span><b>${esc(l.craft.code + l.num)}</b><span>${esc(l.from)} → ${esc(l.to)}</span><small>${esc((acType(l.craft.typeId) || {} as any).model || '')}</small><em class="${/Delayed/.test(st(l)) ? 'amber' : /air/.test(st(l)) ? 'green' : ''}">${esc(st(l))}</em></div>`).join('') || '<p class="muted pad">No flights today.</p>'}</div></div>`, { cls: 'wide' });
 };

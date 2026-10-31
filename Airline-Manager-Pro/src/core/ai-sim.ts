@@ -197,6 +197,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.from === f.to ? 'Test flight ' + f.reg + ' at ' + f.from : (F.ferry ? 'Ferry ' : F.job ? 'Charter ' : '') + f.callsign + ' ' + f.from + ' to ' + f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
     amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: m.lines, byPilot: f.pilotId } as any);
   c.balance += net;
+  try { if (f.from !== f.to && !F.ferry) hubOnLand(c.id, f.from, f.to, at, f.pax || 0, Math.round((at - (F.schedEnd || at)) / 60000), F.schedEnd || at); } catch (e) { /* ignore */ }
   // keep the day's flown legs for the schedule (the last two days)
   const S: any = State; S.aiDay = (S.aiDay || []).filter((x: any) => x.end > Date.now() - 2 * 864e5);
   S.aiDay.push({ reg: a.reg, from: f.from, to: f.to, start: F.depAt, end: at, sched: F.sched || F.depAt, schedEnd: F.schedEnd || at, why: aiDelayWhy(F), retry: !!F.retry, callsign: f.callsign });
@@ -311,12 +312,16 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       const gu = (S.groundedUntil || {})[a.companyId]; if (gu && gu > n.depAt) { wait(gu, 'Operating certificate suspended'); continue; }
       // a strike: the leg waits (and is cancelled after five hours)
       const sb = strikeBlock(a.companyId, a.typeId, n.from); if (sb) { wait(now + 60 * 60e3, sb); continue; }
+      // night curfew at the airport: the departure waits until it opens
+      try { const d0 = Math.max(n.depAt, earliest); if (curfewAt(n.from, d0)) { wait(curfewEnd(n.from, d0) + 60e3, `Night curfew at ${n.from}`); continue; } } catch (e) { /* ignore */ }
       // never off and back onto the same airport, except a test flight you set up
       const test = n.from === n.to;
       if (!n.to || (test && !aiTestRoute(n.pilotId, n.from))) { p.status = 'standby'; continue; }
       // passengers and cargo from demand on the route (none on a test or ferry flight; a charter's own load)
       const ld = n.carry || aiPlannedLoad(n);
       const depAt = Math.max(n.depAt, earliest); let prof = aiProfile({ reg: n.reg, from: n.from, to: n.to, depAt });
+      // and timed so it doesn't land while the destination's night curfew is on
+      try { const arr = depAt + prof.totalS * 1000 / (n.spd || 1); if (!test && curfewAt(n.to, arr)) { wait(depAt + (curfewEnd(n.to, arr) - arr) + 60e3, `Night curfew at ${n.to}: timed to land when it opens`); continue; } } catch (e) { /* ignore */ }
       const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF, cargoKg: ld.cargoKg, paxMax: cabinSeats(acType(a.typeId), a) || n.paxMax, test,
         alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg, ferry: !!n.ferry, job: n.job || undefined, jobNext: n.jobNext || undefined,
         sched: n.sched || depAt, waitWhy: n.why || '', retry: !!n.retry };

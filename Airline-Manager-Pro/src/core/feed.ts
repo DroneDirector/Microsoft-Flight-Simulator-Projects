@@ -309,6 +309,7 @@ function finishLeg(e: FlightEvent) {
   const job = Jobs.forMyLeg(from, to, a.reg);
   const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg, gsxTakeLegFlag() && !!(State.settings as any).gsx, { book: true, reg: a.reg, job: job ? jobPayFor(job.id) : undefined });
   try { vaStatLeg({ onTime: true, pax: sm.pax, net: m.net, fpm: sm.landingFpm, score: (State.logbook[0] as any).score }); } catch (er) { /* ignore */ }
+  try { hubOnLand(c.id, from, to, Date.now(), sm.pax, 0, Date.now()); if (curfewAt(to, Date.now())) { const fine = 30000; payTxn(c.id, `Night curfew breach at ${to}`, -fine, 'fees', [[curfewText(to), -fine]]); State.notices.unshift({ id: uid(), kind: 'authority', title: `Curfew breach at ${to}`, body: `You landed during the ${curfewText(to).toLowerCase()}: a fine of ${money(fine)}.`, time: 'Now', at: Date.now(), read: false } as any); } } catch (er) { /* ignore */ }
   const now = new Date(), day = dateStr(now).slice(0, 10), time = dateStr(now).slice(11);
   const flight = c.icao + (100 + (_hashStr(a.reg) % 800));
   const rev = m.revenue, fuel = m.costs, fees = 0;
