@@ -176,6 +176,7 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'staff' && n.ref && /^sk-/.test(n.ref)) strikePopup(n.ref.slice(3));
   else if (n.kind === 'staff' && n.ref && /^si-/.test(n.ref)) sickPopup(n.ref.slice(3));
   else if (n.kind === 'staff' && n.ref && /^wb-/.test(n.ref)) whistlePopup();
+  else if (n.kind === 'staff' && n.ref && /^ty-/.test(n.ref)) thanksPopup(n.ref);
   else if (n.ref && /^news-/.test(n.ref)) newsOpen(n.ref);
   else if (n.kind === 'staff' && n.ref) incidentPopup(n.ref);
   else if (n.kind === 'birthday') ACTIONS['bday-preview'](null, null);

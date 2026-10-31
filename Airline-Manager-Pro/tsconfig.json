@@ -57,6 +57,7 @@
     "src/ui/crew-ui.ts",
     "src/ui/whats-new.ts",
     "src/ui/first-start.ts",
+    "src/ui/thanks.ts",
     "src/ui/splash.ts",
     "src/core/court.ts",
     "src/core/staffing.ts",

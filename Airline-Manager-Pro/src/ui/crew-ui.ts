@@ -502,6 +502,8 @@ ACTIONS['commend-do'] = el => {
   const recent = (p.commends || []).filter((x: any) => x.id === c.id).length;
   staffMoodAdd(p, c.mood / Math.max(1, recent * 0.7), title);
   p.loyalty = clamp((p.loyalty || 50) + c.mood / 2, 0, 100);
+  // they come back to you with their thanks a little later
+  try { const d = $('.commend-dest') as HTMLSelectElement, k = d ? d.value : ''; thanksQueue(p, c.id, title, k && apt(k) ? apt(k).city : ''); } catch (e) { /* ignore */ }
   closeAll(); Sound.tick(); Store.save(); refresh();
   toast(`${p.name}: ${title.toLowerCase()}${cost ? ', ' + money(cost) : ''}. Mood up.`, 'ok');
 };

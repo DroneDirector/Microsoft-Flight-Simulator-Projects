@@ -41,6 +41,7 @@
   startConductClock();
   startCourtClock();
   startStaffing();
+  try { startThanks(); } catch (e) { /* ignore */ }
   startProgress();
   startConditionClock();
   Link.init();
