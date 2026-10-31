@@ -115,7 +115,7 @@ function av3Style(): string { return (State && State.settings && (State.settings
 
 function av3Key(look: Look, role: CrewRole, accent: string): string {
   const L = dressed(look, role);
-  return av3Style() + '|' + role + '|' + accent + '|' + ['sex', 'skin', 'face', 'eyes', 'nose', 'lips', 'hair', 'hairColor', 'facial', 'glasses', 'top', 'bottom', 'shoes', 'neck', 'hat', 'uniform'].map(k => (L as any)[k]).join(',');
+  return av3Style() + '|' + role + '|' + accent + '|' + ['sex', 'skin', 'face', 'eyes', 'nose', 'lips', 'hair', 'hairColor', 'facial', 'glasses', 'top', 'bottom', 'shoes', 'neck', 'hat', 'uniform', 'civil'].map(k => (L as any)[k]).join(',');
 }
 
 /** The avatar markup: a canvas the renderer paints into (see avatarSvg). */

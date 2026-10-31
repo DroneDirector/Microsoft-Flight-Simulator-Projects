@@ -47,6 +47,9 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
     const nat = roll < 0.6 && natFrom ? natFrom[Math.floor(r() * natFrom.length)] : roll < 0.85 && natTo ? natTo[Math.floor(r() * natTo.length)] : undefined;
     const p: any = makePerson(seed, 'fa', '', f.from, r() < 0.5 ? 'f' : 'm', nat);
     p.look.uniform = Math.floor(r() * 6);
+    // their own clothes, not a uniform: a pullover, a jacket or a shirt, open collar, no tie or crew wings
+    p.look.civil = true; p.look.top = ['pullover', 'pullover', 'jacket', 'shirt'][Math.floor(r() * 4)]; p.look.neck = 'open'; p.look.hat = 'none';
+    p.look.shoes = p.sex === 'f' ? ['sneakers', 'boots', 'pumps'][Math.floor(r() * 3)] : ['sneakers', 'boots', 'oxford'][Math.floor(r() * 3)];
     const age = 2026 - parseInt(p.dob, 10) + Math.floor(r() * 25) - 8;
     const pkey = (p.name + '|' + p.nat + '|' + age).toLowerCase();
     // a past record for about one passenger in 60, a ban for about one in 1,500
@@ -104,7 +107,7 @@ ACTIONS['pax-jump'] = el => {
 };
 function paxRowHtml(fid: string, p: PaxSeat, i: number): string {
   const rec = p.record, banned = rec && rec.banned;
-  return `<div class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''} ${p.famous ? 'famous' : ''} ${p.pet ? (p.pet.left ? 'has-petleft' : 'has-pet') : ''} ${rec ? 'has-rec' : ''} ${p.famous ? 'has-star' : ''}">
+  return `<div role="button" tabindex="0" data-act="pax-card" data-f="${esc(fid)}" data-key="${esc(p.key)}" class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''} ${p.famous ? 'famous' : ''} ${p.pet ? (p.pet.left ? 'has-petleft' : 'has-pet') : ''} ${rec ? 'has-rec' : ''} ${p.famous ? 'has-star' : ''}">
     <span class="pax-face" data-face="${esc(fid)}|${esc(p.key)}" data-i="${i}"></span>
     <span class="pax-who"><b>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small>${p.pet ? `<span class="pax-pet ${p.pet.left ? 'left' : ''}" title="${esc(p.pet.left || '')}">${petSvg(p.pet)}<small>${esc(p.pet.name)}, ${p.pet.kind}, ${p.pet.left ? 'stayed behind' : p.pet.where === 'cabin' ? 'under the seat' : 'in the hold'}</small></span>` : ''}</span>
     <span class="pax-seat">${esc(p.seat)}</span>
@@ -135,8 +138,37 @@ ACTIONS['pax-record'] = el => {
     <div class="modal-body warn-list">${rec.notes.map(n => `<div class="warn-item sev-${n.sev === 'ban' ? 'severe' : 'moderate'}"><div class="wi-h"><span class="wi-sev">${n.sev === 'ban' ? 'Ban' : 'Warning'}</span><b>${esc(n.title)}</b><time>${esc(n.date)}</time></div><p>${esc(n.text)}</p></div>`).join('')}
       <div class="modal-actions">${mine ? `<button class="btn ghost" data-act="pax-unban" data-key="${esc(rec.key)}">Lift your airline's ban</button>` : `<button class="btn danger" data-act="pax-ban" data-key="${esc(rec.key)}">${icon('shield')}Ban from your airline</button>`}</div></div>`, { cls: 'narrow' });
 };
+/** A passenger's card: who they are, their seat, why they travel, their pet, and any record. Opens on top of
+ *  the list, so closing it goes back to the list. */
+ACTIONS['pax-card'] = el => {
+  const fid = el.getAttribute('data-f'), key = el.getAttribute('data-key');
+  const f = State.live.filter(x => x.id === fid)[0]; if (!f) return;
+  const p = manifestOf(f).filter(x => x.key === key)[0]; if (!p) return;
+  Sound.tick();
+  const r = seeded(p.key + 'card'), cls = ({ F: 'First', J: 'Business', Y: 'Economy' } as any)[p.cls];
+  const why = p.famous ? 'Work: ' + p.famous.toLowerCase() : ['Holiday', 'Visiting family', 'Business', 'Business', 'A wedding', 'Studies', 'Going home', 'A conference', 'Weekend away'][Math.floor(r() * 9)];
+  const tier = ['None', 'None', 'None', 'Blue', 'Blue', 'Silver', 'Gold'][Math.floor(r() * 7)], bags = p.cls === 'Y' ? Math.floor(r() * 2.4) : 1 + Math.floor(r() * 2);
+  const svc = servicesOf((plane(f.reg) || {} as any).companyId || State.companyId);
+  const meal = svc.specialMeals === 'yes' && r() < 0.12 ? ['Vegetarian', 'Vegan', 'Halal', 'Kosher', 'Gluten-free', 'Child\'s meal'][Math.floor(r() * 6)] : 'Standard';
+  const flights = 1 + Math.floor(r() * (tier === 'Gold' ? 90 : tier === 'Silver' ? 40 : tier === 'Blue' ? 15 : 4));
+  const rec = p.record, banned = rec && rec.banned;
+  const kv = (k: string, v: string) => `<div><small>${esc(k)}</small><b>${v}</b></div>`;
+  openLayer('modal', `<div class="modal-head"><div><h2>${esc(p.name)}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</h2><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Back to the list">${icon('close')}</button></div>
+    <div class="modal-body pax-card"><div class="pc-fig">${avatarSvg(p.look, 'fa', { view: 'bust', still: true })}</div>
+      <div class="pc-info"><div class="kv-row">
+        ${kv('Flight', `${esc(f.callsign)}, ${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)}`)}${kv('Seat', `${esc(p.seat)}, ${cls}`)}${kv('Travelling for', esc(why))}
+        ${kv('Checked bags', String(bags))}${kv('Meal', esc(meal))}${kv('Frequent flyer', tier === 'None' ? 'Not a member' : `${tier}, ${flights} flights with you`)}
+        ${p.pet ? kv('Pet', `${petSvg(p.pet)} ${esc(p.pet.name)}, ${p.pet.kind}${p.pet.left ? ', left behind' : p.pet.where === 'cabin' ? ', under the seat' : ', in the hold'}`) : ''}
+        ${kv('Conduct', rec ? `<span class="${banned ? 'red' : 'amber'}">${banned ? 'Banned by ' + esc(rec.bannedBy || 'an airline') : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</span>` : '<span class="green">Clean record</span>')}
+      </div>
+      <div class="modal-actions">${rec ? `<button class="btn ghost" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}Conduct record</button>` : ''}
+        ${noFly()[p.key] ? '' : `<button class="btn danger" data-act="pax-ban" data-key="${esc(p.key)}" data-f="${esc(fid)}">${icon('shield')}Ban from your airline</button>`}</div></div></div>`, { cls: 'wide pax-card-pop' });
+};
 ACTIONS['pax-ban'] = el => {
-  const k = el.getAttribute('data-key'), rec = paxStore()[k]; if (!rec) return;
+  const k = el.getAttribute('data-key'); let rec = paxStore()[k];
+  // a passenger with a clean record can be banned too: a record is started for them
+  if (!rec) { const f = State.live.filter(x => x.id === el.getAttribute('data-f'))[0], p = f ? manifestOf(f).filter(x => x.key === k)[0] : null; if (!p) return;
+    rec = paxStore()[k] = { key: k, name: p.name, nat: p.nat, sex: p.sex, notes: [] }; p.record = rec; }
   noFly()[k] = dateStr(new Date()).slice(0, 10); rec.banned = true; rec.bannedBy = 'your airline';
   rec.notes.push({ date: dateStr(new Date()).slice(0, 10), title: 'Banned by your airline', text: `${rec.name} may no longer fly with ${company().name}.`, sev: 'ban' });
   Store.save(); closeAll(); toast(`${rec.name} is on your no-fly list`, 'ok');
@@ -194,19 +226,53 @@ function scanDecide(id: string, deny: boolean, auto?: boolean) {
 /* ---------- the loadsheet ---------- */
 /** What a flight weighs: passengers at 84 kg and 13 kg of bags each (standard weights), cargo, catering and
  *  fuel, against the aircraft's limits and the runways' limit. */
-function loadsheetOf(f: LiveFlight): { rows: [string, number][]; zfw: number; tow: number; lw: number; mtow: number; mlw: number; rwyMax: number; ok: boolean; note: string } {
+function loadsheetOf(f: LiveFlight): { rows: [string, number][]; zfw: number; tow: number; lw: number; mtow: number; mlw: number; rwyMax: number; ok: boolean; note: string; now: number; nowPh: string; burnt: number } {
   const F: any = f, t = acType(flightTypeId(f)) || AIRCRAFT[0], S = speedSpec(t.id);
   const A = apt(f.from), B = apt(f.noDest ? f.from : f.to), dist = A && B ? gcDistanceNm(A.pos, B.pos) : 300;
-  const pax = f.pax || 0, cargo = F.cargoKg || 0, crewN = t.seats > 100 ? 2 + Math.ceil(t.seats / 50) : t.seats > 20 ? 3 : 1;
+  const crewN = t.seats > 100 ? 2 + Math.ceil(t.seats / 50) : t.seats > 20 ? 3 : 1;
   const catering = Math.round(t.seats >= 20 ? t.seats * (dist > 1500 ? 9 : 4) : 0);
-  const W = flightWeights(t.id, pax, dist, cargo / 1000);
-  const fuelTo = Math.round((W.tow - W.zfw) * 1000), burn = Math.round((W.tow - W.lw) * 1000);
-  const rows: [string, number][] = [['Empty aircraft', Math.round(S.oew * 1000)], [`Crew (${crewN})`, crewN * 85], [`Passengers (${pax} × 84 kg)`, pax * 84], [`Bags (${pax} × 13 kg)`, pax * 13], ['Cargo', cargo], ['Catering', catering], ['Take-off fuel', fuelTo]];
-  const zfw = rows.slice(0, 6).reduce((s2, r) => s2 + r[1], 0), tow = zfw + fuelTo, lw = tow - burn;
+  const MT = S.mtow * 1000, ML = S.mlw * 1000;
+  const sum = (pax: number, cargo: number) => {
+    const W = flightWeights(t.id, pax, dist, cargo / 1000);
+    const fuelTo = Math.max(0, Math.round((W.tow - W.zfw) * 1000)), burn = clamp(Math.round((W.tow - W.lw) * 1000), 0, Math.max(0, Math.round((W.tow - W.zfw) * 1000)));
+    const zfw = Math.round(S.oew * 1000) + crewN * 85 + pax * 97 + cargo + catering;
+    return { fuelTo, burn, zfw, tow: zfw + fuelTo, lw: zfw + fuelTo - burn };
+  };
+  // the loaders keep the aircraft within its limits: cargo off first, then passengers with their bags,
+  // until the take-off and landing weights are just under the maximum (decided once for the flight)
+  if (!F.lsTrimmed && !f.you && !f.real) {
+    F.lsTrimmed = true;
+    let pax = f.pax || 0, cargo = F.cargoKg || 0, x = sum(pax, cargo), offK = 0, offP = 0;
+    const over = () => Math.max(x.tow - (MT - 60), x.lw - (ML - 60));
+    if (over() > 0) {
+      // all the cargo can go before any passenger is left behind
+      while (over() > 0 && cargo > 0) { const cut = Math.min(cargo, Math.max(50, Math.ceil(over() / 50) * 50)); cargo -= cut; offK += cut; x = sum(pax, cargo); }
+      while (over() > 0 && pax > 0) { pax--; offP++; x = sum(pax, cargo); }
+      F.cargoKg = cargo; f.pax = pax;
+      F.offloadKg = (F.offloadKg || 0) + offK; F.offloadPax = (F.offloadPax || 0) + offP; F.lsWeight = true;
+    }
+  }
+  const pax = f.pax || 0, cargo = F.cargoKg || 0, x = sum(pax, cargo);
+  const rows: [string, number][] = [['Empty aircraft', Math.round(S.oew * 1000)], [`Crew (${crewN})`, crewN * 85], [`Passengers (${pax} × 84 kg)`, pax * 84], [`Bags (${pax} × 13 kg)`, pax * 13], ['Cargo', cargo], ['Catering', catering], ['Take-off fuel', x.fuelTo]];
   const rc = f.noDest ? null : legRunwayCheck(t.id, f.from, f.to, pax, cargo);
-  const ok = tow <= S.mtow * 1000 + 1 && lw <= S.mlw * 1000 + 1 && (!rc || rc.maxPax >= pax);
-  const note = (F.offloadPax ? `${F.offloadPax} passengers offloaded for the runway. ` : '') + (F.offloadKg ? `${num(F.offloadKg)} kg of cargo offloaded for the runway. ` : '') + (rc && !rc.full ? rc.why : '');
-  return { rows, zfw, tow, lw, mtow: S.mtow * 1000, mlw: S.mlw * 1000, rwyMax: rc ? rc.maxPax : pax, ok, note };
+  const ok = x.tow <= MT + 1 && x.lw <= ML + 1 && (!rc || rc.maxPax >= pax);
+  const note = (F.offloadPax ? `${F.offloadPax} passengers offloaded to keep within the limits. ` : '') + (F.offloadKg ? `${num(F.offloadKg)} kg of cargo offloaded to keep within the limits. ` : '') + (rc && !rc.full ? rc.why : '');
+  // the weight right now: full at the gate, a little less after taxiing, then falling with the fuel burnt until landing
+  let burnt = 0, nowPh = String(f.phase || 'At the gate');
+  try {
+    if (F.depAt) {
+      const prof = aiProfile(F), el = flightEl(F, Date.now()).el;
+      const tk = prof.pts.filter((p: any) => p.ph === 'Takeoff')[0], td = prof.pts.filter((p: any) => p.ph === 'Landing')[0];
+      const taxi = Math.round(x.fuelTo * 0.012);
+      if (tk && td) {
+        if (el <= tk.s) burnt = Math.round(taxi * clamp(el / Math.max(1, tk.s), 0, 1));
+        else if (el < td.s) { const k = clamp((el - tk.s) / (td.s - tk.s), 0, 1); burnt = taxi + Math.round((x.burn - taxi) * Math.pow(k, 0.92)); }   // a little faster in the climb
+        else burnt = x.burn;
+      }
+    }
+  } catch (e) { /* not started */ }
+  burnt = clamp(burnt, 0, Math.max(0, x.tow - x.lw));
+  return { rows, zfw: x.zfw, tow: x.tow, lw: x.lw, mtow: MT, mlw: ML, rwyMax: rc ? rc.maxPax : pax, ok, note, now: x.tow - burnt, nowPh, burnt };
 }
 ACTIONS['loadsheet'] = el => {
   const f = State.live.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!f) return;
@@ -215,8 +281,16 @@ ACTIONS['loadsheet'] = el => {
   openLayer('modal', `<div class="modal-head"><div><h2>Loadsheet: ${esc(f.callsign)}</h2><small>${esc(f.from)} → ${esc(f.noDest ? '…' : f.to)} · loaded by the ground staff within the limits</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body loadsheet"><table>${L.rows.map(r => `<tr><td>${esc(r[0])}</td><td>${kg(r[1])}</td></tr>`).join('')}
       <tr class="tot"><td>Zero-fuel weight</td><td>${kg(L.zfw)}</td></tr>
-      <tr class="tot ${L.tow > L.mtow ? 'bad' : ''}"><td>Take-off weight <small>max ${kg(L.mtow)}</small></td><td>${kg(L.tow)}</td></tr>
-      <tr class="tot ${L.lw > L.mlw ? 'bad' : ''}"><td>Landing weight <small>max ${kg(L.mlw)}</small></td><td>${kg(L.lw)}</td></tr></table>
+      <tr class="tot ${L.tow > L.mtow ? 'bad' : 'good'}"><td>Take-off weight <small>max ${kg(L.mtow)}</small></td><td>${kg(L.tow)}</td></tr>
+      <tr class="tot ${L.lw > L.mlw ? 'bad' : 'good'}"><td>Landing weight <small>max ${kg(L.mlw)}</small></td><td>${kg(L.lw)}</td></tr>
+      <tr class="now"><td>Weight now <small class="ls-ph">${esc(L.nowPh)} · ${kg(L.burnt)} of fuel burnt</small></td><td class="ls-now">${kg(L.now)}</td></tr></table>
       <p class="ls-check ${L.ok ? 'ok' : 'bad'}">${icon(L.ok ? 'check' : 'alert')}${L.ok ? 'Within the aircraft\'s limits and the runways\' limit.' : 'Over a limit.'}</p>
-      ${L.note ? `<p class="fine-print">${icon('info')}${esc(L.note)}</p>` : ''}</div>`, { cls: 'narrow' });
+      ${L.note ? `<p class="fine-print">${icon('info')}${esc(L.note)}</p>` : ''}</div>`, { cls: 'narrow ls-pop' });
+  // the weight now keeps up while the sheet is open
+  const iv = setInterval(() => {
+    const box = document.querySelector('.ls-pop'); if (!box || !document.body.contains(box)) { clearInterval(iv); return; }
+    const g = State.live.filter(x => x.id === f.id)[0]; if (!g) return;
+    const M2 = loadsheetOf(g), n = box.querySelector('.ls-now'), ph = box.querySelector('.ls-ph');
+    if (n) n.textContent = kg(M2.now); if (ph) ph.textContent = `${M2.nowPh} · ${kg(M2.burnt)} of fuel burnt`;
+  }, 1000);
 };

@@ -1028,7 +1028,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       hemY: I.crotchY + 0.015, waistY: I.hipY + 0.1, cuffS: I.armLen - 0.012, shoeY: I.ankleY + 0.035, botLow: I.ankleY + 0.035,
       vBot: I.neckY - 0.25, vW: 0.06, tieBot: I.neckY - 0.23, stripes: 0, lapels: true, pockets: false, topFab: 1, sleeveFab: 1,
       topT: 0.006, botT: 0.005, fit: f ? 0.55 : 0.6, legX: Math.abs(I.J['upperleg01.L'][0]) + 0.005, hivis: false, skirt: false,
-      wings: pilot ? 1 : role === 'fa' ? 0.7 : 0, buttons: false, epaulettes: false, scarf: false, bald: L.hair === 'bald',
+      wings: (L as any).civil ? 0 : pilot ? 1 : role === 'fa' ? 0.7 : 0,   // passengers wear no crew wings buttons: false, epaulettes: false, scarf: false, bald: L.hair === 'bald',
     };
     if (L.shoes === 'boots') c.shoeY = c.botLow = I.ankleY + 0.06;
     if (L.shoes === 'pumps') c.shoeY = c.botLow = I.ankleY + 0.02;

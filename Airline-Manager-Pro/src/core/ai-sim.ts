@@ -336,9 +336,14 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
           f.delayS = after; f.durMs = prof.totalS * 1000 + after * 1000;
         } catch (e) { /* the weather never stops the simulation */ }
       }
+      // diverted soon after take-off: too heavy to land, so the crew hold to dump or burn off fuel first
+      if (!test && (f.medical || f.wxDivert)) {
+        try { heavyLandingHold(f, a, prof, (f.medical || f.wxDivert).orig); const hs = (f.holds || []).reduce((s2: number, h: Hold) => s2 + h.s, 0); f.delayS = hs; f.durMs = prof.totalS * 1000 + hs * 1000; } catch (e) { /* lands as planned */ }
+      }
       a.status = 'flying'; if (!isSick(p)) p.status = 'flying';
       if (sickCovered) f.coverBy = 'Contract pilot (covering ' + p.name + ')';
       State.live.push(f);
+      try { loadsheetOf(f); } catch (e) { /* the loaders keep it within the limits before boarding */ }
     }
   }
   for (const f of State.live) if (aiOn(f)) aiUpdate(f, now);

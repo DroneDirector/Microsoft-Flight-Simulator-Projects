@@ -134,3 +134,22 @@ function medicalNote(f: any) {
   State.notices.unshift({ id: uid(), kind: 'pilot', title: `${f.callsign}: medical emergency, diverting to ${f.to}`, body: `${m.name} (seat ${m.seat}) has ${m.why}. A doctor on board is helping and the crew declared an emergency. ${f.callsign} diverts to ${f.to}; after the stop it carries on to ${m.orig}.`, time: 'Now', read: false, ref: f.id } as any);
   try { renderTopbar(); Sound.chime(); } catch (e) { /* not ready */ }
 }
+
+/* ---------- landing heavy after a diversion ---------- */
+// Aircraft that can dump fuel in flight (a fuel jettison system); the rest burn it off in a hold.
+const FUEL_DUMP: { [typeId: string]: number } = { 'b77w-pmdg': 2400, 'b748': 2400, 'a350-ini': 2000, 'b78x': 1800, 'a310-ini': 1300 };   // kg a minute
+/** A diversion soon after take-off can mean landing far over the maximum landing weight: the crew hold
+ *  first, dumping fuel where the aircraft can, otherwise burning it off, until it is at the limit. */
+function heavyLandingHold(f: any, a: any, prof: FlightProfile, origTo: string) {
+  const t = acType(a.typeId), S = speedSpec(t.id), A = apt(f.from), O = apt(origTo), N = apt(f.to); if (!t || !A || !O || !N) return;
+  const cargoT = (f.cargoKg || 0) / 1000;
+  const Wo = flightWeights(t.id, f.pax || 0, gcDistanceNm(A.pos, O.pos), cargoT), Wn = flightWeights(t.id, f.pax || 0, gcDistanceNm(A.pos, N.pos), cargoT);
+  const lw = (Wo.tow - (Wn.tow - Wn.lw)) * 1000, mlw = S.mlw * 1000, excess = Math.round(lw - mlw);
+  if (excess < Math.max(300, mlw * 0.005)) return;   // at or about the limit: lands normally
+  const dump = FUEL_DUMP[t.id], rate = dump || (BURN_KG_H[t.cls] || 2500) / 60 * 1.1;
+  let min = excess / rate + (dump ? 4 : 0), why = dump ? `Dumping ${num(Math.round(excess / 100) * 100)} kg of fuel to get down to the landing weight` : `Holding to burn off ${num(Math.round(excess / 100) * 100)} kg of fuel before landing`;
+  if (min > 75) { min = 75; why += ' (then an overweight landing, with an inspection after)'; f.overweight = true; }
+  const desc = prof.pts.filter((p: any) => p.ph === 'Descent')[0], at = desc ? desc.s : prof.totalS * 0.8;
+  (f.holds = f.holds || []).push({ at, s: Math.round(min * 60), kind: 'air', why });
+  f.holds.sort((x: Hold, y: Hold) => x.at - y.at);
+}

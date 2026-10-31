@@ -32,6 +32,15 @@ const SETTINGS: SetSection[] = [
         <div class="v3d-scale"><span>20 km</span><span>150</span><span>400</span><span>800 km</span></div>${note}</div>`;
     } },
     { type: 'toggle', key: 'v3dSat', label: 'Satellite imagery', hint: 'Shows the real ground from space (Sentinel-2 cloudless by EOX) instead of the map look. Can also be switched in the 3D view.' },
+    { type: 'html', html: () => {
+      if (!(State.settings as any).v3dSat) return '';
+      const q = v3dSatQ(), names = ['Standard', 'Sharp', 'Very sharp', 'Highest'], mb = [2, 8, 30, 45][q];
+      const note = q >= 2 ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: about ${mb} MB of imagery each time the 3D view opens, more memory and more battery use.</p>`
+        : q === 0 ? `<p class="v3d-note ok">${icon('info')}Low settings might improve performance on slower phones and PCs and use less data.</p>` : '';
+      return `<div class="set-card col"><div class="sc-h">${icon('layers')}<span><b>Satellite detail: ${names[q]}</b><small>How sharp the satellite ground is. Higher shows fields, roads, villages and coastlines in more detail, near you and from high up. The imagery itself is about 10 m per pixel, so the very closest view stays a little soft.</small></span></div>
+        <input type="range" class="v3d-satq" min="0" max="3" step="1" value="${q}" aria-label="Satellite detail">
+        <div class="v3d-scale"><span>Standard</span><span>Sharp</span><span>Very sharp</span><span>Highest</span></div>${note}</div>`;
+    } },
   ] },
   { id: 'time', title: 'Time and years', icon: 'clock', items: [
     { type: 'choice', key: 'timeMode', label: 'Company calendar', hint: 'Real-world years follow today’s date. Simulated years run faster, so your airline can build up several years of history.', options: [['real', 'Real-world years'], ['sim', 'Simulated years']] },
@@ -403,6 +412,15 @@ document.addEventListener('change', e => {
 });
 ACTIONS['discord-test'] = () => { Online.test().then(() => toast('Test message sent to Discord', 'ok'), (e: any) => toast((e && e.message) || 'Not sent', 'warn')); };
 
+// the satellite detail slider: kept when let go
+document.addEventListener('input', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-satq')) return;
+  const h = el.parentElement && el.parentElement.querySelector('.sc-h b'); if (h) h.textContent = `Satellite detail: ${['Standard', 'Sharp', 'Very sharp', 'Highest'][+el.value]}`;
+});
+document.addEventListener('change', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-satq')) return;
+  (State.settings as any).v3dSatQ = +el.value; Store.save(); rerenderSettingsBody();
+});
 // the 3D view distance slider: the value shows while dragging, it's kept when let go
 document.addEventListener('input', e => {
   const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-range')) return;
