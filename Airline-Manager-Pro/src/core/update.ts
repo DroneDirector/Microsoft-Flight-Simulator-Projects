@@ -120,8 +120,8 @@ function updateBody(): string {
   const u = Updater, busy = u.state === 'downloading' || u.state === 'installing';
   return `<div class="upd-v"><span class="brand-lg">${brandMark()}</span><span><small>Installed</small><b>${esc(APP.version)}</b></span>${icon('chevron')}<span><small>New</small><b class="green">${esc(u.info.version)}</b></span>${u.info.size ? `<em>${(u.info.size / 1048576).toFixed(1)} MB</em>` : ''}</div>
     ${u.info.notes ? `<div class="upd-notes">${esc(u.info.notes.replace(/^#+\s*/gm, '').replace(/\*\*/g, '').trim().slice(0, 2400))}</div>` : ''}
-    ${busy ? `<div class="upd-bar"><i style="width:${Math.max(4, u.pct)}%"></i></div><p class="fine-print">${icon('info')}${esc(updateStatusText())}</p>` : ''}
-    <p class="fine-print">${icon('info')}Your airline is kept. Android asks you to confirm the install.</p>
+    <div class="upd-prog ${busy ? '' : 'hide'}"><div class="upd-bar"><i style="width:${Math.max(4, u.pct || 0)}%"></i></div><p class="fine-print">${icon('info')}${esc(busy ? updateStatusText() : '')}</p></div>
+    <p class="fine-print">${icon('info')}Your airline is kept. The update installs over this version and the app opens again.</p>
     <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Later</button><button class="btn" data-act="update-install" ${busy ? 'disabled' : ''}>${icon('download')}${busy ? 'Installing…' : 'Download and install'}</button></div>`;
 }
 
@@ -132,7 +132,8 @@ function openUpdate() {
 }
 
 function updateChanged() {
-  const b = $('#upd-body'); if (b && Updater.info) b.innerHTML = updateBody();
+  // changed in place (no flashing while the download counts up)
+  const b = $('#upd-body'); if (b && Updater.info) patchHtml(b, updateBody());
   try { if ($('#set-body') && _setSection === 'support') rerenderSettingsBody(); } catch (e) { /* settings closed */ }
 }
 

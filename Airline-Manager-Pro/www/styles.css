@@ -2475,3 +2475,5 @@ html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
 .v3d-free.v3d-pc .fc-esc { display: inline-flex; }
 .fc-esc kbd { font: 700 11px Inter, sans-serif; padding: 4px 7px; border-radius: 6px; background: linear-gradient(#F4F6F8, #CDD3DA); color: #1A2230; box-shadow: 0 2px 0 #8A95A3, inset 0 -1px 0 rgba(0,0,0,.15); }
 .v3d-free.v3d-pc .v3d-modes { margin-left: 190px; }
+.upd-bar i { transition: width .4s ease; }
+.upd-prog.hide { display: none; }
