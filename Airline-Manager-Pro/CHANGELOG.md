@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.41 (2026-10-31)
+
+- Landing lights in the wing leading edge; approach lighting (full/short, flashers, red side bars); PAPI/VASI (light kind 6, angle by viewer); dimmer cabin windows
+
 ## 0.9.40 (2026-10-31)
 
 - Cabin and cockpit window lights; landing/taxi/turn-off/logo lights by phase (v3dPlaneLightsSet), ground light pool (SPOT_GLSL), beams in mist

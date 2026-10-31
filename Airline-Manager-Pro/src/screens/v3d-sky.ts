@@ -667,7 +667,7 @@ void main() {
   for (let x = s.win.from; x <= s.win.to + 1e-6; x += s.win.pitch) {
     if (s.doors.some(d => Math.abs(d - x) < (airliner ? 0.75 : 0.55))) continue;
     const hw = fusSection(s, x).hw + 0.04;
-    for (const side of [-1, 1]) { const q = v(x, side * hw, zw); cp.push(q.x, q.y, q.z); cc.push(1, 0.8, 0.52); cs.push(airliner ? 0.55 : 0.4); }
+    for (const side of [-1, 1]) { const q = v(x, side * hw, zw); cp.push(q.x, q.y, q.z); cc.push(0.62, 0.5, 0.32); cs.push(airliner ? 0.5 : 0.36); }
   }
   // the cockpit: the front windscreen and the side windows, softly lit from inside (seen from outside only)
   const fw = s.nose * 0.5, fs = s.nose * 0.66, ckz = s.ground + s.h * 0.76;
