@@ -16,6 +16,7 @@
     "src/core/icons.ts",
     "src/core/sound.ts",
     "src/data/airports.ts",
+    "src/data/airports-major.ts",
     "src/data/world-airports.ts",
     "src/data/airport-layouts.ts",
     "src/data/aircraft.ts",

@@ -46,6 +46,7 @@ function aptSize(icao: string): number {
   const w: any = typeof World !== 'undefined' ? World.get(icao) : null;
   // airports the airline itself uses are never smaller than regional
   const own = AIRPORTS[icao] ? 1 : 0;
+  if (w && w.size === 3) return own;   // seaplane bases
   if (w && typeof w.size === 'number') return Math.max(own, Math.min(2, Math.max(0, Math.round(w.size))));
   return own;
 }
