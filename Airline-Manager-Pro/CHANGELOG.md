@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.29 (2026-10-31)
+
+- Ground reference point is the nose wheel (noseWheelAhead from shape gear data) in the 3D view and the 2D airport view; blended to the fuselage middle below 30 m
+
 ## 0.9.28 (2026-10-31)
 
 - 3D airport sheet: type 3 paths end at a stand (parks index), type 9 lead-ins drawn as thin lines, no edge lines, OSM stands use their own lead-ins (same as the 2D map)
