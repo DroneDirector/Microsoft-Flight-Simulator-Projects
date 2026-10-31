@@ -110,6 +110,7 @@ ACTIONS['ac-sell'] = el => {
   const a = plane(el.getAttribute('data-reg')); if (!a) return;
   const t = acType(a.typeId), S: any = State;
   if ((a as any).lease) { toast(`${a.reg} is leased: return it or buy it out first`, 'warn'); return; }
+  if ((a as any).leasedOut) { toast(`${a.reg} is leased out: recall it first`, 'warn'); return; }
   if (a.status === 'flying' || State.live.some(f => f.reg === a.reg) || (S.aiNext || []).some((n: any) => n.reg === a.reg)) { toast(`${a.reg} is flying. Sell it when it's on the ground and has no flight planned.`, 'warn'); return; }
   const value = aircraftValue(a), fee = value - sellPrice(a), get = sellPrice(a);
   const open = State.issues.filter(i => i.reg === a.reg && i.status === 'open');

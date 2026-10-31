@@ -2421,3 +2421,4 @@ html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
 .mkt .btn small { margin-left: 6px; color: var(--ink-2); font-weight: 500; }
 .mkt-hist summary { cursor: pointer; color: var(--ink-2); font-size: 12.5px; margin-top: 6px; } .mkt-hist div { font-size: 12.5px; padding: 3px 0; } .mkt-hist em { font-style: normal; margin-left: 4px; }
 @media (max-width: 700px) { .mkt-row { grid-template-columns: 1fr; } }
+.lo-note { display: flex; flex-direction: column; gap: 2px; } .lo-note b { display: flex; gap: 5px; align-items: center; } .lo-note .ic { width: 15px; height: 15px; }
