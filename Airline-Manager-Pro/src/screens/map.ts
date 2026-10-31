@@ -159,7 +159,7 @@ function focusAirport(icao: string, stay?: boolean) {
     <div class="apt-rwy" id="apt-rwy"></div>
     <small class="muted">${onRoutes.length ? 'On your routes: ' + onRoutes.join(', ') : 'Not on any of your routes yet'}</small>
     <div class="apt-wx" id="apt-wx">${aptWxHtml(icao)}</div>
-    ${AIRPORT_VIEW ? `<button class="btn primary sm apt-view-btn" data-act="apt-view" data-icao="${esc(icao)}">${icon('land')}Airport view</button>` : ''}
+    <div class="btn-row">${AIRPORT_VIEW ? `<button class="btn primary sm apt-view-btn" data-act="apt-view" data-icao="${esc(icao)}">${icon('land')}Airport view</button>` : ''}<button class="btn ghost sm" data-act="apt-3d" data-icao="${esc(icao)}"><b>3D</b>View in 3D</button></div>
   </div></div>`;
   if (LiveWx.on() && !LiveWx.cache[icao]) LiveWx.fetch([icao]).then(() => { const w = $('#apt-wx'); if (w) w.innerHTML = aptWxHtml(icao); });
   World.loadRunways().then(rw => {
