@@ -9,11 +9,23 @@ amp-market.json on the amp-market-data branch (the app reads it from there).
 """
 import csv, io, json, sys, urllib.request, datetime
 
+UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+
+def get(url, timeout=90):
+    """Download with a few tries; the error goes to the job's annotations."""
+    import time
+    last = None
+    for i in range(4):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read()
+        except Exception as e:
+            last = e; print(f"::warning::{url}: {e}"); time.sleep(5 * (i + 1))
+    raise last
+
 def series(sid):
-    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}"
-    req = urllib.request.Request(url, headers={"User-Agent": "AirlineManagerPro-market/1.0"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        rows = list(csv.reader(io.StringIO(r.read().decode("utf-8"))))
+    rows = list(csv.reader(io.StringIO(get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}").decode("utf-8"))))
     out = []
     for row in rows[1:]:
         if len(row) < 2: continue
@@ -26,9 +38,7 @@ def steo_jet_fuel():
     cents a gallon), history and forecast, from its public spreadsheet. [] if it can't be read."""
     try:
         import openpyxl
-        req = urllib.request.Request("https://www.eia.gov/outlooks/steo/xls/STEO_m.xlsx", headers={"User-Agent": "AirlineManagerPro-market/1.0"})
-        with urllib.request.urlopen(req, timeout=120) as r:
-            wb = openpyxl.load_workbook(io.BytesIO(r.read()), read_only=True, data_only=True)
+        wb = openpyxl.load_workbook(io.BytesIO(get("https://www.eia.gov/outlooks/steo/xls/STEO_m.xlsx", 180)), read_only=True, data_only=True)
         months = {m: i + 1 for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])}
         for ws in wb.worksheets:
             rows = list(ws.iter_rows(values_only=True))
@@ -49,13 +59,16 @@ def steo_jet_fuel():
                     out.append([f"{year}-{m:02d}", round(float(row[i]), 2)])
             return out
     except Exception as e:
-        print("outlook not read:", e)
+        print(f"::warning::outlook not read: {e}")
     return []
 
-fuel = series("DJFUELUSGULF")[-400:]
-parts = series("PCU336413336413")[-60:]
+try:
+    fuel = series("DJFUELUSGULF")[-400:]
+    parts = series("PCU336413336413")[-60:]
+except Exception as e:
+    print(f"::error::prices not read: {e!r}"); sys.exit(1)
 if len(fuel) < 20 or len(parts) < 12:
-    sys.exit("not enough data")
+    print(f"::error::not enough data: fuel {len(fuel)}, parts {len(parts)}"); sys.exit(1)
 data = {
     "updated": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"),
     "fuel": {"name": "US Gulf Coast jet fuel spot price", "unit": "$/gal", "source": "U.S. Energy Information Administration (public domain)", "series": fuel},
