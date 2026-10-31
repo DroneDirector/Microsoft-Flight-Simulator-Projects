@@ -509,8 +509,17 @@ function v3dLoop(now: number) {
     P.model.rotateY(-(P.hdg + 90) * D2R);
     P.model.rotateZ(-P.pitch * D2R);   // nose up
     P.model.rotateX(P.bank * D2R);
+    // touchdown: tyre smoke from the main wheels (left behind on the runway as the aircraft rolls on)
+    const PS: any = P, agl = w.altM - ground;
+    if (!w.onGround && agl > 3) PS.air = true;
+    if (w.onGround && PS.air && (g.gs || 140) > 50 && s.gear && !s.gear.fixed) { PS.air = false; PS.smokeUntil = now + 350; PS.smokeK = g.you && (State as any).lastTouchdown ? clamp(Math.abs((State as any).lastTouchdown.fpm || 150) / 200, 0.6, 2) : 1; }
+    if (PS.smokeUntil > now && (PS.smokeTick = !PS.smokeTick)) {
+      const h = P.hdg * D2R, fx = Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = Math.sin(h), bx = bodyO ? bodyO.position.x : -s.L / 2, back = bx + s.gear.main;
+      for (const side of [-1, 1]) v3dSmokePuff(P.pos.x - fx * back + rx * side * s.gear.track / 2, P.pos.y + 0.4, P.pos.z - fz * back + rz * side * s.gear.track / 2, PS.smokeK || 1);
+    }
     void s;
   }
+  v3dSmokeStep(dt);
   for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); delete V3d.planes[id]; }
 
   // the camera follows the aircraft (or flies freely)
@@ -816,4 +825,30 @@ function v3dCrashCheck() {
   let lowered = '';
   if (m.sat && (S.v3dSatQ == null ? 1 : S.v3dSatQ) > 0) { S.v3dSatQ = Math.max(0, (S.v3dSatQ == null ? 1 : S.v3dSatQ) - 1); lowered = names[S.v3dSatQ]; Store.soon(); }
   State.notices.unshift({ id: uid(), kind: 'mechanic' as any, title: 'The 3D view closed the app', body: `Your device ran out of graphics memory in the 3D view.${lowered ? ` Satellite detail is now ${lowered}; you can raise it again in Settings → 3D view.` : ''} The details are in Settings → Updates and errors.`, time: 'Now', at: Date.now(), read: false } as any);
+}
+
+/* ---------- tyre smoke at touchdown ---------- */
+let _smokeTex: any = null;
+const _smoke: { sp: any; age: number; life: number; k: number; vx: number; vz: number }[] = [];
+function v3dSmokePuff(x: number, y: number, z: number, k: number) {
+  const T = THREE;
+  if (!_smokeTex) {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31);
+    gr.addColorStop(0, 'rgba(235,235,235,1)'); gr.addColorStop(0.45, 'rgba(220,220,220,.55)'); gr.addColorStop(1, 'rgba(210,210,210,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    _smokeTex = new T.CanvasTexture(c);
+  }
+  if (_smoke.length > 160) return;
+  const sp = new T.Sprite(new T.SpriteMaterial({ map: _smokeTex, transparent: true, depthWrite: false, opacity: 0.6 }));
+  sp.position.set(x + (Math.random() - 0.5) * 0.8, y, z + (Math.random() - 0.5) * 0.8); sp.scale.set(1.5, 1.5, 1.5); sp.renderOrder = 12;
+  V3d.scene.add(sp);
+  _smoke.push({ sp, age: 0, life: 2.2 + Math.random() * 1.4, k, vx: (Math.random() - 0.5) * 1.2, vz: (Math.random() - 0.5) * 1.2 });
+}
+function v3dSmokeStep(dt: number) {
+  for (let i = _smoke.length - 1; i >= 0; i--) {
+    const p = _smoke[i]; p.age += dt; const t = p.age / p.life;
+    if (t >= 1 || !V3d.scene) { if (V3d.scene) V3d.scene.remove(p.sp); p.sp.material.dispose(); _smoke.splice(i, 1); continue; }
+    const sz = (1.2 + Math.sqrt(t) * 6.5) * p.k; p.sp.scale.set(sz, sz, sz);
+    p.sp.position.x += p.vx * dt; p.sp.position.z += p.vz * dt; p.sp.position.y += (0.6 + t * 0.8) * dt;
+    p.sp.material.opacity = 0.6 * Math.min(1, 0.6 + p.k * 0.3) * (1 - t) * (1 - t);
+  }
 }
