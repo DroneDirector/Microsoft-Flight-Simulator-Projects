@@ -122,6 +122,8 @@
     "src/core/biz-more.ts",
     "src/core/pax-mood.ts",
     "src/screens/v3d-clouds.ts",
+    "src/data/stars.ts",
+    "src/screens/v3d-sky.ts",
     "src/ui/qol.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",

@@ -448,6 +448,7 @@ class WorldMap {
       this.sceneDraws = fade > 0;
       if (fade > 0) for (const icao of Object.keys(this.scenes)) { const sc = this.scenes[icao]; if (sc.L && sc.graph) sc.drawAircraftTo(c, now); }
     }
+    try { nightMapDraw(c, this); } catch (e) { /* never stop the map */ }
     try { WxLayer.draw(c, this, degPx); } catch (e) { /* never stop the map */ }
     try { if (typeof Network !== 'undefined') Network.drawOnMap(c, this, degPx); } catch (e) { /* never stop the map */ }
     try { this.drawTraffic(c, degPx); } catch (e) { /* never stop the map */ }

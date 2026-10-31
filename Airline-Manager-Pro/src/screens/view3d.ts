@@ -91,9 +91,10 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const sc = new T.Scene(); V3d.scene = sc;
   sc.background = new T.Color(0x0A1A2E);
   sc.fog = new T.Fog(0x0A1A2E, rg.fog[0], rg.fog[1]);
-  sc.add(new T.HemisphereLight(0xDDE8FF, 0x223348, 1.6));
-  const sun = new T.DirectionalLight(0xFFFFFF, 1.9); sun.position.set(-4000, 9000, 3000); sc.add(sun);
+  const hemi = new T.HemisphereLight(0xDDE8FF, 0x223348, 1.6); sc.add(hemi); (V3d as any).hemi = hemi;
+  const sun = new T.DirectionalLight(0xFFFFFF, 1.9); sun.position.set(-4000, 9000, 3000); sc.add(sun); (V3d as any).sunL = sun;
   V3d.cam = new T.PerspectiveCamera(50, 1, 2, rg.far);
+  try { v3dSkyInit(); } catch (e) { /* the old plain sky */ }
   v3dSize();
   v3dBind();
   v3dShowInfo();
@@ -113,7 +114,7 @@ function v3dClose() {
   } catch (e) { /* gone */ }
   if (V3d.root) V3d.root.remove();
   try { V3dTerrain.clear(); V3dTerrain.gen++; } catch (e) { /* none */ }
-  v3dCloudsClear();
+  v3dCloudsClear(); v3dSkyClear();
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
 // closing from the free camera: back to the normal Overview
@@ -285,6 +286,7 @@ function v3dBuildAirport(L: AirportLayout) {
     const bm = new T.Mesh(geo, mBuild); bm.renderOrder = 9; g.add(bm);
   }
   // the airport's ground paint, drawn from its own layout into one picture and laid over the terrain like a sheet
+  try { const lt = v3dAirportLights(L, loc, gy); if (lt) g.add(lt); } catch (e) { /* no lights */ }
   try { g.add(v3dGroundPaint(L, loc, gy)); } catch (x) { try { const sheet = airportSheet(L, loc, gy); if (sheet) g.add(sheet); } catch (y) { /* never stop the view */ } }
   // runways: strips that follow the ground, painted with the markings their size calls for, numbers always
   for (const r of L.runways) {
@@ -454,6 +456,7 @@ function v3dLoop(now: number) {
       const body = buildAircraftModel(typeId, liveryFor(c.color, c.color2, c.id)), model = new T.Group();
       body.position.x = -shapeOf(typeId).L / 2; model.add(body); model.userData.body = body;
       body.traverse((o: any) => { o.renderOrder = 10; });   // after the airport's ground paint
+      try { v3dPlaneLightsAdd(body, typeId); } catch (e) { /* no lights */ }
       model.userData.flightId = g.id; model.userData.set = body.userData.set;
       V3d.scene.add(model);
       const lab = document.createElement('span'); lab.className = 'v3d-lab' + ((g as any).tfc ? ' tfc' : ''); lab.textContent = (g as any).tfc ? `${(g as any).tfc.airline} ${g.callsign}` : g.callsign; V3d.root.querySelector('.v3d-labels').appendChild(lab);
@@ -493,6 +496,7 @@ function v3dLoop(now: number) {
     P.pitch += (clamp(Math.atan2(vs / 196.85, gs * 0.5144) / D2R + (w.onGround ? 0 : 2.5), -6, 15) - P.pitch) * Math.min(1, dt * 1.5);
     // flaps and gear by phase (the type's own speeds in flight-configs when available)
     const ph = w.phase.toLowerCase();
+    try { v3dPlaneLightsSet(P.model, ph, (w.altM - ground) / 0.3048, w.onGround); } catch (e) { /* no lights */ }
     const cfg = flightConfig(P.type, ph, (g as any).ias || g.gs || 0, (w.altM - ground) / 0.3048, w.onGround);
     // your own flight: the flaps and gear as they are in the simulator
     const simCfg = g.you && g.real && Link.sim && Link.sim.lat ? { f: clamp((Link.sim.flapsIndex || 0) / Math.max(1, (configSpec(P.type) || { flaps: [1, 2, 3, 4] } as any).flaps.length), 0, 1), g: Link.sim.gearDown ? 1 : 0 } : null;
@@ -561,6 +565,7 @@ function v3dLoop(now: number) {
     }
   }
   try { v3dCloudsStep(now); } catch (e) { /* no clouds this frame */ }
+  try { v3dSkyStep(now); } catch (e) { /* the sky as it was */ }
   V3d.r.render(V3d.scene, V3d.cam);
 
   // callsigns over the aircraft
@@ -651,6 +656,7 @@ function v3dLoaderTick(now: number) {
   // airports nearby, and the clouds from the weather reports (a part that fails counts as done)
   const terrainOk = V3dTerrain.done, nRings = V3dTerrain.rings.length;
   const satOk = !satOn || (terrainOk && (pr.sat || 0) >= nRings);
+  const cityOk = !skyOpt('v3dCity') || (terrainOk && V3dTerrain.rings.every((r: any) => r.cityDone));
   const aptOk = !V3d.icao || V3d.aptReady;
   const preOk = !!VL.pre && VL.pre.got >= VL.pre.want;
   const C: any = V3dClouds, cloudOk = !cloudKm() || (!!C.fetchAt && !C.pending && !!C.key && !!C.mesh);
@@ -658,9 +664,10 @@ function v3dLoaderTick(now: number) {
     [satOn ? 0.45 : 0.62, terrainOk ? 1 : clamp(pr.got / Math.max(1, pr.want), 0, 0.97)],
     [satOn ? 0.25 : 0, satOk ? 1 : clamp((pr.sat || 0) / Math.max(1, nRings || 6), 0, 0.97)],
     [0.13, aptOk ? 1 : 0], [0.1, preOk ? 1 : VL.pre ? VL.pre.got / Math.max(1, VL.pre.want) : 0], [0.12, cloudOk ? 1 : C.pending ? 0.5 : 0],
+    [0.06, cityOk ? 1 : V3dTerrain.rings.filter((r: any) => r.cityDone).length / Math.max(1, nRings)],
   ];
   const tot = parts.reduce((s, p) => s + p[0], 0), k = parts.reduce((s, p) => s + p[0] * p[1], 0) / tot;
-  const all = terrainOk && satOk && aptOk && preOk && cloudOk;
+  const all = terrainOk && satOk && aptOk && preOk && cloudOk && cityOk;
   const minMs = V3D_SPLASH_MS + q * 1500, maxMs = 60000 + q * 20000;   // never stuck: after a minute it opens anyway
   // the bar never runs ahead of the minimum time, so it fills smoothly, and stays short of 100% until everything is in
   const shown = Math.min(all ? 1 : Math.min(0.98, k), t / minMs);
@@ -670,7 +677,7 @@ function v3dLoaderTick(now: number) {
   if (tip) tip.style.left = (V3d.shown * 100).toFixed(1) + '%';
   if (pct) pct.textContent = Math.round(V3d.shown * 100) + '%';
   if (step) step.textContent = !terrainOk ? 'Loading the mountains and the sea…' : !satOk ? `Loading satellite imagery${q >= 3 ? ' (highest detail)' : q >= 2 ? ' (very sharp)' : ''}…`
-    : !aptOk ? `Building ${V3d.icao}…` : !preOk ? 'Loading the airports nearby…' : !cloudOk ? 'Loading the clouds from the weather reports…' : 'Ready';
+    : !aptOk ? `Building ${V3d.icao}…` : !preOk ? 'Loading the airports nearby…' : !cloudOk ? 'Loading the clouds from the weather reports…' : !cityOk ? 'Loading the lights of the towns…' : 'Ready';
   if ((all && t >= minMs) || t > maxMs) {
     // everything goes onto the graphics card before the view shows, so the first moments don't stutter
     try { V3d.r.compile(V3d.scene, V3d.cam); } catch (e) { /* ignore */ }
