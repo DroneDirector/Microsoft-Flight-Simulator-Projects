@@ -49,6 +49,7 @@ const Bank = {
     const months = years * 12, monthly = this.monthly(amount, o.rate, months), now = Date.now();
     const l: Loan = { id: uid(), companyId: cid, lender: LENDERS[_hashStr(cid + bankState().loans.length) % LENDERS.length], amount, rate: o.rate, months, monthly, left: amount, paid: 0, since: now, nextAt: now + BANK_MONTH };
     bankState().loans.push(l);
+    try { newsLoan(cid, amount, l.lender); } catch (e) { /* ignore */ }
     payTxn(cid, `Loan from ${l.lender}`, amount, 'loan', [[`${years}-year loan at ${o.rate}% a year`, amount]]);
     try { Online.discord('fleet', `${company(cid).name} took a loan`, `${money(amount)} over ${years} years at ${o.rate}%.`); } catch (e) { /* ignore */ }
     return l;

@@ -23,10 +23,10 @@ function weatherChip(f: LiveFlight): string {
 
 function flightCard(f: LiveFlight): string {
   const a = plane(f.reg), t = acType(a.typeId), A = apt(f.from), B = apt(f.to);
-  const dist = gcDistanceNm(A.pos, B.pos);
+  const dist = A && B ? gcDistanceNm(A.pos, B.pos) : 0;
   const F: any = f, ai = !f.real && F.depAt;
   // hired pilots: miles along the planned route and time to the gate from the real-world flight profile
-  const left = ai ? F.leftNm : f.real ? (f.noDest ? 0 : gcDistanceNm(f.pos, B.pos)) : dist * (1 - f.t);
+  const left = ai ? F.leftNm : f.real ? (f.noDest ? 0 : F.leftNm != null && !f.pos ? F.leftNm : gcDistanceNm(f.pos, B ? B.pos : null)) : dist * (1 - f.t);
   const mo = flightMotion(f);
   const altTxt = f.alt < 50 ? 'Ground' : f.alt < 18000 ? num(Math.round(f.alt / 100) * 100) + ' ft' : 'FL' + Math.round(f.alt / 100);
   const fuelOk = (State as any).myLoad.fuelKg >= (State as any).myLoad.tripFuelKg + (State as any).myLoad.reserveKg;
@@ -121,8 +121,10 @@ SCREENS.ops = {
           const phases: { [k: string]: number } = {};
           gnd.forEach((f: any) => { const k = String(f.phase || 'On the ground').replace(/^Delayed: .*/, 'Delayed at the gate').replace(/^Holding short: .*/, 'Holding short'); phases[k] = (phases[k] || 0) + 1; });
           const gTxt = Object.keys(phases).map(k => `${phases[k]} ${k.toLowerCase()}`).join(', ');
+          const dvs = live.filter((f: any) => flightDiverted(f));
+          const dvTxt = dvs.length ? `<span class="w-sub w-divert">${dvs.slice(0, 3).map((f: any) => `<span class="chip chip-divert chip-link" role="button" tabindex="0" data-act="show-flight" data-id="${esc(f.id)}" title="${esc(flightDiverted(f).why)}">${icon('alert')}${esc(f.callsign || f.reg)} diverted to ${esc(f.to)}${icon('map')}</span>`).join('')}${dvs.length > 3 ? `<small>+${dvs.length - 3} more</small>` : ''}</span>` : '';
           return widget('map', 'Active flights', `<span class="w-big">${air.length}<small>in the air now</small></span>
-          <span class="w-sub">${gnd.length ? `<i class="gnd-dot"></i>${gnd.length} on the ground: ${esc(gTxt)}` : `<i class="live-dot"></i>${mine ? 'You and ' + (live.length - 1) + ' pilot' + (live.length - 1 === 1 ? '' : 's') : live.length + ' pilot' + (live.length === 1 ? '' : 's') + ' flying'}`}</span>`, 'w-active', 1);
+          <span class="w-sub">${gnd.length ? `<i class="gnd-dot"></i>${gnd.length} on the ground: ${esc(gTxt)}` : `<i class="live-dot"></i>${mine ? 'You and ' + (live.length - 1) + ' pilot' + (live.length - 1 === 1 ? '' : 's') : live.length + ' pilot' + (live.length === 1 ? '' : 's') + ' flying'}`}</span>${dvTxt}`, 'w-active', 1);
         })()}
         ${widget('maint', 'Fleet availability', `<span class="w-ring">${ring(avail)}<b class="${avail >= 100 ? 'w3' : ''}">${avail}<small>%</small></b></span>
           <span class="w-sub">${fl.length - nMaint} of ${fl.length} ready to fly</span>`, 'w-avail', 2)}

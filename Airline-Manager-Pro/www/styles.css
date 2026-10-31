@@ -2368,3 +2368,27 @@ body.coop-mode .topbar{box-shadow:inset 0 -2px 0 rgba(255,180,60,.55)}
 .tick-fade{animation:tickFade .6s ease}
 @keyframes tickFade{0%{opacity:.35;filter:blur(1.5px)}100%{opacity:1;filter:none}}
 html.calm .flap-w .fl,html.calm .tick-fade{animation:none}
+
+.news-pop.np-still.open .panel, .news-pop.np-still.open .panel * { animation: none !important; }
+.np-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.np-card { text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 14px; background: #F4EFE3; color: #1E1B16; border: 0; cursor: pointer; transition: transform .15s; }
+.np-card:hover { transform: translateY(-2px); }
+.np-card b { font: 700 18px/1.2 Georgia, serif; } .np-card span { font: italic 13.5px/1.4 Georgia, serif; color: #3A3428; }
+.np-card .np-cp, .np-card .np-cc { color: #6A6152; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+.np-card.lead { grid-column: 1 / -1; } .np-card.lead b { font-size: 26px; }
+
+/* the menu scrolls when it doesn't fit: arrows and fades say so */
+.rail { position: relative; }
+.rail-more { flex: none; height: 0; opacity: 0; overflow: hidden; display: grid; place-items: center; border: 0; background: none; color: var(--cyan); transition: height .25s, opacity .25s; cursor: pointer; }
+.rail-more .ic { width: 18px; height: 18px; } .rail-more.up .ic { transform: rotate(180deg); }
+.rail.can-up .rail-more.up, .rail.can-down .rail-more.down { height: 22px; opacity: 1; }
+.rail.can-down .rail-more.down .ic { animation: railBob 1.6s ease-in-out infinite; }
+@keyframes railBob { 50% { transform: translateY(3px); } }
+.rail.can-down .rail-items { -webkit-mask-image: linear-gradient(#000 calc(100% - 34px), transparent); mask-image: linear-gradient(#000 calc(100% - 34px), transparent); }
+.rail.can-up .rail-items { -webkit-mask-image: linear-gradient(transparent, #000 34px); mask-image: linear-gradient(transparent, #000 34px); }
+.rail.can-up.can-down .rail-items { -webkit-mask-image: linear-gradient(transparent, #000 34px, #000 calc(100% - 34px), transparent); mask-image: linear-gradient(transparent, #000 34px, #000 calc(100% - 34px), transparent); }
+.calm .rail.can-down .rail-more.down .ic { animation: none; }
+
+.chip-divert { background: rgba(255, 140, 60, .16); color: #FFAA6B; margin-left: 4px; gap: 4px; }
+.chip-divert .ic { width: 13px; height: 13px; }
+.w-divert { flex-wrap: wrap; gap: 5px; margin-top: 6px; } .w-divert .chip-divert { margin-left: 0; }

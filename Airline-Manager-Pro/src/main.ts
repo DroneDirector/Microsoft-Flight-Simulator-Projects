@@ -50,6 +50,7 @@
   Licence.init();
   startAiClock();
   try { modeStart(); } catch (e) { /* ignore */ }
+  try { startNewsWatch(); startWarnClock(); } catch (e) { /* ignore */ }
   startCoopClock();
   startBases();
   Battery.init();

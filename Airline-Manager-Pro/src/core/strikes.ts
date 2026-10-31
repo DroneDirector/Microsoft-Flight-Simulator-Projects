@@ -136,10 +136,12 @@ function strikeStart(cid: string, g: PayGroup, why: string) {
   Object.assign(u, { stage: 3, at: Date.now(), strikeAt: Date.now(), why, offered: false });
   strikeGroupPeople(cid, g).forEach(p => { p.strikeWas = p.status; p.status = 'off'; p.onStrike = true; });
   const effect = g === 'pilots' ? 'Hired pilots\' flights stay on the ground.' : g === 'fa' ? 'Aircraft with 20 seats or more can\'t fly without cabin crew.' : g === 'mech' ? 'No aircraft is released to service without a mechanic.' : 'Departures from airports where your own ground crew work are stopped.';
+  try { newsStrike(cid, g, why, 'start'); } catch (e) { /* ignore */ }
   note(cid, `${name} of ${company(cid).name} are on strike`, `Over ${why}. ${effect} Meet their demands, offer a compromise, wait, or dismiss them and hire cheaper replacements.`, cid + ':' + g);
   try { Progress.popularity(-2, `${name} on strike`); Sound.chime(); toast(`${name} are on strike`, 'warn', { label: 'Decide', act: 'strike-open', data: cid + ':' + g }); } catch (e) { /* ignore */ }
 }
 function strikeEnd(cid: string, g: PayGroup, text: string) {
+  try { newsStrike(cid, g, '', 'end', text); } catch (e) { /* ignore */ }
   const u = unionOf(cid, g), name = PAY_GROUPS.filter(x => x[0] === g)[0][1];
   strikeGroupPeople(cid, g).forEach(p => { if (p.onStrike) { p.status = p.strikeWas && p.strikeWas !== 'off' ? p.strikeWas : 'on duty'; p.onStrike = false; } });
   Object.assign(u, { stage: 0, since: 0, at: Date.now(), cool: Date.now() + 21 * 864e5 });
@@ -206,6 +208,7 @@ ACTIONS['strike-fire'] = el => {
   const people = strikeGroupPeople(cid, g), sever = people.reduce((s, p) => s + (p.salary || 0) * 2, 0);
   if (sever) payTxn(cid, `Severance: ${people.length} ${PAY_GROUPS.filter(x => x[0] === g)[0][2]}`, -sever, 'salary', [['Two weeks\' pay each', -sever]]);
   people.forEach(p => { p.left = true; p.onStrike = false; });
+  try { newsStrike(cid, g, '', 'fired', '', people.length); } catch (e) { /* ignore */ }
   S.staff = (S.staff || []).filter((p: any) => people.indexOf(p) < 0);
   State.pilots = State.pilots.filter((p: any) => people.indexOf(p) < 0);
   // replacements: as many as before, cheaper and weaker

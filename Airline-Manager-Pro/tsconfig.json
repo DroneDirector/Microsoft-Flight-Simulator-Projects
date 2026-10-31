@@ -104,6 +104,8 @@
     "src/core/pax-experience.ts",
     "src/core/weather.ts",
     "src/core/news.ts",
+    "src/core/news-more.ts",
+    "src/core/warnings.ts",
     "src/core/court-plus.ts",
     "src/core/coop-jobs.ts",
     "src/core/coop-connect.ts",

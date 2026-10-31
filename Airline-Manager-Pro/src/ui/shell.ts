@@ -4,7 +4,7 @@ interface AppScreen { title: string; icon: string; render: () => string; mount?:
 const SCREENS: { [k: string]: AppScreen } = {};
 const ACTIONS: { [k: string]: (el: HTMLElement, ev: Event) => void } = {};
 
-const NAV_ORDER = ['ops', 'fleet', 'routes', 'jobs', 'schedule', 'dispatch', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'coop'];
+const NAV_ORDER = ['ops', 'fleet', 'routes', 'jobs', 'schedule', 'dispatch', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'news', 'coop'];
 // Pages opened from inside other pages, shown under their parent in the rail
 const SUB_PAGES: { [k: string]: string } = { map: 'ops', market: 'fleet' };
 
@@ -13,16 +13,19 @@ function renderShell() {
   app.innerHTML = `
     <nav class="rail" aria-label="Main">
       <div class="rail-brand" title="${esc(APP.name)}">${brandMark()}</div>
+      <button class="rail-more up" data-act="rail-scroll" data-d="-1" aria-label="Scroll the menu up">${icon('down')}</button>
       <div class="rail-items">${NAV_ORDER.map(k => `
         <button class="rail-btn" data-act="go" data-screen="${k}" aria-label="${esc(SCREENS[k].title)}">
           ${icon(SCREENS[k].icon)}<span>${esc(SCREENS[k].title)}</span>${k === 'maint' ? `<i class="rail-dot" data-maint-dot></i>` : ''}
         </button>`).join('')}
       </div>
+      <button class="rail-more down" data-act="rail-scroll" data-d="1" aria-label="More in the menu below">${icon('down')}</button>
       <button class="rail-btn rail-set" data-act="settings" aria-label="Settings">${icon('gear')}<span>Settings</span></button>
       <div class="rail-ver" title="${esc(APP.name)} version ${esc(APP.version)}">v${esc(APP.version)}</div>
     </nav>
     <header class="topbar"></header>
     <main class="view" id="view"></main>`;
+  setTimeout(railScrollBind, 0);
   renderTopbar();
   go(State.screen, true);
 }
@@ -86,6 +89,21 @@ function go(screen: string, instant?: boolean) {
 }
 
 /** Re-render the current screen in place (after data changes). */
+/** The menu scrolls when it is taller than the screen: arrows and a fade show there is more above or below. */
+function railScrollState() {
+  const r = $('.rail-items'), nav = $('.rail'); if (!r || !nav) return;
+  const more = r.scrollHeight - r.clientHeight > 4;
+  nav.classList.toggle('can-up', more && r.scrollTop > 4);
+  nav.classList.toggle('can-down', more && r.scrollTop + r.clientHeight < r.scrollHeight - 4);
+}
+function railScrollBind() {
+  const r = $('.rail-items'); if (!r) return;
+  r.addEventListener('scroll', railScrollState, { passive: true }); window.addEventListener('resize', railScrollState);
+  setTimeout(railScrollState, 50); setTimeout(railScrollState, 800);
+  // a gentle nudge the first time, so it is clear the menu moves
+  setTimeout(() => { if (r.scrollHeight - r.clientHeight > 4 && !State.settings.reduceMotion) { r.scrollTo({ top: 28, behavior: 'smooth' }); setTimeout(() => r.scrollTo({ top: 0, behavior: 'smooth' }), 650); } }, 6500);
+}
+ACTIONS['rail-scroll'] = el => { const r = $('.rail-items'); if (r) r.scrollBy({ top: +el.getAttribute('data-d') * r.clientHeight * 0.6, behavior: 'smooth' }); };
 function refresh() {
   renderTopbar();
   const view = $('#view');
@@ -194,7 +212,13 @@ function liveChip(reg: string, status?: string): string {
   const air = typeof flightInAir === 'function' ? flightInAir(f) : (f.alt || 0) > 50;
   const ph = String(f.phase || '').replace(/^Delayed: .*/, 'Delayed at the gate').replace(/^Holding short.*/, 'Holding short').replace(/^Lining up.*/, 'Lining up');
   const label = air ? (/climb/i.test(ph) ? 'Climbing' : /descent|approach|final/i.test(ph) ? 'Descending' : /hold/i.test(ph) ? 'Holding' : 'In flight') : (ph || 'On the ground');
-  return `<span class="chip chip-${air ? 'flight' : 'amber'} chip-link" role="button" tabindex="0" data-act="show-flight" data-id="${esc(f.id)}" title="Show on the map">${esc(label)}${icon('map')}</span>`;
+  const dv = flightDiverted(f);
+  return `<span class="chip chip-${air ? 'flight' : 'amber'} chip-link" role="button" tabindex="0" data-act="show-flight" data-id="${esc(f.id)}" title="Show on the map">${esc(label)}${icon('map')}</span>${dv ? `<span class="chip chip-divert chip-link" role="button" tabindex="0" data-act="show-flight" data-id="${esc(f.id)}" title="${esc(dv.why)}">${icon('alert')}Diverted to ${esc(dv.to)}</span>` : ''}`;
+}
+/** A flight that diverted (medical or weather): where it went instead, from where, and why. */
+function flightDiverted(f: any): { to: string; orig: string; why: string } | null {
+  const d = f.medical || f.wxDivert; if (!d) return null;
+  return { to: f.to, orig: d.orig || '', why: f.medical ? `Medical emergency: diverted to ${f.to} instead of ${d.orig || 'its destination'}` : `Weather at ${d.orig || 'its destination'}${d.why ? ' (' + d.why + ')' : ''}: diverted to ${f.to}` };
 }
 ACTIONS['show-flight'] = el => showFlightOnMap(el.getAttribute('data-id'));
 function statusChip(s: string): string {

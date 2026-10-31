@@ -17,9 +17,11 @@ function newsPublish(a: Omit<NewsArticle, 'id' | 'at' | 'byline'> & { byline?: s
   State.notices.unshift({ id: uid(), kind: 'company' as any, title: `In the news: ${art.headline}`, body: `${art.paper}: ${art.standfirst}`, time: 'Now', at: art.at, read: false, ref: art.id } as any);
   try { renderTopbar(); } catch (e) { /* not ready */ }
   // shown when the screen is free (a window closing or open now: it waits, up to about a minute)
-  if (show !== false) { let tries = 0; const tryShow = () => { if (document.hidden || document.querySelector('.layer.open')) { if (++tries < 30) setTimeout(tryShow, 2000); return; } newsOpen(art.id); }; setTimeout(tryShow, 700); }
+  if (show !== false && newsMode() === 'popup') { let tries = 0; const tryShow = () => { if (document.hidden || document.querySelector('.layer.open')) { if (++tries < 30) setTimeout(tryShow, 2000); return; } newsOpen(art.id); }; setTimeout(tryShow, 700); }
   return art;
 }
+/** Settings → News: 'popup' (opens by itself, animated), 'notify' (inbox only, animated when opened), 'plain' (inbox only, no animation). */
+function newsMode(): string { return (State.settings as any).newsMode || 'popup'; }
 function newsOpen(id: string) {
   const a = newsList().filter(x => x.id === id)[0]; if (!a) return;
   const d = new Date(a.at), date = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -37,7 +39,7 @@ function newsOpen(id: string) {
       ${a.body.map((p, i) => `<p class="${i === 0 ? 'np-lead' : ''}">${esc(p)}</p>`).join('')}
       ${a.quote ? `<blockquote>“${esc(a.quote[0])}”<cite>${esc(a.quote[1])}</cite></blockquote>` : ''}
       ${a.quote2 ? `<blockquote>“${esc(a.quote2[0])}”<cite>${esc(a.quote2[1])}</cite></blockquote>` : ''}
-    </div></div>`, { cls: 'wide news-pop' });
+    </div></div>`, { cls: 'wide news-pop' + (newsMode() === 'plain' ? ' np-still' : '') });
 }
 
 /* ---------- a new route makes the local news ---------- */

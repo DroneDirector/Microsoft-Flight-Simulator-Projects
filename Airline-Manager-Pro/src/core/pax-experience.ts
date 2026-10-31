@@ -82,6 +82,7 @@ function rateAiFlight(f: LiveFlight, at: number) {
     if (med) add(med.key === p.key ? 'The crew saved my day' : 'A diversion for a sick passenger', med.key === p.key ? 0.8 : -0.25);
     if (F.wxDivert) add(temper === 'calm' ? 'A safe diversion for weather' : 'Diverted because of the weather', temper === 'calm' ? -0.2 : -0.6);
     if (p.famous) add('Treated discreetly', 0.2);
+    const dr = conductDrama(cid); if (dr && r() < 0.35 + 0.1 * dr) add('Heard about trouble with the airline\'s staff', -0.12 * dr);
     const stars = clamp(Math.round(s), 1, 5); dist[stars - 1]++; sum += stars;
     why.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
     const top = why[0]; if (top) { if (top[1] >= 0.1) good[top[0]] = (good[top[0]] || 0) + 1; else if (top[1] <= -0.1) bad[top[0]] = (bad[top[0]] || 0) + 1; }
@@ -131,6 +132,7 @@ function maybeMedical(f: any, a: any): boolean {
 /** The moment the crew decide to divert (shown once the flight is well on its way). */
 function medicalNote(f: any) {
   const m = f.medical; if (!m || m.noted) return; m.noted = true;
+  try { newsMedical(f); } catch (e) { /* ignore */ }
   State.notices.unshift({ id: uid(), kind: 'pilot', title: `${f.callsign}: medical emergency, diverting to ${f.to}`, body: `${m.name} (seat ${m.seat}) has ${m.why}. A doctor on board is helping and the crew declared an emergency. ${f.callsign} diverts to ${f.to}; after the stop it carries on to ${m.orig}.`, time: 'Now', read: false, ref: f.id } as any);
   try { renderTopbar(); Sound.chime(); } catch (e) { /* not ready */ }
 }
@@ -148,6 +150,7 @@ function heavyLandingHold(f: any, a: any, prof: FlightProfile, origTo: string) {
   if (excess < Math.max(300, mlw * 0.005)) return;   // at or about the limit: lands normally
   const dump = FUEL_DUMP[t.id], rate = dump || (BURN_KG_H[t.cls] || 2500) / 60 * 1.1;
   let min = excess / rate + (dump ? 4 : 0), why = dump ? `Dumping ${num(Math.round(excess / 100) * 100)} kg of fuel to get down to the landing weight` : `Holding to burn off ${num(Math.round(excess / 100) * 100)} kg of fuel before landing`;
+  try { newsFuelDump(f, t.id, excess, !!dump); } catch (e) { /* ignore */ }
   if (min > 75) { min = 75; why += ' (then an overweight landing, with an inspection after)'; f.overweight = true; }
   const desc = prof.pts.filter((p: any) => p.ph === 'Descent')[0], at = desc ? desc.s : prof.totalS * 0.8;
   (f.holds = f.holds || []).push({ at, s: Math.round(min * 60), kind: 'air', why });
@@ -237,6 +240,7 @@ ACTIONS['pet-visit'] = el => {
   const f = State.live.filter(x => x.id === el.getAttribute('data-f'))[0]; if (!f) return;
   const p = manifestOf(f).filter(x => x.key === el.getAttribute('data-key'))[0]; if (!p || !p.pet) return;
   const pt = p.pet, he = seeded(p.key + 'petsex')() < 0.5;
+  try { newsPet(f, pt.name || 'A pet', pt.kind || 'dog'); } catch (e) { /* ignore */ }
   Sound.tick();
   openLayer('modal', `<div class="modal-head"><div><h2>${esc(pt.name)}</h2><small>${esc(p.name)}'s ${pt.kind}, ${pt.left ? 'left behind at ' + esc(f.from) : pt.where === 'cabin' ? 'under seat ' + esc(p.seat) : 'in the heated hold'}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body pet-visit"><div class="pv-fig">${petPortrait(pt)}</div>

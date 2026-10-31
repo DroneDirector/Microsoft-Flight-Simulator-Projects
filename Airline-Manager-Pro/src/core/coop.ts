@@ -168,7 +168,7 @@ function coopBook(pr: CoopPirep, live: boolean) {
   if (a) { a.hoursMin += pr.blockMin; a.cycles += 1; try { conditionAfterFlight(a, pr.blockMin); } catch (e) { /* ignore */ } }
   const p = pilot(pr.by); if (p) { p.hoursMin += pr.blockMin; p.landings += 1; }
   try { crewAfterLeg(co.id, { typeId: pr.typeId, from: pr.from, to: pr.to, blockMin: pr.blockMin }); } catch (e) { /* ignore */ }
-  if (m) { m.flights++; m.hoursMin += pr.blockMin; m.revenue += money0.net; }
+  if (m) { m.flights++; m.hoursMin += pr.blockMin; m.revenue += money0.net; try { newsCoopMilestone(m); } catch (e) { /* ignore */ } }
   try { Progress.popularity(pr.fpm > -250 ? 0.2 : 0, 'A good co-op flight'); } catch (e) { /* ignore */ }
   try { Ratings.record({ who: pr.by, name: pr.name, fpm: Math.abs(pr.fpm), g: pr.g, at: pr.at, from: pr.from, to: pr.to, typeId: pr.typeId, kind: 'coop' }); } catch (e) { /* ignore */ }
   coopRecord({ id: 'fl-' + pr.id, at: pr.at, by: pr.by, type: 'flight', text: `${pr.name} landed at ${pr.to} from ${pr.from}`, amount: money0.net, tx: txId });

@@ -31,6 +31,7 @@ function thanksRole(p: any): string { const r = personRole(p); return r === 'cap
 /** Queue a thank-you after a commendation: in 20 to 60 seconds, or on the trip's return. */
 function thanksQueue(p: any, cid: string, title: string, where: string) {
   const S: any = State; S.thanksDue = S.thanksDue || [];
+  try { newsKind(p, cid, ''); } catch (e) { /* ignore */ }
   const delay = cid === 'trip' ? 90e3 : (20 + Math.random() * 40) * 1000;
   S.thanksDue.push({ at: Date.now() + delay, staffId: p.id, c: cid, title, where });
   setTimeout(thanksAdvance, delay + 200);

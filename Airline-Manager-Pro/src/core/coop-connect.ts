@@ -20,6 +20,7 @@ function coopConn(mid: string, state: CoopConn['state'], why?: string, app?: boo
   const msg = state === 'joined' ? `${m.name}${from} joined the airline` : state === 'connecting' ? `${m.name} is connecting…` : state === 'connected' ? `${m.name} is connected`
     : state === 'failed' ? `${m.name} failed to connect: ${why || 'unknown reason'}` : `${m.name} disconnected`;
   try { if (State.screen === 'coop' || state !== 'connecting') toast(msg, state === 'failed' ? 'warn' : state === 'connected' || state === 'joined' ? 'ok' : 'info'); } catch (e2) { /* not ready */ }
+  if (state === 'joined') { try { newsCoopJoin(m); } catch (e) { /* ignore */ } }
   if (state === 'joined' || state === 'failed')
     State.notices.unshift({ id: uid(), kind: 'pilot', title: msg, body: state === 'joined' ? `${m.name}${from} now flies for ${company().name}.` : `${why || 'The reason is unknown'}.${app ? ' This was a problem in the app; the details are in Settings → Error reports.' : ' It was on their side; they can try again.'}`, time: 'Now', at: e.at, read: false } as any);
   if (state === 'failed' && app) { try { ErrorLog.add('co-op', 'A co-op player could not connect', `${m.name}: ${why}`, `member ${m.id}, airline ${c.companyId}, backend ${c.backend}, app ${APP.version}`); } catch (e3) { /* ignore */ } }

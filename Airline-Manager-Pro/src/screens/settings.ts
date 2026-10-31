@@ -96,6 +96,9 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'crashPrompt', label: 'Ask me before registering a crash', hint: 'Choose to register or disregard each crash.' },
     { type: 'choice', key: 'repairTime', label: 'Repair time', hint: 'Instant: the aircraft is ready to fly as soon as you pay. Decided by the app: it stays in the hangar for 5, 10, 15, 20, 25, 30, 40, 50, 60 or 90 minutes, depending on the job and how good your mechanics are.', options: [['instant', 'Instant'], ['auto', 'Decided by the app']] },
   ] },
+  { id: 'news', title: 'News', icon: 'news', items: [
+    { type: 'choice', key: 'newsMode', label: 'Newspaper articles', hint: 'When your airline makes the papers. Every article is also in the inbox and under Newspaper in the menu.', options: [['popup', 'Open by themselves, animated'], ['notify', 'Only in the inbox, animated when opened'], ['plain', 'Only in the inbox, without animation']] },
+  ] },
   { id: 'voice', title: 'Voices', icon: 'volume', items: [
     { type: 'toggle', key: 'mechanicVoice', label: 'People speak their messages', hint: 'The mechanic, the gate agent, passengers and the head of operations read their messages aloud, word for word, with a play button to hear them again: women with women\'s voices, men with men\'s, angry people sound angry, apologies sound sorry. Everything runs on this device.' },
     { type: 'choice', key: 'voiceEngine', label: 'Voice', hint: 'Natural voices sound like real people. Until they are downloaded, the device\'s own voice reads the messages.', options: [['neural', 'Natural voices'], ['device', 'Device voice']], when: () => State.settings.mechanicVoice },
@@ -314,6 +317,7 @@ ACTIONS['new-division'] = () => {
   const c = company();
   c.divisions.push({ id: uid(), name: 'Division ' + (c.divisions.length + 1), color: '#5FD4A0' });
   rerenderSettingsBody(); renderTopbar(); toast(`New division added to ${c.name}`, 'ok');
+  try { newsDivision(c, c.divisions[c.divisions.length - 1].name); } catch (e) { /* ignore */ }
 };
 
 ACTIONS['reset-ask'] = () => {

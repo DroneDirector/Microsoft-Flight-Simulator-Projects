@@ -337,6 +337,7 @@ ACTIONS['fine-contest'] = el => {
 /* ---------- Crash: register or disregard ---------- */
 function crashPopup(logId: string) {
   const l = State.logbook.filter(x => x.id === logId)[0]; if (!l) return;
+  try { setTimeout(() => newsIncident(logId), 4000); } catch (e) { /* ignore */ }
   const a = plane(l.reg), c = company(a.companyId);
   openLayer('modal', `
     <div class="modal-head crash"><span class="crash-ic">${icon('alert')}</span><div><h2>Crash detected</h2><small>${esc(l.from)} to ${esc(l.to)}, ${esc(l.reg)}, ${esc(l.date)}</small></div>
@@ -385,7 +386,7 @@ ACTIONS['create-company'] = el => {
   closeAll();
   if (asDivision) {
     cur.divisions.push({ id: uid(), name: kind === 'bush' ? 'Bush' : kind === 'regional' ? 'Regional' : 'Division ' + (cur.divisions.length + 1), color: '#5FD4A0' });
-    Store.save(); renderTopbar(); toast(`New division added to ${cur.name}`, 'ok'); return;
+    Store.save(); renderTopbar(); toast(`New division added to ${cur.name}`, 'ok'); try { newsDivision(cur, cur.divisions[cur.divisions.length - 1].name); } catch (e) { /* ignore */ } return;
   }
   const make = (profileId: string, hub?: string) => {
     if (!hub) { openBasePicker('Home base for the new company', 'Required: where the company is based, its aircraft delivered and its hub crew work.', icao => make(profileId, icao)); return; }
@@ -398,6 +399,7 @@ ACTIONS['create-company'] = el => {
     (State as any).coPilot[id] = { sex: 'f', id: '' };
     State.companyId = id; State.divisionId = 'all';
     applyCompanyTheme(true); Store.save(); go('ops'); renderTopbar();
+    try { newsFounded(id, 'new'); } catch (e) { /* ignore */ }
     toast(`${n[0]} founded. Buy your first aircraft and hire a mechanic to start flying.`, 'ok');
   };
   if (ownPilot) { make(profileOfCompany(cur.id).id); return; }

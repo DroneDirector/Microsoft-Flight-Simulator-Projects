@@ -198,6 +198,7 @@ ACTIONS['pax-ban'] = el => {
   }
   const d = +days, until = d ? Date.now() + d * 864e5 : null;
   noFly()[k] = { since: Date.now(), until }; rec.banned = true; rec.bannedBy = 'your airline';
+  try { newsBan(rec, until); } catch (e) { /* ignore */ }
   rec.notes.push({ date: dateStr(new Date()).slice(0, 10), title: 'Banned by your airline', text: `${rec.name} may not fly with ${company().name} ${until ? 'until ' + dateStr(new Date(until)).slice(0, 10) : 'ever again (a lifetime ban)'}.`, sev: 'ban' });
   Store.save(); closeAll(); toast(`${rec.name} is ${until ? 'banned until ' + dateStr(new Date(until)).slice(0, 10) : 'banned for life'}`, 'ok');
 };
@@ -212,6 +213,7 @@ function celebOnBoard(f: LiveFlight) {
   const F: any = f; if (F.celebNoted) return;
   const star = manifestOf(f).filter(p => p.famous)[0]; if (!star) return;
   F.celebNoted = true;
+  try { newsCeleb(f, star); } catch (e) { /* ignore */ }
   State.notices.unshift({ id: uid(), kind: 'pilot', title: `${star.famous} on board ${f.callsign}`, body: `${star.name}, ${star.famous.toLowerCase()} from ${natLabel(star.nat)}, boarded at ${f.from} for ${f.to}, seat ${star.seat}. The crew are taking good care of them; photos with your aircraft are already online.`, time: 'Now', read: false, ref: f.id } as any);
   try { Progress.popularity(1, `${star.famous} flew with you`); } catch (e) { /* ignore */ }
 }

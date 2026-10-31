@@ -311,6 +311,7 @@ function whistlePopup() {
 ACTIONS['wb-do'] = el => {
   const S: any = State, w = S.whistle; if (!w) return; w.open = false;
   const v = el.getAttribute('data-v'), p: any = staffById(w.staffId), co = company(w.cid);
+  if (v !== 'fix' && Math.random() < 0.6) { try { newsWhistle(co, p, w.what || 'safety'); } catch (e) { /* ignore */ } }
   if (v === 'fix') { payTxn(w.cid, 'Safety review after a staff report', -150000, 'fees', [['Inspections, staffing and records', -150000]]); staffOf(w.cid).forEach((x: any) => staffMoodAdd(x, 3)); if (p) staffMoodAdd(p, 15); toast('Fixed. Your staff noticed.', 'ok'); }
   else if (v === 'ignore') { if (Math.random() < 0.4 && p) setTimeout(() => { openCourtCase({ id: 'airline-' + co.id, name: co.name, look: null, base: co.hub, companyId: co.id }, 'airline', 2, 'staff warnings about safety were ignored: ' + w.what); }, 2000); }
   else { if (p) courtRemove(p); if (Math.random() < 0.6) setTimeout(() => { openCourtCase({ id: 'airline-' + co.id, name: co.name, look: null, base: co.hub, companyId: co.id }, 'airline', 2, `the airline dismissed ${w.name} for reporting that ${w.what}`); }, 2000); }

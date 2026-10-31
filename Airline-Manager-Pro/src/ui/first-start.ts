@@ -48,6 +48,7 @@ ACTIONS['fs-wipe'] = () => {
 /** Remove everything but the settings and your own pilot, and found one new airline. */
 function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: string; hub: string; pilot: string }) {
   if (Mode.coop()) { try { localStorage.setItem('amp-coop-new', '1'); } catch (e) { /* ignore */ } }
+  try { localStorage.setItem('amp-news-first', Mode.coop() ? 'coop' : 'first'); } catch (e) { /* ignore */ }
   const S: any = State, me: any = State.pilots.filter((p: any) => p.id === 'you')[0] || myPilot();
   const keep = ['settings', 'staffCandidates', 'candidates', 'seenVersion', 'wnClosed', 'licence', 'knownAirports', 'simInstalled', 'linkPc', 'favs'];
   const fresh: any = {};

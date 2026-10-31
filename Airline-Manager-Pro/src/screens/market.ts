@@ -109,7 +109,7 @@ ACTIONS['buy-confirm'] = () => {
   if (noStandsFor(_buy.base || company().hub, _buy.qty)) { toast('Not enough free stands there: choose another base', 'warn'); return; }
   const t = acType(_buy.id), c = company();
   try { coopAfterBuy(`${_buy.qty}× ${t.maker} ${t.model}`, Math.round(t.price * ((engineOptions(t.id).filter(e => e.id === (_buy as any).eng)[0] || { price: 1 } as any).price)) * _buy.qty); } catch (e) { /* ignore */ }
-  const regs = nextRegs(c, _buy.qty);
+  const regs = nextRegs(c, _buy.qty), _firstEver = !fleetOf(c.id).length, _newType = !fleetOf(c.id).some(a => a.typeId === t.id);
   const from = c.balance, eng = (engineOptions(t.id).filter(e => e.id === (_buy as any).eng)[0] || engineOptions(t.id)[0]);
   const unit = Math.round(t.price * (eng ? eng.price : 1));
   c.balance -= unit * _buy.qty;
@@ -120,6 +120,7 @@ ACTIONS['buy-confirm'] = () => {
   Bases.ensure();
   try { Online.discord('fleet', `New aircraft: ${regs.join(', ')}`, `${c.name} bought ${_buy.qty > 1 ? _buy.qty + ' new ' + t.maker + ' ' + t.model + 's' : 'a new ' + t.maker + ' ' + t.model}, based at ${_buy.base || c.hub}.`); } catch (e) { /* ignore */ }
   Sound.purchase(); Haptics.success();
+  try { newsDelivery(c, t.id, regs, _firstEver, _newType); } catch (e) { /* ignore */ }
   animateBalance(from, c.balance);
   // delivery celebration
   openLayer('modal', `
