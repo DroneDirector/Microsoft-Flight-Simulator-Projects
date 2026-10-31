@@ -66,6 +66,7 @@ const V3dTerrain = {
       if (!cv) return null;
       const d = cv.getContext('2d').getImageData(0, 0, size, size).data, H = new Float32Array(size * size);
       for (let i = 0; i < size * size; i++) H[i] = d[i * 4] * 256 + d[i * 4 + 1] + d[i * 4 + 2] / 256 - 32768;
+      v3dDespike(H, size);
       return H;
     }).catch(() => null);
     const water = this.waterMask(z, x0, y0, N).catch(() => null);
@@ -144,7 +145,8 @@ const V3dTerrain = {
     const level = (i: number) => { const x = i % size, y = (i / size) | 0, h = H[i]; let d = 0;
       if (x > 0) d = Math.max(d, Math.abs(H[i - 1] - h)); if (x < size - 1) d = Math.max(d, Math.abs(H[i + 1] - h));
       if (y > 0) d = Math.max(d, Math.abs(H[i - size] - h)); if (y < size - 1) d = Math.max(d, Math.abs(H[i + size] - h)); return d < 4; };
-    const sea = (i: number) => mapWater(i) && H[i] <= 8;
+    const seaArr = v3dSeaMap(H, size, mapWater); (r as any).sea = seaArr;
+    const sea = (i: number) => seaArr[i] === 1;
     const water = (i: number) => mapWater(i) && (H[i] <= 8 || level(i));
     const river = (i: number) => M ? M[i * 4 + 1] > 110 && M[i * 4] <= 110 : false;
     // the map look: dark blue land shaded by its slopes, the sea darker, cyan along the coasts
@@ -250,7 +252,7 @@ const V3dTerrain = {
       const n = 1 << r.z, px = ((lon + 180) / 360 * n - r.x0) * 256, py = ((1 - Math.log(Math.tan(lat * D2R) + 1 / Math.cos(lat * D2R)) / Math.PI) / 2 * n - r.y0) * 256;
       if (px < 0 || py < 0 || px >= r.size - 1 || py >= r.size - 1) continue;
       const i = Math.floor(py) * r.size + Math.floor(px);
-      if (r.mask && r.mask[i * 4] > 110 && r.H[i] < 3) return 0;
+      if ((r as any).sea ? (r as any).sea[i] : (r.mask && r.mask[i * 4] > 110 && r.H[i] < 3)) return 0;
       return Math.max(0, r.H[i]);
     }
     return V3d.elev || 0;
@@ -309,4 +311,32 @@ function v3dAirportPatch(tries?: number) {
     if ((V3d as any).patch) { V3d.scene.remove((V3d as any).patch); try { (V3d as any).patch.geometry.dispose(); (V3d as any).patch.material.map.dispose(); } catch (e) { /* ignore */ } }
     (V3d as any).patch = mesh; V3d.scene.add(mesh);
   });
+}
+
+/** Heights with errors in them show as spikes out of the sea: a point or two standing high where nearly
+ *  everything around is at sea level. Those are lowered to the level around them. Mountains are never
+ *  touched (their neighbours are high too), so real peaks and cliffs stay. */
+function v3dDespike(H: Float32Array, size: number) {
+  const nb: number[] = [];
+  for (let pass = 0; pass < 2; pass++) for (let y = 1; y < size - 1; y++) for (let x = 1; x < size - 1; x++) {
+    const i = y * size + x, h = H[i]; if (h <= 12) continue;
+    let low = 0; nb.length = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const v = H[i + dy * size + dx]; nb.push(v); if (v <= 8) low++; }
+    if (low >= 6) { nb.sort((a, b) => a - b); H[i] = Math.min(h, nb[3]); }   // the middle of its neighbours
+  }
+}
+/** Where the sea is (1) and isn't (0): water on the map that is near sea level, plus water on the map that
+ *  is mostly surrounded by such sea (so a stray high value in the middle of the sea is flattened too).
+ *  Land where the map and the heights disagree over a wide area stays land. */
+function v3dSeaMap(H: Float32Array, size: number, mapWater: (i: number) => boolean): Uint8Array {
+  const s = new Uint8Array(size * size);
+  for (let i = 0; i < size * size; i++) s[i] = mapWater(i) && H[i] <= 8 ? 1 : 0;
+  const out = s.slice(), R = 3;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const i = y * size + x; if (s[i] || !mapWater(i)) continue;
+    let n = 0, t = 0;
+    for (let dy = -R; dy <= R; dy++) { const yy = y + dy; if (yy < 0 || yy >= size) continue; for (let dx = -R; dx <= R; dx++) { const xx = x + dx; if (xx < 0 || xx >= size) continue; t++; n += s[yy * size + xx]; } }
+    if (n >= t * 0.6) out[i] = 1;
+  }
+  return out;
 }
