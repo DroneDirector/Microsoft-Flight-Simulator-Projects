@@ -341,7 +341,6 @@ ACTIONS['fine-contest'] = el => {
 /* ---------- Crash: register or disregard ---------- */
 function crashPopup(logId: string) {
   const l = State.logbook.filter(x => x.id === logId)[0]; if (!l) return;
-  try { setTimeout(() => newsIncident(logId), 4000); } catch (e) { /* ignore */ }
   const a = plane(l.reg), c = company(a.companyId);
   openLayer('modal', `
     <div class="modal-head crash"><span class="crash-ic">${icon('alert')}</span><div><h2>Crash detected</h2><small>${esc(l.from)} to ${esc(l.to)}, ${esc(l.reg)}, ${esc(l.date)}</small></div>
@@ -371,6 +370,7 @@ ACTIONS['crash-decide'] = el => {
     a.status = 'grounded'; a.condition = 12;
     State.issues.unshift({ id: uid(), reg: a.reg, title: 'Crash damage', detail: 'Airframe damaged in the crash. Major structural repair needed before the next flight.', source: 'Crash registered by you', severity: 'grounding', cost: 410000, days: 9, status: 'open', date: dateStr(new Date()).slice(0, 10) });
     company(a.companyId).reputation -= 6;
+    try { setTimeout(() => newsIncident(l.id), 4000); } catch (e) { /* ignore */ }
   }
   State.notices = State.notices.filter(n => n.ref !== l.id);
   closeAll(); Haptics.pulse(30); refresh();
