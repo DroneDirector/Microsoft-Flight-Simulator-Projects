@@ -15,7 +15,7 @@ def get(url, timeout=90):
     """Download with a few tries; the error goes to the job's annotations."""
     import time
     last = None
-    for i in range(4):
+    for i in range(2):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
             with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -24,8 +24,40 @@ def get(url, timeout=90):
             last = e; print(f"::warning::{url}: {e}"); time.sleep(5 * (i + 1))
     raise last
 
+def eia_jet_fuel():
+    """US Gulf Coast kerosene-type jet fuel spot price, daily, $/gal, from the EIA's own spreadsheet."""
+    import xlrd
+    wb = xlrd.open_workbook(file_contents=get("https://www.eia.gov/dnav/pet/hist_xls/EER_EPJK_PF4_RGC_DPGd.xls", 120))
+    ws = wb.sheet_by_name("Data 1")
+    out = []
+    for r in range(3, ws.nrows):
+        d, v = ws.cell_value(r, 0), ws.cell_value(r, 1)
+        if isinstance(d, float) and isinstance(v, float):
+            out.append([xlrd.xldate_as_datetime(d, wb.datemode).strftime("%Y-%m-%d"), round(v, 4)])
+    return out
+
+def bls_parts():
+    """US producer price index, aircraft parts and auxiliary equipment (PCU336413336413), monthly, BLS public API."""
+    now = datetime.datetime.utcnow().year
+    body = json.dumps({"seriesid": ["PCU336413336413"], "startyear": str(now - 5), "endyear": str(now)}).encode()
+    req = urllib.request.Request("https://api.bls.gov/publicAPI/v1/timeseries/data/", data=body, headers={"Content-Type": "application/json", "User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=90) as r:
+        d = json.load(r)
+    rows = d["Results"]["series"][0]["data"]
+    out = [[f"{x['year']}-{x['period'][1:]}-01", round(float(x["value"]), 4)] for x in rows if x["period"].startswith("M") and x["period"] != "M13"]
+    return sorted(out)
+
+def first(*fns):
+    for f in fns:
+        try:
+            out = f()
+            if out: return out
+        except Exception as e:
+            print(f"::warning::{getattr(f, '__name__', 'source')}: {e!r}")
+    return []
+
 def series(sid):
-    rows = list(csv.reader(io.StringIO(get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}").decode("utf-8"))))
+    rows = list(csv.reader(io.StringIO(get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}", 30).decode("utf-8"))))
     out = []
     for row in rows[1:]:
         if len(row) < 2: continue
@@ -62,11 +94,8 @@ def steo_jet_fuel():
         print(f"::warning::outlook not read: {e}")
     return []
 
-try:
-    fuel = series("DJFUELUSGULF")[-400:]
-    parts = series("PCU336413336413")[-60:]
-except Exception as e:
-    print(f"::error::prices not read: {e!r}"); sys.exit(1)
+fuel = first(eia_jet_fuel, lambda: series("DJFUELUSGULF"))[-400:]
+parts = first(bls_parts, lambda: series("PCU336413336413"))[-60:]
 if len(fuel) < 20 or len(parts) < 12:
     print(f"::error::not enough data: fuel {len(fuel)}, parts {len(parts)}"); sys.exit(1)
 data = {
