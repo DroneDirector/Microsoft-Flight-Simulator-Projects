@@ -540,6 +540,18 @@ function v3dPlaneLightsAdd(body: any, typeId: string) {
   const pts = v3dLightPoints(pos, col, size, kind, dir, ph);
   pts.material.uniforms.uAlways.value = 1;   // aircraft lights are on by day too (only less bright)
   body.add(pts); body.userData.lights = pts;
+  // cabin lights: a warm glow in every passenger window, and a faint one in the cockpit windows; seen at
+  // dusk and at night only
+  const cp: number[] = [], cc: number[] = [], cs: number[] = [], zw = s.ground + s.win.z * s.h;
+  const airliner = s.L > 20;
+  for (let x = s.win.from; x <= s.win.to + 1e-6; x += s.win.pitch) {
+    if (s.doors.some(d => Math.abs(d - x) < (airliner ? 0.75 : 0.55))) continue;
+    const hw = fusSection(s, x).hw + 0.04;
+    for (const side of [-1, 1]) { const q = v(x, side * hw, zw); cp.push(q.x, q.y, q.z); cc.push(1, 0.8, 0.52); cs.push(airliner ? 0.55 : 0.4); }
+  }
+  const ck = s.nose * 0.62, ckz = s.ground + s.h * 0.74, ckw = fusSection(s, ck).hw * 0.75;
+  for (const yy of [-ckw, -ckw * 0.35, ckw * 0.35, ckw]) { const q = v(ck, yy, ckz); cp.push(q.x, q.y, q.z); cc.push(0.42, 0.46, 0.55); cs.push(0.7); }
+  if (cs.length) { const cab = v3dLightPoints(cp, cc, cs); body.add(cab); body.userData.cabin = cab; }
 }
 /** Which lights are on, by the phase of the flight. */
 function v3dPlaneLightsSet(model: any, ph: string, agl: number, onGround: boolean) {

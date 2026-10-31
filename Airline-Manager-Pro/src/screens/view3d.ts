@@ -51,7 +51,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = id.indexOf('apt:') === 0 ? 'free' : 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0; (V3d as any).fc = null; (V3d as any).fcStart = id.indexOf('apt:') === 0;
   const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
-  root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
+  root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-cockpit-glow"></div><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
       <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
       <span class="v3d-batt">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
@@ -540,6 +540,7 @@ function v3dLoop(now: number) {
     v3dFreeStart(); v3dFreeUiBind();
   }
   if (P && V3d.mode !== 'fwd' && !P.model.visible) P.model.visible = true;
+  if (V3d.mode !== 'fwd') { const gl = V3d.root.querySelector('.v3d-cockpit-glow') as HTMLElement; if (gl && gl.style.opacity !== '0') gl.style.opacity = '0'; }
   if (V3d.mode === 'free') { if (fc()) v3dFreeStep(dt); }
   else if (P) {
     const s = shapeOf(P.type), centre = P.pos.clone().add(new T.Vector3(0, s.ground + s.h / 2, 0));
@@ -556,6 +557,9 @@ function v3dLoop(now: number) {
       V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
       if (V3d.cam.fov !== 60) { V3d.cam.fov = 60; V3d.cam.updateProjectionMatrix(); }
       P.model.visible = false;
+      // at night, a faint glow of the cockpit's own lights along the bottom of the view
+      const glow = V3d.root.querySelector('.v3d-cockpit-glow') as HTMLElement, nk = V3dSky.U ? V3dSky.U.uLightsOn.value : 0;
+      if (glow) glow.style.opacity = (nk * 0.55).toFixed(2);
     } else if (V3d.mode === 'tower' && V3d.icao) {
       const tw = new T.Vector3(380, V3d.elev + 45, -260);
       const want = V3d.dist ? centre.clone().add(tw.clone().sub(centre).normalize().multiplyScalar(V3d.dist)) : tw;
