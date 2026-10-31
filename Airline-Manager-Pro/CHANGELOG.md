@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.39 (2026-10-31)
+
+- 3D: Forward camera (cockpit view of the followed aircraft); battery after the camera buttons
+- Bank sign fixed (rotateX(-bank)); flap hinge axis mirrored per wing; spoilers (userData.set spoilers) after touchdown
+- AirportView.timedAt: one-point paths; computePlanes errors caught per airport in the map loop
+
 ## 0.9.38 (2026-10-31)
 
 - v3d-sky.ts: sun/moon (position, phase, size) and Hipparcos stars (data/stars.ts), sky dome and fog colour, day/night light, sim time (pc-bridge ABSOLUTE TIME → simTime)

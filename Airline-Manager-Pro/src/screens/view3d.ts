@@ -53,7 +53,8 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
-      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
+      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
+      <span class="v3d-batt">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
     <div class="v3d-info"></div>
     <div class="v3d-status"></div>
@@ -124,7 +125,7 @@ ACTIONS['v3d-mode'] = el => {
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
   V3d.root.classList.toggle('v3d-free', V3d.mode === 'free');
-  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
+  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
 };
 ACTIONS['v3d-next'] = el => {
@@ -503,7 +504,10 @@ function v3dLoop(now: number) {
     const wantF = simCfg ? simCfg.f : cfg ? cfg.flaps : /final|landing|touchdown|roll/.test(ph) ? 1 : /approach|take-?off|lift-?off/.test(ph) ? 0.4 : /taxi|pushback|gate|boarding/.test(ph) ? (/out/.test(ph) ? 0.3 : 0) : 0;
     const wantG = simCfg ? simCfg.g : cfg ? cfg.gear : w.onGround || /final|landing|touchdown|lift-?off|take-?off/.test(ph) || (w.altM - ground < 600 && !/cruise|climb/.test(ph)) ? 1 : 0;
     P.flaps += (wantF - P.flaps) * Math.min(1, dt * 0.35); P.gear += (wantG - P.gear) * Math.min(1, dt * 0.25);
-    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18 });
+    // spoilers: only up on the runway after touchdown, down again as the aircraft slows to taxi speed
+    const PSp: any = P, wantSp = w.onGround && /touchdown|landing|roll/.test(ph) && !/take-?off/.test(ph) && (g.gs || 0) > 35 ? 1 : 0;
+    PSp.spoil = (PSp.spoil || 0) + (wantSp - (PSp.spoil || 0)) * Math.min(1, dt * (wantSp ? 6 : 1.5));
+    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil });
     // on the ground the aircraft is placed by its nose wheel (on the line, on the stand's stop mark), in the
     // air by the middle of the fuselage; between the two it blends over the last 30 m, so nothing jumps
     const PG: any = P, gwT = w.onGround ? 1 : clamp(1 - (w.altM - ground) / 30, 0, 1);
@@ -514,7 +518,7 @@ function v3dLoop(now: number) {
     P.model.rotation.set(0, 0, 0);
     P.model.rotateY(-(P.hdg + 90) * D2R);
     P.model.rotateZ(-P.pitch * D2R);   // nose up
-    P.model.rotateX(P.bank * D2R);
+    P.model.rotateX(-P.bank * D2R);   // a turn to the right lowers the right wing
     // touchdown: tyre smoke from the main wheels (left behind on the runway as the aircraft rolls on)
     const PS: any = P, agl = w.altM - ground;
     if (!w.onGround && agl > 3) PS.air = true;
@@ -535,11 +539,24 @@ function v3dLoop(now: number) {
     V3d.cam.position.set(-700, (V3d.elev || 0) + 220, 700); V3d.cam.lookAt(0, V3d.elev || 0, 0); V3d.cam.updateMatrixWorld();
     v3dFreeStart(); v3dFreeUiBind();
   }
+  if (P && V3d.mode !== 'fwd' && !P.model.visible) P.model.visible = true;
   if (V3d.mode === 'free') { if (fc()) v3dFreeStep(dt); }
   else if (P) {
     const s = shapeOf(P.type), centre = P.pos.clone().add(new T.Vector3(0, s.ground + s.h / 2, 0));
     const fwd = new T.Vector3(Math.sin(P.hdg * D2R), 0, -Math.cos(P.hdg * D2R));
-    if (V3d.mode === 'tower' && V3d.icao) {
+    if (V3d.mode === 'fwd') {
+      // forward: out of the front of the aircraft, from the cockpit, turning, climbing and banking with it;
+      // a drag looks around a little. The aircraft itself is not drawn (you sit in it).
+      const body = P.model.userData.body, eye = new T.Vector3(-0.6, s.ground + s.h * 0.78, 0);   // just ahead of the windscreen
+      P.model.updateMatrixWorld(); body.updateMatrixWorld();
+      const at = body.localToWorld(eye.clone()), q = P.model.getWorldQuaternion(new T.Quaternion());
+      const yaw = clamp(V3d.yaw, -2.4, 2.4), pit = clamp(V3d.pitch, -0.8, 0.8);
+      const dir = new T.Vector3(-Math.cos(pit) * Math.cos(yaw), Math.sin(pit), Math.cos(pit) * Math.sin(yaw)).applyQuaternion(q);
+      const up = new T.Vector3(0, 1, 0).applyQuaternion(q);
+      V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
+      if (V3d.cam.fov !== 60) { V3d.cam.fov = 60; V3d.cam.updateProjectionMatrix(); }
+      P.model.visible = false;
+    } else if (V3d.mode === 'tower' && V3d.icao) {
       const tw = new T.Vector3(380, V3d.elev + 45, -260);
       const want = V3d.dist ? centre.clone().add(tw.clone().sub(centre).normalize().multiplyScalar(V3d.dist)) : tw;
       V3d.cam.position.lerp(want, Math.min(1, dt * 3));
@@ -573,7 +590,7 @@ function v3dLoop(now: number) {
   for (const id in V3d.planes) {
     const Q = V3d.planes[id], s = shapeOf(Q.type);
     v.copy(Q.pos); v.y += s.H + 4; v.project(V3d.cam);
-    const on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    const on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && !(V3d.mode === 'fwd' && id === V3d.target);
     Q.label.style.display = on ? '' : 'none';
     if (on) { Q.label.style.transform = `translate(${((v.x + 1) / 2 * innerWidth).toFixed(0)}px, ${((1 - v.y) / 2 * innerHeight).toFixed(0)}px) translate(-50%, -100%)`; Q.label.classList.toggle('on', id === V3d.target); }
   }

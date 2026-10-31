@@ -345,7 +345,7 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
     return c0 + (W.tip - c0) * clamp((y - y0) / (semi - y0), 0, 1);
   };
   const th = W.t || 0.13;
-  const flapParts: any[] = [];
+  const flapParts: any[] = [], spoilerParts: any[] = [];
   for (const side of [1, -1]) {
     const wg = new T.Group(); root.add(wg);
     const P = (y: number) => [leAt(y), side * y, zAt(y)];
@@ -396,9 +396,17 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
       pivot.position.copy(A);
       const geo = panelGeo([0, 0, 0], fc(a), [hb[0] - ha[0], hb[1] - ha[1], hb[2] - ha[2]], fc(b), 0.1, 0.1, 'z');
       const m = new T.Mesh(geo, mWingTop); pivot.add(m);
-      pivot.userData.axis = B.clone().sub(A).normalize();
+      // the hinge line runs outwards on both wings, so both flaps fold down together
+      pivot.userData.axis = B.clone().sub(A).normalize().multiplyScalar(-side);
       pivot.userData.slide = new T.Vector3(1, 0, 0).multiplyScalar(chordAt((a + b) / 2) * 0.16);
       flapParts.push(pivot);
+      // spoilers on top of the wing, just ahead of the flaps: flat in flight, up after touchdown
+      const sh = (y: number) => [leAt(y) + chordAt(y) * 0.6, side * y, zAt(y) + chordAt(y) * 0.045];
+      const sa = sh(a), sb = sh(b), SA = _av(sa[0], sa[1], sa[2]), SB = _av(sb[0], sb[1], sb[2]);
+      const sp = new T.Group(); wg.add(sp); sp.position.copy(SA);
+      sp.add(new T.Mesh(panelGeo([0, 0, 0], chordAt(a) * 0.13, [sb[0] - sa[0], sb[1] - sa[1], sb[2] - sa[2]], chordAt(b) * 0.13, 0.04, 0.04, 'z'), mWingTop));
+      sp.userData.axis = SB.clone().sub(SA).normalize().multiplyScalar(-side);
+      sp.visible = false; spoilerParts.push(sp);
     }
   }
 
@@ -503,7 +511,8 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   root.userData.flaps = flapParts;
   root.userData.props = props;
   /** Flaps 0..1 (full), gear 0 (up) .. 1 (down), propellers turning. */
-  root.userData.set = (o: { flaps?: number; gear?: number; spin?: number }) => {
+  root.userData.set = (o: { flaps?: number; gear?: number; spin?: number; spoilers?: number }) => {
+    if (o.spoilers != null) for (const p of spoilerParts) { const k = clamp(o.spoilers, 0, 1); p.visible = k > 0.02; p.quaternion.setFromAxisAngle(p.userData.axis, k * 0.85); }
     if (o.flaps != null) for (const p of flapParts) {
       const k = clamp(o.flaps, 0, 1);
       p.quaternion.setFromAxisAngle(p.userData.axis, -k * 0.62);

@@ -2072,6 +2072,10 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .v3d-top { position: absolute; left: 12px; right: 12px; top: calc(10px + env(safe-area-inset-top)); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; pointer-events: none; }
 .v3d-top > * { pointer-events: auto; }
 .v3d-top .icon-btn { background: rgba(8, 20, 36, .8); }
+/* the battery in the 3D view: straight after the camera buttons (it moves along if there are more of them) */
+.v3d-batt { display: flex; }
+.v3d-batt:empty { display: none; }
+.v3d-batt .batt { height: 34px; background: rgba(8, 20, 36, .72); border-color: transparent; color: #DCE6F2; border-radius: 14px; }
 .v3d-modes, .v3d-pick { display: flex; gap: 6px; align-items: center; background: rgba(8, 20, 36, .72); border-radius: 14px; padding: 4px 6px; }
 .v3d-m { height: 28px; padding: 0 12px; cursor: pointer; border: 0; border-radius: 10px; background: transparent; color: #CFE0F2; font: 600 12.5px Inter, sans-serif; }
 .v3d-m.on { background: #3FD0E8; color: #04121F; }
