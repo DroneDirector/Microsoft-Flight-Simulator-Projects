@@ -93,7 +93,7 @@ const V3dTerrain = {
         im.onload = () => { try { c.drawImage(im, i * 256, j * 256); got++; } catch (e) { /* out of memory: skip this tile */ } done(); };
         im.onerror = done;
         const x = (x0 + i + n) % n, y = y0 + j;
-        im.src = ext === 'png' ? `${base}${z}/${x}/${y}.png` : `${base}${z}/${y}/${x}.jpg`;
+        im.src = base.indexOf('{z}') >= 0 ? base.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y)) : ext === 'png' ? `${base}${z}/${x}/${y}.png` : `${base}${z}/${y}/${x}.jpg`;
       }
     });
   },
@@ -260,6 +260,53 @@ const V3dTerrain = {
 ACTIONS['v3d-sat'] = () => {
   const S: any = State.settings; S.v3dSat = !S.v3dSat; Sound.tick();
   V3dTerrain.setSat(S.v3dSat);
+  const P = (V3d as any).patch; if (P) P.visible = !!S.v3dSat; if (S.v3dSat && !P) v3dAirportPatch();
   const b = V3d.root && V3d.root.querySelector('[data-act=v3d-sat]'); if (b) b.classList.toggle('on', !!S.v3dSat);
   Store.save();
 };
+
+/* ---------- the airport patch: the sharpest imagery right at the airport ---------- */
+// The rings cover tens of kilometres each, so their pictures can't be sharper than about 10 m a pixel.
+// Around the airport a separate 5 km patch gets its own picture at the highest zoom the imagery has
+// (zoom 15 for the built-in Sentinel-2 imagery, up to 19 with your own imagery service), laid over the
+// terrain and fading out at its edges.
+function satCustom(): { url: string; max: number } | null {
+  const S: any = State.settings, u = String(S.v3dSatUrl || '').trim();
+  return /^https:\/\/.+\{z\}.+\{x\}.+\{y\}|^https:\/\/.+\{z\}.+\{y\}.+\{x\}/.test(u) ? { url: u, max: clamp(+S.v3dSatMax || 19, 15, 20) } : null;
+}
+function v3dAirportPatch(tries?: number) {
+  if (!V3d.open || !V3d.icao || !(State.settings as any).v3dSat || !V3d.origin) return;
+  if (!V3dTerrain.rings.length) { if ((tries || 0) < 15) setTimeout(() => v3dAirportPatch((tries || 0) + 1), 1500); return; }
+  const T = THREE, icao = V3d.icao, ctr = V3d.origin.slice(), cust = satCustom(), cap = v3dTexCap(), size = 5000;
+  const lat = ctr[1], tileKm = (z: number) => 40075 * Math.cos(lat * D2R) / (1 << z);
+  // the highest zoom whose tiles for the patch still fit the device's picture size
+  let z = cust ? cust.max : 15;
+  while (z > 12 && Math.ceil(size / 1000 / tileKm(z)) + 1 > cap / 256) z--;
+  const n = 1 << z, tx = (lon: number) => (lon + 180) / 360 * n, ty = (la: number) => (1 - Math.log(Math.tan(la * D2R) + 1 / Math.cos(la * D2R)) / Math.PI) / 2 * n;
+  const half = size / 2, ll0 = v3dLonLat(-half, half), ll1 = v3dLonLat(half, -half);
+  const x0 = Math.floor(tx(ll0[0])), y0 = Math.floor(ty(ll1[1])), N = Math.max(Math.ceil(tx(ll1[0])) - x0, Math.ceil(ty(ll0[1])) - y0);
+  const gen = V3dTerrain.gen;
+  V3dTerrain.tiles(cust ? cust.url : SAT_URL, z, x0, y0, N, 'jpg').then(cv => {
+    if (!cv || !V3d.open || V3d.icao !== icao || gen !== V3dTerrain.gen) return;
+    // soft edges, so the sharp patch melts into the ring around it
+    const g = cv.getContext('2d'), W = cv.width, px = (lon: number, la: number) => [(tx(lon) - x0) * 256, (ty(la) - y0) * 256];
+    const c0 = px(ctr[0], ctr[1]), r = (size / 2) / 1000 / tileKm(z) * 256;
+    const grad = g.createRadialGradient(c0[0], c0[1], r * 0.72, c0[0], c0[1], r * 0.98); grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalCompositeOperation = 'destination-in'; g.fillStyle = grad; g.fillRect(0, 0, W, W); g.globalCompositeOperation = 'source-over';
+    const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = V3d.r.capabilities.getMaxAnisotropy ? V3d.r.capabilities.getMaxAnisotropy() : 8;
+    tex.onUpdate = () => { tex.onUpdate = null; setTimeout(() => { try { cv.width = 1; cv.height = 1; } catch (e) { /* ignore */ } }, 0); };
+    // a grid laid on the terrain, with each corner's picture position from the map projection
+    const seg = 64, geo = new T.PlaneGeometry(size, size, seg, seg); geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position, uv = geo.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), zz = pos.getZ(i), ll = v3dLonLat(x, zz);
+      pos.setY(i, v3dGround(ll[0], ll[1]) - v3dCurve(x, zz) + 0.08);
+      uv.setXY(i, (tx(ll[0]) - x0) / N, 1 - (ty(ll[1]) - y0) / N);
+    }
+    pos.needsUpdate = true; uv.needsUpdate = true;
+    const mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+    mesh.renderOrder = 1;
+    if ((V3d as any).patch) { V3d.scene.remove((V3d as any).patch); try { (V3d as any).patch.geometry.dispose(); (V3d as any).patch.material.map.dispose(); } catch (e) { /* ignore */ } }
+    (V3d as any).patch = mesh; V3d.scene.add(mesh);
+  });
+}

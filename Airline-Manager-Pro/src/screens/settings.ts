@@ -39,7 +39,10 @@ const SETTINGS: SetSection[] = [
         : q === 0 ? `<p class="v3d-note ok">${icon('info')}Low settings might improve performance on slower phones and PCs and use less data.</p>` : '';
       return `<div class="set-card col"><div class="sc-h">${icon('layers')}<span><b>Satellite detail: ${names[q]}</b><small>How sharp the satellite ground is. Higher shows fields, roads, villages and coastlines in more detail, near you and from high up. The imagery itself is about 10 m per pixel, so the very closest view stays a little soft.</small></span></div>
         <input type="range" class="v3d-satq" min="0" max="3" step="1" value="${q}" aria-label="Satellite detail">
-        <div class="v3d-scale"><span>Standard</span><span>Sharp</span><span>Very sharp</span><span>Highest</span></div>${note}</div>`;
+        <div class="v3d-scale"><span>Standard</span><span>Sharp</span><span>Very sharp</span><span>Highest</span></div>${note}</div>
+        <div class="set-card col"><div class="sc-h">${icon('map')}<span><b>Sharper imagery at airports: your own imagery service</b><small>The built-in imagery (Sentinel-2) is about 10 m a pixel, so details on the ground are hard to make out. With an imagery service of your own (for example MapTiler Satellite with your own key), the 5 km around the airport show in up to about 1 m a pixel. Paste its tile address with {z}, {x} and {y}. You are responsible for following that service's terms.</small></span></div>
+        <input class="le-in v3d-saturl" placeholder="https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=YOUR_KEY" value="${esc((State.settings as any).v3dSatUrl || '')}" spellcheck="false" autocapitalize="off">
+        <small class="muted">${satCustom() ? 'In use at airports, up to zoom ' + satCustom().max + '.' : 'Empty: the built-in imagery is used everywhere.'}</small></div>`;
     } },
   ] },
   { id: 'time', title: 'Time and years', icon: 'clock', items: [
@@ -438,4 +441,11 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-range')) return;
   (State.settings as any).v3dKm = +el.value; Store.save(); rerenderSettingsBody();
+});
+
+document.addEventListener('change', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-saturl')) return;
+  const v = el.value.trim(); (State.settings as any).v3dSatUrl = v; Store.save();
+  toast(!v ? 'Built-in imagery everywhere' : satCustom() ? 'Your imagery service is used at airports' : 'That address needs https:// and {z}, {x} and {y}', v && !satCustom() ? 'warn' : 'ok');
+  try { rerenderSettingsBody(); } catch (x) { /* ignore */ }
 });
