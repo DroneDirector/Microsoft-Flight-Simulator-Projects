@@ -86,6 +86,37 @@ function marketFromReal(k: MarketId, m: Market, d: any, vol: number) {
     } else m.events.unshift({ at: Date.parse(last[0]) || Date.now(), text: k === 'fuel' ? `Jet fuel steady on the world market: $${last[1].toFixed(2)} a gallon on the US Gulf Coast (EIA, ${last[0]})` : `Aircraft parts prices steady (US producer price index, BLS, ${last[0].slice(0, 7)})`, delta: ch, kind: 'news', real: true } as any);
     if (m.events.length > 40) m.events.length = 40;
   }
+  marketOutlook(k, m, d, s);
+}
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** What's coming: the EIA's forecast for jet fuel; for parts, where the last year's trend leads (not a forecast). */
+function marketOutlook(k: MarketId, m: Market, d: any, s: [string, number][]) {
+  let o: any = null;
+  if (k === 'fuel') {
+    const f: [string, number][] = (d.outlook && d.outlook.series) || [], now = new Date().toISOString().slice(0, 7);
+    const i = f.map(x => x[0]).lastIndexOf(f.filter(x => x[0] <= now).map(x => x[0]).pop() || '');
+    if (i >= 0 && f[i][1] > 0) {
+      const j = Math.min(f.length - 1, i + 3);
+      if (j > i) {
+        const ch = f[j][1] / f[i][1] - 1, mon = MONTH_NAMES[Number(f[j][0].slice(5, 7)) - 1] || f[j][0];
+        const at = s[s.length - 1][1] * (1 + ch);
+        o = { ch, key: 'fuel:' + f[f.length - 1][0] + ':' + f[j][0] + ':' + Math.round(ch * 100), forecast: true,
+          text: Math.abs(ch) < 0.02 ? `The EIA expects jet fuel to stay about where it is through ${mon} (Short-Term Energy Outlook).`
+            : `The EIA expects jet fuel about ${ch > 0 ? '+' : ''}${Math.round(ch * 100)}% by ${mon}, around $${at.toFixed(2)} a gallon (Short-Term Energy Outlook).` };
+      }
+    }
+  } else if (s.length >= 13) {
+    const back = s[s.length - 13][1], last = s[s.length - 1][1];
+    if (back > 0) {
+      const rate = Math.pow(last / back, 1 / 12) - 1, ch = Math.pow(1 + rate, 3) - 1;
+      o = { ch, key: 'parts:' + s[s.length - 1][0], forecast: false,
+        text: Math.abs(ch) < 0.003 ? 'Parts prices have been flat over the last year (trend, not a forecast).'
+          : `At the last year's pace, parts prices would be about ${ch > 0 ? '+' : ''}${(Math.round(ch * 1000) / 10).toFixed(1)}% in three months (trend, not a forecast).` };
+    }
+  }
+  const was = (m as any).outlook; (m as any).outlook = o;
+  if (o && (!was || was.key !== o.key) && Math.abs(o.ch) >= (k === 'fuel' ? 0.05 : 0.01))
+    marketNotice(k, `${MARKET_NAME[k]} prices expected to ${o.ch > 0 ? 'rise' : 'fall'}`, `${o.text} ${o.ch > 0 ? 'Buying stock now could pay off. ' : 'Holding off on stock could save money. '}${marketStockText(k)}`, Date.now());
 }
 /** Run the markets up to now (also after the app was closed for a while). */
 function marketsAdvance() {
@@ -169,6 +200,7 @@ function marketsCardHtml(): string {
       <div class="mkt-stock"><small>In stock</small><b>${k === 'fuel' ? num(Math.round(have / 1000)) + ' t' : money(have, { compact: true })}</b><span class="mkt-bar"><i style="width:${Math.min(100, have / cap * 100).toFixed(0)}%"></i></span><small>room for ${k === 'fuel' ? num(Math.round(cap / 1000)) + ' t' : money(cap, { compact: true })}</small></div>
     </div>
     ${realMarkets() ? `<p class="mkt-real">${icon('wifi')}Real-world prices: ${esc(k === 'fuel' ? realMarkets().fuel.name : realMarkets().parts.name)}, ${esc(k === 'fuel' ? realMarkets().fuel.source : realMarkets().parts.source)}. Updated ${esc(String(realMarkets().updated).slice(0, 10))}.</p>` : ''}
+    ${realMarkets() && (m as any).outlook ? `<p class="mkt-warn mkt-outlook">${icon(Math.abs((m as any).outlook.ch) >= 0.05 ? 'alert' : 'info')}Outlook: ${esc((m as any).outlook.text)}</p>` : ''}
     ${warn && !realMarkets() ? `<p class="mkt-warn">${icon('alert')}${esc(warn.text)} (expected by ${esc(dateStr(new Date(warn.due)).slice(5, 10))}).</p>` : ''}
     ${last ? `<p class="mkt-why">${icon('info')}Latest: ${esc(last.text)} (${last.delta > 0 ? '+' : ''}${Math.round(last.delta * 100)}%, ${esc(dateStr(new Date(last.at)).slice(5, 10))}).</p>` : `<p class="mkt-why">${icon('info')}A calm market for now.</p>`}
     <div class="btn-row">${buys.map(q => { const cost = k === 'fuel' ? Math.round(q * price) : Math.round(q * m.idx); return `<button class="btn ghost sm" data-act="mkt-buy" data-k="${k}" data-q="${q}" ${have + q > cap ? 'disabled' : ''}>${icon('plus')}${k === 'fuel' ? num(q / 1000) + ' t' : money(q, { compact: true })}<small>${money(cost, { compact: true })}</small></button>`; }).join('')}</div>
