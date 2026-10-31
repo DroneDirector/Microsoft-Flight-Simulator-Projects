@@ -326,26 +326,35 @@ function airportSheet(L: AirportLayout, loc: (x: number, y: number) => number[],
     for (let y = Math.floor(y0 / 7.5) * 7.5; y < y1; y += 7.5) { c.beginPath(); c.moveTo(0, Y(y)); c.lineTo(cv.width, Y(y)); c.stroke(); }
     c.restore();
   }
-  const taxi = (L.paths || []).filter(p => [1, 4, 9, 3].indexOf(p[0]) >= 0 && L.points[p[2]] && L.points[p[3]]);
+  // the same lines as the 2D map: taxiways (types 1 and 4, between two taxi points), stand connectors
+  // (type 3, from a taxi point to a STAND: its end is a stand number, not a point) and the painted
+  // lead-in lines to the stands (type 9, thin yellow lines on the apron, no pavement of their own)
+  const osm = L.source === 'osm';
+  const taxi = (L.paths || []).filter(p => (p[0] === 1 || p[0] === 4) && L.points[p[2]] && L.points[p[3]]);
+  const conn = osm ? [] : (L.paths || []).filter(p => p[0] === 3 && L.points[p[2]] && L.parks && L.parks[p[3]]);
+  const leads = (L.paths || []).filter(p => p[0] === 9 && L.points[p[2]] && L.points[p[3]]);
   const seg = (p: number[]) => { const A = L.points[p[2]], B = L.points[p[3]]; c.beginPath(); c.moveTo(X(A[0]), Y(A[1])); c.lineTo(X(B[0]), Y(B[1])); };
-  // taxiways: shoulders first, then the asphalt (strokes with round joins: no gaps, no overlaps)
-  for (const p of taxi) { if (p[0] === 3) continue; seg(p); c.strokeStyle = '#5E636A'; c.lineWidth = (Math.max(10, p[1] || 18) + 9) * k; c.stroke(); }
-  // taxiway edge lines (two thin yellow lines) and the yellow centre line
-  // edge lines: all the yellow first, then all the asphalt inside it, so junctions stay clean
-  const ew = Math.max(1, 0.3 * k);
-  for (const p of taxi) { if (p[0] === 3) continue; seg(p); c.strokeStyle = '#D9A92E'; c.lineWidth = Math.max(10, p[1] || 18) * k + ew * 2; c.stroke(); }
-  for (const p of taxi) { seg(p); c.strokeStyle = p[0] === 3 ? '#4A4F56' : '#3B4047'; c.lineWidth = Math.max(p[0] === 3 ? 8 : 10, p[1] || (p[0] === 3 ? 10 : 18)) * k - (p[0] === 3 ? 0 : ew * 2); c.stroke(); }
-  for (const p of taxi) { seg(p); c.strokeStyle = '#E8B730'; c.lineWidth = Math.max(1.2, 0.3 * k); c.stroke(); }
-  // stands: a yellow lead-in line, a stop bar and the stand number
+  const segC = (p: number[]) => { const A = L.points[p[2]], B = L.parks[p[3]]; c.beginPath(); c.moveTo(X(A[0]), Y(A[1])); c.lineTo(X(B[0]), Y(B[1])); };
+  const tw = (p: number[]) => Math.min(40, Math.max(10, p[1] || 18));
+  // taxiway pavement: a slightly lighter shoulder, then the asphalt (round joins: no gaps, no overlaps)
+  for (const p of taxi) { seg(p); c.strokeStyle = '#5E636A'; c.lineWidth = (tw(p) + 6) * k; c.stroke(); }
+  for (const p of conn) { segC(p); c.strokeStyle = '#4A4F56'; c.lineWidth = Math.max(10, p[1] || 12) * k; c.stroke(); }
+  for (const p of taxi) { seg(p); c.strokeStyle = '#3B4047'; c.lineWidth = tw(p) * k; c.stroke(); }
+  // the yellow lines: taxiway centre lines, connectors and lead-in lines, all thin, as painted
+  const lw = Math.max(1.2, 0.3 * k);
+  c.strokeStyle = '#E8B730'; c.lineWidth = lw;
+  for (const p of taxi) { seg(p); c.stroke(); }
+  for (const p of conn) { segC(p); c.stroke(); }
+  for (const p of leads) { seg(p); c.stroke(); }
+  // stands: a stop bar, the stand number, and (where the map has no lead-in lines) a short lead-in
   c.font = `700 ${Math.max(8, 3 * k)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
   (L.parks || []).forEach(pk => {
-    const h = (pk[2] || 0) * D2R, ux = Math.sin(h), uy = Math.cos(h), len = Math.max(25, (pk[3] || 20) * 1.6);
-    c.strokeStyle = '#E8B730'; c.lineWidth = Math.max(1.2, 0.3 * k);
-    c.beginPath(); c.moveTo(X(pk[0] - ux * len), Y(pk[1] - uy * len)); c.lineTo(X(pk[0] + ux * (pk[3] || 15) * 0.6), Y(pk[1] + uy * (pk[3] || 15) * 0.6)); c.stroke();
-    const sx = pk[0] + ux * (pk[3] || 15) * 0.6, sy = pk[1] + uy * (pk[3] || 15) * 0.6;
-    c.lineWidth = Math.max(2, 0.6 * k); c.beginPath(); c.moveTo(X(sx - uy * 2.5), Y(sy + ux * 2.5)); c.lineTo(X(sx + uy * 2.5), Y(sy - ux * 2.5)); c.stroke();
+    const h = (pk[2] || 0) * D2R, ux = Math.sin(h), uy = Math.cos(h), r = pk[3] || 15;
+    c.strokeStyle = '#E8B730';
+    if (!osm) { c.lineWidth = lw; c.beginPath(); c.moveTo(X(pk[0] - ux * r * 2.2), Y(pk[1] - uy * r * 2.2)); c.lineTo(X(pk[0]), Y(pk[1])); c.stroke(); }
+    c.lineWidth = Math.max(2, 0.5 * k); c.beginPath(); c.moveTo(X(pk[0] - uy * r * 0.35), Y(pk[1] + ux * r * 0.35)); c.lineTo(X(pk[0] + uy * r * 0.35), Y(pk[1] - ux * r * 0.35)); c.stroke();
     const name = L.parkNames && pk[6] != null ? L.parkNames[pk[6]] : pk[6] != null ? String(pk[6]) : '';
-    if (name && k >= 1.5) { c.fillStyle = '#F4D35E'; c.save(); c.translate(X(pk[0] - ux * len * 0.75), Y(pk[1] - uy * len * 0.75)); c.rotate(h); c.fillText(name, 0, 0); c.restore(); }
+    if (name && k >= 1.5) { c.fillStyle = '#F4D35E'; c.save(); c.translate(X(pk[0] - ux * r * 1.4), Y(pk[1] - uy * r * 1.4)); c.rotate(h); c.fillText(name, 0, 0); c.restore(); }
   });
   // runway holding positions: two solid and two dashed yellow lines across the taxiway
   for (const r of L.runways) {
@@ -360,7 +369,7 @@ function airportSheet(L: AirportLayout, loc: (x: number, y: number) => number[],
       const on = onA ? a : b, off = onA ? b : a, P0 = onA ? A : B, P1 = onA ? B : A;
       if (Math.abs(off.across) < hold) continue;
       const t = (hold - Math.abs(on.across)) / (Math.abs(off.across) - Math.abs(on.across)), hx = P0[0] + (P1[0] - P0[0]) * t, hy = P0[1] + (P1[1] - P0[1]) * t;
-      const dx = P1[0] - P0[0], dy = P1[1] - P0[1], dl = Math.hypot(dx, dy) || 1, tx = dx / dl, ty = dy / dl, nx = -ty, ny = tx, w = Math.max(10, p[1] || 18) / 2 + 3;
+      const dx = P1[0] - P0[0], dy = P1[1] - P0[1], dl = Math.hypot(dx, dy) || 1, tx = dx / dl, ty = dy / dl, nx = -ty, ny = tx, w = tw(p) / 2 + 3;
       c.strokeStyle = '#E8B730'; c.lineWidth = Math.max(1.2, 0.3 * k); c.lineCap = 'butt';
       // (t points away from the runway) dashed pair nearer the runway, solid pair on the taxiway side
       [[0.0, true], [0.6, true], [1.3, false], [1.9, false]].forEach(([o, dash]) => {
