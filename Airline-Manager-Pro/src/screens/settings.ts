@@ -96,6 +96,9 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'crashPrompt', label: 'Ask me before registering a crash', hint: 'Choose to register or disregard each crash.' },
     { type: 'choice', key: 'repairTime', label: 'Repair time', hint: 'Instant: the aircraft is ready to fly as soon as you pay. Decided by the app: it stays in the hangar for 5, 10, 15, 20, 25, 30, 40, 50, 60 or 90 minutes, depending on the job and how good your mechanics are.', options: [['instant', 'Instant'], ['auto', 'Decided by the app']] },
   ] },
+  { id: 'economy', title: 'Economy', icon: 'finance', items: [
+    { type: 'html', html: () => difficultySettingsHtml() } as any,
+  ] },
   { id: 'news', title: 'News', icon: 'news', items: [
     { type: 'choice', key: 'newsMode', label: 'Newspaper articles', hint: 'When your airline makes the papers. Every article is also in the inbox and under Newspaper in the menu.', options: [['popup', 'Open by themselves, animated'], ['notify', 'Only in the inbox, animated when opened'], ['plain', 'Only in the inbox, without animation']] },
   ] },

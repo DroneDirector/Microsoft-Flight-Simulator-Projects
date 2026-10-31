@@ -42,7 +42,7 @@ function averageFare(typeId: string, from: string, to: string): number {
 
 /** Extra facts about a leg: the aircraft (cabin, tankered fuel, route fares), passengers by class, a
  *  charter job it flies, or a ferry flight without anyone on board. */
-interface LegX { reg?: string; paxJ?: number; paxF?: number; job?: { pay: number; title: string }; ferry?: boolean }
+interface LegX { reg?: string; paxJ?: number; paxF?: number; job?: { pay: number; title: string }; ferry?: boolean; book?: boolean }
 
 /** Everything a leg earns and costs, with the lines shown in Finance. fuelKg: actual burn if known. */
 function legEconomics(typeId: string, from: string, to: string, pax: number, cargoKg: number, blockMin: number, fuelKg?: number, gsxCharged?: boolean, x?: LegX): LegMoney {
@@ -77,7 +77,9 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
   const price = fuelPrice(from), A2: any = a;
   let tankUsed = 0;
   if (A2 && A2.tankKg > 0 && A2.tankAt === from) { tankUsed = Math.min(A2.tankKg, burn); A2.tankKg = 0; A2.tankAt = ''; }
-  const fuel = Math.round((burn - tankUsed) * price);
+  // from your own stock at your bases (bookings only, not estimates)
+  const stockUsed = x.book ? fuelFromStock(cid, from, burn - tankUsed) : 0;
+  const fuel = Math.round((burn - tankUsed - stockUsed) * price);
   // tankering: the route asks for it and the next stop's fuel costs more: carry the next leg's fuel now
   let tankCost = 0, tankKg = 0, tankNext = '';
   if (a && route && (route as any).tanker && !x.ferry) {
@@ -92,7 +94,9 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
   const landing = landingFee(to, t), parking = parkingFee(to, t);
   const handling = x.ferry ? 0 : Math.round(pax * (isDomestic(from, to) ? 6 : 9) + (cls === 'widebody' ? 900 : cls === 'airliner' ? 350 : small ? 0 : 150));
   const nav = small ? 0 : Math.round(km / 100 * Math.sqrt(mtow / 50) * 82);
-  const mx = Math.round(bh * (MX_PER_BH[cls] || 800) * engineMx(x.reg));
+  const mxBase = Math.round(bh * (MX_PER_BH[cls] || 800) * engineMx(x.reg)), partsUsed = x.book ? partsFromStock(cid, Math.round(mxBase * 0.45)) : 0;
+  // parts are about 45% of maintenance: those follow the parts market (or come from stock)
+  const mx = Math.round(mxBase * 0.55 + (mxBase * 0.45 - partsUsed) * marketIdx('parts'));
   const sales = Math.round(tickets * (small ? 0.03 : 0.06));                         // booking systems, agents, card fees
   const catering = gsxCharged || x.ferry ? 0 : Math.round(pY * (small ? 0 : longHaul ? 24 : cls === 'turboprop' ? 1.5 : 4) * svc.cateringMul + (pJ + pF) * (small ? 0 : longHaul ? 85 : 18) * svc.cateringPrem);
   const crewN = small ? 1 : 2 + (typeof faNeeded === 'function' ? faNeeded(t) : 0);
@@ -114,7 +118,9 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
   const ownHere = ownApronCrewAt(ownCid, to);
   const hd = gsxCharged ? 0 : ownHere ? Math.round(handling * 0.3) : handling;
   if (tankUsed) lines.push([`Fuel, ${num(tankUsed)} kg tankered (paid on the leg before)`, 0]);
-  lines.push([`Fuel at ${from}, ${num(burn - tankUsed)} kg × $${price.toFixed(2)}`, -fuel]);
+  if (stockUsed) lines.push([`Fuel from your stock, ${num(stockUsed)} kg (paid when bought)`, 0]);
+  if (burn - tankUsed - stockUsed > 0) lines.push([`Fuel at ${from}, ${num(burn - tankUsed - stockUsed)} kg × $${price.toFixed(2)}`, -fuel]);
+  if (partsUsed) lines.push([`Spare parts from your stock (paid when bought)`, 0]);
   if (tankCost) lines.push([`Tankering: ${num(tankKg)} kg for the next leg (fuel at ${tankNext} costs $${fuelPrice(tankNext).toFixed(2)})`, -tankCost]);
   lines.push([`Landing fee at ${to}`, -landing], [`Parking and gate at ${to}`, -parking]);
   if (hd) lines.push([ownHere ? `Handling by your own apron crew at ${to} (materials)` : `Handling by the local handling company at ${to}`, -hd]);
@@ -125,7 +131,10 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
   if (svcCost) svc.extraLines.forEach(l => lines.push(l));
   lines.push(['Crew allowances and hotels', -crewTrip], ['Overheads: offices and IT', -overhead]);
   if (A2 && tankKg) { A2.tankKg = tankKg; A2.tankAt = tankNext; }
-  const revenue = tickets + onboard + bags + cargo + jobPay, costs = fuel + tankCost + landing + parking + hd + nav + mx + sales + catering + svcCost + crewTrip + overhead;
+  // difficulty: what flights earn and cost
+  const dd = diff();
+  if (dd.income !== 1 || dd.cost !== 1) for (const l of lines) l[1] = Math.round(l[1] * (l[1] > 0 ? dd.income : dd.cost));
+  const revenue = lines.reduce((s, l) => s + Math.max(0, l[1]), 0), costs = -lines.reduce((s, l) => s + Math.min(0, l[1]), 0);
   return { revenue, costs, net: revenue - costs, lines, fare, fuelKg: burn };
 }
 

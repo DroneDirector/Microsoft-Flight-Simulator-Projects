@@ -290,7 +290,7 @@ function flightPathPos(f: any, now?: number): { pos: number[]; hdg: number; d: n
   let fp = _flightPaths[pk];
   if (!fp) { fp = flightPathFor(f.from, f.noDest ? null : f.to); if (!fp) return null; _flightPaths[pk] = fp; }
   now = now || Date.now();
-  const prof: FlightProfile = f.coop ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
+  const prof: FlightProfile = f.coop || f.tfc ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
   const fe = flightEl(f, now), q = profileAt(prof, fe.el);
   // the profile's distance (along airways) mapped onto this path
   const d = prof.routeNm > 0 ? q.d / prof.routeNm * fp.len : 0;

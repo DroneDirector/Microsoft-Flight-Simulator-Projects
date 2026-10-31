@@ -109,6 +109,8 @@
     "src/core/court-plus.ts",
     "src/core/coop-jobs.ts",
     "src/core/coop-connect.ts",
+    "src/core/traffic.ts",
+    "src/core/markets.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/main.ts"

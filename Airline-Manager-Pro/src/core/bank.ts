@@ -38,7 +38,8 @@ const Bank = {
     const c = company(cid), owed = bankState().loans.filter(l => l.companyId === cid).reduce((t, l) => t + l.left, 0);
     const max = Math.max(0, Math.round((fleetValue(cid) * 0.6 + Math.max(0, c.balance) * 0.2 - owed) / 100000) * 100000);
     const rate = Math.round((5.2 + (100 - (c.reputation || 50)) / 100 * 4.5 + (c.balance < 0 ? 2 : 0)) * 10) / 10;
-    return { max, rate };
+    const lr = typeof diff === 'function' ? diff().loan : 0;
+    return { max, rate: Math.max(1, Math.round((rate + lr) * 10) / 10) };
   },
   monthly(amount: number, ratePct: number, months: number): number {
     const r = ratePct / 100 / 12;

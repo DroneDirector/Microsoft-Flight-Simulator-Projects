@@ -58,7 +58,8 @@ function fuelPrice(icao: string, d?: Date): number {
   const day = (d || new Date()).toDateString(), base = 0.85 * (FUEL_REGION[icao[0]] || 1.05);
   const size = aptSize(icao), remote = REMOTE_AIRPORTS.indexOf(icao) >= 0 ? 1.1 : 1;
   const wobble = 1 + (((hashMix(icao[0] + day) % 1000) / 1000) - 0.5) * 0.08 + (((hashMix(icao + day) % 1000) / 1000) - 0.5) * 0.03;
-  return Math.round(base * (size === 2 ? 1 : size === 1 ? 1.04 : 1.13) * remote * wobble * 1000) / 1000;
+  const mk = typeof marketIdx === 'function' ? marketIdx('fuel') : 1;
+  return Math.round(base * (size === 2 ? 1 : size === 1 ? 1.04 : 1.13) * remote * wobble * mk * 1000) / 1000;
 }
 
 /* ---------- Airport charges ---------- */
@@ -248,5 +249,5 @@ function aircraftValue(a: Aircraft): number {
   return Math.round(t.price * Math.max(0.12, Math.pow(0.93, age)) * cond / 1000) * 1000;
 }
 const BROKER_FEE = 0.06;
-function sellPrice(a: Aircraft): number { return Math.round(aircraftValue(a) * (1 - BROKER_FEE) / 1000) * 1000; }
+function sellPrice(a: Aircraft): number { const d = typeof diff === 'function' ? diff() : { sell: 1 } as any; return Math.round(aircraftValue(a) * (1 - BROKER_FEE) * d.sell / 1000) * 1000; }
 function fleetValue(cid: string): number { return fleetOf(cid).filter(a => !(a as any).lease).reduce((t, a) => t + aircraftValue(a), 0); }

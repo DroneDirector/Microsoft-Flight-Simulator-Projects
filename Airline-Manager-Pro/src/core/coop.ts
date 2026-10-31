@@ -156,7 +156,7 @@ interface CoopPirep { id: string; at: number; by: string; name: string; callsign
 /** Book an accepted flight report: money, logbook, hours, the pilot's record. */
 function coopBook(pr: CoopPirep, live: boolean) {
   const co = company(), m = coopMember(pr.by);
-  const money0 = legEconomics(pr.typeId, pr.from, pr.to, pr.pax, pr.cargoKg, pr.blockMin, pr.fuelKg, false, { reg: pr.reg || undefined });
+  const money0 = legEconomics(pr.typeId, pr.from, pr.to, pr.pax, pr.cargoKg, pr.blockMin, pr.fuelKg, false, { book: true, reg: pr.reg || undefined });
   const d = new Date(pr.at), day = dateStr(d).slice(0, 10), time = dateStr(d).slice(11);
   const txId = uid(); pr.tx = txId;
   State.txns.unshift({ id: txId, companyId: co.id, date: day, time, label: `${pr.callsign} ${pr.from} to ${pr.to} (${pr.name})`, amount: money0.net, kind: money0.net >= 0 ? 'revenue' : 'fees',

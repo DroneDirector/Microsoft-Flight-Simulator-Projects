@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.11 (2026-10-31)
+
+- Other airlines' traffic: fixed fleet of 140 aircraft on deterministic shuttles between scheduled airports; 2D map (decluttered labels) and 3D (frustum-culled); on/off switch; own airline only
+- Difficulty levels (cruise/easy/normal/hard/extreme): aircraft prices, sale prices, leg income and costs, loan rates, starting money, market volatility; per world
+- Jet fuel and spare parts markets with event-driven moves, warnings, history and newspaper stories; fuel and parts stock used on booked legs
+
 ## 0.9.10 (2026-10-31)
 
 - Co-op mode as a separate world (own save; device settings shared); co-op setup, mode chip, switch back

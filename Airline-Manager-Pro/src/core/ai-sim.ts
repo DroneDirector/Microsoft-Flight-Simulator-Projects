@@ -191,7 +191,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
   const m = f.from === f.to
     ? (() => { const fuel = Math.round(burnKg * 0.95), crew = Math.round(t.costPerHr * blockMin / 60 * 0.35); return { net: -(fuel + crew), revenue: 0, costs: fuel + crew, lines: [['Test flight fuel', -fuel], ['Aircraft and crew time', -crew]] } as any; })()
-    : legEconomics(a.typeId, f.from, f.to, f.pax, F.cargoKg || 0, blockMin, burnKg, false, { reg: a.reg, paxJ: F.paxJ, paxF: F.paxF, ferry: !!F.ferry, job: F.job ? jobPayFor(F.job) : undefined });
+    : legEconomics(a.typeId, f.from, f.to, f.pax, F.cargoKg || 0, blockMin, burnKg, false, { book: true, reg: a.reg, paxJ: F.paxJ, paxF: F.paxF, ferry: !!F.ferry, job: F.job ? jobPayFor(F.job) : undefined });
   const net = m.net, d = new Date(at), ds = dateStr(d);
   const txId = uid(); (summary.tx = summary.tx || []).push(txId);
   State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.from === f.to ? 'Test flight ' + f.reg + ' at ' + f.from : (F.ferry ? 'Ferry ' : F.job ? 'Charter ' : '') + f.callsign + ' ' + f.from + ' to ' + f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
