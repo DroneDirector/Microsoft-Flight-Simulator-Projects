@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.38 (2026-10-31)
+
+- v3d-sky.ts: sun/moon (position, phase, size) and Hipparcos stars (data/stars.ts), sky dome and fog colour, day/night light, sim time (pc-bridge ABSOLUTE TIME → simTime)
+- Living water in the ground material (waves by wind, Fresnel sky reflection, sun/moon glitter, surf), optional mirror pass
+- Airport, aircraft and town lights (NASA GIBS Black Marble); night side on the 2D map; settings for each
+- standsOnAprons for OSM layouts without stands; passenger list sort and search
+
 ## 0.9.37 (2026-10-31)
 
 - data/airports-major.ts (scripts/make-major-airports.py, OurAirports): 3,886 well-known airports built in

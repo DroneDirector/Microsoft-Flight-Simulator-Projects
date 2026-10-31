@@ -93,7 +93,7 @@ class AirportView {
   }
   labelSource() {
     const src = $('#apv-src'), L = this.L; if (!src || !L) return;
-    src.innerHTML = L.source === 'sim' ? 'Layout from your simulator' : L.source === 'osm' ? 'Real airport layout · © OpenStreetMap contributors'
+    src.innerHTML = L.source === 'sim' ? 'Layout from your simulator' : L.source === 'osm' ? (L.gen ? 'Real runways · taxiways and apron laid out to the standard dimensions · © OpenStreetMap contributors' : (L as any).genStands ? 'Real airport layout, stands laid out on the aprons · © OpenStreetMap contributors' : 'Real airport layout · © OpenStreetMap contributors')
       : this.fetching ? '<span class="apv-spin"></span>Real runways · getting the full layout…' : L.runways.length ? (L.gen ? 'Real runways · taxiways and apron laid out to the standard dimensions' : 'Real runways · taxiways and apron drawn simplified') : 'No runway data for this airport';
     src.classList.toggle('sim', L.source !== 'runways');
   }

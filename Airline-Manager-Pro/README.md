@@ -42,6 +42,8 @@ The whole interface is plain HTML, CSS and TypeScript compiled to one classic sc
 - node-simconnect, GNU LGPL v3, used unmodified in the PC app
 - MapLibre GL JS, BSD 3-Clause License (optional street and satellite maps)
 - three.js by the three.js authors, MIT License (3D crew figures)
+- Star positions from the Hipparcos catalogue (ESA), as prepared in d3-celestial, Copyright (c) 2015, Olaf Frohn, BSD 3-Clause License (the stars in the 3D view; src/data/stars.ts)
+- Town lights at night: NASA Black Marble via NASA GIBS, public domain
 - Human body model and shape targets from MakeHuman, CC0 1.0 public domain (packed into `assets/humans.bin` by `tools/human-data`)
 - Street map © OpenStreetMap contributors, OpenMapTiles, served by OpenFreeMap
 - Satellite map: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0

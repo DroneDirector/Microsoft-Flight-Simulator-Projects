@@ -54,7 +54,7 @@ const V3dTerrain = {
     next(0);
   },
   clear() {
-    for (const r of this.rings) { if (r.mesh) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } if (r.mapTex) r.mapTex.dispose(); if (r.satTex) r.satTex.dispose(); }
+    for (const r of this.rings) { if (r.mesh) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } if (r.mapTex) r.mapTex.dispose(); if (r.satTex) r.satTex.dispose(); const R: any = r; if (R.wetTex) R.wetTex.dispose(); if (R.cityTex) R.cityTex.dispose(); if (r.mesh && r.mesh.material) r.mesh.material.dispose(); }
     this.rings = [];
   },
 
@@ -211,9 +211,13 @@ const V3dTerrain = {
     }
     (r as any).mh = mh; (r as any).G = G;
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx);
-    r.mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ map: (State.settings as any).v3dSat && r.satTex ? r.satTex : r.mapTex }));
+    // the water as its own picture (the sea and lakes; rivers half), for the living water and the coastline
+    const wetTex = v3dWetTexture(size, (i: number) => water(i) ? 255 : river(i) ? 150 : 0);
+    r.mesh = new T.Mesh(geo, v3dGroundMat((State.settings as any).v3dSat && r.satTex ? r.satTex : r.mapTex, wetTex));
+    (r as any).wetTex = wetTex;
     r.mesh.renderOrder = -r.z;
     V3d.scene.add(r.mesh);
+    try { v3dCityLoad(r); } catch (e) { (r as any).cityDone = true; }
   },
 
   /** Satellite imagery for a ring (loaded once, when first wanted). */

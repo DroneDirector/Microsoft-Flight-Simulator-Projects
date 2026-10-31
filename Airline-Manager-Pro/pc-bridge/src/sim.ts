@@ -43,6 +43,8 @@ const MAIN_VARS: [string, string][] = [
   // weather around the aircraft
   ['AMBIENT WIND DIRECTION', 'degrees'], ['AMBIENT WIND VELOCITY', 'knots'], ['AMBIENT VISIBILITY', 'meters'], ['AMBIENT TEMPERATURE', 'celsius'],
   ['SEA LEVEL PRESSURE', 'millibars'], ['AMBIENT PRECIP STATE', 'mask'], ['AMBIENT PRECIP RATE', 'millimeters of water'], ['AMBIENT IN CLOUD', 'bool'],
+  // the simulator's own date and time (seconds since 1 January of year 1), for the sun and moon in the 3D view
+  ['ABSOLUTE TIME', 'seconds'],
 ];
 const GSX_VARS: [string, string][] = [
   ['L:FSDT_GSX_COUATL_STARTED', 'number'], ['L:FSDT_GSX_BOARDING_STATE', 'number'],
@@ -234,6 +236,8 @@ export class SimConnectSource extends EventEmitter implements SimSource {
       // precipitation state is a bit mask: 2 none, 4 rain, 8 snow
       s.wx = { windDir: Math.round(wDir), windKt: Math.round(wKt), visM: Math.round(vis), tempC: Math.round(temp), qnhHpa: Math.round(qnh),
         precip: (pState & 8) ? 'snow' : (pState & 4) ? 'rain' : 'none', precipMm: Math.round(pRate * 10) / 10, inCloud: cloud > 0.5, turb: 'none' };
+      const abs = v[i++];
+      (s as any).simTime = abs > 6e10 ? Math.round((abs - 62135596800) * 1000) : 0;
       if (!s.inFlight && (s.lat !== 0 || s.lon !== 0) && s.totalKg > 0) s.inFlight = true;
       s.t = Date.now();
       this.emit('snapshot', Object.assign({}, s, { stations: s.stations.slice() }));

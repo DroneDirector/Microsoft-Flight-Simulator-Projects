@@ -284,9 +284,45 @@ const AirportLayouts = {
     if (!l.runways.length) return null;
     // mapped runways but no taxiways (common at smaller airports): laid out to the standard dimensions
     if (!l.paths.some(p => p[0] === 1 || p[0] === 4)) try { layoutGenerate(l, a); } catch (e) { /* as mapped */ }
+    // mapped taxiways and aprons but no stands: stands laid out on the mapped aprons
+    else if (!l.parks.length) try { standsOnAprons(l); } catch (e) { /* as mapped */ }
     return l;
   },
 };
+/* ---------- stands on mapped aprons ---------- */
+/** For airports whose aprons are mapped but not their stands: stands in rows across each apron, a stand's
+ * size from the longest runway, the nose pointing away from the nearest taxiway, joined to it. */
+function standsOnAprons(l: AirportLayout) {
+  const aprons = (l.areas || []).filter(a => a.k === 'apron' && a.pts.length >= 3); if (!aprons.length) return;
+  const taxi: number[] = []; const seen: { [i: number]: 1 } = {};
+  for (const p of l.paths) if ((p[0] === 1 || p[0] === 4) && l.points[p[2]] && l.points[p[3]]) for (const i of [p[2], p[3]]) if (!seen[i]) { seen[i] = 1; taxi.push(i); }
+  if (!taxi.length) return;
+  const segs = l.paths.filter(p => (p[0] === 1 || p[0] === 4) && l.points[p[2]] && l.points[p[3]]);
+  const rl = Math.max(0, ...l.runways.map(r => r.surf === 4 ? r.len : 0));
+  const kind = rl >= 2400 ? { sp: 52, r: 24, t: 9 } : rl >= 1500 ? { sp: 40, r: 18, t: 9 } : { sp: 24, r: 12, t: 2 };
+  const inside = (x: number, y: number, P: number[][]) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+  l.parkNames = l.parkNames || [];
+  let made = 0;
+  for (const A of aprons) {
+    const xs = A.pts.map(q => q[0]), ys = A.pts.map(q => q[1]), m = kind.r * 0.75;
+    for (let y = Math.min(...ys) + kind.sp / 2; y < Math.max(...ys) && made < 80; y += kind.sp)
+      for (let x = Math.min(...xs) + kind.sp / 2; x < Math.max(...xs) && made < 80; x += kind.sp) {
+        if (![[0, 0], [m, 0], [-m, 0], [0, m], [0, -m]].every(o => inside(x + o[0], y + o[1], A.pts))) continue;
+        let j = -1, bd = 400 * 400; for (const i of taxi) { const q = l.points[i], d = (q[0] - x) ** 2 + (q[1] - y) ** 2; if (d < bd) { bd = d; j = i; } }
+        if (j < 0) continue;
+        // the nearest point on a taxiway: the nose points straight away from it; only the rows next to one
+        let px = l.points[j][0], py = l.points[j][1], sd = 1e18;
+        for (const p of segs) { const A2 = l.points[p[2]], B2 = l.points[p[3]], dx = B2[0] - A2[0], dy = B2[1] - A2[1], L2 = dx * dx + dy * dy || 1, t = clamp(((x - A2[0]) * dx + (y - A2[1]) * dy) / L2, 0, 1), cx = A2[0] + dx * t, cy = A2[1] + dy * t, d = (cx - x) ** 2 + (cy - y) ** 2; if (d < sd) { sd = d; px = cx; py = cy; } }
+        if (Math.sqrt(sd) > kind.sp * 2.2) continue;
+        const hdg = (Math.atan2(x - px, y - py) * 180 / Math.PI + 360) % 360;
+        const ni = l.parkNames.length; l.parkNames.push(String(++made));
+        l.parks.push([Math.round(x * 10) / 10, Math.round(y * 10) / 10, Math.round(hdg), kind.r, kind.t, 0, ni]);
+        l.paths.push([3, 8, j, l.parks.length - 1, 0, 0, 0]);
+      }
+  }
+  if (made) (l as any).genStands = true;
+}
+
 /* ---------- taxiways laid out from the runways ---------- */
 // For airports with no mapped taxiways: a taxi system built from the real runways (position, length, width,
 // heading) with the ICAO Annex 14 dimensions for that size of runway: the parallel taxiway's distance from the

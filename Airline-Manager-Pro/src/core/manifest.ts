@@ -112,9 +112,60 @@ ACTIONS['pax-list'] = el => {
           left ? chip('petleft', 'pet left', '', `${left} ${left === 1 ? 'pet' : 'pets'} left behind`) : '',
           star ? chip('star', 'star', icon('star'), star.famous) : ''].join('');
       })()}</div></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-    <div class="modal-body pax-list">${groups.map(([c, ps]) => `<h4>${clsName[c]} · ${ps.length}</h4>${ps.map((p, i) => paxRowHtml(f.id, p, i)).join('')}`).join('') || emptyState('Nobody on board', 'The passengers show here once they have boarded.')}</div>`, { cls: 'wide pax-pop' });
+    ${paxSortHtml(f.id)}
+    <div class="modal-body pax-list">${paxBodyHtml(f, list)}</div>`, { cls: 'wide pax-pop' });
+  void groups; void clsName;
   paxFacesLazy();
 };
+/* sorting the passenger list: by seat (in cabin classes), name, nationality, age, gender, mood, conduct or pets */
+const PAX_SORTS: [string, string][] = [['seat', 'Seat'], ['name', 'Name'], ['nat', 'Nationality'], ['age', 'Age'], ['sex', 'Gender'], ['mood', 'Mood'], ['conduct', 'Conduct'], ['pet', 'Pets']];
+let _paxQ = '';
+function paxSortPref(): { by: string; dir: number } { const S: any = State.settings; return S.paxSort || { by: 'seat', dir: 1 }; }
+function paxSortHtml(fid: string): string {
+  const p = paxSortPref();
+  return `<div class="sort-bar pax-sort"><span class="lst-q-w">${icon('search')}<input class="le-in pax-q" data-f="${esc(fid)}" placeholder="Name or nationality" value="${esc(_paxQ)}" spellcheck="false"></span><span class="sort-l">Sort</span>${PAX_SORTS.map(o => `<button class="fchip sm ${p.by === o[0] ? 'on' : ''}" data-act="pax-sort" data-f="${esc(fid)}" data-b="${o[0]}">${esc(o[1])}${p.by === o[0] ? (p.dir > 0 ? ' ↓' : ' ↑') : ''}</button>`).join('')}</div>`;
+}
+function paxBodyHtml(f: LiveFlight, list: PaxSeat[]): string {
+  const p = paxSortPref(), q = _paxQ.toLowerCase().trim();
+  let rows = q ? list.filter(x => (x.name + ' ' + natLabel(x.nat) + ' ' + x.nat).toLowerCase().indexOf(q) >= 0) : list.slice();
+  if (!rows.length) return emptyState(q ? 'Nobody matches that' : 'Nobody on board', q ? 'Try another name or nationality.' : 'The passengers show here once they have boarded.');
+  const clsName: { [k: string]: string } = { F: 'First', J: 'Business', Y: 'Economy' };
+  if (p.by === 'seat') {
+    const groups = (['F', 'J', 'Y'] as const).map(c => [c, rows.filter(x => x.cls === c)] as [string, PaxSeat[]]).filter(g => g[1].length);
+    if (p.dir < 0) groups.reverse().forEach(g => g[1].reverse());
+    return groups.map(([c, ps]) => `<h4>${clsName[c]} · ${ps.length}</h4>${ps.map((x, i) => paxRowHtml(f.id, x, i)).join('')}`).join('');
+  }
+  const mood: { [k: string]: number } = {};
+  if (p.by === 'mood') for (const x of rows) { try { mood[x.key] = paxMood(f, x, list).mood; } catch (e) { mood[x.key] = 50; } }
+  const conduct = (x: PaxSeat) => x.record ? (x.record.banned ? 2 : 1) * 100 + x.record.notes.length : 0;
+  const cmp: { [k: string]: (a: PaxSeat, b: PaxSeat) => number } = {
+    name: (a, b) => a.name.localeCompare(b.name), nat: (a, b) => natLabel(a.nat).localeCompare(natLabel(b.nat)) || a.name.localeCompare(b.name),
+    age: (a, b) => a.age - b.age, sex: (a, b) => (a.sex === b.sex ? 0 : a.sex === 'f' ? -1 : 1) || a.name.localeCompare(b.name),
+    mood: (a, b) => mood[b.key] - mood[a.key],                                        // happiest first
+    conduct: (a, b) => conduct(b) - conduct(a) || a.name.localeCompare(b.name),       // worst record first
+    pet: (a, b) => (b.pet ? 1 : 0) - (a.pet ? 1 : 0) || a.name.localeCompare(b.name), // with a pet first
+  };
+  rows.sort((a, b) => (cmp[p.by] || cmp.name)(a, b) * p.dir);
+  const label = PAX_SORTS.filter(o => o[0] === p.by)[0];
+  return `<h4>All passengers by ${esc((label ? label[1] : 'name').toLowerCase())} · ${rows.length}</h4>${rows.map((x, i) => paxRowHtml(f.id, x, i)).join('')}`;
+}
+function paxRerender(fid: string) {
+  const f = State.live.filter(x => x.id === fid)[0]; if (!f) return;
+  const body = document.querySelector('.pax-pop .pax-list') as HTMLElement, bar = document.querySelector('.pax-pop .pax-sort') as HTMLElement;
+  if (body) { body.innerHTML = paxBodyHtml(f, manifestOf(f)); body.scrollTop = 0; }
+  if (bar) { const t = document.createElement('div'); t.innerHTML = paxSortHtml(fid); const nb = t.firstElementChild as HTMLElement; const qv = (bar.querySelector('.pax-q') as HTMLInputElement); const focused = document.activeElement === qv; bar.replaceWith(nb); if (focused) { const ni = nb.querySelector('.pax-q') as HTMLInputElement; ni.focus(); ni.setSelectionRange(ni.value.length, ni.value.length); } }
+  paxFacesLazy();
+}
+ACTIONS['pax-sort'] = el => {
+  const b = el.getAttribute('data-b'), cur = paxSortPref(), S: any = State.settings;
+  S.paxSort = { by: b, dir: cur.by === b ? -cur.dir : 1 }; Store.soon(); Sound.tick();
+  paxRerender(el.getAttribute('data-f'));
+};
+let _paxQT: any = null;
+document.addEventListener('input', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('pax-q')) return;
+  _paxQ = el.value; clearTimeout(_paxQT); _paxQT = setTimeout(() => paxRerender(el.getAttribute('data-f')), 200);
+});
 let _paxJump: { [k: string]: number } = {};
 ACTIONS['pax-jump'] = el => {
   const k = el.getAttribute('data-k'), rows = Array.from(document.querySelectorAll(`.pax-pop .pax-row.has-${k}`)) as HTMLElement[]; if (!rows.length) return;

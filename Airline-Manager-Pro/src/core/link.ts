@@ -23,6 +23,7 @@ interface SimSnapshot {
     deboarding?: number; catering?: number; refueling?: number; departure?: number; deicing?: number; fuelHose?: boolean };
   approachAirport: string; phase: string; from: string;
   wx?: SimWeather;              // weather at the aircraft from the simulator (PC app 0.5.1 and later)
+  simTime?: number;             // the simulator's date and time (ms since 1970, UTC), PC app 0.9.38 and later
 }
 interface FlightEvent {
   type: string; t: number; lat: number; lon: number; airport?: string; fpm?: number; g?: number; pitch?: number; bounces?: number;
