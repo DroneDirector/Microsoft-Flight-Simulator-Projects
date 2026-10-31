@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.19 (2026-10-31)
+
+- Fix: aircraft model setter line commented out in 3D (TypeError every frame)
+- 3D airport ground as a single terrain-draped canvas (aprons, taxiways, edges, centre lines, stands, hold lines); terrain-following runway strips; rebuild when the near terrain arrives
+- Android: UPDATE_PACKAGES_WITHOUT_USER_ACTION and MY_PACKAGE_REPLACED receiver (reopen or notification)
+- Update window and settings patched in place during downloads
+
 ## 0.9.18 (2026-10-31)
 
 - 3D airports: ground paint (aprons, taxiways with shoulders and round joins, centre lines, runways, hold lines) drawn over terrain; aircraft and buildings render after it

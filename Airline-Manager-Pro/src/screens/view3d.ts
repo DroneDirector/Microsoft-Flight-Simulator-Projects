@@ -270,64 +270,120 @@ function v3dGround(lon: number, lat: number): number { return V3dTerrain.ground(
 
 function v3dBuildAirport(L: AirportLayout) {
   const T = THREE, g = new T.Group(), e = L.alt || 0;
+  (V3d as any).lastL = L;
   const loc = (x: number, y: number) => { const ll = [L.lon + x / (111320 * Math.cos(L.lat * D2R)), L.lat + y / 110540]; return v3dXY(ll[0], ll[1]); };
-  const flat = (pts: number[][], y: number, mat: any) => {
-    const sh = new T.Shape(pts.map(p => { const q = loc(p[0], p[1]); return new T.Vector2(q[0], -q[1]); }));
-    const geo = new T.ShapeGeometry(sh); geo.rotateX(-Math.PI / 2); geo.translate(0, y, 0);
-    const mm = new T.Mesh(geo, mat); mm.renderOrder = (mat as any)._order || 2; g.add(mm);
-  };
-  // painted on top of the ground (drawn after it, without hiding behind its height model), in real colours:
-  // concrete aprons, asphalt taxiways with soft shoulders, yellow centre lines
-  const top = (m: any, order: number) => { m.depthTest = false; m.depthWrite = false; (m as any)._order = order; return m; };
-  const mApron = top(new T.MeshBasicMaterial({ color: 0x6E737A, transparent: true, opacity: 0.92 }), 2), mShoulder = top(new T.MeshBasicMaterial({ color: 0x4B5057, transparent: true, opacity: 0.85 }), 3);
-  const mTaxi = top(new T.MeshBasicMaterial({ color: 0x3A3F46 }), 4), mLine = top(new T.MeshBasicMaterial({ color: 0xE2B33C }), 6);
-  const mBuild = new T.MeshLambertMaterial({ color: 0x55667C });
+  // the ground's height where it is known (the terrain may still be loading: then the airport's elevation)
+  const gy = (x: number, z: number) => { if (!V3dTerrain.rings.length) return e; const ll = v3dLonLat(x, z); return Math.max(V3dTerrain.ground(ll[0], ll[1]), 0) - v3dCurve(x, z); };
+  // terminals and other buildings
+  const mBuild = new T.MeshLambertMaterial({ color: 0x8C96A3 });
   for (const a of L.areas || []) {
-    if (a.pts.length < 3) continue;
-    if (a.k === 'apron') flat(a.pts, e + 0.15, mApron);   // (buildings keep their depth)
-    else {
-      const sh = new T.Shape(a.pts.map(p => { const q = loc(p[0], p[1]); return new T.Vector2(q[0], -q[1]); }));
-      const geo = new T.ExtrudeGeometry(sh, { depth: 14, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, e, 0);
-      const bm = new T.Mesh(geo, mBuild); bm.renderOrder = 9; g.add(bm);
-    }
+    if (a.k === 'apron' || a.pts.length < 3) continue;
+    const sh = new T.Shape(a.pts.map(p => { const q = loc(p[0], p[1]); return new T.Vector2(q[0], -q[1]); }));
+    const c = loc(a.pts[0][0], a.pts[0][1]);
+    const geo = new T.ExtrudeGeometry(sh, { depth: 14, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, gy(c[0], c[1]) - 0.5, 0);
+    const bm = new T.Mesh(geo, mBuild); bm.renderOrder = 9; g.add(bm);
   }
-  // taxiways as ribbons, all in one mesh, with their yellow centre lines
-  const rib = (mat: any, wk: number, yOff: number, types: number[]) => {
-    const pos: number[] = [];
-    for (const p of L.paths) {
-      if (types.indexOf(p[0]) < 0) continue;
-      const A = L.points[p[2]], B = L.points[p[3]]; if (!A || !B) continue;
-      const a = loc(A[0], A[1]), b = loc(B[0], B[1]), dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz) || 1, w = (wk ? Math.max(0.3, wk) : Math.max(8, p[1] || 18) * widen) / 2;
-      const nx = -dz / len * w, nz = dx / len * w, y = e + yOff;
-      pos.push(a[0] + nx, y, a[1] + nz, b[0] + nx, y, b[1] + nz, a[0] - nx, y, a[1] - nz, a[0] - nx, y, a[1] - nz, b[0] + nx, y, b[1] + nz, b[0] - nx, y, b[1] - nz);
-    }
-    if (!pos.length) return;
-    // round joins where taxiways meet or turn, so corners aren't cut off
-    if (!wk) for (const p of L.paths) {
-      if (types.indexOf(p[0]) < 0) continue;
-      for (const k of [p[2], p[3]]) { const P = L.points[k]; if (!P) continue; const c = loc(P[0], P[1]), w = Math.max(8, p[1] || 18) / 2 * widen, y = e + yOff;
-        for (let i = 0; i < 12; i++) { const a1 = i / 12 * Math.PI * 2, a2 = (i + 1) / 12 * Math.PI * 2; pos.push(c[0], y, c[1], c[0] + Math.cos(a1) * w, y, c[1] + Math.sin(a1) * w, c[0] + Math.cos(a2) * w, y, c[1] + Math.sin(a2) * w); } }
-    }
-    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
-    const m = new T.Mesh(geo, mat); m.material.side = T.DoubleSide; m.renderOrder = (mat as any)._order || 2; g.add(m);
-  };
-  let widen = 1.35; rib(mShoulder, 0, 0.22, [1, 4, 9, 3]);
-  widen = 1; rib(mTaxi, 0, 0.25, [1, 4, 9, 3]);
-  rib(mLine, 0.35, 0.3, [1, 4]);
-  // runways: painted with the markings a runway of that size has (ICAO Annex 14), numbers always
+  // the airport's ground paint, drawn from its own layout into one picture and laid over the terrain like a sheet
+  try { const sheet = airportSheet(L, loc, gy); if (sheet) g.add(sheet); } catch (x) { /* never stop the view */ }
+  // runways: strips that follow the ground, painted with the markings their size calls for, numbers always
   for (const r of L.runways) {
     if (r.surf === 9) continue;   // water runways have no paint
     const tex = new T.CanvasTexture(runwayMarkingsCanvas(r)); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = V3d.r ? V3d.r.capabilities.getMaxAnisotropy() : 4;
-    const geo = new T.PlaneGeometry(r.wid || 45, r.len); geo.rotateX(-Math.PI / 2);
-    const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, depthTest: false, depthWrite: false })); m.renderOrder = 5;
-    const q = v3dXY(r.lon, r.lat); m.position.set(q[0], e + 0.4, q[1]); m.rotation.y = -r.hdg * D2R;
+    const segs = Math.max(2, Math.ceil(r.len / 40)), geo = new T.PlaneGeometry(r.wid || 45, r.len, 2, segs); geo.rotateX(-Math.PI / 2);
+    const q = v3dXY(r.lon, r.lat), a = -r.hdg * D2R, cs = Math.cos(a), sn = Math.sin(a), pos = geo.attributes.position;
+    for (let k = 0; k < pos.count; k++) { const x = pos.getX(k), z = pos.getZ(k), wx = q[0] + x * cs + z * sn, wz = q[1] - x * sn + z * cs; pos.setXYZ(k, wx, gy(wx, wz) + 0.3, wz); }
+    pos.needsUpdate = true; geo.computeBoundingSphere();
+    const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 })); m.renderOrder = 4;
     g.add(m);
   }
-  // hold short lines where taxiways meet a runway
-  try { v3dHoldLines(L, g, loc, e); } catch (x) { /* never stop the view */ }
-  if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
+  if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }
   V3d.airport = g; V3d.scene.add(g);
   try { v3dAirportPatch(); } catch (x) { /* never stop the view */ }
+}
+
+/** The airport's ground as one picture: aprons (concrete), taxiways (asphalt with shoulders, joined with
+ *  round corners), yellow taxiway centre lines, stand lead-in lines and numbers, and runway holding
+ *  positions. Laid on a grid that follows the terrain, so nothing sinks into it or floats above it. */
+function airportSheet(L: AirportLayout, loc: (x: number, y: number) => number[], gy: (x: number, z: number) => number): any {
+  const T = THREE;
+  // the airport's extent (metres east/north of its reference point), with a margin
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  const add = (x: number, y: number) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); };
+  (L.points || []).forEach(p => add(p[0], p[1])); (L.areas || []).forEach(a => a.pts.forEach(p => add(p[0], p[1]))); (L.parks || []).forEach(p => add(p[0], p[1]));
+  if (x1 < x0) return null;
+  x0 -= 80; y0 -= 80; x1 += 80; y1 += 80;
+  const W = x1 - x0, H = y1 - y0, cap = v3dTexCap(), k = Math.min(cap / W, cap / H, 4);   // pixels a metre (at most 4)
+  const cv = document.createElement('canvas'); cv.width = Math.ceil(W * k); cv.height = Math.ceil(H * k);
+  const c = cv.getContext('2d'), X = (x: number) => (x - x0) * k, Y = (y: number) => (y1 - y) * k;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // aprons: light concrete with a faint slab pattern
+  for (const a of L.areas || []) {
+    if (a.k !== 'apron' || a.pts.length < 3) continue;
+    c.beginPath(); a.pts.forEach((p, i) => i ? c.lineTo(X(p[0]), Y(p[1])) : c.moveTo(X(p[0]), Y(p[1]))); c.closePath();
+    c.fillStyle = '#8E9399'; c.fill();
+    c.save(); c.clip(); c.strokeStyle = 'rgba(60,64,70,.18)'; c.lineWidth = Math.max(1, k * 0.15);
+    for (let x = Math.floor(x0 / 7.5) * 7.5; x < x1; x += 7.5) { c.beginPath(); c.moveTo(X(x), 0); c.lineTo(X(x), cv.height); c.stroke(); }
+    for (let y = Math.floor(y0 / 7.5) * 7.5; y < y1; y += 7.5) { c.beginPath(); c.moveTo(0, Y(y)); c.lineTo(cv.width, Y(y)); c.stroke(); }
+    c.restore();
+  }
+  const taxi = (L.paths || []).filter(p => [1, 4, 9, 3].indexOf(p[0]) >= 0 && L.points[p[2]] && L.points[p[3]]);
+  const seg = (p: number[]) => { const A = L.points[p[2]], B = L.points[p[3]]; c.beginPath(); c.moveTo(X(A[0]), Y(A[1])); c.lineTo(X(B[0]), Y(B[1])); };
+  // taxiways: shoulders first, then the asphalt (strokes with round joins: no gaps, no overlaps)
+  for (const p of taxi) { if (p[0] === 3) continue; seg(p); c.strokeStyle = '#5E636A'; c.lineWidth = (Math.max(10, p[1] || 18) + 9) * k; c.stroke(); }
+  // taxiway edge lines (two thin yellow lines) and the yellow centre line
+  // edge lines: all the yellow first, then all the asphalt inside it, so junctions stay clean
+  const ew = Math.max(1, 0.3 * k);
+  for (const p of taxi) { if (p[0] === 3) continue; seg(p); c.strokeStyle = '#D9A92E'; c.lineWidth = Math.max(10, p[1] || 18) * k + ew * 2; c.stroke(); }
+  for (const p of taxi) { seg(p); c.strokeStyle = p[0] === 3 ? '#4A4F56' : '#3B4047'; c.lineWidth = Math.max(p[0] === 3 ? 8 : 10, p[1] || (p[0] === 3 ? 10 : 18)) * k - (p[0] === 3 ? 0 : ew * 2); c.stroke(); }
+  for (const p of taxi) { seg(p); c.strokeStyle = '#E8B730'; c.lineWidth = Math.max(1.2, 0.3 * k); c.stroke(); }
+  // stands: a yellow lead-in line, a stop bar and the stand number
+  c.font = `700 ${Math.max(8, 3 * k)}px Arial, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  (L.parks || []).forEach(pk => {
+    const h = (pk[2] || 0) * D2R, ux = Math.sin(h), uy = Math.cos(h), len = Math.max(25, (pk[3] || 20) * 1.6);
+    c.strokeStyle = '#E8B730'; c.lineWidth = Math.max(1.2, 0.3 * k);
+    c.beginPath(); c.moveTo(X(pk[0] - ux * len), Y(pk[1] - uy * len)); c.lineTo(X(pk[0] + ux * (pk[3] || 15) * 0.6), Y(pk[1] + uy * (pk[3] || 15) * 0.6)); c.stroke();
+    const sx = pk[0] + ux * (pk[3] || 15) * 0.6, sy = pk[1] + uy * (pk[3] || 15) * 0.6;
+    c.lineWidth = Math.max(2, 0.6 * k); c.beginPath(); c.moveTo(X(sx - uy * 2.5), Y(sy + ux * 2.5)); c.lineTo(X(sx + uy * 2.5), Y(sy - ux * 2.5)); c.stroke();
+    const name = L.parkNames && pk[6] != null ? L.parkNames[pk[6]] : pk[6] != null ? String(pk[6]) : '';
+    if (name && k >= 1.5) { c.fillStyle = '#F4D35E'; c.save(); c.translate(X(pk[0] - ux * len * 0.75), Y(pk[1] - uy * len * 0.75)); c.rotate(h); c.fillText(name, 0, 0); c.restore(); }
+  });
+  // runway holding positions: two solid and two dashed yellow lines across the taxiway
+  for (const r of L.runways) {
+    if (r.surf === 9 || r.surf === 1) continue;
+    const cx = (r.lon - L.lon) * 111320 * Math.cos(L.lat * D2R), cy = (r.lat - L.lat) * 110540, ux = Math.sin(r.hdg * D2R), uy = Math.cos(r.hdg * D2R), half = r.len / 2, hw = (r.wid || 45) / 2;
+    const hold = hw + ((r.wid || 45) >= 40 ? 65 : (r.wid || 45) >= 25 ? 45 : 30);
+    const side = (x: number, y: number) => ({ along: (x - cx) * ux + (y - cy) * uy, across: -(x - cx) * uy + (y - cy) * ux });
+    for (const p of taxi) {
+      const A = L.points[p[2]], B = L.points[p[3]], a = side(A[0], A[1]), b = side(B[0], B[1]);
+      const onA = Math.abs(a.across) < hw + 8 && Math.abs(a.along) < half, onB = Math.abs(b.across) < hw + 8 && Math.abs(b.along) < half;
+      if (onA === onB) continue;
+      const on = onA ? a : b, off = onA ? b : a, P0 = onA ? A : B, P1 = onA ? B : A;
+      if (Math.abs(off.across) < hold) continue;
+      const t = (hold - Math.abs(on.across)) / (Math.abs(off.across) - Math.abs(on.across)), hx = P0[0] + (P1[0] - P0[0]) * t, hy = P0[1] + (P1[1] - P0[1]) * t;
+      const dx = P1[0] - P0[0], dy = P1[1] - P0[1], dl = Math.hypot(dx, dy) || 1, tx = dx / dl, ty = dy / dl, nx = -ty, ny = tx, w = Math.max(10, p[1] || 18) / 2 + 3;
+      c.strokeStyle = '#E8B730'; c.lineWidth = Math.max(1.2, 0.3 * k); c.lineCap = 'butt';
+      // (t points away from the runway) dashed pair nearer the runway, solid pair on the taxiway side
+      [[0.0, true], [0.6, true], [1.3, false], [1.9, false]].forEach(([o, dash]) => {
+        const ox = hx + tx * (o as number), oy = hy + ty * (o as number);
+        c.setLineDash(dash ? [Math.max(2, 0.9 * k), Math.max(2, 0.9 * k)] : []);
+        c.beginPath(); c.moveTo(X(ox - nx * w), Y(oy - ny * w)); c.lineTo(X(ox + nx * w), Y(oy + ny * w)); c.stroke();
+      });
+      c.setLineDash([]); c.lineCap = 'round';
+    }
+  }
+  // the sheet: a grid over the airport that follows the terrain
+  const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = V3d.r ? V3d.r.capabilities.getMaxAnisotropy() : 4;
+  tex.onUpdate = () => { tex.onUpdate = null; setTimeout(() => { try { cv.width = 1; cv.height = 1; } catch (e) { /* ignore */ } }, 0); };
+  const nx = Math.min(120, Math.ceil(W / 40)), ny = Math.min(120, Math.ceil(H / 40)), pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
+    const mx = x0 + W * i / nx, my = y0 + H * j / ny, q = loc(mx, my);
+    pos.push(q[0], gy(q[0], q[1]) + 0.12, q[1]); uv.push(i / nx, j / ny);
+  }
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, d = a + nx + 1, e2 = d + 1; idx.push(a, d, b, b, d, e2); }
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeBoundingSphere();
+  const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: T.DoubleSide }));
+  m.renderOrder = 3;
+  return m;
 }
 
 /** Centre the view on an airport (its layout, its aircraft on the ground) or on open country. */
@@ -386,7 +442,8 @@ function v3dLoop(now: number) {
       // the model is built from its nose; a pivot in its middle places and turns it
       const body = buildAircraftModel(typeId, liveryFor(c.color, c.color2, c.id)), model = new T.Group();
       body.position.x = -shapeOf(typeId).L / 2; model.add(body);
-      body.traverse((o: any) => { o.renderOrder = 10; });   // after the airport's ground paint model.userData.flightId = g.id; model.userData.set = body.userData.set;
+      body.traverse((o: any) => { o.renderOrder = 10; });   // after the airport's ground paint
+      model.userData.flightId = g.id; model.userData.set = body.userData.set;
       V3d.scene.add(model);
       const lab = document.createElement('span'); lab.className = 'v3d-lab' + ((g as any).tfc ? ' tfc' : ''); lab.textContent = (g as any).tfc ? `${(g as any).tfc.airline} ${g.callsign}` : g.callsign; V3d.root.querySelector('.v3d-labels').appendChild(lab);
       P = V3d.planes[g.id] = { id: g.id, model, type: typeId, pos: null, tgt: new T.Vector3(), hdg: w.hdg, tgtHdg: w.hdg, bank: 0, pitch: 0, flaps: 0, gear: 1, label: lab, seen: now };
@@ -430,7 +487,7 @@ function v3dLoop(now: number) {
     const wantF = simCfg ? simCfg.f : cfg ? cfg.flaps : /final|landing|touchdown|roll/.test(ph) ? 1 : /approach|take-?off|lift-?off/.test(ph) ? 0.4 : /taxi|pushback|gate|boarding/.test(ph) ? (/out/.test(ph) ? 0.3 : 0) : 0;
     const wantG = simCfg ? simCfg.g : cfg ? cfg.gear : w.onGround || /final|landing|touchdown|lift-?off|take-?off/.test(ph) || (w.altM - ground < 600 && !/cruise|climb/.test(ph)) ? 1 : 0;
     P.flaps += (wantF - P.flaps) * Math.min(1, dt * 0.35); P.gear += (wantG - P.gear) * Math.min(1, dt * 0.25);
-    P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18 });
+    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18 });
     // place it: nose (−x of the model) along the heading, centre of the fuselage at the right height
     P.model.position.copy(P.pos);
     P.model.rotation.set(0, 0, 0);
@@ -723,42 +780,6 @@ function runwayMarkingsCanvas(r: { len: number; wid: number; surf: number; a: st
   return cv;
 }
 
-/** Runway holding positions: where a taxiway reaches a runway, the yellow lines (two solid on the
- *  taxiway side, two dashed on the runway side), at a distance that suits the runway's size. */
-function v3dHoldLines(L: AirportLayout, g: any, loc: (x: number, y: number) => number[], e: number) {
-  const T = THREE, made: string[] = [];
-  const tex = (() => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const c = cv.getContext('2d');
-    c.fillStyle = '#E2B33C'; c.fillRect(0, 4, 128, 8); c.fillRect(0, 20, 128, 8); for (let x = 0; x < 128; x += 24) { c.fillRect(x, 36, 14, 8); c.fillRect(x, 52, 14, 8); }
-    const t = new T.CanvasTexture(cv); t.wrapS = T.RepeatWrapping; t.colorSpace = T.SRGBColorSpace; return t; })();
-  const mat = new T.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
-  for (const r of L.runways) {
-    if (r.surf === 9 || r.surf === 1) continue;
-    // the runway in local metres: centre and direction
-    const cx = (r.lon - L.lon) * 111320 * Math.cos(L.lat * D2R), cy = (r.lat - L.lat) * 110540;
-    const ux = Math.sin(r.hdg * D2R), uy = Math.cos(r.hdg * D2R), half = r.len / 2, hw = (r.wid || 45) / 2;
-    const hold = hw + ((r.wid || 45) >= 40 ? 65 : (r.wid || 45) >= 25 ? 45 : 30);
-    const side = (x: number, y: number) => ({ along: (x - cx) * ux + (y - cy) * uy, across: -(x - cx) * uy + (y - cy) * ux });
-    for (const p of L.paths) {
-      if ([1, 4, 9, 3].indexOf(p[0]) < 0) continue;
-      const A = L.points[p[2]], B = L.points[p[3]]; if (!A || !B) continue;
-      const a = side(A[0], A[1]), b = side(B[0], B[1]);
-      // one end on the runway, the other well off it
-      const onA = Math.abs(a.across) < hw + 8 && Math.abs(a.along) < half, onB = Math.abs(b.across) < hw + 8 && Math.abs(b.along) < half;
-      if (onA === onB) continue;
-      const on = onA ? a : b, off = onA ? b : a, P0 = onA ? A : B, P1 = onA ? B : A;
-      if (Math.abs(off.across) < hold) continue;   // too short a stub to fit the line
-      const t = (hold - Math.abs(on.across)) / (Math.abs(off.across) - Math.abs(on.across));
-      const hx = P0[0] + (P1[0] - P0[0]) * t, hy = P0[1] + (P1[1] - P0[1]) * t, key = Math.round(hx / 10) + ':' + Math.round(hy / 10);
-      if (made.indexOf(key) >= 0) continue; made.push(key);
-      const q = loc(hx, hy), q1 = loc(P1[0], P1[1]), dirx = q1[0] - q[0], dirz = q1[1] - q[1], ang = Math.atan2(dirx, dirz);
-      const w = Math.max(10, p[1] || 18) + 4;
-      const geo = new T.PlaneGeometry(w, 3.2); geo.rotateX(-Math.PI / 2);
-      const m = new T.Mesh(geo, mat); m.renderOrder = 7; m.position.set(q[0], e + 0.32, q[1]); m.rotation.y = ang;
-      (m.material.map as any).repeat && (m.material.map.repeat.x = Math.max(1, w / 12));
-      g.add(m);
-    }
-  }
-}
 
 /* ---------- when the device runs out of graphics memory ---------- */
 // Android closes the app without an error when the graphics take too much memory. A mark is kept while
