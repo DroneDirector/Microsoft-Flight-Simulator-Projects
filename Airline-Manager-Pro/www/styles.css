@@ -2305,3 +2305,5 @@ button.route-row:hover { border-color: var(--line-2); background: var(--panel-2)
 .calm .news-pop.open .panel { animation: np-calm .35s ease-out both; }
 .calm .news-pop.open .np-mast, .calm .news-pop.open .np-h, .calm .news-pop.open .np-sf, .calm .news-pop.open .np-fig, .calm .news-pop.open .np-cols > p, .calm .news-pop.open .np blockquote { animation: none; }
 @keyframes np-calm { from { opacity: 0; transform: translate(-50%, -50%) scale(.97); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+.gnd-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #F2C14E; margin-right: 6px; vertical-align: 1px; }
+.mf-ph { font-style: normal; font-weight: 600; font-size: 10.5px; padding: 1px 6px; border-radius: 6px; margin-right: 4px; } .mf-ph.air { background: rgba(61,220,151,.15); color: #3DDC97; } .mf-ph.gnd { background: rgba(242,193,78,.15); color: #F2C14E; }
