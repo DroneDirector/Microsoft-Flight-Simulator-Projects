@@ -86,6 +86,7 @@ const BURN_KG_H: { [cls: string]: number } = { ga: 30, bush: 120, turboprop: 650
 
 function onSimState(s: SimSnapshot) {
   Link.sim = s;
+  try { MyRec.onState(s); } catch (e) { /* never stop the feed */ }
   try { paxOnState(s); } catch (e) { /* never stop the feed */ }
   try { if (s && s.connected) gsxOnState(s, nearestKnownAirport(s.lon, s.lat, 8) || s.from || ((State.live.filter(f => f.id === 'me')[0] || {} as any).from) || ''); } catch (e) { /* never stop the feed */ }
   const b: any = State.bridge, S: any = State;
@@ -274,6 +275,7 @@ function onSimEvent(e: FlightEvent) {
       const l: LogEntry = { id: uid(), date: dateStr(new Date()), from: (State.live.filter(f => f.id === 'me')[0] || { from: '' } as any).from || '—', to: e.airport || '—', reg: a.reg,
         blockMin: 0, landingFpm: -(e.fpm || 0), g: e.g || 0, pax: S.myLoad.pax || 0, result: 'crash', decision: 'pending', atc: State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'Built-in', notes: e.detail };
       State.logbook.unshift(l);
+      try { (l as any).score = 0; if (MyRec.pts.length > 2) trackSave(l.id, trackThin(MyRec.pts, trackMarks(MyRec.pts.slice(), MyRec.marks.concat([{ k: 'td', i: MyRec.pts.length - 1 }])), 500)); MyRec.reset(); } catch (er) { /* ignore */ }
       removeMyLiveFlight();
       Store.save(); refresh();
       if (State.settings.crashPrompt) setTimeout(() => crashPopup(l.id), 600);
@@ -295,8 +297,10 @@ function finishLeg(e: FlightEvent) {
   if ((a as any).noBase) sm.pax = 0;   // flown without a stand at its base: nobody on board
   const hard = sm.landingFpm >= 600 || sm.landingG >= 1.8;
   const grounded = LEG_ISSUES.map(id => State.issues.filter(i => i.id === id)[0]).some(i => i && i.severity === 'grounding');
+  let _rcNote = ''; try { _rcNote = recencyMyLeg(a.typeId, sm); } catch (er) { /* ignore */ }
   State.logbook.unshift({ id: uid(), date: dateStr(new Date()), from, to, reg: a.reg, blockMin: sm.blockMin, landingFpm: -sm.landingFpm, g: sm.landingG, pax: sm.pax,
-    typeId: a.typeId, result: grounded ? 'incident' : hard ? 'hard' : 'ok', atc: State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'Built-in', notes: _legNotes.join(', ') || undefined } as any);
+    typeId: a.typeId, result: grounded ? 'incident' : hard ? 'hard' : 'ok', atc: State.settings.atcSource === 'beyondatc' ? 'BeyondATC' : 'Built-in', notes: [_rcNote].concat(_legNotes).filter(Boolean).join(', ') || undefined } as any);
+  try { const L0: any = State.logbook[0]; vaAfterMyLeg(L0, sm, a.typeId, S.lastTouchdown ? { lon: S.lastTouchdown.lon, lat: S.lastTouchdown.lat, icao: to } : undefined); const scn = sharedAfterMyLeg(L0, sm.blockMin); if (scn) L0.notes = [L0.notes, scn].filter(Boolean).join(', '); } catch (er) { /* ignore */ }
   me.hoursMin += sm.blockMin; me.landings += 1;
   a.hoursMin += sm.blockMin; a.cycles += 1; a.location = to; a.status = grounded ? 'grounded' : 'parked';
   try { conditionAfterFlight(a, sm.blockMin); } catch (er) { /* ignore */ }
@@ -304,6 +308,7 @@ function finishLeg(e: FlightEvent) {
   // real-world fares, on-board sales and costs (economics.ts), with the fuel actually burned in the sim
   const job = Jobs.forMyLeg(from, to, a.reg);
   const m = legEconomics(a.typeId, from, to, sm.pax, sm.cargoKg, sm.blockMin, sm.fuelUsedKg, gsxTakeLegFlag() && !!(State.settings as any).gsx, { book: true, reg: a.reg, job: job ? jobPayFor(job.id) : undefined });
+  try { vaStatLeg({ onTime: true, pax: sm.pax, net: m.net, fpm: sm.landingFpm, score: (State.logbook[0] as any).score }); } catch (er) { /* ignore */ }
   const now = new Date(), day = dateStr(now).slice(0, 10), time = dateStr(now).slice(11);
   const flight = c.icao + (100 + (_hashStr(a.reg) % 800));
   const rev = m.revenue, fuel = m.costs, fees = 0;

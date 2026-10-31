@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.25 (2026-10-31)
+
+- Flight replay, flight score (sim rules + procedural for AI/co-op), fuel plan/check, screenshots (IndexedDB), recency, NOTAMs (activeRunway respects closures/ILS)
+- Airline league vs scheduled AI airlines, Airline of the Month/Year with badges and news, monthly report, Pilot of the Month and awards
+- Co-op crew room: shared cockpit, trainer sign-off of check rides, photo contest, base transfers; PIREP minimum flight score
+- Other airlines: hubs, fleets and daily schedules with delays
+
 ## 0.9.24 (2026-10-31)
 
 - Boarding scan notice opens the decision (was routed to the crash report); settled or departed flights explained

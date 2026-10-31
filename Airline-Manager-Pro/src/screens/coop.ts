@@ -19,6 +19,7 @@ SCREENS.coop = {
     if (_coopTab === 'board') return head + flightBoardHtml();
     if (_coopTab === 'chat') return head + coopChatHtml();
     if (_coopTab === 'events') return head + eventsHtml();
+    if (_coopTab === 'crew') return head + crewRoomHtml();
     if (_coopTab === 'staff') return head + coopStaffHtml();
     if (_coopTab === 'rules') return head + coopRulesHtml();
     const week = Date.now() - 7 * 864e5;

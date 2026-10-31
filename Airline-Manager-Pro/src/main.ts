@@ -52,6 +52,7 @@
   try { modeStart(); } catch (e) { /* ignore */ }
   try { startNewsWatch(); startWarnClock(); } catch (e) { /* ignore */ }
   try { applyDifficultyPrices(); startMarkets(); } catch (e) { /* ignore */ }
+  try { startVa(); } catch (e) { /* ignore */ }
   try { v3dCrashCheck(); } catch (e) { /* ignore */ }
   startCoopClock();
   startBases();

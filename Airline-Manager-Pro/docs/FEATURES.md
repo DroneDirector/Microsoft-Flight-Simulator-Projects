@@ -101,6 +101,17 @@ Each widget opens its own page.
 |---|---|
 | Flight hours, landings, landing rate and G per flight | Built (demo) |
 | Crashes: choose to register or disregard | Built |
+| Flight replay: track on a map, altitude and speed chart, take-off, top of climb, top of descent and touchdown, playback | Built |
+| Flight score out of 100 with the airline's flying rules (250 kt below 10,000 ft, taxi speed, flap and gear limits, stable approach, landing, centre line, touchdown zone, fuel reserve); lights and stall checks once the PC app reads them | Built |
+| Fuel check: planned against used and left at the gate | Built |
+| Screenshots added to flights, shown on the flight and your profile | Built |
+| Recency: 3 landings on a type in 90 days (recency flight or simulator session otherwise; hired pilots go to the simulator) | Built |
+| NOTAMs in the briefings (closed runways and ILS are respected) | Built |
+| Airline league against the other airlines, Airline of the Month and of the Year with badges and newspaper stories | Built |
+| Monthly report against the month before | Built |
+| Pilot of the Month (best hired pilot, or the co-op's vote) and staff awards | Built |
+| Co-op crew room: shared cockpit flights, trainers signing off check rides, photo contest, base transfer requests | Built |
+| Other airlines fly their own daily schedules from their own hubs, with delays | Built |
 
 ## Maintenance and damage
 
