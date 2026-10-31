@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.17 (2026-10-31)
+
+- PC free camera: pointer-lock mouse look, WASD/Space/C/Shift, wheel speed, Esc exits to the map with Esc badge; touch controls hidden on PC
+
 ## 0.9.16 (2026-10-31)
 
 - Map airport card: View in 3D (airport-only 3D view in free camera mode)
