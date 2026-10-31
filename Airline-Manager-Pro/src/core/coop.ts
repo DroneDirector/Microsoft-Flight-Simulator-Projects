@@ -81,6 +81,7 @@ const CoopDemo: CoopBackend = {
     }
     for (const f of State.live) if ((f as any).coop) coopUpdate(f, now);
     try { coopJobsTick(now); } catch (e) { /* ignore */ }
+    try { coopConnTick(now); } catch (e) { /* ignore */ }
   },
 };
 

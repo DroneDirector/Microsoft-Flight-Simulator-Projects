@@ -49,6 +49,7 @@
   Backup.init();
   Licence.init();
   startAiClock();
+  try { modeStart(); } catch (e) { /* ignore */ }
   startCoopClock();
   startBases();
   Battery.init();

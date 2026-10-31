@@ -99,7 +99,7 @@ ACTIONS['new-base'] = el => {
   const k = el.getAttribute('data-k');
   openBasePicker('Base for the new aircraft', 'Where it is delivered and parked', icao => { if (k === 'lease') { _lease.base = icao; rerenderLease(); } else if (k === 'used') { _used.base = icao; rerenderUsed(); } else { _buy.base = icao; rerenderBuy(); } });
 };
-function rerenderBuy() { const p = $('.buy-pop .panel'); if (p) p.innerHTML = buySheetHtml(); }
+function rerenderBuy() { const p = $('.buy-pop .panel'); if (p) patchHtml(p, buySheetHtml()); }
 ACTIONS['buy-qty'] = el => { _buy.qty = clamp(_buy.qty + parseInt(el.getAttribute('data-d'), 10), 1, 12); Sound.tick(); rerenderBuy(); };
 ACTIONS['buy-eng'] = el => { (_buy as any).eng = el.getAttribute('data-e'); Sound.tick(); rerenderBuy(); };
 ACTIONS['buy-div'] = el => { _buy.div = el.getAttribute('data-div'); Sound.tick(); rerenderBuy(); };

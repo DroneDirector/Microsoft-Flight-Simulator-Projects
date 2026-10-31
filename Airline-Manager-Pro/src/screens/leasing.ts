@@ -95,7 +95,7 @@ function leaseSheetHtml(): string {
     </div>`;
 }
 ACTIONS['lease-eng'] = el => { (_lease as any).eng = el.getAttribute('data-e'); Sound.tick(); rerenderLease(); };
-function rerenderLease() { const p = $('.lease-pop .panel'); if (p) p.innerHTML = leaseSheetHtml(); }
+function rerenderLease() { const p = $('.lease-pop .panel'); if (p) patchHtml(p, leaseSheetHtml()); }
 
 ACTIONS.lease = el => {
   if (!canTrade()) return;

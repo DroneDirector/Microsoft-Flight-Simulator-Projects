@@ -40,12 +40,13 @@ function renderTopbar() {
   const linkTxt = st === 'connected' ? (Link.sim && !Link.sim.connected ? 'Linked, sim not running' : DESKTOP ? 'Linked on this PC' : Link.via === 'wifi' ? 'Linked over Wi-Fi' : Link.via === 'usb' ? 'Linked over USB' : 'Linked via hotspot')
     : st === 'unpaired' ? ((State as any).linkedOnce ? 'Link your PC' : 'Demo, link your PC') : 'Looking for your PC';
   const n = unreadCount();
-  $('.topbar').innerHTML = `
+  patchHtml($('.topbar'), `
     <button class="co-switch" data-act="switcher" aria-label="Switch company">
       <span class="co-badge" style="--co:${c.color};--co2:${c.color2}">${esc(c.icao)}</span>
       <span class="co-text"><b>${esc(c.name)}</b><small>${div ? esc(div.name) + ' division' : (c.divisions.length ? 'All divisions' : esc(myPilot().name))}</small></span>
       ${icon('down', 'co-chev')}
     </button>
+    ${Mode.coop() ? `<button class="mode-chip" data-act="go" data-screen="coop" aria-label="Co-op mode. Open Co-op">${icon('coop')}<span>Co-op</span><em>${coopState() ? coopState().members.filter((m: any) => m.online || m.you).length : 1}</em></button>` : ''}
     <button class="link-pill ${b.pc === 'connected' ? 'ok' : 'warn'}" data-act="link-panel" aria-label="${linkTxt}. Open connection details">
       <i class="link-led"></i>${icon(st === 'connected' && Link.via !== 'wifi' ? 'cell' : 'wifi')}<span>${linkTxt}</span><em>${b.pc === 'connected' && Link.latency ? Link.latency + ' ms' : ''}</em>
     </button>
@@ -55,7 +56,7 @@ function renderTopbar() {
     <button class="icon-btn sound-btn ${State.settings.muteAll ? 'muted-btn' : ''}" data-act="sound-toggle" aria-label="${State.settings.muteAll ? 'Sounds are muted. Tap to turn sounds on' : 'Sounds are on. Tap to mute all sounds'}">${icon(State.settings.muteAll ? 'mute' : 'volume')}</button>
     <button class="icon-btn bell ${n ? 'has' : ''}" data-act="inbox" aria-label="Notifications, ${n} unread">${icon('bell')}${n ? `<span class="badge">${n}</span>` : ''}</button>
     <button class="icon-btn" data-act="settings" aria-label="Settings">${icon('gear')}</button>
-    <button class="icon-btn power-btn" data-act="exit" aria-label="Exit ${esc(APP.name)}">${icon('power')}</button>`;
+    <button class="icon-btn power-btn" data-act="exit" aria-label="Exit ${esc(APP.name)}">${icon('power')}</button>`);
   const dot = $('[data-maint-dot]');
   if (dot) dot.style.display = State.issues.some(i => i.status === 'open' && plane(i.reg) && plane(i.reg).companyId === State.companyId) ? '' : 'none';
 }
@@ -88,11 +89,71 @@ function go(screen: string, instant?: boolean) {
 function refresh() {
   renderTopbar();
   const view = $('#view');
-  const st = view.scrollTop;
-  view.innerHTML = `<section class="screen screen-${State.screen}">${SCREENS[State.screen].render()}</section>`;
+  const st = view.scrollTop, cur = view.firstElementChild as HTMLElement, html = `<section class="screen screen-${State.screen}">${SCREENS[State.screen].render()}</section>`;
+  // the same screen again: change only what changed (text, numbers, a new row), so nothing flashes or
+  // animates in again. Screens with live maps or drawings are built afresh, without the entrance animations.
+  if (cur && cur.classList.contains('screen-' + State.screen) && !SCREENS[State.screen].mount) { patchHtml(view, html); view.scrollTop = st; return; }
+  const again = !!(cur && cur.classList.contains('screen-' + State.screen));
+  view.innerHTML = html;
   const root = view.firstElementChild as HTMLElement;
   if (SCREENS[State.screen].mount) SCREENS[State.screen].mount(root);
+  if (again) settleAnimations(root);
   view.scrollTop = st;
+}
+
+/** Put new HTML into an element by changing only the parts that differ: unchanged elements stay as they
+ *  are (no flash, no animation starting over, pictures not drawn again). */
+function patchHtml(el: Element, html: string) {
+  const t = document.createElement(el.tagName === 'TBODY' ? 'tbody' : 'div'); t.innerHTML = html;
+  patchChildren(el, t);
+}
+function patchChildren(from: Node, to: Node) {
+  const a = Array.from(from.childNodes), b = Array.from(to.childNodes);
+  for (let i = 0; i < b.length; i++) {
+    const n = b[i], o = a[i];
+    if (!o) { from.appendChild(n); continue; }
+    // text that flipped last time (wrapped for the animation) compared as the text it shows
+    if (n.nodeType === 3 && (o as Element).classList && (o as Element).classList.contains('flap-w')) {
+      const t = document.createTextNode(o.textContent); from.replaceChild(t, o); if (t.nodeValue !== n.nodeValue) flapText(t, n.nodeValue); continue;
+    }
+    if (o.nodeType !== n.nodeType || o.nodeName !== n.nodeName) { from.replaceChild(n, o); continue; }
+    if (o.nodeType === 3) { if (o.nodeValue !== n.nodeValue) flapText(o as Text, n.nodeValue); continue; }
+    if (o.nodeType === 8) { if (o.nodeValue !== n.nodeValue) o.nodeValue = n.nodeValue; continue; }
+    patchNode(o as Element, n as Element);
+  }
+  for (let i = b.length; i < a.length; i++) if (a[i].parentNode === from) from.removeChild(a[i]);
+}
+function patchNode(o: Element, n: Element) {
+  // a different item in this place (another id): swap it rather than reshape it
+  const ko = o.getAttribute('data-id'), kn = n.getAttribute('data-id');
+  if (ko !== kn && ko && kn) { o.parentNode.replaceChild(n, o); return; }
+  const na = n.attributes, oa = o.attributes;
+  for (let i = oa.length - 1; i >= 0; i--) if (!n.hasAttribute(oa[i].name)) o.removeAttribute(oa[i].name);
+  for (let i = 0; i < na.length; i++) if (o.getAttribute(na[i].name) !== na[i].value) o.setAttribute(na[i].name, na[i].value);
+  if (o.tagName === 'INPUT' || o.tagName === 'TEXTAREA' || o.tagName === 'SELECT') { if (document.activeElement !== o && 'value' in n) (o as any).value = (n as any).value; return; }
+  if (o.tagName === 'CANVAS') return;   // drawn by code
+  if (o.innerHTML !== n.innerHTML) patchChildren(o, n);
+}
+/** Changed text turns over like a split-flap departure board: only the characters that changed flip, one
+ *  after the other. Long text fades across instead; with reduced motion it simply changes. */
+function flapText(o: Text, txt: string) {
+  const par = o.parentElement, old = o.nodeValue || '';
+  if (!par || State.settings.reduceMotion || par.closest('svg, option, select, textarea, title') || !txt.trim()) { o.nodeValue = txt; return; }
+  if (txt.length > 32) { o.nodeValue = txt; par.classList.remove('tick-fade'); void par.offsetWidth; par.classList.add('tick-fade'); return; }
+  const w = document.createElement('span'); w.className = 'flap-w';
+  // characters are lined up from the right for numbers (so 9→10 flips the right digits), from the left otherwise
+  const num = /^[\s\d.,:%+\-−€$£kKmMh]+$/.test(txt) && /\d/.test(txt), off = num ? old.length - txt.length : 0;
+  let k = 0;
+  for (let i = 0; i < txt.length; i++) {
+    const ch = txt[i], was = old[i + off];
+    if (ch === was || ch === ' ') { w.appendChild(document.createTextNode(ch)); continue; }
+    const s = document.createElement('span'); s.className = 'fl'; s.textContent = ch; s.style.setProperty('--d', (k++ * 28) + 'ms'); w.appendChild(s);
+  }
+  par.replaceChild(w, o);
+}
+/** Entrance animations of a rebuilt screen jump to their end; animations that loop keep going. */
+function settleAnimations(root: HTMLElement) {
+  try { (root as any).getAnimations({ subtree: true }).forEach((a: any) => { const t = a.effect && a.effect.getTiming(); if (t && t.iterations !== Infinity) a.finish(); }); } catch (e) { /* older browser */ }
 }
 
 function bindActions() {

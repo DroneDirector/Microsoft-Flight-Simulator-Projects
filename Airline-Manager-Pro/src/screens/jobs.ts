@@ -96,7 +96,7 @@ function jobEstimate(j: Job, a: Aircraft): number {
   if (a.location !== j.from && apt(a.location) && apt(j.from)) { const nm = gcDistanceNm(apt(a.location).pos, apt(j.from).pos); ferry = -legEconomics(a.typeId, a.location, j.from, 0, 0, block(nm), undefined, false, { ferry: true }).net; }
   return Math.round(m.net - ferry);
 }
-function rerenderJa() { const p = $('.ja-pop .panel'); if (p) p.innerHTML = jobPilotHtml(); }
+function rerenderJa() { const p = $('.ja-pop .panel'); if (p) patchHtml(p, jobPilotHtml()); }
 ACTIONS['job-pilot'] = el => { _ja = { id: el.getAttribute('data-id'), reg: '' }; Sound.tick(); openLayer('modal', jobPilotHtml(), { cls: 'wide ja-pop' }); };
 ACTIONS['ja-ac'] = el => { _ja.reg = el.getAttribute('data-reg'); Sound.tick(); rerenderJa(); };
 ACTIONS['ja-go'] = el => {

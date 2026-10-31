@@ -7,7 +7,7 @@ const TX_FILTERS = [['all', 'All'], ['revenue', 'Revenue'], ['salary', 'Salaries
 function staffCountFor(cid: string): number { return State.pilots.filter((p: any) => !p.you && pilotCompany(p) === cid).length + staffOf(cid).length; }
 
 function txRows(cid: string): string {
-  const all = State.txns.filter(t => (t.companyId || 'atn') === cid);
+  const all = State.txns.filter(t => (t.companyId || 'atn') === cid && (!coopOn() || _coopWho === 'all' || (_coopWho === 'me' ? !(t as any).coopBy : (t as any).coopBy === _coopWho)));
   let rows: any[];
   if (_txFilter === 'all') {
     const sal = all.filter(t => t.kind === 'salary');
@@ -69,7 +69,7 @@ SCREENS.finance = {
       ${bankCardsHtml(c.id)}
       <div class="card fin-tx">
         <div class="card-h"><b>Transactions</b><small>Tap one for details</small></div>
-        <div class="tx-filter">${TX_FILTERS.map(fl => `<button class="fchip ${_txFilter === fl[0] ? 'on' : ''}" data-act="tx-filter" data-f="${fl[0]}">${fl[1]}</button>`).join('')}</div>
+        ${coopWhoChips(true)}<div class="tx-filter">${TX_FILTERS.map(fl => `<button class="fchip ${_txFilter === fl[0] ? 'on' : ''}" data-act="tx-filter" data-f="${fl[0]}">${fl[1]}</button>`).join('')}</div>
         ${_txFilter === 'salary' || _txFilter === 'all' ? `<div class="payroll"><span>${icon('pilots')}<b>Next payroll in 6 days</b><small>${staffCountFor(c.id)} people, paid every week</small></span><b class="red">${money(-weeklyPayroll(c.id))}</b></div>` : ''}
         ${txRows(c.id)}
       </div>
@@ -156,7 +156,7 @@ function loansHtml(): string {
     : `<p class="fine-print">${icon('info')}The bank lends against the aircraft you own. Buy aircraft (not leased) or pay back what you owe to borrow more.</p>`}
   </div>`;
 }
-function rerenderLoans() { const p = $('.loan-pop .panel'); if (p) p.innerHTML = loansHtml(); }
+function rerenderLoans() { const p = $('.loan-pop .panel'); if (p) patchHtml(p, loansHtml()); }
 ACTIONS['bank-loans'] = () => { if (!canTrade()) return; _loan.amount = 0; Sound.tick(); openLayer('modal', loansHtml(), { cls: 'narrow loan-pop' }); };
 ACTIONS['loan-years'] = el => { _loan.years = +el.getAttribute('data-y'); Sound.tick(); rerenderLoans(); };
 document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (el && el.id === 'loan-amt') { _loan.amount = +el.value; rerenderLoans(); } });
@@ -196,7 +196,7 @@ function campaignHtml(): string {
     <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Close</button><button class="btn primary" data-act="camp-go" ${_camp.kind === 'route' && !_camp.route || c.balance < _camp.cost ? 'disabled' : ''}>${c.balance < _camp.cost ? 'Not enough money' : 'Start the campaign'}</button></div>
   </div>`;
 }
-function rerenderCamp() { const p = $('.camp-pop .panel'); if (p) p.innerHTML = campaignHtml(); }
+function rerenderCamp() { const p = $('.camp-pop .panel'); if (p) patchHtml(p, campaignHtml()); }
 ACTIONS['mk-campaign'] = el => { const r = el && el.getAttribute('data-route'); if (r) { _camp.kind = 'route'; _camp.route = r; } Sound.tick(); closeAll(); openLayer('modal', campaignHtml(), { cls: 'narrow camp-pop' }); };
 ACTIONS['camp-kind'] = el => { _camp.kind = el.getAttribute('data-k') as any; Sound.tick(); rerenderCamp(); };
 ACTIONS['camp-route'] = el => { _camp.route = el.getAttribute('data-id'); Sound.tick(); rerenderCamp(); };

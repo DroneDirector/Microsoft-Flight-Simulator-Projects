@@ -159,7 +159,7 @@ setInterval(() => {
 }, 20000);
 ACTIONS['inbox-tab'] = el => { _inboxTab = el.getAttribute('data-tab'); Sound.tick(); rerenderInbox(); };
 ACTIONS['mark-read'] = () => { State.notices.forEach(n => n.read = true); rerenderInbox(); renderTopbar(); };
-function rerenderInbox() { const p = $('.layer-drawer.inbox .panel'); if (p) p.innerHTML = inboxHtml(); }
+function rerenderInbox() { const p = $('.layer-drawer.inbox .panel'); if (p) patchHtml(p, inboxHtml()); }
 
 ACTIONS['open-notice'] = el => {
   const n = State.notices.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!n) return;

@@ -2347,3 +2347,24 @@ body.v3d-on .toast { z-index: 1010; }
 .pv-words { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
 .calm .pet-portrait * { animation: none !important; }
 @media (max-width: 640px) { .pet-visit { grid-template-columns: 1fr; } .pv-fig { max-width: 200px; margin: 0 auto; } }
+
+/* co-op mode */
+.mode-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid rgba(255,190,70,.55);background:rgba(255,170,40,.14);color:#FFC861;font-weight:700;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.mode-chip svg{width:15px;height:15px}.mode-chip em{font-style:normal;background:rgba(255,190,70,.25);border-radius:999px;padding:0 6px;font-size:11px}
+body.coop-mode .topbar{box-shadow:inset 0 -2px 0 rgba(255,180,60,.55)}
+.coop-conn{margin-top:14px}.coop-conn .cn-st{font-style:normal;font-weight:600;font-size:11px;margin-left:8px;padding:1px 7px;border-radius:999px;background:rgba(255,255,255,.08)}
+.cn-connected .cn-st,.cn-joined .cn-st{color:#4ADE80;background:rgba(74,222,128,.14)}.cn-failed .cn-st{color:#F87171;background:rgba(248,113,113,.14)}
+.cn-connecting .cn-st{color:#FFC861;animation:cnPulse 1.2s ease-in-out infinite}.cn-left .cn-st{color:#9AA7B8}
+@keyframes cnPulse{50%{opacity:.45}}
+.chip.coop{background:rgba(255,170,40,.16);color:#FFC861;margin-left:6px}
+
+/* live text: changed characters turn over like a split-flap board */
+.flap-w{white-space:pre}
+.flap-w .fl{display:inline-block;transform-origin:50% 55%;animation:flapIn .5s cubic-bezier(.25,1.5,.45,1) var(--d,0ms) both;backface-visibility:hidden}
+@keyframes flapIn{0%{transform:perspective(160px) rotateX(-92deg);opacity:0;color:#FFC861;text-shadow:0 0 10px rgba(255,200,97,.9)}
+ 45%{transform:perspective(160px) rotateX(18deg);opacity:1;color:#FFD98A;text-shadow:0 0 8px rgba(255,200,97,.6)}
+ 70%{transform:perspective(160px) rotateX(-6deg)}
+ 100%{transform:none;text-shadow:none}}
+.tick-fade{animation:tickFade .6s ease}
+@keyframes tickFade{0%{opacity:.35;filter:blur(1.5px)}100%{opacity:1;filter:none}}
+html.calm .flap-w .fl,html.calm .tick-fade{animation:none}

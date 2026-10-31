@@ -386,10 +386,10 @@ function aiRefreshCards() {
     if (!f) { const pop = el.closest('.sel-pop'); if (pop) pop.remove(); continue; }
     if (f.real) continue;
     const tmp = document.createElement('div'); tmp.innerHTML = flightCard(f).trim();
-    el.replaceWith(tmp.firstElementChild);
+    patchNode(el, tmp.firstElementChild);
   }
   // aircraft at the gate: the turnaround counts on
-  for (const el of $all('[data-ob]')) { const a = plane(el.getAttribute('data-ob')), o = a ? onBoardParked(a) : null; if (o) el.innerHTML = onBoardHtml(o); }
+  for (const el of $all('[data-ob]')) { const a = plane(el.getAttribute('data-ob')), o = a ? onBoardParked(a) : null; if (o) patchHtml(el, onBoardHtml(o)); }
 }
 
 function startAiClock() {

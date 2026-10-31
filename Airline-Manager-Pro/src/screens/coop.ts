@@ -7,7 +7,8 @@ SCREENS.coop = {
   title: 'Co-op', icon: 'coop',
   render() {
     const c = coopState(), co = company();
-    if (!c || !c.on) return coopIntroHtml(co);
+    if (!Mode.coop()) return coopIntroHtml(co);
+    if (!c || !c.on) return `<div class="screen-head"><div><h1>Co-op</h1></div></div><div class="card coop-note">${icon('coop')}<span><b>Set up your co-op airline</b><small>Found one or join with a code.</small></span><button class="btn primary sm" data-act="cw-open">Set up</button></div>`;
     if (c.companyId !== co.id) {
       const other = State.companies.filter(x => x.id === c.companyId)[0];
       return `<div class="screen-head"><div><h1>Co-op</h1><p class="sub">${esc(co.name)}</p></div></div>
@@ -39,9 +40,9 @@ SCREENS.coop = {
           const f: any = flying(m.id), p: any = m.you ? myPilot() : pilot(m.id);
           const share = Math.max(0, m.revenue) / total;
           return `<div class="coop-m" style="--i:${i}">
-            <span class="coop-av">${p && p.look ? avatarSvg(p.look, 'captain', { view: 'bust', accent: co.color, still: true }) : icon('user')}${f || m.you ? '<i class="on"></i>' : ''}</span>
-            <span class="coop-mt"><b>${esc(m.name)}${m.you ? ' <em>you</em>' : ''}</b>
-              <small><span class="chip ${m.role}">${m.role === 'owner' ? 'Owner' : 'Pilot'}</span>${f ? `<span class="coop-fly">${icon('fleet')}${esc(f.from)} → ${esc(f.to)} · ${esc(f.phase || '')}</span>` : m.you ? 'Online' : m.flights ? `Last flight ${ago(m.lastSeen)}` : 'No flights yet'}</small>
+            <span class="coop-av">${p && p.look ? avatarSvg(p.look, 'captain', { view: 'bust', accent: co.color, still: true }) : icon('user')}${f || m.you || (m as any).online ? '<i class="on"></i>' : ''}</span>
+            <span class="coop-mt"><b>${esc(m.name)}${m.you ? ' <em>you</em>' : ''} ${m.nat ? flag(m.nat) : ''}</b>
+              <small><span class="chip ${m.role}">${m.role === 'owner' ? 'Owner' : 'Pilot'}</span>${f ? `<span class="coop-fly">${icon('fleet')}${esc(f.from)} → ${esc(f.to)} · ${esc(f.phase || '')}</span>` : m.you || (m as any).online ? 'Online' : (m as any).connecting ? 'Connecting…' : m.flights ? `Last flight ${ago(m.lastSeen)}` : 'No flights yet'}</small>
               <span class="coop-bar"><i style="width:${(share * 100).toFixed(1)}%"></i></span></span>
             <span class="coop-num"><b>${num(m.flights)}</b><small>flights</small></span>
             <span class="coop-num"><b>${hours(m.hoursMin)}</b><small>hours</small></span>
@@ -57,6 +58,7 @@ SCREENS.coop = {
           <span><b>${esc(e.text)}</b><small>${ago(e.at)}</small></span>${e.amount != null ? `<em class="${e.amount >= 0 ? 'green' : 'red'}">${money(e.amount, { sign: true })}</em>` : ''}</${e.tx ? 'button' : 'div'}>`).join('') || '<p class="fine-print">Nothing yet.</p>'}</div>
       </div>
     </div>
+    ${coopConnHtml()}
     ${coopPirepsHtml(c)}
     <div class="card coop-rules">
       <div class="card-h"><b>Rules</b><small>Set by the owner</small></div>
@@ -64,7 +66,7 @@ SCREENS.coop = {
       <div class="ch-row"><span><b>Review flight reports (PIREPs)</b><small>Every co-op flight waits for the owner to accept it before its money, hours and landing count for the airline. Off: they count straight away.</small></span>
         <button class="tg ${c.rules.reviewPireps ? 'on' : ''}" data-act="coop-rule" data-r="reviewPireps" role="switch" aria-checked="${!!c.rules.reviewPireps}" ${(coopMe() || {} as any).role !== 'owner' ? 'disabled' : ''}><i></i></button></div>
       <div class="ch-row"><span><b>${c.backend === 'supabase' ? 'Online, powered by Supabase' : 'Online play is being set up'}</b><small>${c.backend === 'supabase' ? 'The airline is shared live with every pilot in it.' : 'Co-op runs as a demo with sample pilots for now. When the online service (Supabase) is connected, real pilots join with the invite code.'}</small></span><span></span></div>
-      <div class="ch-row"><span><b>Leave co-op</b><small>The co-op pilots leave. Everything the airline earned and logged stays.</small></span><button class="btn ghost sm danger" data-act="coop-leave">Leave</button></div>
+      <div class="ch-row"><span><b>Back to my own airline</b><small>Leaves co-op mode. The co-op airline is kept and opens again next time you switch to co-op mode.</small></span><button class="btn ghost sm" data-act="mode-solo">${icon('swap')}Switch</button></div>
     </div>`;
   },
 };
@@ -82,11 +84,11 @@ function coopIntroHtml(co: Company): string {
     </div>
     <div class="coop-choose">
       <div class="card coop-opt">
-        <b>Start a co-op airline</b><small>Share ${esc(co.name)} with other pilots. You become its owner.</small>
-        <button class="btn primary" data-act="coop-start">${icon('coop')}Start co-op</button>
+        <b>Switch to co-op mode</b><small>Co-op is its own world: a separate airline with its own aircraft, crew, money, maintenance and logs, flown by real players. ${esc(co.name)} stays just as it is.</small>
+        <button class="btn primary" data-act="mode-coop">${icon('coop')}Switch to co-op mode</button>
       </div>
       <div class="card coop-opt">
-        <b>Join with a code</b><small>Fly for another pilot's airline.</small>
+        <b>Join with a code</b><small>Fly for another player's co-op airline (opens in co-op mode).</small>
         <span class="coop-join"><input id="coop-code" class="inp" maxlength="9" placeholder="ABCD-2345" value="${esc(_coopJoin)}" autocomplete="off" autocapitalize="characters"><button class="btn" data-act="coop-join">Join</button></span>
       </div>
     </div>
@@ -154,3 +156,4 @@ ACTIONS['pr-why'] = el => { $all('.pr-why button').forEach(b => b.classList.remo
 ACTIONS['pr-reject-go'] = el => { const w = $('.pr-why button.on'); coopReview(el.getAttribute('data-id'), false, w ? w.getAttribute('data-w') : ''); closeAll(); Store.save(); refresh(); toast('Flight report rejected', 'info'); };
 ACTIONS['coop-leave'] = () => { confirmChange('Leave co-op?', 'The co-op pilots leave this airline. Everything it earned and logged stays.', 'Leave', 'Stay', () => { closeTop(); coopLeave(); toast('You left co-op', 'info'); refresh(); }, () => closeTop()); };
 ACTIONS['coop-switch'] = el => { const id = el.getAttribute('data-id'); State.companyId = id; State.divisionId = 'all'; Store.save(); try { applyCompanyTheme(true); renderTopbar(); } catch (e) { /* ignore */ } refresh(); };
+ACTIONS['cw-open'] = () => coopWorldWelcome();

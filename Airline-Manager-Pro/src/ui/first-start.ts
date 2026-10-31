@@ -47,6 +47,7 @@ ACTIONS['fs-wipe'] = () => {
 
 /** Remove everything but the settings and your own pilot, and found one new airline. */
 function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: string; hub: string; pilot: string }) {
+  if (Mode.coop()) { try { localStorage.setItem('amp-coop-new', '1'); } catch (e) { /* ignore */ } }
   const S: any = State, me: any = State.pilots.filter((p: any) => p.id === 'you')[0] || myPilot();
   const keep = ['settings', 'staffCandidates', 'candidates', 'seenVersion', 'wnClosed', 'licence', 'knownAirports', 'simInstalled', 'linkPc', 'favs'];
   const fresh: any = {};
@@ -67,4 +68,39 @@ function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: 
   Store.save(); Store.flushNative();
   try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: 'ops' })); } catch (e) { /* ignore */ }
   location.reload();
+}
+
+/* ---------- co-op mode: its own world, set up the first time it opens ---------- */
+function coopWorldWelcome() {
+  openLayer('modal', `<div class="modal-head"><div><h2>Co-op mode</h2><small>A separate airline, flown by real players. Your own airline is kept just as it is.</small></div></div>
+    <div class="fs-choice">
+      <button class="fs-card" data-act="cw-new"><span class="fs-ic">${icon('coop')}</span><b>Found a co-op airline</b><small>You are its owner: you buy, sell and lease the aircraft, hire the crew and invite pilots with a code.</small></button>
+      <button class="fs-card" data-act="cw-join"><span class="fs-ic">${icon('user')}</span><b>Join with a code</b><small>Fly for another player's co-op airline.</small></button>
+    </div>
+    <div class="btn-row fs-restore"><small>Not now?</small><button class="btn ghost sm" data-act="mode-solo">${icon('swap')}Back to my own airline</button></div>`, { cls: 'fs-modal' });
+}
+ACTIONS['cw-new'] = () => {
+  ACTIONS['fs-scratch'](null as any, null as any);
+  const h = $('.fs-modal h2'), s = $('.fs-modal .modal-head small'), w = $('.fs-modal .fine-print'), b = $('.fs-modal [data-act=fs-wipe]'), bk = $('.fs-modal [data-act=fs-back]');
+  if (h) h.textContent = 'Your co-op airline'; if (s) s.textContent = 'You are the owner. You can change all of this later.';
+  if (w) w.innerHTML = `${icon('info')}Only the co-op world starts empty. Your own airline, its aircraft, staff and money stay as they are.`;
+  if (b) { b.classList.remove('danger'); b.classList.add('primary'); b.innerHTML = `${icon('coop')}Found the airline`; }
+  if (bk) bk.setAttribute('data-act', 'cw-back');
+};
+ACTIONS['cw-back'] = () => { closeAll(); coopWorldWelcome(); };
+ACTIONS['cw-join'] = () => toast('Joining from other devices opens when the online service is connected. Found your own co-op airline to try it now.', 'info');
+ACTIONS['mode-solo'] = () => { Sound.tick(); Mode.set(false); };
+ACTIONS['mode-coop'] = () => { Sound.tick(); Mode.set(true); };
+/** On start: the co-op world just founded becomes a co-op; your own world never runs co-op. */
+function modeStart() {
+  const S: any = State;
+  document.body.classList.toggle('coop-mode', Mode.coop());
+  if (Mode.coop()) {
+    let fresh = false; try { fresh = localStorage.getItem('amp-coop-new') === '1'; localStorage.removeItem('amp-coop-new'); } catch (e) { /* ignore */ }
+    if ((fresh || !coopState()) && !Store.wasEmpty) { coopStart(); try { coopBackend().tick(Date.now()); } catch (e) { /* ignore */ } }
+  } else if (S.coop) {
+    // a co-op started inside your own airline in an earlier version: co-op has its own world now
+    coopLeave();
+    State.notices.unshift({ id: uid(), kind: 'company' as any, title: 'Co-op has its own mode now', body: 'Co-op is now a separate world with its own airline, aircraft, crew, money and logs, flown by real players. Open Co-op and switch to co-op mode. Your own airline stays as it is.', time: 'Now', at: Date.now(), read: false } as any);
+  }
 }

@@ -97,10 +97,11 @@ const Backup = {
 
   /** First start with nothing saved (a new phone, a reinstall, cleared data): offer to bring the airline back. */
   offerRestoreOnFirstStart() {
-    if (DESKTOP && Store.wasEmpty) {
+    if (DESKTOP && Store.wasEmpty && !Mode.coop()) {
       fetch('/api/backup').then(r => r.json()).then(r => { if (r && r.data) setTimeout(() => this.confirmRestore(r.data, 'Found in Documents\\Airline Manager Pro on this PC'), 1500); else setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600); }).catch(() => setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600));
       return;
     }
+    if (Mode.coop()) { if (Store.wasEmpty) setTimeout(() => coopWorldWelcome(), SPLASH_MS + 600); return; }
     if (!Store.wasEmpty) return;
     setTimeout(() => firstStartWelcome(!!this.tools()), SPLASH_MS + 600);
   },

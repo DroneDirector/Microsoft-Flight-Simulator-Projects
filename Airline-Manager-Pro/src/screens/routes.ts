@@ -71,7 +71,7 @@ ACTIONS['new-route'] = () => {
   _nr = { stops: [c.hub], typeId: ft ? ft.typeId : '', test: false, q: '' };
   openLayer('modal', newRouteHtml(), { cls: 'wide nr-pop' });
 };
-function rerenderNr() { const p = $('.nr-pop .panel'); if (p) p.innerHTML = newRouteHtml(); }
+function rerenderNr() { const p = $('.nr-pop .panel'); if (p) patchHtml(p, newRouteHtml()); }
 /** Airports to add: your search across every airport, otherwise the main airports near the last stop. */
 function nrGridHtml(): string {
   const c = company(), last = _nr.stops[_nr.stops.length - 1], t = _nr.typeId ? acType(_nr.typeId) : null, max = t ? usableRange(t) : 99999;
@@ -149,7 +149,7 @@ function routeDetailHtml(): string {
     <div class="modal-actions"><button class="btn ghost" data-act="sb-plan" data-from="${esc(r.legs[0])}" data-to="${esc(r.legs[1] || r.legs[0])}">${icon('routes')}Plan on SimBrief</button><button class="btn primary" data-act="close-layer">Done</button></div>
   </div>`;
 }
-function rerenderRd() { const p = $('.rd-pop .panel'); if (p) p.innerHTML = routeDetailHtml(); }
+function rerenderRd() { const p = $('.rd-pop .panel'); if (p) patchHtml(p, routeDetailHtml()); }
 ACTIONS['route-detail'] = el => {
   const r = State.routes.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!r || r.test) return;
   _rdId = r.id; Sound.tick(); openLayer('modal', routeDetailHtml(), { cls: 'wide rd-pop' });

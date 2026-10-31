@@ -85,7 +85,7 @@ function usedSheetHtml(): string {
       </div>
     </div>`;
 }
-function rerenderUsed() { const p = $('.used-pop .panel'); if (p) p.innerHTML = usedSheetHtml(); }
+function rerenderUsed() { const p = $('.used-pop .panel'); if (p) patchHtml(p, usedSheetHtml()); }
 ACTIONS['buy-used'] = el => { if (!canTrade()) return; Sound.tick(); _used = { id: el.getAttribute('data-id'), base: company().hub }; openLayer('modal', usedSheetHtml(), { cls: 'wide used-pop' }); };
 ACTIONS['buy-used-go'] = () => {
   if (!canTrade()) return;
@@ -164,7 +164,7 @@ function cabinSheetHtml(): string {
       <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="cab-save" ${used > units && !c.freighter || !cost || a.status === 'flying' ? 'disabled' : ''}>${a.status === 'flying' ? 'Wait until it lands' : 'Change the cabin'}</button></div>
     </div>`;
 }
-function rerenderCab() { const p = $('.cab-pop .panel'); if (p) p.innerHTML = cabinSheetHtml(); }
+function rerenderCab() { const p = $('.cab-pop .panel'); if (p) patchHtml(p, cabinSheetHtml()); }
 ACTIONS['ac-cabin'] = el => { const a = plane(el.getAttribute('data-reg')); if (!a) return; if (!canTrade()) return; _cab = { reg: a.reg, c: Object.assign({}, cabinOf(a)) }; closeAll(); openLayer('modal', cabinSheetHtml(), { cls: 'narrow cab-pop' }); };
 ACTIONS['cab-step'] = el => {
   const a = plane(_cab.reg), t = acType(a.typeId), k = el.getAttribute('data-k') as 'f' | 'j' | 'y', d = +el.getAttribute('data-d');

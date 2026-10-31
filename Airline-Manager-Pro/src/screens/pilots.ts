@@ -36,7 +36,7 @@ SCREENS.pilots = {
         <span class="co-txt"><small>Your co-pilot in ${esc(myA ? myA.reg : '')}</small><b>${esc(co.name)}</b><small>First officer, ${natLabel(co.nat)}, ${ageOf(co.dob)}</small>
           <span class="btn-row"><button class="btn ghost sm" data-act="copilot-sex">${icon('swap')}Male or female</button><button class="btn ghost sm" data-act="staff-detail" data-id="${co.id}">Details</button></span></span>
       </div>` : myA ? `<p class="fine-print">${icon('info')}${esc(acType(myA.typeId).model)} is flown by one pilot, so you don't need a co-pilot.</p>` : ''}
-      <div class="crew-list">${crew.map((p: any, i) => {
+      ${coopOn() ? coopPlayersCrewHtml() : ''}<div class="crew-list">${crew.map((p: any, i) => {
         const f = State.live.filter(x => x.pilotId === p.id)[0];
         const route = State.routes.filter(r => r.pilotId === p.id)[0];
         return `<div class="crew-row" style="--i:${i}">
@@ -57,13 +57,13 @@ SCREENS.pilots = {
       <p class="fine-print">${icon('info')}The people on the ramp: baggage handlers, push-back, fuel, catering and de-icing drivers, apron buses, stairs and ramp agents. They load every flight within the loadsheet's limits.</p>
       ${GROUND_JOBS.map(j => { const ps = ground.filter((p: any) => p.job === j[0]); return ps.length ? `<h4 class="grp-h">${esc(j[1])} · ${ps.length}</h4><div class="staff-grid">${ps.map((p, i) => staffCard(p, i)).join('')}</div>` : ''; }).join('') || emptyState('No ground staff yet', 'Hire baggage handlers, drivers and ramp agents under Hire staff.', 'Hire staff', 'pilot-hire')}`;
     else body = `
-      <div class="filter-row">${[['all', 'Everyone'], ['captain', 'Captains'], ['fo', 'First officers'], ['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['ground', 'Ground staff']].map(r => `<button class="fchip ${_hireRole === r[0] ? 'on' : ''}" data-act="hire-role" data-r="${r[0]}">${r[1]}</button>`).join('')}</div>
+      <div class="filter-row">${(coopOn() ? [['all', 'Everyone']] : [['all', 'Everyone'], ['captain', 'Captains'], ['fo', 'First officers']]).concat([['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['ground', 'Ground staff']]).map(r => `<button class="fchip ${_hireRole === r[0] ? 'on' : ''}" data-act="hire-role" data-r="${r[0]}">${r[1]}</button>`).join('')}</div>
       ${_hireRole === 'ground' ? `<div class="filter-row sub">${[['all', 'All jobs']].concat(GROUND_JOBS as any).map((r: any) => `<button class="fchip ${_hireJob === r[0] ? 'on' : ''}" data-act="hire-job" data-j="${r[0]}">${esc(r[1])}</button>`).join('')}</div>` : ''}
       <div class="staff-grid">
-        ${(_hireRole === 'all' || _hireRole === 'captain') ? State.candidates.map((p: any, i) => `<button class="staff-card hire" data-act="hire" data-id="${p.id}" style="--i:${i}">
+        ${!coopOn() && (_hireRole === 'all' || _hireRole === 'captain') ? State.candidates.map((p: any, i) => `<button class="staff-card hire" data-act="hire" data-id="${p.id}" style="--i:${i}">
           <span class="sc-av">${avatarSvg(p.look, personRole(p), { view: 'bust', accent: c.color })}</span>
           <span class="sc-txt"><b>${esc(p.name)}</b><small>${esc(p.rank)}, ${flag(p.nat)} ${ageOf(p.dob)}</small><small>${num(p.hoursMin / 60)} h, ${money(p.salary)}/wk</small><small>Rated: ${(p.types || []).map((t: string) => acType(t) ? esc(acType(t).model) : '').filter(Boolean).join(', ') || 'no types yet'}</small></span><span class="sc-hire">${icon('plus')}Hire</span></button>`).join('') : ''}
-        ${cands.map((p: Staff, i: number) => staffCard(p, i + 4, { hire: true })).join('')}
+        ${cands.filter((p: any) => !coopOn() || (p.role !== 'captain' && p.role !== 'fo')).map((p: Staff, i: number) => staffCard(p, i + 4, { hire: true })).join('')}${coopOn() ? `<p class="fine-print">${icon('info')}In co-op the pilots are real players: invite them with the code under Co-op.</p>` : ''}
       </div>`;
     return `
     <div class="pilot-hero">
