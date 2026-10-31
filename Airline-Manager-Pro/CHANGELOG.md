@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.28 (2026-10-31)
+
+- 3D airport sheet: type 3 paths end at a stand (parks index), type 9 lead-ins drawn as thin lines, no edge lines, OSM stands use their own lead-ins (same as the 2D map)
+
 ## 0.9.27 (2026-10-31)
 
 - patchNode leaves code-drawn canvases alone (width/height and shown state were wiped on every in-place update)
