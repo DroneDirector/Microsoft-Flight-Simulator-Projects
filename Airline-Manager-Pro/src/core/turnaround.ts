@@ -77,9 +77,10 @@ function onBoardHtml(o: OnBoard): string {
   const pct = (x: number) => Math.round(x * 100) + '%';
   // passengers on board out of the seats in the aircraft (the tickets sold for this flight), and how full that is
   const lf = o.paxMax ? Math.round(o.pax / o.paxMax * 100) : 0;
-  return `<div class="sync-item ob">${icon('pax')}<span><small>Passengers on board · ${esc(o.stage)}</small><b>${num(o.pax)} <em class="ob-of">of ${num(o.paxMax)} seats${/boarding|deboarding/i.test(o.stage) ? '' : ` · ${lf}% full`}</em></b></span></div>
-    <div class="sync-item ob">${icon('fuel')}<span><small>Fuel${o.fuelNote ? ' · ' + esc(o.fuelNote) : ''}</small><b>${num(o.fuelKg)} kg</b></span></div>
-    <div class="sync-item ob">${icon('jobs')}<span><small>Catering and bags</small><b>${o.catering >= 1 && o.bags >= 1 ? 'Loaded' : `${pct(o.catering)} · ${pct(o.bags)}`}</b></span></div>
+  // always three lines each (what it is, the number, how it stands), so the card keeps its size as they change
+  return `<div class="sync-item ob">${icon('pax')}<span><small>Passengers</small><b>${num(o.pax)} <em class="ob-of">of ${num(o.paxMax)}</em></b><small class="ob-d">${esc(o.stage)}${/boarding|deboarding/i.test(o.stage) ? '' : ` · ${lf}% full`}</small></span></div>
+    <div class="sync-item ob">${icon('fuel')}<span><small>Fuel</small><b>${num(o.fuelKg)} kg</b><small class="ob-d">${o.fuelNote ? esc(o.fuelNote) : '&nbsp;'}</small></span></div>
+    <div class="sync-item ob">${icon('jobs')}<span><small>Catering and bags</small><b>${o.catering >= 1 && o.bags >= 1 ? 'Loaded' : `${pct(o.catering)} · ${pct(o.bags)}`}</b><small class="ob-d">&nbsp;</small></span></div>
     ${o.next ? `<div class="sync-item ob">${icon('clock')}<span><small>Next flight</small><b>${esc(o.next)}</b></span></div>` : ''}`;
 }
 

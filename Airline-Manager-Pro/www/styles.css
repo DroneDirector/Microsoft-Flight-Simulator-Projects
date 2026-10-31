@@ -408,6 +408,17 @@ small { font-size: 12px; color: var(--ink-2); }
 .fc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .fc-grid small { display: block; font-size: 10.5px; }
 .fc-grid b { font: 600 14px var(--display); }
+/* the flight card keeps its size while its numbers change: every figure on one line, the vertical speed with room for its unit */
+.fc-grid > div { min-width: 0; }
+.fc-grid small, .fc-grid b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-grid b { display: block; font-variant-numeric: tabular-nums; }
+.fc-grid .fc-vs { grid-column: span 2; }
+/* the phase can be long ("Holding short 01L"): always room for two lines, so the card doesn't grow and shrink */
+.fc-grid .fc-ph b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.2; min-height: 2.4em; }
+.sync-item.ob > span { min-width: 0; }
+.sync-item.ob small, .sync-item.ob b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sync-item.ob b { font-variant-numeric: tabular-nums; }
+.sync-item.ob .ob-d { color: var(--ink-3, #8A9BB0); }
 .fc-sync { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .sync-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); min-width: 0; }
 .sync-item .ic { color: var(--cyan); width: 18px; height: 18px; }
