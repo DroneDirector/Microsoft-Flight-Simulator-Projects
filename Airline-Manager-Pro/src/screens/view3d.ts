@@ -49,6 +49,17 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-info"></div>
     <div class="v3d-status"></div>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
+    <div class="v3d-free-ui">
+      <div class="fc-stick" data-fc="stick"><i></i><small>Move</small></div>
+      <div class="fc-ud"><button class="fc-btn" data-fc="up" aria-label="Climb">${icon('down', 'flip-v')}</button><small>Height</small><button class="fc-btn" data-fc="down" aria-label="Sink">${icon('down')}</button></div>
+      <div class="fc-speed"><small>Speed</small><input type="range" class="fc-spd" min="0" max="100" value="${Math.round((Math.log((State.settings as any).v3dFreeSpeed || 1) / Math.log(8) + 1) * 50)}"><b class="fc-spd-v">${((State.settings as any).v3dFreeSpeed || 1).toFixed(1)}×</b></div>
+      <button class="fc-help-btn" data-act="fc-help" aria-label="Controls">?</button>
+      <div class="fc-help"><b>Free camera</b>
+        <span><i>One finger</i>Look around</span><span><i>Left stick</i>Move forward, back and sideways</span><span><i>Height buttons</i>Climb and sink</span>
+        <span><i>Two fingers</i>Slide, or pinch to fly forward and back</span><span><i>Speed</i>How fast you move (faster the higher you fly)</span>
+        <span><i>PC</i>Mouse drag looks, wheel flies forward. W A S D move, Q and E sink and climb, arrows look, Shift is faster</span>
+        <span><i>Close</i>Back to the Overview</span></div>
+    </div>
     ${Mode.coop() ? '' : `<button class="v3d-sat v3d-tfc tfc-btn ${Traffic.on() ? 'on' : ''}" data-act="tfc-toggle">${icon('fleet')}Other airlines</button>`}
     <small class="v3d-credit">Terrain: Terrain Tiles on AWS · water: © OpenStreetMap contributors · imagery: Sentinel-2 cloudless 2016 by EOX (see Settings → About)</small>
     ${v3dLoaderHtml()}`;
@@ -97,9 +108,9 @@ function v3dClose() {
 ACTIONS['v3d-close'] = () => { const free = V3d.mode === 'free'; v3dClose(); if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } };
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
-  if (V3d.mode === 'free') v3dFreeStart();
+  if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   V3d.root.classList.toggle('v3d-free', V3d.mode === 'free');
-  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : 0.22; V3d.dist = 0;
+  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
 };
 ACTIONS['v3d-next'] = el => {
@@ -133,7 +144,8 @@ function v3dBind() {
     const p = V3d.ptrs[e.pointerId]; if (!p) return;
     const ids = Object.keys(V3d.ptrs);
     if (V3d.mode === 'free') { v3dFreeGesture(e, p, ids); p.x = e.clientX; p.y = e.clientY; return; }
-    if (ids.length === 1) { V3d.yaw -= (e.clientX - p.x) * 0.006; V3d.pitch = clamp(V3d.pitch + (e.clientY - p.y) * 0.004, -0.15, 1.45); }
+    if (ids.length === 1) { V3d.yaw -= (e.clientX - p.x) * 0.007; V3d.pitch = clamp(V3d.pitch + (e.clientY - p.y) * 0.005, -0.6, 1.5); }
+    if (ids.length === 2) { const VA: any = V3d; VA.panX = (VA.panX || 0) - (e.clientX - p.x) * 0.5 / 2; VA.panY = (VA.panY || 0) + (e.clientY - p.y) * 0.5 / 2; }
     p.x = e.clientX; p.y = e.clientY;
     if (ids.length === 2) { const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (V3d.pinch0) V3d.dist = clamp(V3d.dist0 * V3d.pinch0 / d, 8, 30000); }
   });
@@ -264,20 +276,17 @@ function v3dBuildAirport(L: AirportLayout) {
   };
   rib(mTaxi, 0, 0.25, [1, 4, 9, 3]);
   rib(mLine, 0.35, 0.3, [1, 4]);
-  // runways: asphalt with white markings, painted once
+  // runways: painted with the markings a runway of that size has (ICAO Annex 14), numbers always
   for (const r of L.runways) {
-    const cv = document.createElement('canvas'); cv.width = 64; cv.height = 1024; const c = cv.getContext('2d');
-    c.fillStyle = '#2B323B'; c.fillRect(0, 0, 64, 1024);
-    c.fillStyle = '#E8ECF0';
-    for (let y = 60; y < 964; y += 34) c.fillRect(31, y, 2, 18);                         // centre line
-    for (const end of [0, 1]) for (let k = 0; k < 8; k++) c.fillRect(6 + k * 7 - (k > 3 ? -2 : 0), end ? 1024 - 46 : 8, 3, 38);   // threshold bars
-    c.fillRect(1, 0, 1.5, 1024); c.fillRect(61.5, 0, 1.5, 1024);                      // edges
-    const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+    if (r.surf === 9) continue;   // water runways have no paint
+    const tex = new T.CanvasTexture(runwayMarkingsCanvas(r)); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = V3d.r ? V3d.r.capabilities.getMaxAnisotropy() : 4;
     const geo = new T.PlaneGeometry(r.wid || 45, r.len); geo.rotateX(-Math.PI / 2);
     const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex }));
     const q = v3dXY(r.lon, r.lat); m.position.set(q[0], e + 0.4, q[1]); m.rotation.y = -r.hdg * D2R;
     g.add(m);
   }
+  // hold short lines where taxiways meet a runway
+  try { v3dHoldLines(L, g, loc, e); } catch (x) { /* never stop the view */ }
   if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
   V3d.airport = g; V3d.scene.add(g);
 }
@@ -410,8 +419,12 @@ function v3dLoop(now: number) {
       const VA: any = V3d; if (VA.camBase == null) VA.camBase = base;
       VA.camBase += ((((base - VA.camBase) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI) * Math.min(1, dt * 2.5);
       const a = VA.camBase + V3d.yaw, el = V3d.pitch;
+      // two-finger slide: the view's centre moves sideways and up or down (within reach of the aircraft)
+      const span = s.span || 35, px = clamp(VA.panX || 0, -span * 4, span * 4), py = clamp(VA.panY || 0, -span, span * 3); VA.panX = px; VA.panY = py;
+      centre.add(new T.Vector3(Math.cos(a), 0, -Math.sin(a)).multiplyScalar(px)).add(new T.Vector3(0, py, 0));
       const want = centre.clone().add(new T.Vector3(Math.sin(a) * Math.cos(el) * d, Math.sin(el) * d, Math.cos(a) * Math.cos(el) * d));
-      const ll = v3dLonLat(want.x, want.z), gr = v3dGround(ll[0], ll[1]) + 3 - v3dCurve(want.x, want.z);
+      // tilted all the way down the camera sits just above the ground, looking along it
+      const ll = v3dLonLat(want.x, want.z), gr = v3dGround(ll[0], ll[1]) + 1.6 - v3dCurve(want.x, want.z);
       if (want.y < gr) want.y = gr;
       V3d.cam.position.copy(want);
       V3d.cam.lookAt(centre);
@@ -533,11 +546,12 @@ function v3dFreeSpeed(): number { const F = fc(); if (!F) return 20; const ll = 
 function v3dFreePush(right: number, up: number, fwd: number) {
   const F = fc(); if (!F) return; const T = THREE, s = v3dFreeSpeed();
   const f = new T.Vector3(Math.sin(F.yaw) * Math.cos(F.pitch), Math.sin(F.pitch), -Math.cos(F.yaw) * Math.cos(F.pitch)), r = new T.Vector3(Math.cos(F.yaw), 0, Math.sin(F.yaw));
-  F.vel.addScaledVector(f, fwd * s).addScaledVector(r, right * s).add(new T.Vector3(0, up * s, 0));
+  const m = (State.settings as any).v3dFreeSpeed || 1;
+  F.vel.addScaledVector(f, fwd * s * m).addScaledVector(r, right * s * m).add(new T.Vector3(0, up * s * m, 0));
 }
 function v3dFreeGesture(e: PointerEvent, p: any, ids: string[]) {
   const F = fc(); if (!F) return; const dx = e.clientX - p.x, dy = e.clientY - p.y;
-  if (ids.length === 1) { F.yaw += dx * 0.004; F.pitch = clamp(F.pitch - dy * 0.004, -1.45, 1.2); return; }
+  if (ids.length === 1) { F.yaw += dx * 0.0075; F.pitch = clamp(F.pitch - dy * 0.0065, -1.5, 1.4); return; }
   if (ids.length >= 2) {
     const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]], d = Math.hypot(a.x - b.x, a.y - b.y), VA: any = V3d;
     if (VA.fcPinch) v3dFreePush(0, 0, (d - VA.fcPinch) * 0.02);
@@ -550,6 +564,8 @@ function v3dFreeStep(dt: number) {
   const F = fc(); if (!F || !dt) return; const T = THREE, k = F.keys;
   // keys: steady thrust while held
   const kx = (k.d ? 1 : 0) - (k.a ? 1 : 0), ky = ((k.e || k.r) ? 1 : 0) - ((k.q || k.f) ? 1 : 0), kz = (k.w ? 1 : 0) - (k.s ? 1 : 0);
+  const st: any = (V3d as any).fcStick || { x: 0, y: 0 }, hb = (V3d as any).fcHeight || 0;
+  if (st.x || st.y || hb) v3dFreePush(st.x * dt * 3, hb * dt * 2.5, -st.y * dt * 3);
   if (kx || ky || kz) v3dFreePush(kx * dt * 3 * (k.shift ? 3 : 1), ky * dt * 3, kz * dt * 3 * (k.shift ? 3 : 1));
   if (k.arrowleft) F.yaw -= dt * 1.2; if (k.arrowright) F.yaw += dt * 1.2; if (k.arrowup) F.pitch = clamp(F.pitch + dt, -1.45, 1.2); if (k.arrowdown) F.pitch = clamp(F.pitch - dt, -1.45, 1.2);
   // drift, then ease to a stop like a drone in the air
@@ -571,4 +587,125 @@ function v3dFreeRecentre() {
   v3dRecentre({ from: icao || '', to: icao || '', noDest: !icao } as any, { lon: centre[0], lat: centre[1] });
   if (!icao) { V3d.icao = ''; }
   const q = v3dXY(ll[0], ll[1]); F.pos.set(q[0], oldY, q[1]);
+}
+
+ACTIONS['fc-help'] = () => { const h = V3d.root && V3d.root.querySelector('.fc-help'); if (h) h.classList.toggle('on'); Sound.tick(); };
+/** The on-screen stick, height buttons and speed slider of the free camera. */
+function v3dFreeUiBind() {
+  const root = V3d.root; if (!root || (root as any).fcBound) return; (root as any).fcBound = true;
+  const stick = root.querySelector('.fc-stick') as HTMLElement, knob = stick && stick.querySelector('i') as HTMLElement;
+  if (stick) {
+    stick.style.touchAction = 'none';
+    const mv = (e: PointerEvent) => { const r = stick.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width / 2;
+      let x = (e.clientX - cx) / R, y = (e.clientY - cy) / R; const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; }
+      (V3d as any).fcStick = { x, y }; if (knob) knob.style.transform = `translate(${x * R * 0.6}px, ${y * R * 0.6}px)`; };
+    stick.addEventListener('pointerdown', e => { stick.setPointerCapture(e.pointerId); mv(e); e.stopPropagation(); });
+    stick.addEventListener('pointermove', e => { if (stick.hasPointerCapture(e.pointerId)) mv(e); });
+    const end = () => { (V3d as any).fcStick = { x: 0, y: 0 }; if (knob) knob.style.transform = ''; };
+    stick.addEventListener('pointerup', end); stick.addEventListener('pointercancel', end);
+  }
+  root.querySelectorAll('.fc-btn').forEach((b: Element) => {
+    const v = b.getAttribute('data-fc') === 'up' ? 1 : -1, B = b as HTMLElement; B.style.touchAction = 'none';
+    B.addEventListener('pointerdown', e => { B.setPointerCapture(e.pointerId); (V3d as any).fcHeight = v; });
+    const end = () => { (V3d as any).fcHeight = 0; }; B.addEventListener('pointerup', end); B.addEventListener('pointercancel', end);
+  });
+  const sp = root.querySelector('.fc-spd') as HTMLInputElement;
+  if (sp) sp.addEventListener('input', () => { const m = Math.pow(8, +sp.value / 50 - 1); (State.settings as any).v3dFreeSpeed = Math.round(m * 10) / 10; const o = root.querySelector('.fc-spd-v'); if (o) o.textContent = m.toFixed(1) + '×'; Store.soon(); });
+}
+
+/** A runway's paint, drawn to scale: numbers (and L, C, R) at both ends, threshold stripes by width,
+ *  centre line, and on longer runways the aiming point, touchdown zone and side stripes. Grass runways get
+ *  only their numbers and white end markers. */
+function runwayMarkingsCanvas(r: { len: number; wid: number; surf: number; a: string; b: string }): HTMLCanvasElement {
+  const len = r.len || 2000, wid = r.wid || 45, grass = r.surf === 1;
+  const k = Math.min(256 / wid, 8192 / len), W = Math.max(32, Math.round(wid * k)), H = Math.round(len * k);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
+  const M = (m: number) => m * k;   // metres to pixels
+  c.fillStyle = grass ? '#3D5A2E' : '#2B323B'; c.fillRect(0, 0, W, H);
+  if (!grass) { for (let i = 0; i < 400; i++) { c.fillStyle = `rgba(${Math.random() < .5 ? '0,0,0' : '255,255,255'},${Math.random() * .05})`; c.fillRect(Math.random() * W, Math.random() * H, M(2 + Math.random() * 6), M(10 + Math.random() * 60)); } }   // wear and patches
+  c.fillStyle = '#E8ECF0';
+  // both ends: the 'a' end at the bottom (landing towards the top), the 'b' end at the top, turned round
+  const end = (designator: string, top: boolean) => {
+    c.save(); if (top) { c.translate(W, H); c.rotate(Math.PI); }
+    let y = H - M(6);   // from the threshold inwards (upwards)
+    if (grass) { c.fillRect(M(2), y - M(3), W - M(4), M(3)); y -= M(10); }
+    else {
+      // threshold stripes: their number follows the runway width
+      const n = wid >= 60 ? 16 : wid >= 45 ? 12 : wid >= 30 ? 8 : wid >= 23 ? 6 : 4, sw = M(1.8), gap = (W - M(6) - n * sw) / (n + 1);
+      for (let i = 0; i < n; i++) { const x = M(3) + gap * (i + 1) + sw * i + (i >= n / 2 ? gap * 0.6 : -gap * 0.3); c.fillRect(x, y - M(30), sw, M(30)); }
+      y -= M(42);
+    }
+    // the runway number (and its letter): about 9 m tall, read when lined up for landing
+    const m = /^(\d{1,2})([LCR]?)$/i.exec(String(designator || '').trim()), num = m ? m[1].padStart(2, '0') : String(designator || '').slice(0, 3), letter = m ? m[2].toUpperCase() : '';
+    // ICAO: about 9 m tall and 3 m wide a character (smaller on narrow runways)
+    const th = M(wid >= 30 ? 9 : wid >= 23 ? 7.5 : 6), cw = Math.min(M(wid >= 30 ? 3 : 2.4), W * 0.38 / 2);
+    c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.font = `700 100px Arial, Helvetica, sans-serif`;
+    const draw = (t: string, yy: number) => {
+      const mt = c.measureText(t), gh = (mt.actualBoundingBoxAscent || 72), gw = Math.max(1, mt.width);
+      c.save(); c.translate(W / 2, yy); c.scale(cw * t.length * 1.25 / gw, th / gh); c.fillText(t, 0, 0); c.restore();
+    };
+    if (letter) { draw(letter, y); y -= th + M(3); }
+    draw(num, y); y -= th + M(12);
+    if (!grass && len >= 1200) {
+      // aiming point: two broad bars about 400 m in (300 m on shorter runways)
+      const ap = len >= 2400 ? 400 : 300, abW = M(wid >= 45 ? 10 : 6), abL = M(len >= 2400 ? 60 : 45), off = M(Math.min(wid * 0.18, 9));
+      c.fillRect(W / 2 - off - abW, H - M(6) - M(ap) - abL, abW, abL); c.fillRect(W / 2 + off, H - M(6) - M(ap) - abL, abW, abL);
+      // touchdown zone: pairs of bars every 150 m up to 900 m (shorter runways: fewer)
+      if (len >= 1500 && wid >= 30) for (const d of [150, 450, 600, 750, 900]) {
+        if (d > len / 2 - 100 || d === 300 || d === 400) continue;
+        const bars = d <= 150 ? 3 : d <= 450 ? 2 : 1, bw = M(1.8), bl = M(22), o2 = M(Math.min(wid * 0.18, 9));
+        for (let i = 0; i < bars; i++) { c.fillRect(W / 2 - o2 - bw * (i + 1) - M(1.5) * i, H - M(6) - M(d) - bl, bw, bl); c.fillRect(W / 2 + o2 + bw * i + M(1.5) * i, H - M(6) - M(d) - bl, bw, bl); }
+      }
+    }
+    c.restore();
+  };
+  end(r.a, false); end(r.b, true);
+  if (!grass) {
+    // centre line: 30 m stripes with 20 m gaps between the numbers
+    const cw = Math.max(1, M(wid >= 45 ? 0.9 : 0.45)), from = M(90), to = H - M(90);
+    for (let y = from; y < to - M(30); y += M(50)) c.fillRect(W / 2 - cw / 2, y, cw, M(30));
+    // side stripes on wider runways
+    if (wid >= 30) { c.fillRect(M(1), 0, M(0.9), H); c.fillRect(W - M(1.9), 0, M(0.9), H); }
+  } else {
+    // grass: white edge markers along the sides
+    for (let y = M(30); y < H; y += M(90)) { c.fillRect(0, y, M(3), M(1)); c.fillRect(W - M(3), y, M(3), M(1)); }
+  }
+  return cv;
+}
+
+/** Runway holding positions: where a taxiway reaches a runway, the yellow lines (two solid on the
+ *  taxiway side, two dashed on the runway side), at a distance that suits the runway's size. */
+function v3dHoldLines(L: AirportLayout, g: any, loc: (x: number, y: number) => number[], e: number) {
+  const T = THREE, made: string[] = [];
+  const tex = (() => { const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const c = cv.getContext('2d');
+    c.fillStyle = '#E2B33C'; c.fillRect(0, 4, 128, 8); c.fillRect(0, 20, 128, 8); for (let x = 0; x < 128; x += 24) { c.fillRect(x, 36, 14, 8); c.fillRect(x, 52, 14, 8); }
+    const t = new T.CanvasTexture(cv); t.wrapS = T.RepeatWrapping; t.colorSpace = T.SRGBColorSpace; return t; })();
+  const mat = new T.MeshBasicMaterial({ map: tex, transparent: true });
+  for (const r of L.runways) {
+    if (r.surf === 9 || r.surf === 1) continue;
+    // the runway in local metres: centre and direction
+    const cx = (r.lon - L.lon) * 111320 * Math.cos(L.lat * D2R), cy = (r.lat - L.lat) * 110540;
+    const ux = Math.sin(r.hdg * D2R), uy = Math.cos(r.hdg * D2R), half = r.len / 2, hw = (r.wid || 45) / 2;
+    const hold = hw + ((r.wid || 45) >= 40 ? 65 : (r.wid || 45) >= 25 ? 45 : 30);
+    const side = (x: number, y: number) => ({ along: (x - cx) * ux + (y - cy) * uy, across: -(x - cx) * uy + (y - cy) * ux });
+    for (const p of L.paths) {
+      if ([1, 4, 9, 3].indexOf(p[0]) < 0) continue;
+      const A = L.points[p[2]], B = L.points[p[3]]; if (!A || !B) continue;
+      const a = side(A[0], A[1]), b = side(B[0], B[1]);
+      // one end on the runway, the other well off it
+      const onA = Math.abs(a.across) < hw + 8 && Math.abs(a.along) < half, onB = Math.abs(b.across) < hw + 8 && Math.abs(b.along) < half;
+      if (onA === onB) continue;
+      const on = onA ? a : b, off = onA ? b : a, P0 = onA ? A : B, P1 = onA ? B : A;
+      if (Math.abs(off.across) < hold) continue;   // too short a stub to fit the line
+      const t = (hold - Math.abs(on.across)) / (Math.abs(off.across) - Math.abs(on.across));
+      const hx = P0[0] + (P1[0] - P0[0]) * t, hy = P0[1] + (P1[1] - P0[1]) * t, key = Math.round(hx / 10) + ':' + Math.round(hy / 10);
+      if (made.indexOf(key) >= 0) continue; made.push(key);
+      const q = loc(hx, hy), q1 = loc(P1[0], P1[1]), dirx = q1[0] - q[0], dirz = q1[1] - q[1], ang = Math.atan2(dirx, dirz);
+      const w = Math.max(10, p[1] || 18) + 4;
+      const geo = new T.PlaneGeometry(w, 3.2); geo.rotateX(-Math.PI / 2);
+      const m = new T.Mesh(geo, mat); m.position.set(q[0], e + 0.32, q[1]); m.rotation.y = ang;
+      (m.material.map as any).repeat && (m.material.map.repeat.x = Math.max(1, w / 12));
+      g.add(m);
+    }
+  }
 }
