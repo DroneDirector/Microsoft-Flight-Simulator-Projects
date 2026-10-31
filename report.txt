@@ -1,0 +1,24 @@
+ams_pages option: '{"home":5,"features":6}\nPHP: 2026-10-31 20:41:08 [notice X 0][/home/runner/site/wp-content/plugins/elementor/modules/global-classes/atomic-global-styles.php::410] Elementor\\Modules\\GlobalClasses\\Atomic_Global_Styles::get_cache_root_key(): Implicitly marking parameter $key as nullable is deprecated, the explicit nullable type must be used instead [array (\n  \'trace\' => \'\n#0: Elementor\\Core\\Logger\\Manager -> shutdown()\n\',\n)]'
+pages: {"home": "http://127.0.0.1:8080/", "features": "http://127.0.0.1:8080/airline-manager-pro-features/"}
+home phone-360: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home phone-412: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home phone-landscape: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home tablet-portrait: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home tablet-landscape: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home laptop: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home full-hd: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home qhd: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home ultrawide: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+home super-ultrawide: HTTP 200, 16 sections, sideways overflow 0px, errors 0
+features phone-360: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features phone-412: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features phone-landscape: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features tablet-portrait: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features tablet-landscape: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features laptop: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features full-hd: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features qhd: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features ultrawide: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+features super-ultrawide: HTTP 200, 5 sections, sideways overflow 0px, errors 0
+front page = home page: yes
+PHP messages from the plugin: 0
