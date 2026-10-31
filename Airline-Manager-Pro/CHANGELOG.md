@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.31 (2026-10-31)
+
+- 3D ground paint as batched meshes (v3dGroundPaint) instead of a canvas texture; canvas sheet kept as fallback
+- Destination layout prefetched within 150 nm
+
 ## 0.9.30 (2026-10-31)
 
 - 3D view: tyre smoke sprites from the main gear at touchdown (air to ground transition above 50 kt)

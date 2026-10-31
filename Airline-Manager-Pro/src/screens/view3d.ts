@@ -284,7 +284,7 @@ function v3dBuildAirport(L: AirportLayout) {
     const bm = new T.Mesh(geo, mBuild); bm.renderOrder = 9; g.add(bm);
   }
   // the airport's ground paint, drawn from its own layout into one picture and laid over the terrain like a sheet
-  try { const sheet = airportSheet(L, loc, gy); if (sheet) g.add(sheet); } catch (x) { /* never stop the view */ }
+  try { g.add(v3dGroundPaint(L, loc, gy)); } catch (x) { try { const sheet = airportSheet(L, loc, gy); if (sheet) g.add(sheet); } catch (y) { /* never stop the view */ } }
   // runways: strips that follow the ground, painted with the markings their size calls for, numbers always
   for (const r of L.runways) {
     if (r.surf === 9) continue;   // water runways have no paint
@@ -427,6 +427,7 @@ function v3dLoop(now: number) {
   const ctr = v3dCentre(f, [w0.lon, w0.lat]);
   if (V3d.mode === 'free' && V3d.origin) v3dFreeRecentre();
   else if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && gcDistanceNm(V3d.origin, [w0.lon, w0.lat]) > 14)) v3dRecentre(f, w0);
+  v3dPrefetch(f, w0);
   if (V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
   v3dLoaderTick(now);
 
@@ -851,4 +852,108 @@ function v3dSmokeStep(dt: number) {
     p.sp.position.x += p.vx * dt; p.sp.position.z += p.vz * dt; p.sp.position.y += (0.6 + t * 0.8) * dt;
     p.sp.material.opacity = 0.6 * Math.min(1, 0.6 + p.k * 0.3) * (1 - t) * (1 - t);
   }
+}
+
+/* ---------- the airport ahead: its layout fetched early ---------- */
+// The destination's layout (the simulator's or OpenStreetMap's) is fetched about 150 nm out, so by the time
+// the view moves to the airport (60 nm) everything is there and only has to be built.
+const _v3dPre: { [icao: string]: number } = {};
+function v3dPrefetch(f: LiveFlight, w: { lon: number; lat: number }) {
+  if (!f || f.noDest || !f.to) return;
+  const B = apt(f.to); if (!B || _v3dPre[f.to] && Date.now() - _v3dPre[f.to] < 600e3) return;
+  if (gcDistanceNm([w.lon, w.lat], B.pos) > 150) return;
+  _v3dPre[f.to] = Date.now();
+  try { AirportLayouts.get(f.to, () => { /* kept for when the view gets there */ }); } catch (e) { /* ignore */ }
+}
+
+/* ---------- the airport's ground paint, as shapes ---------- */
+// Taxiways, their centre lines, the lead-in lines to the stands, stop bars, holding positions and aprons, built
+// as flat shapes that follow the ground (not one big picture): quick to build and sharp from any distance.
+function v3dGroundPaint(L: AirportLayout, loc: (x: number, y: number) => number[], gy: (x: number, z: number) => number): any {
+  const T = THREE, g = new T.Group(), osm = L.source === 'osm';
+  const batches: { [k: string]: number[] } = {};
+  const tri = (key: string, a: number[], b: number[], c: number[]) => { const B = batches[key] || (batches[key] = []); B.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]); };
+  const v = (x: number, y: number, lift: number) => { const q = loc(x, y); return [q[0], gy(q[0], q[1]) + lift, q[1]]; };
+  // a strip along a line (split every 25 m so it follows the ground)
+  const strip = (key: string, A: number[], B: number[], w: number, lift: number) => {
+    const dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy); if (len < 0.05) return;
+    const nx = -dy / len * w / 2, ny = dx / len * w / 2, n = Math.max(1, Math.ceil(len / 25));
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n, x0 = A[0] + dx * t0, y0 = A[1] + dy * t0, x1 = A[0] + dx * t1, y1 = A[1] + dy * t1;
+      const a = v(x0 + nx, y0 + ny, lift), b = v(x0 - nx, y0 - ny, lift), c = v(x1 - nx, y1 - ny, lift), d = v(x1 + nx, y1 + ny, lift);
+      tri(key, a, b, c); tri(key, a, c, d);
+    }
+  };
+  // a round end (so joints have no gaps or notches)
+  const disc = (key: string, P: number[], r: number, lift: number) => { const c = v(P[0], P[1], lift), seg = r > 8 ? 16 : 10; for (let i = 0; i < seg; i++) { const a0 = i / seg * Math.PI * 2, a1 = (i + 1) / seg * Math.PI * 2; tri(key, c, v(P[0] + Math.cos(a1) * r, P[1] + Math.sin(a1) * r, lift), v(P[0] + Math.cos(a0) * r, P[1] + Math.sin(a0) * r, lift)); } };
+  const taxi = (L.paths || []).filter(p => (p[0] === 1 || p[0] === 4) && L.points[p[2]] && L.points[p[3]]);
+  const conn = osm ? [] : (L.paths || []).filter(p => p[0] === 3 && L.points[p[2]] && L.parks && L.parks[p[3]]);
+  const leads = (L.paths || []).filter(p => p[0] === 9 && L.points[p[2]] && L.points[p[3]]);
+  const tw = (p: number[]) => Math.min(40, Math.max(10, p[1] || 18));
+  // aprons: concrete
+  for (const ar of L.areas || []) {
+    if (ar.k !== 'apron' || ar.pts.length < 3) continue;
+    try {
+      const contour = ar.pts.map(p => new T.Vector2(p[0], p[1])), faces = T.ShapeUtils.triangulateShape(contour, []);
+      for (const f of faces) { const [a, b, c] = f.map((i: number) => v(ar.pts[i][0], ar.pts[i][1], 0.15)); tri('apron', a, c, b); }
+    } catch (e) { /* an odd outline: left out */ }
+  }
+  // taxiways: shoulder, then asphalt (with round joints)
+  const joints: { [i: number]: number } = {};
+  for (const p of taxi) { strip('shoulder', L.points[p[2]], L.points[p[3]], tw(p) + 6, 0.22); [p[2], p[3]].forEach(i => joints[i] = Math.max(joints[i] || 0, tw(p))); }
+  for (const i in joints) disc('shoulder', L.points[+i], joints[i] / 2 + 3, 0.22);
+  for (const p of conn) strip('shoulder', L.points[p[2]], L.parks[p[3]], Math.max(10, p[1] || 12), 0.24);
+  for (const p of taxi) strip('asphalt', L.points[p[2]], L.points[p[3]], tw(p), 0.28);
+  for (const i in joints) disc('asphalt', L.points[+i], joints[i] / 2, 0.28);
+  // the yellow lines: centre lines, connectors, lead-ins
+  const LW = 0.6;
+  for (const p of taxi) strip('line', L.points[p[2]], L.points[p[3]], LW, 0.36);
+  for (const p of conn) strip('line', L.points[p[2]], L.parks[p[3]], LW, 0.36);
+  for (const p of leads) { strip('line', L.points[p[2]], L.points[p[3]], LW, 0.36); disc('line', L.points[p[3]], LW / 2, 0.36); }
+  for (const i in joints) disc('line', L.points[+i], LW / 2, 0.36);
+  // stands: the stop bar (and a short lead-in where the map has none of its own)
+  for (const pk of L.parks || []) {
+    const h = (pk[2] || 0) * D2R, ux = Math.sin(h), uy = Math.cos(h), r = pk[3] || 15;
+    if (!osm) strip('line', [pk[0] - ux * r * 2.2, pk[1] - uy * r * 2.2], [pk[0], pk[1]], LW, 0.36);
+    strip('line', [pk[0] - uy * r * 0.35, pk[1] + ux * r * 0.35], [pk[0] + uy * r * 0.35, pk[1] - ux * r * 0.35], 0.9, 0.37);
+  }
+  // runway holding positions: two solid and two dashed lines across the taxiway
+  for (const r of L.runways) {
+    if (r.surf === 9 || r.surf === 1) continue;
+    const cx = (r.lon - L.lon) * 111320 * Math.cos(L.lat * D2R), cy = (r.lat - L.lat) * 110540, ux = Math.sin(r.hdg * D2R), uy = Math.cos(r.hdg * D2R), half = r.len / 2, hw = (r.wid || 45) / 2;
+    const hold = hw + ((r.wid || 45) >= 40 ? 65 : (r.wid || 45) >= 25 ? 45 : 30);
+    const side = (x: number, y: number) => ({ along: (x - cx) * ux + (y - cy) * uy, across: -(x - cx) * uy + (y - cy) * ux });
+    for (const p of taxi) {
+      const A = L.points[p[2]], B = L.points[p[3]], a = side(A[0], A[1]), b = side(B[0], B[1]);
+      const onA = Math.abs(a.across) < hw + 8 && Math.abs(a.along) < half, onB = Math.abs(b.across) < hw + 8 && Math.abs(b.along) < half;
+      if (onA === onB) continue;
+      const on = onA ? a : b, off = onA ? b : a, P0 = onA ? A : B, P1 = onA ? B : A;
+      if (Math.abs(off.across) < hold) continue;
+      const t = (hold - Math.abs(on.across)) / (Math.abs(off.across) - Math.abs(on.across)), hx = P0[0] + (P1[0] - P0[0]) * t, hy = P0[1] + (P1[1] - P0[1]) * t;
+      const dx = P1[0] - P0[0], dy = P1[1] - P0[1], dl = Math.hypot(dx, dy) || 1, tx = dx / dl, ty = dy / dl, nx = -ty, ny = tx, w = tw(p) / 2 + 3;
+      [[0, true], [0.6, true], [1.3, false], [1.9, false]].forEach(([o, dash]) => {
+        const ox = hx + tx * (o as number), oy = hy + ty * (o as number);
+        if (!dash) { strip('line', [ox - nx * w, oy - ny * w], [ox + nx * w, oy + ny * w], 0.3, 0.38); return; }
+        for (let d = -w; d < w; d += 2) strip('line', [ox + nx * d, oy + ny * d], [ox + nx * Math.min(w, d + 1), oy + ny * Math.min(w, d + 1)], 0.3, 0.38);
+      });
+    }
+  }
+  const look: { [k: string]: [number, number] } = { apron: [0x8E9399, 1], shoulder: [0x5E636A, 2], asphalt: [0x3B4047, 3], line: [0xE8B730, 5] };
+  for (const k in batches) {
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(batches[k], 3)); geo.computeBoundingSphere();
+    const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: look[k][0], side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 - look[k][1], polygonOffsetUnits: -2 - look[k][1] * 2 }));
+    m.renderOrder = look[k][1]; g.add(m);
+  }
+  // stand numbers, flat on the apron in front of each stop bar
+  if (L.parkNames && (L.parks || []).length <= 400) {
+    const mat: { [n: string]: any } = {};
+    for (const pk of L.parks) {
+      const name = pk[6] != null ? L.parkNames[pk[6]] : ''; if (!name) continue;
+      if (!mat[name]) { const c = document.createElement('canvas'); c.width = 128; c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#F4D35E'; x.font = '700 44px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(name, 64, 34); const tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace; mat[name] = new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -16 }); }
+      const h = (pk[2] || 0) * D2R, r = pk[3] || 15, x0 = pk[0] - Math.sin(h) * r * 1.4, y0 = pk[1] - Math.cos(h) * r * 1.4, q = loc(x0, y0);
+      const lab = new T.Mesh(new T.PlaneGeometry(Math.max(4, r * 0.5), Math.max(2, r * 0.25)), mat[name]);
+      lab.rotation.x = -Math.PI / 2; lab.rotation.z = -h; lab.position.set(q[0], gy(q[0], q[1]) + 0.4, q[1]); lab.renderOrder = 6; g.add(lab);
+    }
+  }
+  return g;
 }
