@@ -77,6 +77,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
         <span><i>Close</i>Back to the Overview</span></div>
       ${DESKTOP ? '<div class="fc-pc-hint">Click to look around with the mouse · W A S D to move</div><div class="fc-esc"><kbd>Esc</kbd><span>Exit the free camera</span></div>' : ''}
     </div>
+    <label class="v3d-wzoom" aria-label="Closer to the window">${icon('search')}<input type="range" class="v3d-wz" min="0" max="100" step="1" value="${Math.round(cabinWinZoom() * 100)}" aria-label="Closer to the window"><small>Zoom</small></label>
     ${Mode.coop() ? '' : `<button class="v3d-sat v3d-tfc tfc-btn ${Traffic.on() ? 'on' : ''}" data-act="tfc-toggle">${icon('fleet')}Other airlines</button>`}
     <small class="v3d-credit">Terrain: Terrain Tiles on AWS · water: © OpenStreetMap contributors · imagery: Sentinel-2 cloudless 2016 by EOX (see Settings → About)</small>
     ${v3dLoaderHtml()}`;
@@ -132,7 +133,7 @@ ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
-  V3d.root.classList.toggle('v3d-free', V3d.mode === 'free');
+  V3d.root.classList.toggle('v3d-free', V3d.mode === 'free'); V3d.root.classList.toggle('v3d-win', /^win/.test(V3d.mode));
   V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' || V3d.mode === 'cabin' || /^win/.test(V3d.mode) ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
 };
@@ -164,7 +165,7 @@ function v3dBind() {
   cv.addEventListener('pointerdown', (e: PointerEvent) => {
     cv.setPointerCapture(e.pointerId); V3d.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY };
     const ids = Object.keys(V3d.ptrs);
-    if (ids.length === 2) { const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]]; V3d.pinch0 = Math.hypot(a.x - b.x, a.y - b.y); V3d.dist0 = v3dDist(); }
+    if (ids.length === 2) { const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]]; V3d.pinch0 = Math.hypot(a.x - b.x, a.y - b.y); V3d.dist0 = v3dDist(); (V3d as any).wz0 = cabinWinZoom(); }
   });
   cv.addEventListener('pointermove', (e: PointerEvent) => {
     const p = V3d.ptrs[e.pointerId]; if (!p) return;
@@ -173,7 +174,7 @@ function v3dBind() {
     if (ids.length === 1) { V3d.yaw -= (e.clientX - p.x) * 0.007; V3d.pitch = clamp(V3d.pitch + (e.clientY - p.y) * 0.005, -0.6, 1.5); }
     if (ids.length === 2) { const VA: any = V3d; VA.panX = (VA.panX || 0) - (e.clientX - p.x) * 0.5 / 2; VA.panY = (VA.panY || 0) + (e.clientY - p.y) * 0.5 / 2; }
     p.x = e.clientX; p.y = e.clientY;
-    if (ids.length === 2) { const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (V3d.pinch0) V3d.dist = clamp(V3d.dist0 * V3d.pinch0 / d, 8, 30000); }
+    if (ids.length === 2) { const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (V3d.pinch0) { if (/^win/.test(V3d.mode)) cabinWinZoomSet((V3d as any).wz0 + (d - V3d.pinch0) / 300); else V3d.dist = clamp(V3d.dist0 * V3d.pinch0 / d, 8, 30000); } }
   });
   const up = (e: PointerEvent) => {
     const p = V3d.ptrs[e.pointerId];
@@ -194,7 +195,7 @@ function v3dBind() {
   }
   cv.addEventListener('wheel', (e: WheelEvent) => { e.preventDefault(); if (V3d.mode === 'free') {
     if (DESKTOP) { const S: any = State.settings, m = clamp((S.v3dFreeSpeed || 1) * (e.deltaY > 0 ? 1 / 1.25 : 1.25), 0.125, 8); S.v3dFreeSpeed = Math.round(m * 100) / 100; const o = V3d.root.querySelector('.fc-spd-v'), sp = V3d.root.querySelector('.fc-spd') as HTMLInputElement; if (o) o.textContent = m.toFixed(1) + '×'; if (sp) sp.value = String(Math.round((Math.log(m) / Math.log(8) + 1) * 50)); Store.soon(); return; }
-    v3dFreePush(0, 0, (e.deltaY > 0 ? -1 : 1) * 2.2); return; } V3d.dist = clamp(v3dDist() * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 8, 30000); }, { passive: false } as any);
+    v3dFreePush(0, 0, (e.deltaY > 0 ? -1 : 1) * 2.2); return; } if (/^win/.test(V3d.mode)) { cabinWinZoomSet(cabinWinZoom() + (e.deltaY > 0 ? -0.08 : 0.08)); return; } V3d.dist = clamp(v3dDist() * (e.deltaY > 0 ? 1.15 : 1 / 1.15), 8, 30000); }, { passive: false } as any);
 }
 function v3dDist(): number { const p = V3d.planes[V3d.target]; const span = p ? shapeOf(p.type).span : 35; return V3d.dist || (V3d.mode === 'tower' ? 0 : span * 1.9 + 25); }
 

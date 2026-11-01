@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.45 (2026-11-01)
+
+- v3d-cabin: swept bin profile with smooth normals (cabinSweep), PSU with reading lights and vents, light lines, bezels, curtain, charcoal seats with Catmull-Rom outline (cabinSmooth), winged headrests, headrest covers in company colour (cabinCoverTex), closed window-seat room, eye abeam the measured wing tip
+- Cabin quality setting v3dCabinQ (0-3): curve segments, shell segments, people detail, anisotropy, full pixel ratio at extreme (cabinSharp); cabins freed on leaving (cabinFree)
+- Window zoom v3dWinZoom: slider (.v3d-wzoom), pinch and wheel; eye moves along the line to the wing tip, stopping 0.2 m from the window
+- v3d-sound: cabinVoice (rumble, drone with beat, air rush, window-side pan), v3dCabinVol slider (0 mutes), outside engines muffled in cabin views
+
 ## 0.9.44 (2026-11-01)
 
 - v3d-clouds: world-fixed 3D puffs (sphere impostors, world-space noise and lighting) and sheets, per-puff ids with fade in/out, rain shafts (mode 3), storm towers, lightning glow uniforms
