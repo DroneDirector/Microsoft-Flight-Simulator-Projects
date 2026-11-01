@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.54 (2026-11-01)
+
+- office3d: the seat-now fallback fires only when the visitor makes no progress for 4 s (instead of after 9 s)
+
 ## 0.9.53 (2026-11-01)
 
 - office3d: interview state reset on every open (started, rescued, talk, door); visitor seated by a 9 s fallback; per-frame visitor errors caught, logged and the visitor seated; the interview runs without a figure
