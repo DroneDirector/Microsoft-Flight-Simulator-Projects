@@ -2784,3 +2784,11 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .rs-card em { font-style: normal; font-size: 12px; margin-top: 4px; color: #9FE6F2; }
 .rs-card.to em { color: #FFD08A; }
 @media (max-width: 600px) { .rs-cards { grid-template-columns: 1fr; } }
+
+/* PC: the settings window fits any monitor or TV (the app is scaled to the screen, so its size is set in
+   proportion to the window rather than in screen units), a little narrower and smaller */
+.desktop .layer-modal .panel { max-height: 94%; }
+.desktop .layer-modal.full .panel { width: min(880px, 94%); height: min(520px, 94%); }
+.desktop .settings { grid-template-columns: 186px 1fr; }
+.desktop .set-tab { padding: 7px 9px; font-size: 13px; }
+.desktop .set-body { padding: 14px 18px 20px; }
