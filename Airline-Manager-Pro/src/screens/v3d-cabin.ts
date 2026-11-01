@@ -657,7 +657,7 @@ function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters
   // which blocks face which aisle, and with which letters
   const sides: { y: number; dir: number; txt: string }[] = []; let i0 = 0;
   blocks.forEach(b => { const ys = seatY.slice(i0, i0 + b), lt = letters.slice(i0, i0 + b), lo = Math.min(...ys) - seatW / 2, hi = Math.max(...ys) + seatW / 2;
-    for (const a of aisles) { if (a > hi && a - hi < 0.6) sides.push({ y: hi + 0.04, dir: 1, txt: lt }); if (a < lo && lo - a < 0.6) sides.push({ y: lo - 0.04, dir: -1, txt: lt }); }
+    for (const a of aisles) { if (a > hi && a - hi < 0.6) sides.push({ y: hi + 0.01, dir: 1, txt: lt }); if (a < lo && lo - a < 0.6) sides.push({ y: lo - 0.01, dir: -1, txt: lt }); }
     i0 += b; });
   const cells = rows.length * sides.length, cols = 8, cw = 128, ch = 40, cv = document.createElement('canvas'); cv.width = cols * cw; cv.height = Math.ceil(cells / cols) * ch;
   const x = cv.getContext('2d') as CanvasRenderingContext2D; x.fillStyle = '#1C2026'; x.fillRect(0, 0, cv.width, cv.height);
@@ -669,7 +669,7 @@ function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters
     x.font = '600 18px Inter, Arial, sans-serif'; x.fillStyle = '#C9D2DC'; x.fillText(sd.txt.split('').join(' '), cx + 46, cy + ch / 2 + 1);
     // a small plate facing the aisle, its text reading left to right from there
     // two faces in a shallow V towards the aisle: one readable walking to the back (boarding), one walking forward
-    const ctr = V(rowX[r] - 0.05, sd.y, zf + 1.66), o0 = V(0, 0, 0), hw = 0.11, hh = 0.034;
+    const ctr = V(rowX[r] - 0.05, sd.y, zf + 1.74), o0 = V(0, 0, 0), hw = 0.072, hh = 0.023;   // a small plate just under the bin's edge
     const u0 = cx / cv.width, u1 = (cx + cw) / cv.width, v0 = 1 - (cy + ch) / cv.height, v1 = 1 - cy / cv.height;
     for (const along of [-1, 1]) {
       const n = V(along * 0.75, sd.dir * 0.66, 0).sub(o0).normalize(), right = new T.Vector3().crossVectors(up, n).normalize(), b0 = pos.length / 3;
