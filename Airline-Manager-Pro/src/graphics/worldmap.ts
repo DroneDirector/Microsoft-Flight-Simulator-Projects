@@ -518,7 +518,7 @@ class WorldMap {
       const t = acType(f.typeId), prop = t && (t.cls === 'turboprop' || t.cls === 'bush');
       c.globalAlpha = 0.72; drawPlaneGlyph(c, here[0], here[1], hdg, 13, prop, light ? '#5B6B80' : '#8C9BB0', light ? '#FFFFFF' : '#0B1626'); c.globalAlpha = 1;
       if (this.opts.labels !== false && degPx > 10) {
-        c.font = '500 10px Inter, sans-serif'; const lab = `${f.tfc.airline} ${f.callsign}`, w = c.measureText(lab).width;
+        c.font = '500 10px Inter, sans-serif'; const lab = `${tfcLabel(f.tfc)} ${f.callsign}`, w = c.measureText(lab).width;
         // a name only where it doesn't sit on another one
         const box = [here[0] + 10, here[1] - 19, here[0] + 16 + w, here[1] - 6];
         if (used.some(u => box[0] < u[2] && box[2] > u[0] && box[1] < u[3] && box[3] > u[1])) continue;

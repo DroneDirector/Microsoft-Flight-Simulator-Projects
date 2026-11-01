@@ -455,13 +455,13 @@ function v3dLoop(now: number) {
     if (!P) {
       const a = plane(g.reg), c: any = a ? company(a.companyId) : (g as any).tfc ? { color: (g as any).tfc.color, color2: (g as any).tfc.color2, id: (g as any).tfc.airline } : company();
       // the model is built from its nose; a pivot in its middle places and turns it
-      const body = buildAircraftModel(typeId, liveryFor(c.color, c.color2, c.id)), model = new T.Group();
+      const tc: any = (g as any).tfc, body = buildAircraftModel(typeId, tc && tc.dcode ? realLivery(tc.dcode, tc.color) : liveryFor(c.color, c.color2, c.id)), model = new T.Group();
       body.position.x = -shapeOf(typeId).L / 2; model.add(body); model.userData.body = body;
       body.traverse((o: any) => { o.renderOrder = 10; });   // after the airport's ground paint
       try { v3dPlaneLightsAdd(body, typeId); } catch (e) { /* no lights */ }
       model.userData.flightId = g.id; model.userData.set = body.userData.set;
       V3d.scene.add(model);
-      const lab = document.createElement('span'); lab.className = 'v3d-lab' + ((g as any).tfc ? ' tfc' : ''); lab.textContent = (g as any).tfc ? `${(g as any).tfc.airline} ${g.callsign}` : g.callsign; V3d.root.querySelector('.v3d-labels').appendChild(lab);
+      const lab = document.createElement('span'); lab.className = 'v3d-lab' + ((g as any).tfc ? ' tfc' : ''); lab.textContent = (g as any).tfc ? `${tfcLabel((g as any).tfc)} ${g.callsign}` : g.callsign; V3d.root.querySelector('.v3d-labels').appendChild(lab);
       P = V3d.planes[g.id] = { id: g.id, model, type: typeId, pos: null, tgt: new T.Vector3(), hdg: w.hdg, tgtHdg: w.hdg, bank: 0, pitch: 0, flaps: 0, gear: 1, label: lab, seen: now };
     }
     const s = shapeOf(P.type);
