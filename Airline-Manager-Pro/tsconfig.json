@@ -42,6 +42,8 @@
     "src/core/ai-sim.ts",
     "src/core/procedures.ts",
     "src/core/delays.ts",
+    "src/core/failures.ts",
+    "src/core/catering.ts",
     "src/graphics/land.ts",
     "src/graphics/worldmap.ts",
     "src/ui/battery.ts",

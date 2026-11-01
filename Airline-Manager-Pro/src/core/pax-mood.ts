@@ -12,7 +12,10 @@ function moodEvents(f: any, list: PaxSeat[]): MoodEv[] {
   const late = f.sched && f.depAt ? Math.round((f.depAt - f.sched) / 60000) : 0;
   if (late > 20) out.push({ t: 0.02, text: `Left ${late} minutes late`, d: late > 60 ? -14 : -6 });
   if (r() < 0.35) { const sev = r() < 0.15; out.push({ t: 0.18 + r() * 0.5, text: sev ? 'Severe turbulence: drinks spilled, seat belts on' : 'Bumpy ride for a while', d: sev ? -16 : -5 }); }
-  const svc = r(); out.push({ t: 0.3, text: svc < 0.12 ? 'Slow meal service: some had to wait a long time' : svc < 0.2 ? 'Ran out of the hot meal choice' : 'Friendly service and a good meal', d: svc < 0.12 ? -9 : svc < 0.2 ? -6 : 5 });
+  // the service: something ran out only when the loading really came up short (Catering and storage)
+  const svc = r();
+  if (f.catShort && typeof CAT_SHORT_TEXT !== 'undefined') out.push({ t: 0.32, text: CAT_SHORT_TEXT[f.catShort as CatItem], d: f.catShort === 'hot' ? -8 : -5 });
+  else out.push({ t: 0.3, text: svc < 0.12 ? 'Slow meal service: some had to wait a long time' : 'Friendly service and a good meal', d: svc < 0.12 ? -9 : 5 });
   if (f.pax && list.some(p => p.pet && p.pet.where === 'cabin')) out.push({ t: 0.45, text: 'A pet on board cheered people up', d: 2 });
   // very rarely: a flight attendant shouts at a passenger for no reason
   if (r() < 0.012 && list.length > 4) {

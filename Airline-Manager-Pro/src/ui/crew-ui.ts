@@ -63,7 +63,8 @@ ACTIONS['edit-staff-look'] = el => {
 
 ACTIONS['dismiss-ask'] = el => {
   const p = staffById(el.getAttribute('data-id')); if (!p) return;
-  openLayer('modal', `<div class="modal-head del-head"><span class="sc-av mini">${avatarSvg(p.look, personRole(p), { view: 'bust', still: true })}</span><div><h2>Dismiss ${esc(p.name)}?</h2><small>Are you sure? You'll need to hire a replacement.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+  const beg = dismissMood(p);
+  openLayer('modal', `${beg ? `<div class="dis-beg">${avatarSvg(p.look, personRole(p), { accent: company().color, mood: beg })}<p class="speech">${esc(['Please, don\'t do this. I\'ll change, I promise.', 'I need this job. Give me one more chance, please.', 'I know I messed up. It won\'t happen again, I swear.', 'Please, think of my family. One more chance.', 'Please, please. I\'ll do anything to make it right.'][beg.v])}</p></div>` : ''}<div class="modal-head del-head"><span class="sc-av mini">${avatarSvg(p.look, personRole(p), { view: 'bust', still: true })}</span><div><h2>Dismiss ${esc(p.name)}?</h2><small>Are you sure? You'll need to hire a replacement.</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
     <div class="modal-body"><p class="lede warn">${icon('alert')}${personRole(p) === 'mech' ? 'Without enough mechanics, some aircraft can\'t fly.' : personRole(p) === 'fa' ? 'Airliners can\'t fly without the flight attendants they need.' : 'Two-pilot aircraft can\'t fly without a co-pilot.'}</p>
     <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Keep ${esc(p.name.split(' ')[0])}</button><button class="btn danger" data-act="dismiss-do" data-id="${p.id}">Yes, dismiss</button></div></div>`, { cls: 'narrow' });
 };
@@ -164,6 +165,18 @@ function maybeIncident() {
 }
 function startConductClock() { setInterval(maybeIncident, 4 * 60 * 1000); }
 
+/** How the person looks in the report: furious after violence (hitting someone, throwing bags, a fight), one of ten ways. */
+function incidentMood(inc: any): { kind: string; v: number } {
+  const t = String((inc && (inc.title + ' ' + inc.text)) || '');
+  if (!/hit|struck|strike|punch|slap|kick|assault|attack|fight|violen|threw|thrown|throw|hurl|smash|slam|shov|push|grab|threat|rough|aggress/i.test(t)) return undefined;
+  return { kind: 'angry', v: Math.floor(cloudHash(String(inc.id || '').length * 31 + t.length, t.charCodeAt(0) || 1, 5) * 10) };
+}
+/** Someone with serious trouble on record, about to be dismissed: begging to keep the job, one of five ways. */
+function dismissMood(p: any): { kind: string; v: number } {
+  const inc = ((State as any).incidents || []).filter((x: any) => x.staffId === p.id && (x.sev === 'severe' || incidentMood(x)))[0];
+  if (!inc && !(p.warnings >= 2)) return undefined;
+  return { kind: 'beg', v: Math.floor(Math.random() * 5) };
+}
 ACTIONS['open-incident'] = el => { const t = el.closest('.toast'); if (t) t.remove(); incidentPopup(el.getAttribute('data-id')); };
 function incidentPopup(id: string) {
   const inc = (State as any).incidents.filter((x: Incident) => x.id === id)[0]; if (!inc) return;
@@ -173,7 +186,7 @@ function incidentPopup(id: string) {
   const role = personRole(p);
   openLayer('modal', `
     <div class="inc">
-      <div class="inc-av">${avatarSvg(p.look, role, { accent: company().color })}</div>
+      <div class="inc-av">${avatarSvg(p.look, role, { accent: company().color, mood: incidentMood(inc) })}</div>
       <div class="inc-main">
         <div class="modal-head"><div><small>Conduct report, ${esc(inc.date)}</small><h2>${esc(inc.title)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
         <div class="say-row">${voiceButton(inc.text, 'ops', 'Play the report')}${voiceNoteEl('Head of operations')}</div>

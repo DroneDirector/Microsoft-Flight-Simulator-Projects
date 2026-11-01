@@ -42,7 +42,7 @@ function averageFare(typeId: string, from: string, to: string): number {
 
 /** Extra facts about a leg: the aircraft (cabin, tankered fuel, route fares), passengers by class, a
  *  charter job it flies, or a ferry flight without anyone on board. */
-interface LegX { reg?: string; paxJ?: number; paxF?: number; job?: { pay: number; title: string }; ferry?: boolean; book?: boolean }
+interface LegX { reg?: string; paxJ?: number; paxF?: number; job?: { pay: number; title: string }; ferry?: boolean; book?: boolean; cat?: number }
 
 /** Everything a leg earns and costs, with the lines shown in Finance. fuelKg: actual burn if known. */
 function legEconomics(typeId: string, from: string, to: string, pax: number, cargoKg: number, blockMin: number, fuelKg?: number, gsxCharged?: boolean, x?: LegX): LegMoney {
@@ -98,7 +98,17 @@ function legEconomics(typeId: string, from: string, to: string, pax: number, car
   // parts are about 45% of maintenance: those follow the parts market (or come from stock)
   const mx = Math.round(mxBase * 0.55 + (mxBase * 0.45 - partsUsed) * marketIdx('parts'));
   const sales = Math.round(tickets * (small ? 0.03 : 0.06));                         // booking systems, agents, card fees
-  const catering = gsxCharged || x.ferry ? 0 : Math.round(pY * (small ? 0 : longHaul ? 24 : cls === 'turboprop' ? 1.5 : 4) * svc.cateringMul + (pJ + pF) * (small ? 0 : longHaul ? 85 : 18) * svc.cateringPrem);
+  let catering = gsxCharged || x.ferry ? 0 : Math.round(pY * (small ? 0 : longHaul ? 24 : cls === 'turboprop' ? 1.5 : 4) * svc.cateringMul + (pJ + pF) * (small ? 0 : longHaul ? 85 : 18) * svc.cateringPrem);
+  // from the airline's own storage (Settings → Passenger services): what was loaded from it is already paid
+  // for; the rest is bought from the airport's caterer at the day's prices plus their margin
+  if (catering > 0 && x.book && typeof cateringOn === 'function' && cateringOn()) {
+    try {
+      const need = catNeed(pY, pJ + pF, blockMin), needUsd = CAT_ITEMS.reduce((a, it) => a + need[it.id] * it.usd, 0);
+      const fromStock = x.cat != null ? x.cat : catLoad(null, cid, need).stockUsd;
+      const covered = needUsd > 0 ? clamp(fromStock / needUsd, 0, 1) : 0;
+      catering = Math.round(catering * (1 - covered) * (1.15 * (CAT_ITEMS.reduce((a, it) => a + catIdx(it.id), 0) / CAT_ITEMS.length)));
+    } catch (e) { /* the usual catering cost */ }
+  }
   const crewN = small ? 1 : 2 + (typeof faNeeded === 'function' ? faNeeded(t) : 0);
   const crewTrip = Math.round(crewN * (longHaul ? 260 : bh > 3 ? 120 : 45));             // allowances, hotels and transport away from base
   const overhead = Math.round(revenueBase(tickets, onboard, bags, cargo, jobPay) * (small ? 0.06 : 0.09)); // offices, IT, head office staff
@@ -165,7 +175,10 @@ function gsxOnState(s: any, airport: string) {
     if (st !== 6) { if (st && st < 5) _gsxDone[sv.key] = false; continue; }
     if (_gsxDone[sv.key]) continue;
     _gsxDone[sv.key] = true; _gsxUsedThisLeg = true;
-    const base = sv.price[cls] || 0, pp = sv.perPax ? (sv.perPax[cls] || 0) * pax : 0, cost = Math.round(base + pp);
+    let pp = sv.perPax ? (sv.perPax[cls] || 0) * pax : 0; const base = sv.price[cls] || 0;
+    // GSX's catering truck loads from your own storage: you pay their service, the food comes from stock
+    if (sv.key === 'catering' && typeof cateringOn === 'function' && cateringOn()) { try { const lf: any = State.live.filter(x => x.you)[0]; if (!lf || !lf.catLoaded) { const pJF = Math.round(pax * 0.1), need = catNeed(pax - pJF, pJF, lf && lf.durMs ? lf.durMs / 60000 : 120), r = catLoad(lf, a.companyId, need); if (lf) lf.catStockUsd = r.stockUsd; pp *= 0.25; } } catch (e) { /* the usual charge */ } }
+    const cost = Math.round(base + pp);
     if (!cost) continue;
     const c = company(), before = c.balance;
     c.balance -= cost;

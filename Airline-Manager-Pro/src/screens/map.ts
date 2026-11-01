@@ -189,6 +189,7 @@ function flightBubbleHtml(id: string, following: boolean): string {
       <button class="${following ? 'on' : ''}" data-act="fb-follow" data-id="${esc(id)}">${icon('focus')}${following ? 'Following' : 'Follow'}</button>
       ${f.you ? '' : `<button class="${fav ? 'on fav' : ''}" data-act="fb-fav" data-id="${esc(id)}">${icon('star')}${fav ? 'Favourite' : 'Favourite'}</button>`}
       ${AIRPORT_VIEW ? `<button data-act="fb-airport" data-id="${esc(id)}">${icon('land')}${esc(bubbleAirport(f))}</button>` : ''}
+      ${typeof cateringOn === 'function' && cateringOn() && f.pax && !f.ferry ? `<button data-act="cat-open" data-id="${esc(id)}">${icon('pax')}${f.catLoaded ? 'Catering loaded' : 'Catering'}</button>` : ''}
       <button data-act="fb-details" data-id="${esc(id)}">${icon('info')}Details</button>
     </div></div>`;
 }

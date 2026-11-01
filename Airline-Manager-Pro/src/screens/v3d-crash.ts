@@ -113,6 +113,8 @@ function v3dCrashBuild(L: AirportLayout, loc: (x: number, y: number) => number[]
 
 function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: number) => number[], gy: (x: number, z: number) => number): any {
   const T = THREE, grp = new T.Group(), P = crashPlace(site, L, loc), y0 = gy(P.x, P.z), s = shapeOf(site.typeId), len = s.L;
+  // in the sea: the wreck partly sunk, burning fuel and oil spread on the water, rescue boats instead of fire engines
+  const llP = v3dLonLat(P.x, P.z), sea = (() => { try { return V3dTerrain.isSea(llP[0], llP[1]); } catch (e) { return false; } })();
   const rnd = (k: number) => cloudHash(site.id.length * 17 + k, site.at % 99991, 3);
   const h = P.hdg * D2R, fx = Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = Math.sin(h);
   const at = (along: number, side: number) => [P.x + fx * along + rx * side, P.z + fz * along + rz * side];
@@ -137,7 +139,8 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
     });
     const piv = new T.Group(); m.position.x = -(cut[0] + cut[1]) / 2 * len; piv.add(m);
     const l = lay[i], q = at(l[0], l[1]);
-    piv.position.set(q[0], gy(q[0], q[1]) - l[2] + s.h * 0.15, q[1]);
+    piv.position.set(q[0], gy(q[0], q[1]) - l[2] + s.h * (sea ? -0.32 : 0.15), q[1]);
+    if (sea) { l[4] *= 2.2; l[5] *= 1.3; }
     piv.rotation.set(0, 0, 0); piv.rotateY(-(P.hdg + 90 + l[3]) * D2R); piv.rotateZ(l[4] * D2R); piv.rotateX(l[5] * D2R);
     grp.add(piv); piv.updateMatrixWorld(true);
     // the scene places the airport's group at the origin, so this is where the cut lies in the world
@@ -156,14 +159,28 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   scar.material.userData.noDim = true;
   const sc = at(-len * 0.6 - 60, 0); scar.position.set(sc[0], gy(sc[0], sc[1]) + 0.6, sc[1]); scar.scale.set(s.span * 0.9, 1, len * 2.6 + 140); scar.rotation.y = -h; scar.renderOrder = 7;
   const burn = new T.Mesh(new T.CircleGeometry(1, 28).rotateX(-Math.PI / 2), scar.material); burn.position.set(P.x, y0 + 0.65, P.z); burn.scale.set(s.span * 1.3, 1, len * 1.2); burn.renderOrder = 7;
-  grp.add(scar, burn);
+  if (!sea) grp.add(scar, burn);
+  else {
+    // the slick: dark, ragged, with an oily rainbow sheen, spreading out from the wreck
+    if (!V3dCrash.oilTex) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 256; const x = cv.getContext('2d');
+      for (let i = 0; i < 70; i++) { const a = Math.random() * 6.28, d = Math.pow(Math.random(), 0.6) * 105, cx = 128 + Math.cos(a) * d, cy = 128 + Math.sin(a) * d, r = 14 + Math.random() * 40;
+        const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, `rgba(8,8,10,${0.45 + Math.random() * 0.3})`); gr.addColorStop(1, 'rgba(8,8,10,0)'); x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, r, 0, 6.28); x.fill(); }
+      x.globalCompositeOperation = 'source-atop';
+      for (let i = 0; i < 40; i++) { const cx = 30 + Math.random() * 196, cy = 30 + Math.random() * 196, r = 6 + Math.random() * 20, hue = Math.random() * 360;
+        const gr = x.createRadialGradient(cx, cy, r * 0.4, cx, cy, r); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.6, `hsla(${hue},80%,55%,.22)`); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, r, 0, 6.28); x.fill(); }
+      V3dCrash.oilTex = new T.CanvasTexture(cv);
+    }
+    const oil = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: V3dCrash.oilTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10 }));
+    oil.material.userData.noDim = true; oil.position.set(P.x - fx * len * 0.4, y0 + 0.15, P.z - fz * len * 0.4); oil.scale.set(len * 3.2, 1, len * 4.2); oil.rotation.y = -h; oil.renderOrder = 7; grp.add(oil);
+  }
   // debris: hundreds of pieces strewn back along the path, thickest near the wreck
   const nD = 260, deb = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0x3A3C40 }), nD), M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), Sv = new T.Vector3();
   for (let i = 0; i < nD; i++) {
     const t = Math.pow(Math.random(), 1.8), p = at(-t * (len * 3 + 220) + (Math.random() - 0.3) * len * 0.6, (Math.random() - 0.5) * (s.span * 0.5 + t * 50));
     const sz = (0.25 + Math.pow(Math.random(), 3) * 2.6);
     E.set(Math.random() * 6, Math.random() * 6, Math.random() * 6); Q.setFromEuler(E); Sv.set(sz * (0.5 + Math.random()), sz * 0.25, sz * (0.4 + Math.random()));
-    M.compose(new T.Vector3(p[0], gy(p[0], p[1]) + sz * 0.1, p[1]), Q, Sv); deb.setMatrixAt(i, M);
+    M.compose(new T.Vector3(p[0], gy(p[0], p[1]) + (sea ? 0.05 : sz * 0.1), p[1]), Q, Sv); deb.setMatrixAt(i, M);
     deb.setColorAt(i, new T.Color(Math.random() < 0.25 ? site.color : Math.random() < 0.5 ? 0xD9DCE0 : 0x2A2C30).multiplyScalar(0.35 + Math.random() * 0.4));
   }
   grp.add(deb);
@@ -172,7 +189,13 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   for (const [al, sd, sz] of [[0, 0, 9], [len * 0.05, -s.span * 0.22, 8], [len * 0.05, s.span * 0.22, 8], [lay[0][0], lay[0][1], 6], [-len * 0.2, s.span * 0.35, 5], [lay[2][0] * 0.5, 4, 4]]) {
     const q = at(al, sd); src.push([q[0], gy(q[0], q[1]) + 0.5, q[1], sz * Math.max(0.6, len / 40)]);
   }
-  const fire = crashFx('fire', src, 90), smoke = crashFx('smoke', src.slice(0, 3).map(q => [q[0], q[1] + 4, q[2], q[3] * 1.4]), 70);
+  if (sea) {
+    // burning fuel on the water: many low, wide fires across the slick, the wreck's own fires lower down
+    for (const q of src) q[1] = y0 + 0.3;
+    for (let i = 0; i < 12; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * len * 1.3, q = at(-len * 0.4 + Math.cos(a) * d, Math.sin(a) * d * 0.7); src.push([q[0], y0 + 0.2, q[1], (3 + Math.random() * 5) * Math.max(0.6, len / 40)]); }
+  }
+  const fire = crashFx('fire', src, sea ? 150 : 90), smoke = crashFx('smoke', src.slice(0, sea ? 5 : 3).map(q => [q[0], q[1] + 4, q[2], q[3] * (sea ? 1.8 : 1.4)]), sea ? 100 : 70);
+  if (sea) { fire.material.uniforms.uK.value = 1; for (let i = 0; i < 150; i++) { const b = fire.geometry.attributes.iP; b.setZ(i, b.getZ(i) * 0.55); } fire.geometry.attributes.iP.needsUpdate = true; }
   grp.add(fire, smoke);
   // the fire's glow on the ground at night
   const glow = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.ShaderMaterial({
@@ -187,17 +210,24 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   const mRed = new T.MeshLambertMaterial({ color: 0xB3151B }), mWhite = new T.MeshLambertMaterial({ color: 0xE8EAEC }), mYel = new T.MeshLambertMaterial({ color: 0xD8C21A });
   const nV = 6;
   for (let i = 0; i < nV; i++) {
-    const amb = i >= 4, ang = (i / nV) * Math.PI * 2 + rnd(40 + i) * 0.6, rr = len * 0.7 + 35 + rnd(50 + i) * 25;
+    const amb = !sea && i >= 4, ang = (i / nV) * Math.PI * 2 + rnd(40 + i) * 0.6, rr = (sea ? len * 1.6 + 70 : len * 0.7 + 35) + rnd(50 + i) * 25;
     const x = P.x + Math.cos(ang) * rr, z = P.z + Math.sin(ang) * rr, v = new T.Group();
+    if (sea) {   // a rescue boat: a pointed hull with a cabin
+      const hl = new T.Shape(); hl.moveTo(-5, -1.4); hl.lineTo(3, -1.4); hl.quadraticCurveTo(6.5, 0, 3, 1.4); hl.lineTo(-5, 1.4); hl.lineTo(-5, -1.4);
+      const hull = new T.Mesh(new T.ExtrudeGeometry(hl, { depth: 1.2, bevelEnabled: false }).rotateX(-Math.PI / 2), i % 2 ? mRed : new T.MeshLambertMaterial({ color: 0xE8641B }));
+      const cab = new T.Mesh(new T.BoxGeometry(3.2, 1.6, 2.2), mWhite); cab.position.set(-1.2, 2, 0); v.add(hull, cab);
+    } else {
     const body = new T.Mesh(new T.BoxGeometry(amb ? 6 : 10.5, amb ? 2.6 : 3.3, amb ? 2.3 : 2.6), amb ? mWhite : (i === 0 ? mYel : mRed)); body.position.y = (amb ? 2.6 : 3.3) / 2 + 0.4; v.add(body);
+    }
     for (const sd of [-0.8, 0.8]) {
       const lm = new T.Mesh(new T.SphereGeometry(0.28, 8, 6), new T.MeshBasicMaterial({ color: 0x2040FF })); lm.material.userData.noDim = true;
       lm.position.set((amb ? 3 : 5.25) - 0.4, (amb ? 2.6 : 3.3) + 0.6, sd); v.add(lm); lights.push({ m: lm, ph: i * 0.37 + (sd > 0 ? 0.5 : 0), amb });
     }
-    v.position.set(x, gy(x, z), z); v.rotation.y = -ang + Math.PI;   // facing the wreck
-    grp.add(v); veh.push(v);
+    v.position.set(x, gy(x, z) + (sea ? -0.3 : 0), z); v.rotation.y = -ang + Math.PI;   // facing the wreck
+    grp.add(v); veh.push(v); if (sea) v.userData.boat = true;
   }
-  return { site, obj: grp, fire, smoke, glow, lights, x: P.x, y: y0, z: P.z };
+  if (sea) glow.scale.set(380, 1, 380);
+  return { site, obj: grp, fire, smoke, glow, lights, veh, sea, x: P.x, y: y0, z: P.z };
 }
 
 /** Each frame: the fires flicker and die down over the hours, the smoke drifts with the wind, the lights flash. */
@@ -213,6 +243,7 @@ function v3dCrashStep(now: number) {
     su.uTime.value = t; su.uK.value = sk; su.uWind.value.set(wind[0], wind[1]); su.uAmb.value = amb;
     c.glow.material.uniforms.uK.value = fk * (0.12 + 0.55 * night) * (0.85 + 0.15 * Math.sin(t * 11) * Math.sin(t * 7.3));
     const vehOn = age < 12 * 3600e3;
+    if (c.sea) for (const v of c.veh || []) { if (v.userData.y0 == null) v.userData.y0 = v.position.y; v.position.y = v.userData.y0 + Math.sin(t * 1.3 + v.id) * 0.25; v.rotation.z = Math.sin(t * 1.1 + v.id) * 0.04; }
     for (const l of c.lights) {
       const on = vehOn && Math.sin((t * 2.6 + l.ph) * Math.PI * 2) > 0;
       l.m.material.color.setHex(on ? (l.amb && l.ph % 1 > 0.4 ? 0xFF2020 : 0x2448FF) : 0x0A0A14);
@@ -302,4 +333,58 @@ function v3dTurbMotion(P: any, k: number, t: number): number[] {
   const K = P._tk, sd = P._tseed || (P._tseed = Math.random() * 100), f = (a: number, b: number, c: number) => Math.sin(t * a + sd * b) * Math.sin(t * c + sd);
   const up = K * K * 9 * (0.6 * f(1.3, 1.7, 0.37) + 0.4 * f(2.9, 3.1, 0.71)) + K * 0.6 * Math.sin(t * 5.3 + sd);
   return [up, K * 7 * f(1.7, 2.3, 0.53), K * 2.5 * f(1.1, 0.7, 0.29), K * (0.6 * Math.sin(t * 2.4 + sd) + 0.4 * Math.sin(t * 4.1 + sd * 2))];
+}
+
+/* ---------- emergencies in flight and on the runway ---------- */
+
+/** An engine on fire: flames from the nacelle streaming back, a trail of black smoke. On the runway after an
+ *  emergency landing: fire engines around the aircraft spraying the engine; then a tug tows it in. */
+function v3dEmergencyStep(P: any, f: any, fireI: number, fe: any, now: number, ground: number, w: any) {
+  const T = THREE, body = P.model.userData.body, pts: any[] = body && body.userData.engPts; if (!pts) return;
+  // the flames, fixed to the engine
+  if (fireI >= 0 && pts[fireI]) {
+    if (!P.fireFx) { P.fireFx = crashFx('fire', [[0, 0, 0, Math.max(2.5, pts[fireI].d * 1.6)]], 40); body.add(P.fireFx); }
+    const e = pts[fireI]; P.fireFx.position.copy(e.exh); P.fireFx.visible = true;
+    const u = P.fireFx.material.uniforms; u.uTime.value = now / 1000; u.uK.value = 1; u.uWind.value.set(w.onGround ? 4 : 40, 0);   // streaming back along the fuselage
+    if (now - (P.fireSmokeAt || 0) > 70) { P.fireSmokeAt = now; body.updateMatrixWorld(); const wp = body.localToWorld(e.exh.clone()); v3dSmokePuff(wp.x, wp.y, wp.z, 1.4, 0x1A1A1A); }
+  } else if (P.fireFx) P.fireFx.visible = false;
+  // the stop on the runway: fire engines around the aircraft, spraying the engine that burned
+  const em = f && f.emerg, onStop = !!(em && fe && fe.hold && fe.hold.kind === 'runway' && em.stopAt != null && Math.abs(fe.hold.at - em.stopAt) < 1);
+  if (onStop) {
+    if (!P.trucks) {
+      P.trucks = new T.Group(); const mRed = new T.MeshLambertMaterial({ color: 0xB3151B }), mYel = new T.MeshLambertMaterial({ color: 0xD8C21A });
+      for (let i = 0; i < 3; i++) { const v = new T.Group(); const b = new T.Mesh(new T.BoxGeometry(10.5, 3.3, 2.6), i === 2 ? mYel : mRed); b.position.y = 2.05; v.add(b);
+        const lt = new T.Mesh(new T.SphereGeometry(0.3, 8, 6), new T.MeshBasicMaterial({ color: 0x2448FF })); lt.position.set(4.6, 3.9, 0); v.add(lt); v.userData.lt = lt; P.trucks.add(v); }
+      V3d.scene.add(P.trucks);
+    }
+    const h = P.hdg * D2R, fx = Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = Math.sin(h), e = pts[f.emerg.eng] || pts[0];
+    body.updateMatrixWorld(); const ep = body.localToWorld(e.mid.clone());
+    P.trucks.children.forEach((v: any, i: number) => {
+      const side = (i === 1 ? -1 : 1) * (ep.clone().sub(P.pos).dot(new T.Vector3(rx, 0, rz)) >= 0 ? 1 : -1), along = [8, -6, 22][i], off = [24, 26, 30][i];
+      v.position.set(ep.x + fx * along + rx * side * off, ground, ep.z + fz * along + rz * side * off);
+      v.lookAt(ep.x, ground, ep.z); v.rotateY(-Math.PI / 2);
+      v.userData.lt.material.color.setHex(Math.sin(now / 1000 * 16 + i) > 0 ? 0x2448FF : 0xFF2020);
+      // the water and foam from the roof cannon onto the engine
+      if (i < 2 && now - (v.userData.sprayAt || 0) > 80) {
+        v.userData.sprayAt = now; const k = Math.random();
+        const s0 = new T.Vector3(v.position.x, ground + 4, v.position.z), mid = s0.clone().lerp(ep, k); mid.y += Math.sin(k * Math.PI) * 6;
+        v3dSmokePuff(mid.x, mid.y, mid.z, 0.5 + k * 0.5);
+      }
+    });
+    P.trucks.visible = true;
+  } else if (P.trucks) { V3d.scene.remove(P.trucks); P.trucks = null; }
+  // towed in after a fire: a tug at the nose wheel
+  const towing = !!(em && em.tow && em.noted && w.onGround && /taxi in|parking|arrived/i.test(String(w.phase || '')) && !onStop);
+  if (towing) {
+    if (!P.tug) {
+      P.tug = new T.Group(); const tug = new T.Mesh(new T.BoxGeometry(5, 1.4, 2.6), new T.MeshLambertMaterial({ color: 0xE3C21C })); tug.position.y = 0.9; P.tug.add(tug);
+      const cab = new T.Mesh(new T.BoxGeometry(1.4, 1.1, 1.6), new T.MeshLambertMaterial({ color: 0x30343A })); cab.position.set(1.2, 2, 0); P.tug.add(cab);
+      const bar = new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 6, 6), new T.MeshLambertMaterial({ color: 0x555A60 })); bar.rotation.z = Math.PI / 2; bar.position.set(-5, 0.6, 0); P.tug.add(bar);
+      V3d.scene.add(P.tug);
+    }
+    const s = shapeOf(P.type), h = P.hdg * D2R, fx = Math.sin(h), fz = -Math.cos(h), nose = (body.position.x) + s.gear.nose;   // the nose wheel, from the model's middle
+    const ahead = -nose + 8;
+    P.tug.position.set(P.pos.x + fx * ahead, ground, P.pos.z + fz * ahead); P.tug.rotation.set(0, -h + Math.PI / 2, 0);
+    P.tug.visible = true;
+  } else if (P.tug) { V3d.scene.remove(P.tug); P.tug = null; }
 }

@@ -2689,3 +2689,20 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 @keyframes bcSurge { from { transform: scale(.6); opacity: 1; } to { transform: scale(2.6); opacity: 0; } }
 @keyframes bcShine { to { background-position: 300% 0; } }
 @media (max-width: 560px) { .boost-hero { flex-direction: column; text-align: center; } .boost-btn, .boost-gauge { align-self: center; width: 100%; } }
+
+/* a staff member pleading to keep their job (dismissal dialog) */
+.dis-beg { display: flex; align-items: center; gap: 14px; padding: 6px 18px 0; }
+.dis-beg canvas.av3 { width: 130px; height: 210px; flex: 0 0 auto; }
+.dis-beg .speech { margin: 0; font-style: italic; }
+
+/* storage: food, drink, fuel and parts */
+.storage-card .st-row { display: grid; grid-template-columns: minmax(150px, 1.4fr) 90px minmax(140px, 1.2fr) minmax(120px, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid rgba(147,169,193,.12); }
+.storage-card .st-name small, .storage-card .st-adv small, .storage-card .st-mkt small { display: block; color: var(--muted, #8A9BB0); font-size: 12px; }
+.storage-card .st-bar { height: 8px; border-radius: 5px; background: rgba(255,255,255,.07); overflow: hidden; }
+.storage-card .st-bar i { display: block; height: 100%; background: linear-gradient(90deg, #1A6C8C, #3FD0E8); }
+.storage-card .st-ok { color: #6FD39A; font-weight: 600; font-size: 13px; } .storage-card .st-warn { color: #F2C14E; font-weight: 600; font-size: 13px; } .storage-card .st-bad { color: #FF6B6B; font-weight: 700; font-size: 13px; } .storage-card .st-mute { color: #7F93A8; font-size: 13px; }
+.storage-card .st-spark { width: 60px; height: 18px; display: block; } .storage-card .st-spark polyline { fill: none; stroke: #3FD0E8; stroke-width: 1.4; }
+.storage-card b.up { color: #FF8A6B; } .storage-card b.down { color: #6FD39A; }
+.storage-card .st-buy { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 760px) { .storage-card .st-row { grid-template-columns: 1fr 1fr; } .storage-card .st-buy { grid-column: 1 / -1; justify-content: flex-start; } }
+.cat-load { display: grid; gap: 8px; margin: 10px 0 14px; } .cat-li { display: flex; justify-content: space-between; align-items: center; gap: 10px; } .cat-li small { display: block; color: var(--muted, #8A9BB0); } .cat-li input { width: 96px; }

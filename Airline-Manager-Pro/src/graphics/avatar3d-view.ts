@@ -144,11 +144,12 @@ function av3Key(look: Look, role: CrewRole, accent: string): string {
 }
 
 /** The avatar markup: a canvas the renderer paints into (see avatarSvg). */
-function avatar3dHtml(look: Look, role: CrewRole, o: { view?: 'full' | 'bust'; accent?: string; still?: boolean; cls?: string }): string {
+function avatar3dHtml(look: Look, role: CrewRole, o: { view?: 'full' | 'bust'; accent?: string; still?: boolean; cls?: string; mood?: { kind: string; v: number } }): string {
   const accent = o.accent || '#2C8CFF', view = o.view === 'bust' ? 'bust' : 'full';
   const key = av3Key(look, role, accent);
   Av3.reqs[key] = { look: dressed(look, role), role, accent, view, still: !!o.still };
-  return `<canvas class="av av3 ${view === 'bust' ? 'bust' : ''} ${o.still ? 'still' : ''} ${o.cls || ''}" data-k="${esc(key)}" data-view="${view}" role="img" aria-label="Crew avatar"></canvas>`;
+  const mood = o.mood ? ` data-mood="${esc(o.mood.kind)}:${o.mood.v}"` : '';
+  return `<canvas class="av av3 ${view === 'bust' ? 'bust' : ''} ${o.still && !o.mood ? 'still' : ''} ${o.mood ? 'mood' : ''} ${o.cls || ''}" data-k="${esc(key)}" data-view="${view}"${mood} role="img" aria-label="Crew avatar"></canvas>`;
 }
 
 /** A built figure for a request; q is the detail (1 for large or animated figures, less for small pictures). */
@@ -351,7 +352,8 @@ function av3Tick(now: number) {
     _av3Yaw[el.getAttribute('data-k') || ''] = L.yaw;
     if (sec - L.drawn < 1 / 30) continue;   // 30 frames a second is plenty for idle motion
     L.drawn = sec;
-    av3Draw(L.model, el.getAttribute('data-view'), w, h, { t: sec - L.t0, yaw: L.yaw, blink, gaze: L.gaze });
+    const md = el.getAttribute('data-mood'), mood = md ? { kind: md.split(':')[0], v: +md.split(':')[1] || 0 } : null;
+    av3Draw(L.model, el.getAttribute('data-view'), w, h, { t: sec - L.t0, yaw: L.yaw, blink, gaze: L.gaze, mood } as any);
     const g = el.getContext('2d');
     g.clearRect(0, 0, w, h); g.drawImage(Av3.renderer.domElement, 0, 0, w, h, 0, 0, w, h);
     el.classList.add('in');
@@ -360,7 +362,7 @@ function av3Tick(now: number) {
 }
 
 let _av3PickAt = 0;
-/** Animate the (up to three) largest visible full figures that aren't marked still. */
+/** Animate the (up to six) largest visible figures that aren't marked still; anyone showing a mood first. */
 function av3PickLive() {
   const now = performance.now();
   if (now - _av3PickAt < 500 && Av3.live.every(l => l.el.isConnected)) return;
@@ -370,14 +372,15 @@ function av3PickLive() {
   document.querySelectorAll('canvas.av3:not(.still):not(.hero)').forEach(c => {
     const el = c as HTMLCanvasElement, r = el.getBoundingClientRect();
     if (!r.width || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return;
-    if (r.width * r.height < 9000) return;
+    const hasMood = el.hasAttribute('data-mood');
+    if (r.width * r.height < (hasMood ? 1500 : 4000)) return;
     // skip figures behind an open pop-up
     const top = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, r.left + r.width / 2)), Math.min(innerHeight - 1, Math.max(0, r.top + r.height / 2)));
     if (top && top !== el && !el.contains(top) && !(top as Element).contains(el) && !(el.parentElement && el.parentElement.contains(top))) return;
-    cands.push({ el, area: r.width * r.height });
+    cands.push({ el, area: r.width * r.height * (hasMood ? 100 : 1) });
   });
   cands.sort((a, b) => b.area - a.area);
-  const pick = cands.slice(0, 3).map(c => c.el);
+  const pick = cands.slice(0, 6).map(c => c.el);   // up to six people move at once (staff in lists too)
   Av3.live.forEach(l => { if (pick.indexOf(l.el) < 0) l.el.classList.remove('live'); });
   Av3.live = Av3.live.filter(l => pick.indexOf(l.el) >= 0);
   pick.forEach(el => el.classList.add('live'));

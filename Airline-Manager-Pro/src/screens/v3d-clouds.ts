@@ -318,7 +318,7 @@ function v3dCloudsStep(now: number) {
   const key = V3d.origin.join(',') + '|' + km + '|' + detail;
   if (!V3dClouds.mesh || V3dClouds.mesh.parent !== V3d.scene) { V3dClouds.mesh = v3dCloudMesh(12000); V3d.scene.add(V3dClouds.mesh); V3dClouds.key = ''; V3dClouds.list = []; V3dClouds.built = false; }
   const M: any = V3dClouds.mesh, t = cloudClock();
-  M.visible = true; M.material.uniforms.uTime.value = t;
+  M.visible = V3d.mode !== 'cabin'; M.material.uniforms.uTime.value = t;
   if (key !== V3dClouds.key || Math.hypot(cam.x - V3dClouds.cx, cam.z - V3dClouds.cz) > Math.max(3000, km * 120) || now - V3dClouds.at > 5 * 60e3) {
     // a different place or different settings: start over without fading; otherwise the changes fade
     const restart = !!V3dClouds.key && V3dClouds.key !== key;

@@ -56,6 +56,7 @@ const SETTINGS: SetSection[] = [
         + (wm === 'mirror' ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: the 3D view is drawn twice for every picture.</p>` : '')
         + row('v3dDayNight', 'Day and night', 'The real sun for the place and time you look at: sunrise, sunset, twilight and night as they are there. Off: always daylight.')
         + row('v3dSky', 'Sun, moon and stars', 'The sun and the moon at their true size and place, the moon in its phase, and the real stars at night.')
+        + row('v3dCabinPax', 'Passengers in the cabin', 'In the Cabin view: the passengers in their own seats from the passenger list, each looking as they do there, with pets on their owners\' laps. Off: empty seats (quicker on slower devices).')
         + row('v3dFlare', 'Lens flare', 'Looking towards the sun, its light catches in the camera lens: a glare and a row of soft rings and spots across the picture.')
         + row('v3dPrecip', 'Rain and snow', 'From the real-world weather reports (or Flight Simulator\'s weather when linked): falling around you under a raining cloud, and in grey curtains below the clouds in the distance.')
         + row('v3dLightning', 'Lightning', 'Storm clouds flash from inside, with bolts to the ground now and then; at night the whole area lights up for an instant.')
@@ -120,6 +121,7 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'sttQuality', label: 'Speech recognition quality', hint: 'Higher quality uses more of your PC while you fly.', options: [['light', 'Light'], ['balanced', 'Balanced'], ['accurate', 'Accurate']], when: () => State.settings.atcSource === 'beyondatc' && State.settings.atcListen },
   ] },
   { id: 'services', title: 'Passenger services', icon: 'pax', items: [
+    { type: 'html', html: () => { const S: any = State.settings, on = S.cateringStore !== false; return `<label class="tg-row"><span><b>Catering storage</b><small>Buy hot meals, food, snacks, drinks and alcohol into your own storage (Finance → Storage) at the day's prices; the ground crew load each flight from it. You can load a flight yourself while it boards (tap it on the map → Catering); otherwise they do it, very rarely coming up short. Off: each flight buys its catering at the airport.${Mode.coop() ? ' In a co-op the storage is the co-op airline\'s; only the owner buys stock, and everyone\'s flights are loaded from it.' : ''}</small></span><button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="v3d-opt" data-key="cateringStore"><i></i></button></label>`; } },
     { type: 'html', html: () => servicesHtml() },
   ] },
   { id: 'staff', title: 'Staff', icon: 'pilots', items: [

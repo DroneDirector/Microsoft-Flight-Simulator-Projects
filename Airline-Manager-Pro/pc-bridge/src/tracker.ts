@@ -123,6 +123,8 @@ export class FlightTracker extends EventEmitter {
     // engines failing at any time
     const failed: boolean[] = (s as any)._failed || [];
     failed.forEach((f, i) => { if (f) this.onlyOnce('eng' + i, () => this.damage(s, 'engine-failure', failed.filter(x => x).length > 1 ? 'grounding' : 'major', `Engine ${i + 1} failed`)); });
+    const fires: boolean[] = (s as any).fires || [];
+    fires.forEach((f, i) => { if (f) this.onlyOnce('fire' + i, () => this.damage(s, 'engine-fire' as any, 'grounding', `Engine ${i + 1} fire`)); });
 
     return Object.assign({}, s, { phase: this.phase, from: this.phase === 'parked' ? this.nearestAirport(s.lat, s.lon, 5) : this.fromIcao });
   }

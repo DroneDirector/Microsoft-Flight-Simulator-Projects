@@ -37,6 +37,7 @@ const MAIN_VARS: [string, string][] = [
   ['G FORCE', 'GForce'], ['PLANE PITCH DEGREES', 'degrees'], ['SIM ON GROUND', 'bool'], ['BRAKE PARKING POSITION', 'bool'],
   ['NUMBER OF ENGINES', 'number'], ['GENERAL ENG COMBUSTION:1', 'bool'], ['GENERAL ENG COMBUSTION:2', 'bool'], ['GENERAL ENG COMBUSTION:3', 'bool'], ['GENERAL ENG COMBUSTION:4', 'bool'],
   ['ENG FAILED:1', 'bool'], ['ENG FAILED:2', 'bool'], ['ENG FAILED:3', 'bool'], ['ENG FAILED:4', 'bool'],
+  ['ENG ON FIRE:1', 'bool'], ['ENG ON FIRE:2', 'bool'], ['ENG ON FIRE:3', 'bool'], ['ENG ON FIRE:4', 'bool'],
   ['FLAPS HANDLE INDEX', 'number'], ['GEAR HANDLE POSITION', 'bool'], ['FLAP SPEED EXCEEDED', 'bool'], ['GEAR SPEED EXCEEDED', 'bool'],
   ['FUEL TOTAL QUANTITY WEIGHT', 'pounds'], ['EMPTY WEIGHT', 'pounds'], ['TOTAL WEIGHT', 'pounds'], ['MAX GROSS WEIGHT', 'pounds'],
   ['PLANE TOUCHDOWN NORMAL VELOCITY', 'feet per second'], ['PLANE TOUCHDOWN PITCH DEGREES', 'degrees'], ['PAYLOAD STATION COUNT', 'number'],
@@ -229,6 +230,10 @@ export class SimConnectSource extends EventEmitter implements SimSource {
       const comb = [v[i++], v[i++], v[i++], v[i++]], failed = [v[i++], v[i++], v[i++], v[i++]];
       s.enginesRunning = comb.slice(0, Math.max(1, s.engines)).filter(x => x > 0.5).length;
       (s as any)._failed = failed.slice(0, Math.max(1, s.engines)).map(x => x > 0.5);
+      // engine fires and failures, as the simulator has them, for the 3D view and the emergency on the phone
+      const fire = [v[i++], v[i++], v[i++], v[i++]];
+      (s as any).fires = fire.slice(0, Math.max(1, s.engines)).map(x => x > 0.5);
+      (s as any).engFailed = (s as any)._failed;
       s.flapsIndex = v[i++]; s.gearDown = v[i++] > 0.5;
       (s as any)._flapOverspeed = v[i++] > 0.5; (s as any)._gearOverspeed = v[i++] > 0.5;
       s.fuelKg = v[i++] * LB_TO_KG; s.emptyKg = v[i++] * LB_TO_KG; s.totalKg = v[i++] * LB_TO_KG; s.mtowKg = v[i++] * LB_TO_KG;

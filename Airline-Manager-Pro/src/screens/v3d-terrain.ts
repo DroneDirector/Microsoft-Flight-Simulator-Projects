@@ -264,6 +264,17 @@ const V3dTerrain = {
     for (const r of this.rings) { if (on) this.loadSat(r); else if (r.mesh) { r.mesh.material.map = r.mapTex; r.mesh.material.needsUpdate = true; } }
   },
 
+  /** Is this point on the sea (from the finest ring that covers it)? */
+  isSea(lon: number, lat: number): boolean {
+    for (const r of this.rings) {
+      const n = 1 << r.z, px = ((lon + 180) / 360 * n - r.x0) * 256, py = ((1 - Math.log(Math.tan(lat * D2R) + 1 / Math.cos(lat * D2R)) / Math.PI) / 2 * n - r.y0) * 256;
+      if (px < 0 || py < 0 || px >= r.size - 1 || py >= r.size - 1) continue;
+      const i = Math.floor(py) * r.size + Math.floor(px), R: any = r;
+      return R.sea ? R.sea[i] === 1 : !!(r.mask && r.mask[i * 4] > 110 && r.H[i] < 3);
+    }
+    return false;
+  },
+
   /** Ground height above the sea (m) at a point, from the finest ring that covers it. */
   ground(lon: number, lat: number): number {
     for (const r of this.rings) {

@@ -98,6 +98,8 @@ class WorldMap {
   w = 0; h = 0; dpr = 1;
   cx = 0; cy = 0; R = 200; // view centre in radians-space, pixels per radian
   shownAps: string[] = [];
+  lastInput = 0;
+  _tfcPos: any = null; _tfcAt = 0;
   opts: MapOpts; selected: string = null; mark: string = null; raf = 0; alive = true; last = 0;
   ptrs: { [id: number]: { x: number; y: number } } = {}; pinch0 = 0; R0 = 0; moved = false;
   anim: any = null; colors: any; lastFit: any = null; userMoved = false;
@@ -144,7 +146,7 @@ class WorldMap {
         renderWorldCopies: false, interactive: !!this.opts.interactive, maxZoom: 18,
       });
       this.ml.touchZoomRotate.disableRotation();
-      this.ml.on('move', () => { this.baseDirty = true; });
+      this.ml.on('move', () => { this.baseDirty = true; this.lastInput = performance.now(); });   // the overlay keeps up at full speed while the map moves
       this.ml.on('dragstart', () => { this.userMoved = true; this.followT = performance.now() + 2500; });
       this.ml.on('zoomstart', (e: any) => { if (e.originalEvent) this.userMoved = true; });
       this.ml.on('click', (e: any) => this.tapAt(e.point.x, e.point.y));
@@ -283,6 +285,7 @@ class WorldMap {
     const cv = this.cv;
     cv.style.touchAction = 'none';
     cv.addEventListener('pointerdown', e => {
+      this.lastInput = performance.now();
       cv.setPointerCapture(e.pointerId);
       this.ptrs[e.pointerId] = { x: e.offsetX, y: e.offsetY }; this.moved = false; this.anim = null;
       const ids = Object.keys(this.ptrs);
@@ -290,6 +293,7 @@ class WorldMap {
     });
     cv.addEventListener('pointermove', e => {
       const p = this.ptrs[e.pointerId]; if (!p) return;
+      this.lastInput = performance.now();
       const ids = Object.keys(this.ptrs);
       if (ids.length === 1) {
         const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
@@ -310,7 +314,7 @@ class WorldMap {
     };
     cv.addEventListener('pointerup', up);
     cv.addEventListener('pointercancel', e => { delete this.ptrs[e.pointerId]; });
-    cv.addEventListener('wheel', e => { e.preventDefault(); this.userMoved = true; this.zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.offsetX, e.offsetY); }, { passive: false } as any);
+    cv.addEventListener('wheel', e => { e.preventDefault(); this.userMoved = true; this.lastInput = performance.now(); this.zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.offsetX, e.offsetY); }, { passive: false } as any);
     cv.addEventListener('dblclick', e => this.zoomBy(1.8, e.offsetX, e.offsetY));
   }
 
@@ -418,6 +422,10 @@ class WorldMap {
     if (!this.el.isConnected) { this.destroy(); return; }
     // Game Booster: while the 3D view covers the map, the map doesn't draw at all
     if (typeof V3d !== 'undefined' && V3d.open && gameBoost()) return;
+    // smoother: full speed while you pan, zoom or a move is animating; otherwise about 24 pictures a second
+    // (the aircraft move a few pixels a second at most), which leaves the device time for everything else
+    { const busy = this.anim || Object.keys(this.ptrs || {}).length || (this.lastInput && now - this.lastInput < 1200);
+      const M: any = this; if (!busy && M._fr && now - M._fr < 1000 / 24 - 2) return; M._fr = now; }
     if (_saverWas && !this.anim) { const T: any = this; if (T._svT && now - T._svT < 100) return; T._svT = now; }
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.1) : 0; this.last = now;
     if (this.anim && !this.ml) {
@@ -530,8 +538,9 @@ class WorldMap {
   drawTraffic(c: CanvasRenderingContext2D, degPx: number) {
     const list = Traffic.live(); if (!list.length) return;
     const light = this.ml && State.settings.mapStyle === 'street', now = Date.now(), used: number[][] = [];
+    if (!this._tfcPos || now - this._tfcAt > 250) { this._tfcAt = now; const m: any = {}; for (const f of list) m[f.id] = flightPathPos(f, now); this._tfcPos = m; }
     for (const f of list) {
-      const pp = flightPathPos(f, now); if (!pp) continue;
+      const pp = this._tfcPos[f.id]; if (!pp) continue;
       const here = this.px(pp.pos[0], pp.pos[1]); if (!here || here[0] < -30 || here[1] < -30 || here[0] > this.w + 30 || here[1] > this.h + 30) continue;
       const ah = this.px.apply(this, geoDest(pp.pos, pp.hdg, 0.5)), hdg = Math.atan2(ah[0] - here[0], -(ah[1] - here[1])) / D2R;
       const t = acType(f.typeId), prop = t && (t.cls === 'turboprop' || t.cls === 'bush');

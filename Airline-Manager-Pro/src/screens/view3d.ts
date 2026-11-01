@@ -59,7 +59,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
-      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
+      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['cabin', 'Cabin'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
       <span class="v3d-batt">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
       <span class="v3d-clock" title=""></span>
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
@@ -132,7 +132,7 @@ ACTIONS['v3d-mode'] = el => {
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
   V3d.root.classList.toggle('v3d-free', V3d.mode === 'free');
-  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' || /^win/.test(V3d.mode) ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
+  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' || V3d.mode === 'cabin' || /^win/.test(V3d.mode) ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
 };
 ACTIONS['v3d-next'] = el => {
@@ -532,7 +532,22 @@ function v3dLoop(now: number) {
     // spoilers: only up on the runway after touchdown, down again as the aircraft slows to taxi speed
     const PSp: any = P, wantSp = w.onGround && /touchdown|landing|roll/.test(ph) && !/take-?off/.test(ph) && (g.gs || 0) > 35 ? 1 : 0;
     PSp.spoil = (PSp.spoil || 0) + (wantSp - (PSp.spoil || 0)) * Math.min(1, dt * (wantSp ? 6 : 1.5));
-    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil });
+    // reverse thrust: jet airliners open their reversers two seconds after touchdown and close them again
+    // as the aircraft slows to about 70 kt (types without reversers have none to open)
+    const PR: any = P, revPts = P.model.userData.body && P.model.userData.body.userData.revPts;
+    const wantRev = revPts && revPts.length && w.onGround && PR.tdAt && now - PR.tdAt > 2000 && /touchdown|landing|roll/.test(ph) && (g.gs || 0) > 70 ? 1 : 0;
+    PR.rev = (PR.rev || 0) + (wantRev - (PR.rev || 0)) * Math.min(1, dt * (wantRev ? 2.2 : 1.1));
+    // failures and emergencies: an engine on fire, a stopped engine, fire crews on the runway, the tow in
+    let fireI = -1, outI = -1, feI: any = null;
+    try { const FF: any = g; feI = FF.depAt && !FF.real && !FF.you ? flightEl(FF, Date.now()) : null; fireI = engineFire(FF, feI ? feI.el : undefined); outI = engineOut(FF, feI ? feI.el : undefined); } catch (e) { /* none */ }
+    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI } as any);
+    try { v3dEmergencyStep(P, g, fireI, feI, now, ground, w); } catch (e) { /* no effects */ }
+    // the air blown forward out of the open reversers kicks up spray and dust from the runway
+    if (PR.rev > 0.6 && now - (PR.revAt || 0) > 90) {
+      PR.revAt = now; const body = P.model.userData.body; body.updateMatrixWorld();
+      const h = P.hdg * D2R, fx = Math.sin(h), fz = -Math.cos(h);
+      for (const lp of revPts) { const wp = body.localToWorld(lp.clone()); v3dSmokePuff(wp.x + fx * 4, ground + 0.8, wp.z + fz * 4, 0.55 * PR.rev); }
+    }
     // on the ground the aircraft is placed by its nose wheel (on the line, on the stand's stop mark), in the
     // air by the middle of the fuselage; between the two it blends over the last 30 m, so nothing jumps
     const PG: any = P, gwT = w.onGround ? 1 : clamp(1 - (w.altM - ground) / 30, 0, 1);
@@ -581,9 +596,13 @@ function v3dLoop(now: number) {
     const fwd = new T.Vector3(Math.sin(P.hdg * D2R), 0, -Math.cos(P.hdg * D2R));
     const VW: any = V3d;
     if (VW.cabinFor && (VW.cabinFor !== P.id || !/^win/.test(V3d.mode))) { v3dCabinLeave(V3d.planes[VW.cabinFor]); VW.cabinFor = null; }
+    if (VW.cabinFwdFor && (VW.cabinFwdFor !== P.id || V3d.mode !== 'cabin')) { v3dCabinFwdLeave(V3d.planes[VW.cabinFwdFor]); VW.cabinFwdFor = null; }
     if (V3d.mode === 'winL' || V3d.mode === 'winR') {
       // a window seat over the wing: fixed, looking out at the wing tip (see v3d-cabin.ts)
       VW.cabinFor = P.id; v3dCabinCam(P, V3d.mode);
+    } else if (V3d.mode === 'cabin') {
+      // inside the cabin, from the back of the aisle, looking forward over the seats and passengers
+      VW.cabinFwdFor = P.id; v3dCabinFwdCam(P);
     } else if (V3d.mode === 'fwd') {
       // forward: out of the front of the aircraft, from the cockpit, turning, climbing and banking with it;
       // a drag looks around a little. The aircraft itself is not drawn (you sit in it).
@@ -640,7 +659,7 @@ function v3dLoop(now: number) {
   for (const id in V3d.planes) {
     const Q = V3d.planes[id], s = shapeOf(Q.type);
     v.copy(Q.pos); v.y += s.H + 4; v.project(V3d.cam);
-    const on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && !((V3d.mode === 'fwd' || /^win/.test(V3d.mode)) && id === V3d.target);
+    const on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && !((V3d.mode === 'fwd' || V3d.mode === 'cabin' || /^win/.test(V3d.mode)) && id === V3d.target);
     Q.label.style.display = on ? '' : 'none';
     if (on) { Q.label.style.transform = `translate(${((v.x + 1) / 2 * innerWidth).toFixed(0)}px, ${((1 - v.y) / 2 * innerHeight).toFixed(0)}px) translate(-50%, -100%)`; Q.label.classList.toggle('on', id === V3d.target); }
   }
@@ -932,7 +951,7 @@ function v3dCrashCheck() {
 /* ---------- tyre smoke at touchdown ---------- */
 let _smokeTex: any = null;
 const _smoke: { sp: any; age: number; life: number; k: number; vx: number; vz: number }[] = [];
-function v3dSmokePuff(x: number, y: number, z: number, k: number) {
+function v3dSmokePuff(x: number, y: number, z: number, k: number, col?: number) {
   const T = THREE;
   if (!_smokeTex) {
     const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31);
@@ -942,6 +961,7 @@ function v3dSmokePuff(x: number, y: number, z: number, k: number) {
   if (_smoke.length > 220) return;
   const sp = new T.Sprite(new T.SpriteMaterial({ map: _smokeTex, transparent: true, depthWrite: false, opacity: 0.8 }));
   sp.material.userData.noDim = true;   // lit by hand in v3dSmokeStep
+  if (col != null) sp.userData.col = new T.Color(col);
   sp.position.set(x + (Math.random() - 0.5) * 0.8, y, z + (Math.random() - 0.5) * 0.8); sp.scale.set(1.5, 1.5, 1.5); sp.renderOrder = 12;
   V3d.scene.add(sp);
   _smoke.push({ sp, age: 0, life: 3 + Math.random() * 2.5, k, vx: (Math.random() - 0.5) * 2, vz: (Math.random() - 0.5) * 2 });
@@ -955,7 +975,7 @@ function v3dSmokeStep(dt: number) {
     p.sp.material.opacity = 0.8 * Math.min(1, 0.65 + p.k * 0.3) * (1 - t) * (1 - t * 0.6);
     // the light of the moment: grey-white by day, dim at night (lit a little by the landing lights)
     const tint = (V3dSky as any).tint || [1, 1, 1], amb = Math.max(0.18, (V3dSky as any).amb || 1);
-    p.sp.material.color.setRGB(tint[0] * amb, tint[1] * amb, tint[2] * amb);
+    const cc = p.sp.userData.col; p.sp.material.color.setRGB((cc ? cc.r * 3 : 1) * tint[0] * amb, (cc ? cc.g * 3 : 1) * tint[1] * amb, (cc ? cc.b * 3 : 1) * tint[2] * amb);
   }
 }
 

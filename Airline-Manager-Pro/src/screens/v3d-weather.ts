@@ -81,7 +81,7 @@ function v3dWeatherStep(now: number) {
   }
   V3dWx.k += (V3dWx.want - V3dWx.k) * Math.min(1, dt / 4);
   for (const snow of [0, 1]) {
-    const key = snow ? 'snow' : 'rain', on = V3dWx.k > 0.01 && V3dWx.snow1 === snow;
+    const key = snow ? 'snow' : 'rain', on = V3dWx.k > 0.01 && V3dWx.snow1 === snow && V3d.mode !== 'cabin';
     let m = V3dWx[key];
     if (on && (!m || m.parent !== V3d.scene)) { m = V3dWx[key] = v3dPrecipMesh(!!snow); V3d.scene.add(m); }
     if (!m) continue;

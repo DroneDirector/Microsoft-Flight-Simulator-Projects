@@ -25,6 +25,8 @@ interface SimSnapshot {
   wx?: SimWeather;              // weather at the aircraft from the simulator (PC app 0.5.1 and later)
   simTime?: number;             // the simulator's date and time (ms since 1970, UTC), PC app 0.9.38 and later
   simTz?: number;               // the local time's offset from UTC where the aircraft is, in minutes, PC app 0.9.44 and later
+  fires?: boolean[];            // engines on fire in the simulator, PC app 0.9.44 and later
+  engFailed?: boolean[];        // engines failed in the simulator, PC app 0.9.44 and later
 }
 interface FlightEvent {
   type: string; t: number; lat: number; lon: number; airport?: string; fpm?: number; g?: number; pitch?: number; bounces?: number;

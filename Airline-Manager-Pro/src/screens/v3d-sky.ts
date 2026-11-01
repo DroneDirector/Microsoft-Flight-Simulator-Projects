@@ -905,7 +905,7 @@ const FLARE_PARTS: [number, number, string, number][] = [   // position along th
 function v3dFlareStep(cam: any, A: any, vis: number) {
   const host = V3d.r && V3d.r.domElement && V3d.r.domElement.parentElement; if (!host) return;
   let el: HTMLElement = V3dSky.flare;
-  const on = skyOpt('v3dFlare') && vis > 0.01 && !(A.wx && A.wx.visM < 1500);
+  const on = skyOpt('v3dFlare') && vis > 0.01 && !(A.wx && A.wx.visM < 1500) && V3d.mode !== 'cabin';
   if (!on) { if (el) el.style.opacity = '0'; return; }
   if (!el || el.parentElement !== host) {
     el = document.createElement('div'); el.className = 'v3d-flare';

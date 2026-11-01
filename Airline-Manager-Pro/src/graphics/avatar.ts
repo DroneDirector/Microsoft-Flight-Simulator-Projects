@@ -112,7 +112,7 @@ let _avSeq = 0;
  * company colour is used for the hat badge and scarf/tie accents.
  * Uses the 3D figures where the device can show them (see avatar3d-view.ts), the drawing otherwise.
  */
-function avatarSvg(look: Look, role: CrewRole, o?: { view?: 'full' | 'bust'; accent?: string; still?: boolean; cls?: string }): string {
+function avatarSvg(look: Look, role: CrewRole, o?: { view?: 'full' | 'bust'; accent?: string; still?: boolean; cls?: string; mood?: { kind: string; v: number } }): string {
   o = o || {};
   if (av3Supported()) { av3Init(); return avatar3dHtml(look, role, o); }
   return avatarSvg2d(look, role, o);
