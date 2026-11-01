@@ -23,7 +23,7 @@ function cloudNoise(xKm: number, yKm: number, scaleKm: number, seed: number): nu
   const n = one(xKm / scaleKm, yKm / scaleKm, seed) * 0.65 + one(xKm / scaleKm * 2.7, yKm / scaleKm * 2.7, seed + 7) * 0.35;
   return clamp((n - 0.5) * 2.1 + 0.5, 0, 1);   // spread out, so the share under a threshold is close to the coverage
 }
-interface CloudStation { pos: number[]; elev: number; layers: { cover: string; base: number; type?: string }[] }
+interface CloudStation { pos: number[]; elev: number; layers: { cover: string; base: number; type?: string }[]; wx?: string; temp?: number }
 /** Reports with cloud information within reach of a point (lon, lat), at most a few minutes old in the cache. */
 function cloudStations(lon: number, lat: number, rKm: number): CloudStation[] {
   const out: CloudStation[] = [], cache: any = LiveWx.cache;
@@ -31,7 +31,7 @@ function cloudStations(lon: number, lat: number, rKm: number): CloudStation[] {
     const w = cache[k]; if (!w || !w.clouds || Date.now() - w.at > 3 * 3600e3) continue;
     const A = apt(k); if (!A) continue;
     if (gcDistanceNm([lon, lat], A.pos) * 1.852 > rKm) continue;
-    out.push({ pos: A.pos, elev: w.elev || (A as any).elev || 0, layers: w.clouds });
+    out.push({ pos: A.pos, elev: w.elev || (A as any).elev || 0, layers: w.clouds, wx: w.wx || '', temp: w.temp });
   }
   return out;
 }
@@ -51,6 +51,16 @@ function cloudKind(l: { cover: string; base: number; type?: string }): string {
   return l.type === 'CB' ? 'cb' : l.type === 'TCU' ? 'tcu' : l.base >= 18000 ? 'ci' : l.cover === 'OVC' || (l.cover === 'BKN' && l.base < 5000) ? 'st' : 'cu';
 }
 
+/** What falls from a report's clouds: rain or snow, how hard (0–1), thunder, and whether it is only nearby (VC). */
+function cloudPrecip(wx: string): { kind: string; k: number; ts: boolean; vc: boolean } {
+  wx = String(wx || ''); if (!wx) return null;
+  const ts = /TS/.test(wx), sn = /SN|SG|GS|PL/.test(wx), ra = /RA|DZ|SH|GR|UP/.test(wx);
+  if (!ts && !sn && !ra) return null;
+  const k = /\+/.test(wx) ? 1 : /(^|\s)-/.test(wx) ? 0.4 : /DZ/.test(wx) && !/RA/.test(wx) ? 0.3 : 0.7;
+  const vc = !/(^|\s)[-+]?(TS|RA|SN|DZ|SH|GR|SG|PL)/.test(wx.replace(/VC\w+/g, '').trim()) && /VC/.test(wx);
+  return { kind: sn && !/RA/.test(wx) ? 'sn' : 'ra', k, ts, vc };
+}
+
 /* ---------- the 3D view ---------- */
 
 /* Each cloud is built in three dimensions: a heap of round puffs placed in the world (cumulus, towers, anvils)
@@ -58,9 +68,9 @@ function cloudKind(l: { cover: string; base: number; type?: string }): string {
  * its ragged edge are worked out in world space, so a cloud keeps its shape and its sunny side from every
  * angle while you circle around it. Clouds that come or go (a new report, a layer that moved) fade in and out. */
 
-interface CloudPuff { x: number; y: number; z: number; m: number; s: number; h: number; a: number; sd: number; dx: number; dy: number; dz: number; id: string; born?: number; dies?: number }
+interface CloudPuff { x: number; y: number; z: number; m: number; s: number; h: number; a: number; sd: number; dx: number; dy: number; dz: number; id: string; w?: number; born?: number; dies?: number }
 const CLOUD_FADE_S = 25;   // seconds for a cloud to form or dissolve
-const V3dClouds: any = { mesh: null, key: '', at: 0, cx: 0, cz: 0, list: [] as CloudPuff[], sortAt: 0, sx: 1e9, sz: 1e9, fetchAt: 0, fetchKey: '', built: false };
+const V3dClouds: any = { mesh: null, key: '', at: 0, cx: 0, cz: 0, list: [] as CloudPuff[], sortAt: 0, sx: 1e9, sz: 1e9, fetchAt: 0, fetchKey: '', built: false, storms: [] as number[][] };
 function cloudClock(): number { return performance.now() / 1000; }
 
 function v3dCloudMesh(max: number): any {
@@ -76,6 +86,7 @@ function v3dCloudMesh(max: number): any {
       uFar: { value: 1e5 }, uTime: { value: 0 }, uFadeT: { value: CLOUD_FADE_S }, uDetail: { value: 1 },
       uLight: { value: new T.Color(0.97, 0.98, 1) }, uDark: { value: new T.Color(0.5, 0.55, 0.63) },
       uSun: { value: new T.Vector3(0, 1, 0) }, uSunK: { value: 1 },
+      uFlashPos: { value: new T.Vector3() }, uFlashK: { value: 0 },
     }]),
     vertexShader: `
       #include <common>
@@ -83,9 +94,9 @@ function v3dCloudMesh(max: number): any {
       #include <logdepthbuf_pars_vertex>
       attribute vec4 iOff; attribute vec4 iData; attribute vec4 iDir; attribute vec2 iFade;
       uniform float uTime; uniform float uFadeT;
-      varying vec2 vUv; varying vec3 vCen; varying vec4 vData; varying vec3 vDir; varying float vMode; varying float vFade;
+      varying vec2 vUv; varying vec3 vCen; varying vec4 vData; varying vec3 vDir; varying float vMode; varying float vFade; varying float vHgt;
       void main() {
-        float s = iData.x;
+        float s = iData.x; vHgt = iDir.w;
         vec4 mvPosition;
         if (iOff.w > 0.5 && iOff.w < 1.5) {
           // a round puff: a disc facing the camera, shaded in the fragment shader as the sphere it stands for
@@ -93,6 +104,10 @@ function v3dCloudMesh(max: number): any {
           mvPosition.xy += position.xy * s;
           float d = length(mvPosition.xyz);
           mvPosition.xyz *= max(0.05, (d - s * 0.5) / d);
+        } else if (iOff.w > 2.5) {
+          // rain or snow falling from the cloud base to the ground: upright, turned to face the camera around its own axis
+          vec3 rh = normalize(vec3(viewMatrix[0][0], 0.0, viewMatrix[2][0]) + vec3(1e-5, 0.0, 0.0));
+          mvPosition = modelViewMatrix * vec4(iOff.xyz + rh * position.x * s + vec3(0.0, (position.y - 0.5) * iDir.w, 0.0), 1.0);
         } else {
           // a sheet: lies flat in the world
           mvPosition = modelViewMatrix * vec4(iOff.xyz + vec3(position.x * s, 0.0, position.y * s), 1.0);
@@ -108,8 +123,9 @@ function v3dCloudMesh(max: number): any {
       #include <common>
       #include <fog_pars_fragment>
       #include <logdepthbuf_pars_fragment>
-      uniform vec3 uLight; uniform vec3 uDark; uniform vec3 uSun; uniform float uSunK; uniform float uFar; uniform float uDetail;
-      varying vec2 vUv; varying vec3 vCen; varying vec4 vData; varying vec3 vDir; varying float vMode; varying float vFade;
+      uniform vec3 uLight; uniform vec3 uDark; uniform vec3 uSun; uniform float uSunK; uniform float uFar; uniform float uDetail; uniform float uTime;
+      uniform vec3 uFlashPos; uniform float uFlashK;
+      varying vec2 vUv; varying vec3 vCen; varying vec4 vData; varying vec3 vDir; varying float vMode; varying float vFade; varying float vHgt;
       float h31(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       float vn(vec3 x) {
         vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -139,8 +155,23 @@ function v3dCloudMesh(max: number): any {
           col = mix(uDark, uLight, lit);
           // the bright rim when the sun is behind the cloud
           col += uLight * pow(max(dot(-B, uSun), 0.0), 10.0) * uSunK * (1.0 - smoothstep(0.0, 0.6, den)) * 0.9;
+          // lightning lights the cloud up from inside
+          col += vec3(0.82, 0.86, 1.0) * uFlashK * exp(-distance(p, uFlashPos) / 2500.0) * (0.6 + 0.4 * (1.0 - hgt));
           float dc = distance(vCen, cameraPosition);
           a *= smoothstep(s * 0.3, s * 1.1, dc) * (1.0 - smoothstep(uFar * 0.75, uFar, dc));
+        } else if (vMode > 2.5) {
+          // a curtain of rain (streaks falling fast) or snow (soft, slow): thickest in the middle, fading at the
+          // cloud base and near the ground, and never in the way when you fly through it
+          float snow = vDir.x;
+          float y = vCen.y + (vUv.y - 1.0) * vHgt;
+          float fall = mix(9.0, 1.3, snow);
+          float st = vn(vec3(q.x * s / mix(25.0, 60.0, snow) + sd * 7.0, (y + uTime * fall) / mix(140.0, 60.0, snow), sd));
+          float dens = (1.0 - q.x * q.x) * smoothstep(0.0, 0.12, vUv.y) * (1.0 - smoothstep(0.88, 1.0, vUv.y));
+          a = dens * a0 * (0.55 + 0.45 * st);
+          col = mix(mix(uDark, uLight, 0.35), mix(uDark, uLight, 0.8), snow);
+          vec2 hd = cameraPosition.xz - vCen.xz;
+          a *= smoothstep(s * 0.25, s * 0.7, length(hd)) * (1.0 - smoothstep(uFar * 0.75, uFar, length(hd)));
+          col += vec3(0.8, 0.85, 1.0) * uFlashK * exp(-distance(vec3(vCen.x, y, vCen.z), uFlashPos) / 4000.0) * 0.6;
         } else {
           vec3 p = vCen + vec3(q.x, 0.0, q.y) * s * 0.5;
           float nz = vMode > 1.5
@@ -151,6 +182,7 @@ function v3dCloudMesh(max: number): any {
           float below = step(cameraPosition.y, vCen.y);
           float lit = mix(0.55 + 0.4 * uSunK, 0.18 + 0.25 * hgt, below) + (nz - 0.5) * 0.15;
           col = mix(uDark, uLight, clamp(lit, 0.0, 1.0));
+          col += vec3(0.82, 0.86, 1.0) * uFlashK * exp(-distance(p, uFlashPos) / 3000.0) * 0.7;
           float dc = distance(p, cameraPosition);
           a *= smoothstep(30.0, 260.0, abs(cameraPosition.y - vCen.y)) * (1.0 - smoothstep(uFar * 0.75, uFar, dc));
         }
@@ -183,6 +215,7 @@ function v3dCloudFetch(lon: number, lat: number, km: number) {
  * the same cloud is recognised when the clouds are built again and only real changes fade in or out. */
 function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): CloudPuff[] {
   const R = km * 1000, ll0 = v3dLonLat(cx, cz), list = cloudStations(ll0[0], ll0[1], km + 160), out: CloudPuff[] = [];
+  V3dClouds.storms = [];
   if (!list.length) return out;
   const per = [5, 8, 12, 18][detail - 1], budget = [2000, 4500, 7500, 11000][detail - 1];
   // the size of one cloud cell: smaller cells mean more, better-shaped clouds; the area must fit the budget
@@ -195,14 +228,19 @@ function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): Clou
     const x = i * cell, z = j * cell, d = Math.hypot(x - cx, z - cz); if (d <= R) cells.push([x, z, d, i, j]);
   }
   cells.sort((a, b) => a[2] - b[2]);   // nearest first, so the budget is spent close by
-  const add = (p: CloudPuff) => { const L = Math.hypot(p.dx, p.dy, p.dz) || 1; p.dx /= L; p.dy /= L; p.dz /= L; out.push(p); };
+  const add = (p: CloudPuff) => { if (p.m !== 3) { const L = Math.hypot(p.dx, p.dy, p.dz) || 1; p.dx /= L; p.dy /= L; p.dz /= L; } out.push(p); };
   for (const c of cells) {
     if (out.length >= budget) break;
     const ll = v3dLonLat(c[0], c[1]), st = cloudNearest(list, ll[0], ll[1], 150); if (!st) continue;
     const xk = ll[0] * 111.32 * Math.cos(ll[1] * D2R), yk = ll[1] * 110.54, curve = v3dCurve(c[0], c[1]);
     const lod = clamp(1.35 - c[2] / R * 1.1, 0.3, 1);
+    const pr = cloudPrecip(st.wx), firstHeap = st.layers.findIndex(q => CLOUD_COV[q.cover] && cloudKind(q) !== 'ci');
     st.layers.forEach((l, li) => {
-      const cov = CLOUD_COV[l.cover] || 0, kind = cloudKind(l); if (!cov) return;
+      const cov = CLOUD_COV[l.cover] || 0; let kind = cloudKind(l); if (!cov) return;
+      // a thunderstorm reported without a CB layer: the lowest heap cloud grows into one
+      if (pr && pr.ts && li === firstHeap && (kind === 'cu' || kind === 'tcu')) kind = 'cb';
+      // rain or snow falls only from the lowest layer (and from storm clouds); reported nearby only: from some of them
+      const rains = !!pr && kind !== 'ci' && (li === firstHeap || kind === 'cb') && (!pr.vc || cloudHash(c[3], c[4], 501) < 0.35);
       const n = cloudNoise(xk, yk, kind === 'st' ? 14 : kind === 'ci' ? 22 : kind === 'cb' ? 18 : 6, 11 + li * 17);
       if (n > cov) return;
       const dens = cov >= 1 ? 1 : clamp((cov - n) / Math.max(0.12, cov) * 1.6, 0.25, 1);
@@ -223,6 +261,8 @@ function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): Clou
           }
         }
         if (kind === 'cb') add({ x: cxx, y: top + 150, z: czz, m: 0, s: cell * 4, h: 1, a: 0.75, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|anvil` });
+        if (rains || kind === 'cb') add({ x: cxx, y: base + 60, z: czz, m: 3, s: cell * 1.1, h: 0, a: 0.55 * (pr ? 0.6 + 0.4 * pr.k : 0.8), sd, dx: pr && pr.kind === 'sn' ? 1 : 0, dy: 0, dz: 0, w: base + 60 - (st.elev - curve), id: `${tag}|shaft` });
+        if (kind === 'cb') V3dClouds.storms.push([cxx, base, czz, top, cell, pr && pr.ts ? 1 : 0.25]);
         return;
       }
       if (kind === 'ci') {   // thin, see-through high cloud in streaks
@@ -232,6 +272,7 @@ function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): Clou
       if (kind === 'st') {   // a layer: stacked flat sheets, grey underneath, with a lumpy top on the detailed settings
         const th = l.cover === 'OVC' ? 420 : 300;
         for (let s = 0; s < 3; s++) add({ x: c[0] + (rnd(s) - 0.5) * cell * 0.5, y: base + 40 + s * th / 2, z: c[1] + (rnd(s + 9) - 0.5) * cell * 0.5, m: 0, s: cell * 1.75, h: s / 2, a: 0.8, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|st${s}` });
+        if (rains && rnd(77) < 0.45) add({ x: c[0] + (rnd(78) - 0.5) * cell * 0.4, y: base + 40, z: c[1] + (rnd(79) - 0.5) * cell * 0.4, m: 3, s: cell * 1.5, h: 0, a: 0.3 + 0.3 * pr.k, sd, dx: pr.kind === 'sn' ? 1 : 0, dy: 0, dz: 0, w: base + 40 - (st.elev - curve), id: `${tag}|shaft` });
         if (detail >= 3 && lod > 0.6) for (let s = 0; s < 2; s++)
           add({ x: c[0] + (rnd(s + 40) - 0.5) * cell * 0.8, y: base + th, z: c[1] + (rnd(s + 50) - 0.5) * cell * 0.8, m: 1, s: cell * 0.7, h: 0.9, a: 0.7, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|top${s}` });
         return;
@@ -247,6 +288,7 @@ function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): Clou
         const x = ccx + Math.cos(ang) * rr * W * 0.5, z = ccz + Math.sin(ang) * rr * W * 0.5, y = base + rad * 0.45 + f * Hh;
         add({ x, y, z, m: 1, s: rad * 2, h: clamp((y - base) / (Hh + rad * 0.5), 0, 1), a: 0.88, sd, dx: x - ccx, dy: (y - mid) * 1.4, dz: z - ccz, id: `${tag}|${s}` });
       }
+      if (rains && dens > 0.45) add({ x: ccx, y: base + 50, z: ccz, m: 3, s: W * 0.8, h: 0, a: 0.25 + 0.35 * pr.k, sd, dx: pr.kind === 'sn' ? 1 : 0, dy: 0, dz: 0, w: base + 50 - (st.elev - curve), id: `${tag}|shaft` });
     });
   }
   return out;
@@ -300,7 +342,7 @@ function v3dCloudsStep(now: number) {
       const p = L[i];
       o[i * 4] = p.x; o[i * 4 + 1] = p.y; o[i * 4 + 2] = p.z; o[i * 4 + 3] = p.m;
       a[i * 4] = p.s; a[i * 4 + 1] = p.h; a[i * 4 + 2] = p.a; a[i * 4 + 3] = p.sd;
-      r[i * 4] = p.dx; r[i * 4 + 1] = p.dy; r[i * 4 + 2] = p.dz; r[i * 4 + 3] = 0;
+      r[i * 4] = p.dx; r[i * 4 + 1] = p.dy; r[i * 4 + 2] = p.dz; r[i * 4 + 3] = p.w || 0;
       f[i * 2] = p.born == null ? -1e4 : p.born; f[i * 2 + 1] = p.dies == null ? 1e9 : p.dies;
     }
     g.instanceCount = n;

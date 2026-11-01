@@ -45,6 +45,8 @@ const MAIN_VARS: [string, string][] = [
   ['SEA LEVEL PRESSURE', 'millibars'], ['AMBIENT PRECIP STATE', 'mask'], ['AMBIENT PRECIP RATE', 'millimeters of water'], ['AMBIENT IN CLOUD', 'bool'],
   // the simulator's own date and time (seconds since 1 January of year 1), for the sun and moon in the 3D view
   ['ABSOLUTE TIME', 'seconds'],
+  // the local time where the aircraft is (seconds after midnight), for the clock in the 3D view
+  ['LOCAL TIME', 'seconds'],
 ];
 const GSX_VARS: [string, string][] = [
   ['L:FSDT_GSX_COUATL_STARTED', 'number'], ['L:FSDT_GSX_BOARDING_STATE', 'number'],
@@ -238,6 +240,12 @@ export class SimConnectSource extends EventEmitter implements SimSource {
         precip: (pState & 8) ? 'snow' : (pState & 4) ? 'rain' : 'none', precipMm: Math.round(pRate * 10) / 10, inCloud: cloud > 0.5, turb: 'none' };
       const abs = v[i++];
       (s as any).simTime = abs > 6e10 ? Math.round((abs - 62135596800) * 1000) : 0;
+      const loc = v[i++];
+      if ((s as any).simTime && loc >= 0) {
+        // the local time's offset from UTC, in minutes (to the nearest quarter hour), worked out from the two clocks
+        const utcSec = ((s as any).simTime / 1000) % 86400; let off = loc - utcSec; if (off > 43200) off -= 86400; if (off < -43200) off += 86400;
+        (s as any).simTz = Math.round(off / 900) * 15;
+      }
       if (!s.inFlight && (s.lat !== 0 || s.lon !== 0) && s.totalKg > 0) s.inFlight = true;
       s.t = Date.now();
       this.emit('snapshot', Object.assign({}, s, { stations: s.stations.slice() }));

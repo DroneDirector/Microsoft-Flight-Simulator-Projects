@@ -49,7 +49,7 @@ const V3dTerrain = {
     const next = (i: number) => {
       if (gen !== this.gen || !V3d.open) return;
       if (i >= zs.length) { this.done = true; return; }   // every ring within the view distance is in
-      this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; if (this.rings.length === 1 && (V3d as any).lastL && V3d.icao && (V3d as any).lastL.icao === V3d.icao) { try { v3dBuildAirport((V3d as any).lastL); } catch (e) { /* ignore */ } } } next(i + 1); });
+      this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; if (this.rings.length === 1 && (V3d as any).lastL && V3d.icao && (V3d as any).lastL.icao === V3d.icao) { try { v3dBuildAirport((V3d as any).lastL); } catch (e) { /* ignore */ } } } setTimeout(() => next(i + 1), V3d.loaded ? 30 : 90); });
     };
     next(0);
   },
@@ -75,6 +75,10 @@ const V3dTerrain = {
       if (gen !== this.gen || !V3d.open) return null;
       if (!H) { H = new Float32Array(size * size); if (!inner) H.fill(V3d.elev || 0); }
       ring.H = H; ring.mask = mask; ring.ok = true;
+      // the heavy work in its own turn, after a frame has been drawn, so the screen never freezes for long
+      return new Promise<void>(res => requestAnimationFrame(() => setTimeout(res, 0)));
+    }).then(() => {
+      if (!ring.ok || gen !== this.gen || !V3d.open) return null;
       this.build(ring);
       if (z === 12) this.prog.got++;
       if ((State.settings as any).v3dSat) this.loadSat(ring);

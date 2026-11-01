@@ -53,6 +53,8 @@ const SETTINGS: SetSection[] = [
         + row('v3dDayNight', 'Day and night', 'The real sun for the place and time you look at: sunrise, sunset, twilight and night as they are there. Off: always daylight.')
         + row('v3dSky', 'Sun, moon and stars', 'The sun and the moon at their true size and place, the moon in its phase, and the real stars at night.')
         + row('v3dFlare', 'Lens flare', 'Looking towards the sun, its light catches in the camera lens: a glare and a row of soft rings and spots across the picture.')
+        + row('v3dPrecip', 'Rain and snow', 'From the real-world weather reports (or Flight Simulator\'s weather when linked): falling around you under a raining cloud, and in grey curtains below the clouds in the distance.')
+        + row('v3dLightning', 'Lightning', 'Storm clouds flash from inside, with bolts to the ground now and then; at night the whole area lights up for an instant.')
         + row('v3dRainbow', 'Rainbows', 'Where it rains with the sun low behind you, a rainbow: a full arc or part of one, sometimes with a fainter second bow outside it.')
         + row('v3dAurora', 'Northern and southern lights', 'The aurora from the real space-weather forecast (NOAA), where and as strong as it is forecast, on dark nights.')
         + row('v3dCity', 'Town lights at night', 'The lights of towns and roads from NASA\'s night pictures of the Earth.')
@@ -157,6 +159,7 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => State.settings.mechanicVoice ? `<div class="btn-row">${VOICE_TESTS.map(t => `<button class="btn ghost sm" data-act="voice-test" data-k="${t[0]}">${icon('play')}${esc(t[1])}</button>`).join('')}</div>` : '' },
   ] },
   { id: 'sound', title: 'Sound and feel', icon: 'volume', items: [
+    { type: 'group', title: 'App' },
     { type: 'toggle', key: 'muteAll', label: 'Mute all sounds', hint: 'Silences every sound in the app, voices too.' },
     { type: 'toggle', key: 'mechanicVoice', label: 'Voices in dialogues', hint: 'The mechanic, the gate agent, passengers and the head of operations speak their messages. Off: no voices and no play buttons, the messages are only written.', when: () => !State.settings.muteAll },
     { type: 'toggle', key: 'onlyVoices', label: 'Only the voices', hint: 'Every other sound is off (purchases, payments, taps, chimes), but the people in the dialogues still speak. Switch off to have all sounds again.', when: () => !State.settings.muteAll },
@@ -167,6 +170,16 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'uiSounds', label: 'Interface sounds', when: () => !State.settings.muteAll && !(State.settings as any).onlyVoices },
     { type: 'toggle', key: 'haptics', label: 'Vibration feedback' },
     { type: 'toggle', key: 'reduceMotion', label: 'Reduce motion', hint: 'Shorter animations and a still map.' },
+    { type: 'group', title: '3D view' },
+    { type: 'html', html: () => {
+      const S: any = State.settings, v = Math.round((S.v3dVol == null ? 0.7 : +S.v3dVol) * 100);
+      const row = (k: string, label: string, hint: string) => `<label class="tg-row"><span><b>${label}</b><small>${hint}</small></span><button class="tg ${S[k] !== false ? 'on' : ''}" role="switch" aria-checked="${S[k] !== false}" data-act="v3d-opt" data-key="${k}"><i></i></button></label>`;
+      if (State.settings.muteAll || S.onlyVoices) return `<p class="v3d-note">${icon('info')}Sounds are off (Mute all sounds, or Only the voices, above).</p>`;
+      return row('v3dEngines', 'Engine sounds', 'The aircraft near the camera: the roar and whine of jets, the beat of propellers, louder with power and the nearer they are. Quieter from the forward view.')
+        + row('v3dThunder', 'Thunder', 'After each flash of lightning, arriving as late as real thunder does (about 3 seconds a kilometre), heard out to about 16 km: a sharp crack close by, a low rumble far away.')
+        + `<div class="set-card col"><div class="sc-h">${icon('volume')}<span><b class="v3v-h">3D view volume: ${v}%</b><small>Engines and thunder together. The app's other sounds keep their own level.</small></span></div>
+        <input type="range" class="v3d-vol" min="0" max="100" step="5" value="${v}" aria-label="3D view volume"></div>`;
+    } },
   ] },
   { id: 'profiles', title: 'Profiles and companies', icon: 'pilots', items: [
     { type: 'choice', key: 'appMode', label: 'How pilots and companies relate', options: [['shared', 'One pilot, several companies'], ['separate', 'A pilot per company']] },
@@ -502,6 +515,8 @@ document.addEventListener('change', e => {
   Store.save(); rerenderSettingsBody();
 });
 // how often conduct reports happen
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-vol')) return; (State.settings as any).v3dVol = +el.value / 100; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.v3v-h'); if (h) h.textContent = '3D view volume: ' + el.value + '%'; });
+document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (el && el.classList && el.classList.contains('v3d-vol')) Store.save(); });
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('cr-range')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.cr-h'); if (h) h.textContent = 'Conduct reports: ' + ['Never', 'Rarely', 'Less often', 'Normal', 'Often'][+el.value]; });
 document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('cr-range')) return; (State.settings as any).conductLevel = +el.value; Store.save(); rerenderSettingsBody(); });
 // the 3D view distance slider: the value shows while dragging, it's kept when let go

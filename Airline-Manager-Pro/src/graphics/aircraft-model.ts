@@ -314,12 +314,13 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   const tex = new T.CanvasTexture(paintFuselage(s, lv)); tex.flipY = false; tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
   const finTex = new T.CanvasTexture(paintFin(lv)); finTex.flipY = false; finTex.colorSpace = T.SRGBColorSpace;
   const std = (o: any) => new T.MeshStandardMaterial(Object.assign({ roughness: 0.42, metalness: 0.08 }, o));
-  const mBody = std({ map: tex, side: T.DoubleSide });
-  const mFin = std({ map: finTex, side: T.DoubleSide });
-  const mWing = acMat('wing', () => std({ color: 0xAFB9C5, roughness: 0.5, metalness: 0.25, side: T.DoubleSide }));
-  const mWingTop = acMat('wing2', () => std({ color: 0xB7C0CB, roughness: 0.55, metalness: 0.2, side: T.DoubleSide }));
+  // the painted fuselage, tail and engines are glossy (they reflect the sky and the sun); the wings stay satin
+  const mBody = std({ map: tex, side: T.DoubleSide, roughness: 0.24, metalness: 0.12 });
+  const mFin = std({ map: finTex, side: T.DoubleSide, roughness: 0.26, metalness: 0.12 });
+  const mWing = acMat('wing', () => std({ color: 0xAFB9C5, roughness: 0.5, metalness: 0.25, side: T.DoubleSide, envMapIntensity: 0.35 }));
+  const mWingTop = acMat('wing2', () => std({ color: 0xB7C0CB, roughness: 0.55, metalness: 0.2, side: T.DoubleSide, envMapIntensity: 0.35 }));
   const engCol = lv.engines === 'c1' ? lv.c1 : lv.engines === 'c2' ? lv.c2 : lv.engines === 'body' ? lv.body : '#C9D1DA';
-  const mEng = std({ color: new T.Color(engCol), roughness: 0.35, metalness: lv.engines === 'metal' ? 0.5 : 0.1 });
+  const mEng = std({ color: new T.Color(engCol), roughness: 0.22, metalness: lv.engines === 'metal' ? 0.6 : 0.18 });
   const mMetal = acMat('metal', () => std({ color: 0x9BA4AE, roughness: 0.35, metalness: 0.7 }));
   const mFloat = acMat('float', () => std({ color: 0xD9DEE4, roughness: 0.45, metalness: 0.3 }));
   const mDark = acMat('dark', () => std({ color: 0x1A1F26, roughness: 0.7, metalness: 0.1 }));

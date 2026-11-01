@@ -45,7 +45,7 @@ function v3dAptOnly(): any { const k = String(V3d.target || ''); if (k.indexOf('
 function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
-  V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null;
+  V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null; V3d.shown = 0;   // the loading bar starts from nothing every time
   v3dCrashGuard(true);
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
@@ -55,6 +55,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
       <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
       <span class="v3d-batt">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
+      <span class="v3d-clock" title=""></span>
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
     <div class="v3d-info"></div>
     <div class="v3d-status"></div>
@@ -115,7 +116,7 @@ function v3dClose() {
   } catch (e) { /* gone */ }
   if (V3d.root) V3d.root.remove();
   try { V3dTerrain.clear(); V3dTerrain.gen++; } catch (e) { /* none */ }
-  v3dCloudsClear(); v3dSkyClear();
+  v3dCloudsClear(); v3dSkyClear(); v3dWeatherClear();
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
 // closing from the free camera: back to the normal Overview
@@ -496,6 +497,7 @@ function v3dLoop(now: number) {
     P.bank += (wantBank * (w.onGround ? 0 : 1) - P.bank) * Math.min(1, dt * 1.2);
     const vs = w.vs != null ? w.vs : (g as any).vs || 0, gs = Math.max(60, g.gs || 140);
     const ph = w.phase.toLowerCase();
+    (P as any).ph = ph; (P as any).kt = g.gs || 0;
     // touchdown: the flare raises the nose over the last few metres, the main wheels touch first, the nose
     // stays up for a moment and is then lowered onto the runway
     const PS: any = P, agl = w.altM - ground;
@@ -602,9 +604,18 @@ function v3dLoop(now: number) {
     }
   }
   try { v3dCloudsStep(now); } catch (e) { /* no clouds this frame */ }
+  try { v3dWeatherStep(now); } catch (e) { /* no weather this frame */ }
+  try { V3dSound.step(now); } catch (e) { /* no sound this frame */ }
   try { v3dSkyStep(now); } catch (e) { /* the sky as it was */ }
-  V3d.r.render(V3d.scene, V3d.cam);
+  try { v3dEnvStep(now); } catch (e) { /* the reflections as they were */ }
+  try { v3dRainbowStep(); } catch (e) { /* no rainbow */ }
+  try { v3dAuroraStep(now); } catch (e) { /* no aurora */ }
+  // while the loading screen covers the view, the scene is drawn only a few times a second: the loading
+  // screen stays smooth and the device's time goes to loading instead
+  const VL: any = V3d;
+  if (V3d.loaded || !VL.drawnAt || now - VL.drawnAt > 450) { VL.drawnAt = now; V3d.r.render(V3d.scene, V3d.cam); }
 
+  v3dClockStep(now);
   // callsigns over the aircraft
   const v = new T.Vector3();
   for (const id in V3d.planes) {
@@ -1038,4 +1049,21 @@ function v3dGroundPaint(L: AirportLayout, loc: (x: number, y: number) => number[
     }
   }
   return g;
+}
+
+/** The clock beside the battery: Flight Simulator's local time where your aircraft is, when it is running and
+ *  linked; otherwise this device's own time, as everywhere else in the app. */
+function v3dClockStep(now: number) {
+  const VC: any = V3d; if (VC.clockAt && now - VC.clockAt < 1000) return; VC.clockAt = now;
+  const el = V3d.root && V3d.root.querySelector('.v3d-clock') as HTMLElement; if (!el) return;
+  const L: any = typeof Link !== 'undefined' ? (Link as any).sim : null, t = Date.now();
+  const sim = !!(L && L.simTime && L.t && t - L.t < 60000 && Link.status === 'connected');
+  let txt: string;
+  if (sim) {
+    const ms = L.simTime + (t - L.t) + (L.simTz != null ? L.simTz * 60000 : -new Date().getTimezoneOffset() * 60000), d = new Date(ms);
+    txt = String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+  } else { const d = new Date(t); txt = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  const title = sim ? 'Flight Simulator time' + (L.simTz != null ? '' : ' (in this device\'s time zone)') : 'This device\'s time';
+  if (el.textContent !== txt) el.innerHTML = `${icon('clock')}<b>${txt}</b>`;
+  if (el.title !== title) { el.title = title; el.classList.toggle('sim', sim); }
 }

@@ -342,8 +342,9 @@ void main() {
   V3dSky.astroAt = 0; V3dSky.dimAt = 0;
 }
 function v3dSkyClear() {
+  if (V3dSky.envRt) { try { V3dSky.envRt.dispose(); } catch (e) { /* gone */ } V3dSky.envRt = null; } V3dSky.envKey = ''; V3dSky.envAt = 0; if (V3dSky.pm) { try { V3dSky.pm.dispose(); } catch (e) { /* gone */ } V3dSky.pm = null; }
   if (V3dSky.rt) { try { V3dSky.rt.dispose(); } catch (e) { /* gone */ } }
-  V3dSky.dome = V3dSky.sun = V3dSky.moon = V3dSky.stars = V3dSky.rt = V3dSky.mcam = null;
+  V3dSky.dome = V3dSky.sun = V3dSky.moon = V3dSky.stars = V3dSky.rt = V3dSky.mcam = null; V3dSky.bow = null; V3dSky.bowK = 0; V3dSky.aurora = null;
 }
 
 /** The weather nearest the view: wind (0–1 and the direction it blows to) and how overcast it is. */
@@ -929,4 +930,178 @@ function v3dFlareStep(cam: any, A: any, vis: number) {
     it.style.background = ring ? `radial-gradient(circle, rgba(${f[2]},0) 55%, rgba(${f[2]},${f[3]}) 68%, rgba(${f[2]},0) 74%)`
       : `radial-gradient(circle, rgba(${f[2]},${f[3]}) 0%, rgba(${f[2]},${(f[3] * 0.5).toFixed(3)}) 35%, rgba(${f[2]},0) 70%)`;
   }
+}
+
+/* ---------- reflections on the aircraft ---------- */
+
+/** The sky as the aircraft reflect it: worked out from the sky's own colours (with the sun's glow), the
+ *  ground below dark, made again as the light changes (sunrise, sunset, cloud, night). */
+function v3dEnvStep(now: number) {
+  const T = THREE, U = v3dSkyUniforms(); if (!V3d.r || !V3d.scene) return;
+  const tint = V3dSky.tint || [1, 1, 1], amb = V3dSky.amb || 1, key = [tint[0], tint[1], tint[2], amb].map(v => Math.round(v * 20)).join(',');
+  if (V3dSky.envKey === key && V3d.scene.environment && now - (V3dSky.envAt || 0) < 120000) return;
+  if (V3dSky.envAt && now - V3dSky.envAt < 4000) return;
+  V3dSky.envKey = key; V3dSky.envAt = now;
+  try {
+    const geo = new T.SphereGeometry(1, 32, 16), pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const d = [pos.getX(i), pos.getY(i), pos.getZ(i)];
+      let c: number[];
+      if (d[1] >= -0.02) c = skyColJs([d[0], Math.max(0.02, d[1]), d[2]], U).map(v => Math.pow(Math.max(0, v), 2.2));   // the sky's colours are screen colours: to light
+      else { const k = amb * 0.22; c = [0.32 * k * tint[0], 0.34 * k * tint[1], 0.36 * k * tint[2]]; }
+      col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+    }
+    geo.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+    const sc = new T.Scene(); sc.add(new T.Mesh(geo, new T.MeshBasicMaterial({ vertexColors: true, side: T.BackSide })));
+    // the sun as a bright spot, so it glints on the fuselage
+    const a = V3dSky.a; if (a && a.sunAlt > -2) { const sun = new T.Mesh(new T.SphereGeometry(0.06, 8, 6), new T.MeshBasicMaterial({ color: new T.Color(4, 3.8, 3.4) })); sun.position.set(a.sv[0] * 0.9, a.sv[1] * 0.9, a.sv[2] * 0.9); sc.add(sun); }
+    if (!V3dSky.pm) V3dSky.pm = new T.PMREMGenerator(V3d.r);
+    const rt = V3dSky.pm.fromScene(sc, 0.03);
+    if (V3dSky.envRt) V3dSky.envRt.dispose();
+    V3dSky.envRt = rt; V3d.scene.environment = rt.texture;
+    geo.dispose();
+  } catch (e) { /* no reflections */ }
+}
+
+/* ---------- rainbows ---------- */
+
+/** A rainbow: with the sun low behind you (under 42°) and not hidden by cloud, where rain is falling in
+ *  front of you. The main bow at about 42° from the point opposite the sun (red outside, violet inside),
+ *  the fainter second bow at about 51° with its colours the other way round, and the sky a little brighter
+ *  inside the main bow. A full arc when you are in the rain; parts of one where the rain is only in some
+ *  directions. */
+function v3dRainbowStep() {
+  const T = THREE, cam = V3d.cam, A = V3dSky.a; if (!cam || !A) return;
+  let M = V3dSky.bow;
+  if (!M || M.parent !== V3d.scene) {
+    M = V3dSky.bow = new T.Mesh(new T.SphereGeometry(1, 64, 32), new T.ShaderMaterial({
+      uniforms: { uAnti: { value: new T.Vector3() }, uK: { value: 0 }, uFull: { value: 0 }, uShafts: { value: Array.from({ length: 8 }, () => new T.Vector3()) } },
+      vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n#include <logdepthbuf_vertex>\n}',
+      fragmentShader: `#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uAnti; uniform float uK; uniform float uFull; uniform vec3 uShafts[8]; varying vec3 vDir;
+vec3 spec(float h) { return clamp(abs(fract(h + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0); }
+void main() {
+  #include <logdepthbuf_fragment>
+  vec3 d = normalize(vDir);
+  float th = degrees(acos(clamp(dot(d, uAnti), -1.0, 1.0)));
+  // where along the bow the rain is: everywhere, or only towards the rain curtains around you
+  float m = uFull;
+  vec2 hz = normalize(d.xz + 1e-5);
+  for (int i = 0; i < 8; i++) { if (uShafts[i].z <= 0.0) continue; float a = acos(clamp(dot(hz, uShafts[i].xy), -1.0, 1.0)); m = max(m, 1.0 - smoothstep(uShafts[i].z * 0.6, uShafts[i].z, a)); }
+  float b1 = 1.0 - smoothstep(0.0, 1.0, abs(th - 41.5) / 1.1);   // the main bow, about 2° wide
+  float b2 = 1.0 - smoothstep(0.0, 1.0, abs(th - 51.9) / 1.6);   // the second bow
+  vec3 c = spec(clamp((th - 40.4) / 2.2, 0.0, 1.0) * 0.78) * b1 + spec(clamp((54.0 - th) / 3.4, 0.0, 1.0) * 0.78) * b2 * 0.42;
+  c += vec3(0.05) * (1.0 - smoothstep(38.0, 41.0, th));   // brighter inside the bow
+  c *= m * uK * smoothstep(-0.02, 0.06, d.y + 0.03);
+  gl_FragColor = vec4(c, 1.0);
+}`,
+      side: T.BackSide, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false,
+    }));
+    M.renderOrder = 6; M.frustumCulled = false; V3d.scene.add(M);
+  }
+  // how much rain there is in front of you, and where
+  const U = M.material.uniforms, cp = cam.position, sunAlt = A.sunAlt;
+  const anti = new T.Vector3(-A.sv[0], -A.sv[1], -A.sv[2]).normalize();
+  const shafts = ((V3dClouds as any).list || []).filter((p: any) => p.m === 3 && p.dies == null && !p.dx);   // rain curtains (not snow)
+  const dirs: number[][] = [];
+  for (const p of shafts) {
+    const dx = p.x - cp.x, dz = p.z - cp.z, d = Math.hypot(dx, dz); if (d < 800 || d > 25000) continue;
+    if (dx * anti.x + dz * anti.z < 0) continue;   // only on the side away from the sun
+    dirs.push([dx / d, dz / d, Math.min(0.6, Math.atan2(p.s * 0.7, d)), d]);
+  }
+  dirs.sort((a, b) => a[3] - b[3]);
+  const here = V3dWx.snow1 ? 0 : V3dWx.k;
+  for (let i = 0; i < 8; i++) { const s = dirs[i]; U.uShafts.value[i].set(s ? s[0] : 0, s ? s[1] : 0, s ? s[2] : 0); }
+  const sunOk = sunAlt > 0 && sunAlt < 42 ? Math.min(1, sunAlt / 3) * (1 - Math.max(0, sunAlt - 36) / 6) : 0;
+  const wantK = skyOpt('v3dRainbow') ? sunOk * (1 - 0.85 * (A.wx ? A.wx.cloud : 0)) * Math.min(1, here * 1.5 + Math.min(1, dirs.length / 2) * 0.8) * 0.4 : 0;
+  V3dSky.bowK = (V3dSky.bowK || 0) + (wantK - (V3dSky.bowK || 0)) * 0.03;   // forms and fades over a few seconds
+  U.uK.value = V3dSky.bowK; U.uFull.value = Math.min(1, here * 2); U.uAnti.value.copy(anti);
+  M.visible = V3dSky.bowK > 0.003;
+  M.position.copy(cp); M.scale.setScalar(Math.min(cam.far * 0.8, 20000));
+}
+
+/* ---------- the northern and southern lights ---------- */
+
+/** NOAA's aurora forecast (OVATION, from the Space Weather Prediction Center: US government data, public
+ *  domain): the chance of aurora overhead on a 1° grid, renewed every few minutes. Kept as a small picture
+ *  the sky shader looks up. */
+const AuroraData: any = { tex: null, at: 0, busy: false, max: 0 };
+function auroraFetch() {
+  if (AuroraData.busy || Date.now() - AuroraData.at < 15 * 60e3) return;
+  AuroraData.busy = true;
+  Net.json('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json').then((j: any) => {
+    const pts: number[][] = (j && j.coordinates) || []; if (!pts.length) return;
+    const W = 360, H = 181, d = new Uint8Array(W * H * 4); let max = 0;
+    for (const p of pts) {
+      const lon = ((Math.round(p[0]) % 360) + 360) % 360, lat = Math.round(p[1]) + 90, v = clamp(+p[2] || 0, 0, 100);
+      if (lat < 0 || lat >= H) continue;
+      const i = (lat * W + lon) * 4; d[i] = Math.round(v * 2.55); d[i + 3] = 255; max = Math.max(max, v);
+    }
+    auroraSetGrid(d, W, H); AuroraData.max = max; AuroraData.at = Date.now();
+  }).catch(() => { AuroraData.at = Date.now() - 10 * 60e3; /* try again in five minutes */ }).then(() => { AuroraData.busy = false; });
+}
+function auroraSetGrid(d: Uint8Array, W: number, H: number) {
+  const T = THREE, tex = new T.DataTexture(d, W, H, T.RGBAFormat);
+  tex.wrapS = T.RepeatWrapping; tex.wrapT = T.ClampToEdgeWrapping; tex.magFilter = T.LinearFilter; tex.minFilter = T.LinearFilter; tex.needsUpdate = true;
+  if (AuroraData.tex) AuroraData.tex.dispose();
+  AuroraData.tex = tex;
+  if (V3dSky.aurora) V3dSky.aurora.material.uniforms.uOv.value = tex;
+}
+
+function v3dAuroraStep(now: number) {
+  const T = THREE, cam = V3d.cam, U = v3dSkyUniforms(); if (!cam || !V3dSky.a) return;
+  const night = U.uNight.value, A = V3dSky.a;
+  if (!skyOpt('v3dAurora') || night < 0.05) { if (V3dSky.aurora) V3dSky.aurora.visible = false; return; }
+  auroraFetch();
+  if (!AuroraData.tex || AuroraData.max < 3) { if (V3dSky.aurora) V3dSky.aurora.visible = false; return; }
+  let M = V3dSky.aurora;
+  if (!M || M.parent !== V3d.scene) {
+    M = V3dSky.aurora = new T.Mesh(new T.SphereGeometry(1, 64, 32), new T.ShaderMaterial({
+      uniforms: { uOv: { value: AuroraData.tex }, uLL: { value: new T.Vector2() }, uH: { value: 0 }, uK: { value: 0 }, uTime: { value: 0 } },
+      vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n#include <logdepthbuf_vertex>\n}',
+      fragmentShader: `#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform sampler2D uOv; uniform vec2 uLL; uniform float uH; uniform float uK; uniform float uTime; varying vec3 vDir;
+float h31(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(h31(i), h31(i + vec3(1, 0, 0)), f.x), mix(h31(i + vec3(0, 1, 0)), h31(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(h31(i + vec3(0, 0, 1)), h31(i + vec3(1, 0, 1)), f.x), mix(h31(i + vec3(0, 1, 1)), h31(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+void main() {
+  #include <logdepthbuf_fragment>
+  vec3 d = normalize(vDir);
+  if (d.y < -0.08) discard;
+  float e = asin(clamp(d.y, -1.0, 1.0)), az = atan(d.x, -d.z), R = 6371.0;
+  float la1 = uLL.y, lo1 = uLL.x;
+  vec3 col = vec3(0.0);
+  for (int i = 0; i < 12; i++) {
+    float H = 95.0 + float(i) * 18.0;
+    // where the line of sight is at this height (over the curved Earth), and the forecast there
+    float g = acos(clamp((R + uH) / (R + H) * cos(e), -1.0, 1.0)) - e;
+    float la2 = asin(sin(la1) * cos(g) + cos(la1) * sin(g) * cos(az));
+    float lo2 = lo1 + atan(sin(az) * sin(g) * cos(la1), cos(g) - sin(la1) * sin(la2));
+    float p = texture2D(uOv, vec2(fract(lo2 / 6.2831853), (degrees(la2) + 90.0) / 181.0 + 0.5 / 181.0)).r;
+    if (p < 0.02) continue;
+    // curtains: bright vertical rays in slowly moving folds along the oval
+    float fold = sin(lo2 * 45.0 + sin(la2 * 25.0 + uTime * 0.04) * 3.0 + uTime * 0.03);
+    float rays = pow(vn(vec3(lo2 * 260.0 + fold * 2.0, la2 * 40.0, uTime * 0.12)), 2.5) * 1.6 + 0.15 * (0.5 + 0.5 * fold);
+    float hf = (H - 95.0) / 200.0;
+    vec3 c = mix(vec3(0.12, 1.0, 0.38), vec3(0.85, 0.12, 0.32), smoothstep(0.4, 0.85, hf));   // green low down (oxygen, 558 nm), red high up (630 nm)
+    float prof = exp(-hf * 3.2) + 0.3 * smoothstep(0.35, 0.7, hf) * (1.0 - hf);
+    col += c * smoothstep(0.02, 0.5, p) * rays * prof;
+  }
+  col *= uK / 6.0 * smoothstep(-0.06, 0.05, d.y);
+  gl_FragColor = vec4(col, 1.0);
+}`,
+      side: T.BackSide, transparent: true, depthWrite: false, depthTest: false, blending: T.AdditiveBlending, fog: false,
+    }));
+    M.renderOrder = -985; M.frustumCulled = false; V3d.scene.add(M);
+  }
+  const ll = v3dLonLat(cam.position.x, cam.position.z), u = M.material.uniforms;
+  u.uLL.value.set(ll[0] * D2R, ll[1] * D2R); u.uH.value = Math.max(0, (cam.position.y + v3dCurve(cam.position.x, cam.position.z)) / 1000);
+  u.uTime.value = now / 1000;
+  // only on dark nights, dimmed by the moon and hidden by overcast
+  u.uK.value = night * (1 - 0.5 * (U.uMoonK ? U.uMoonK.value : 0)) * (1 - 0.92 * (A.wx ? A.wx.cloud : 0)) * 1.4;
+  M.visible = u.uK.value > 0.01;
+  M.position.copy(cam.position); M.scale.setScalar(cam.far * 0.88);
 }

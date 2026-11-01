@@ -2638,3 +2638,9 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 
 /* the switch between the parts of a settings section */
 .seg.set-sub { display: flex; flex-wrap: wrap; width: fit-content; max-width: 100%; margin: 4px 0 16px; }
+
+/* the clock beside the battery in the 3D view */
+.v3d-clock { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 14px; background: rgba(8, 20, 36, .72); color: #DCE6F2; font-variant-numeric: tabular-nums; font-size: 14px; }
+.v3d-clock:empty { display: none; }
+.v3d-clock svg { width: 15px; height: 15px; opacity: .8; }
+.v3d-clock.sim svg { color: #3FD0E8; opacity: 1; }
