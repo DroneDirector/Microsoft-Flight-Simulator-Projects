@@ -844,9 +844,14 @@ function v3dPlaneLightsSet(model: any, ph: string, agl: number, onGround: boolea
   const alt = altFt == null ? agl : altFt, low = alt < 10000;
   const nav = 1, beacon = parked ? 0 : 1;
   const strobe = lineUp || toRoll || !onGround || onRwyLanding ? 1 : 0;
-  const landing = toRoll || (!onGround && low) || (onRwyLanding && (gs == null || gs > 30)) ? 1 : 0;
+  const landing = parked ? 0 : toRoll || (!onGround && low) || (onRwyLanding && (gs == null || gs > 30)) ? 1 : 0;
   const gearDown = onGround || /final|landing|approach|lift-?off|take-?off/.test(ph) || agl < 2000;
-  const nose = push ? 0 : taxi || lineUp || toRoll || onRwyLanding || (!onGround && gearDown && low && !/climb/.test(ph)) ? 1 : 0;
+  // standing still on the ground for a while (at the gate, or stopped before it): the taxi light goes off, as crews
+  // switch it off when they stop; parked at the gate it is always off
+  const ud = model.userData || {}, now = performance.now();
+  if (onGround && gs != null && gs < 1.5) { if (!ud.stillSince) ud.stillSince = now; } else ud.stillSince = 0;
+  const stopped = onGround && !lineUp && !toRoll && ud.stillSince && now - ud.stillSince > 8000;
+  const nose = push || parked || stopped ? 0 : taxi || lineUp || toRoll || onRwyLanding || (!onGround && gearDown && low && !/climb/.test(ph)) ? 1 : 0;
   // the light sits on the nose gear: only lit when that gear is fully down (never while it is retracting or stowed)
   const gearNow = model && model.userData ? model.userData.gearNow : null;
   const noseOn = gearNow == null || gearNow > 0.97 ? nose : 0;
@@ -860,7 +865,8 @@ function v3dPlaneLightsSet(model: any, ph: string, agl: number, onGround: boolea
     const T = THREE, at = (p: any) => p.clone().applyMatrix4(body.matrixWorld), dirOf = (d: number[]) => new T.Vector3(d[0], d[1], d[2]).transformDirection(body.matrixWorld);
     const a = at(src.land[0]), b = at(src.land[1]);
     if (landing) V3dSky.spots.push({ pos: a.add(b).multiplyScalar(0.5), dir: dirOf(src.landDir), k: 1, range: 420 });
-    if (noseOn) V3dSky.spots.push({ pos: at(src.nose), dir: dirOf(src.taxiDir), k: landing ? 0.45 : 0.8, range: 110 });
+    // the nose gear's taxi light: as bright on the ground as the landing lights, reaching well ahead
+    if (noseOn) V3dSky.spots.push({ pos: at(src.nose), dir: dirOf(src.taxiDir), k: landing ? 0.75 : 1, range: 220 });
   }
   const beams = body.userData.beams;
   if (beams) { const k = landing * U.uMist.value * U.uLightsOn.value; body.userData.beamMat.uniforms.uK.value = k; for (const m of beams) m.visible = k > 0.01; }
