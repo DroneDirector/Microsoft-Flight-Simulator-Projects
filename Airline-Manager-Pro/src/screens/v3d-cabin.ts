@@ -651,36 +651,42 @@ function cabinCoverTex(color: string): any {
   }));
 }
 
-/** The placards with the row number and the seat letters, all in one mesh drawn from one picture. */
+/** The placards with the row number and the seat letters, as on board: a white plate along the bin's lower edge,
+ *  facing down towards the aisle, with the row number, a person (the aisle), the seat letters in boxes from the
+ *  aisle seat out to the window seat, and a window. All in one mesh drawn from one picture. */
 function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters: string, seatY: number[], seatW: number, aisles: number[], zf: number, V: (x: number, y: number, z: number) => any): any {
   const T = THREE, rows = Object.keys(rowX).map(Number).sort((a, b) => a - b); if (!rows.length || !aisles.length) return null;
-  // which blocks face which aisle, and with which letters
+  // which blocks face which aisle, and their letters from the aisle seat to the window seat
   const sides: { y: number; dir: number; txt: string }[] = []; let i0 = 0;
   blocks.forEach(b => { const ys = seatY.slice(i0, i0 + b), lt = letters.slice(i0, i0 + b), lo = Math.min(...ys) - seatW / 2, hi = Math.max(...ys) + seatW / 2;
-    for (const a of aisles) { if (a > hi && a - hi < 0.6) sides.push({ y: hi + 0.01, dir: 1, txt: lt }); if (a < lo && lo - a < 0.6) sides.push({ y: lo - 0.01, dir: -1, txt: lt }); }
+    for (const a of aisles) { if (a > hi && a - hi < 0.6) sides.push({ y: hi - 0.06, dir: 1, txt: lt.split('').reverse().join('') }); if (a < lo && lo - a < 0.6) sides.push({ y: lo + 0.06, dir: -1, txt: lt }); }
     i0 += b; });
-  const cells = rows.length * sides.length, cols = 8, cw = 128, ch = 40, cv = document.createElement('canvas'); cv.width = cols * cw; cv.height = Math.ceil(cells / cols) * ch;
-  const x = cv.getContext('2d') as CanvasRenderingContext2D; x.fillStyle = '#1C2026'; x.fillRect(0, 0, cv.width, cv.height);
+  const cells = rows.length * sides.length, cols = 4, cw = 256, ch = 56, cv = document.createElement('canvas'); cv.width = cols * cw; cv.height = Math.ceil(cells / cols) * ch;
+  const x = cv.getContext('2d') as CanvasRenderingContext2D; x.fillStyle = '#ECEEF0'; x.fillRect(0, 0, cv.width, cv.height);
   const pos: number[] = [], uv: number[] = [], idx: number[] = []; let c = 0;
-  const up = new T.Vector3(0, 1, 0);
   for (const r of rows) for (const sd of sides) {
     const cx = (c % cols) * cw, cy = Math.floor(c / cols) * ch;
-    x.fillStyle = '#F2F4F6'; x.font = 'bold 24px Inter, Arial, sans-serif'; x.textBaseline = 'middle'; x.fillText(String(r), cx + 8, cy + ch / 2 + 1);
-    x.font = '600 18px Inter, Arial, sans-serif'; x.fillStyle = '#C9D2DC'; x.fillText(sd.txt.split('').join(' '), cx + 46, cy + ch / 2 + 1);
-    // a small plate facing the aisle, its text reading left to right from there
-    // two faces in a shallow V towards the aisle: one readable walking to the back (boarding), one walking forward
-    const ctr = V(rowX[r] - 0.05, sd.y, zf + 1.74), o0 = V(0, 0, 0), hw = 0.072, hh = 0.023;   // a small plate just under the bin's edge
+    x.fillStyle = '#F7F8F9'; x.fillRect(cx + 2, cy + 3, cw - 4, ch - 6);
+    x.fillStyle = '#16181B'; x.textBaseline = 'middle'; x.textAlign = 'left';
+    x.font = 'bold 38px Inter, Arial, sans-serif'; x.fillText(String(r), cx + 12, cy + ch / 2 + 2);
+    let px = cx + 14 + x.measureText(String(r)).width + 12;
+    // the person (the aisle side): a head and a body
+    x.beginPath(); x.arc(px + 7, cy + 17, 5, 0, 6.3); x.fill(); x.fillRect(px, cy + 24, 14, 18); x.fillRect(px + 2, cy + 40, 4, 6); x.fillRect(px + 8, cy + 40, 4, 6); px += 20;
+    // the letters, each in a box, then the window
+    x.font = 'bold 22px Inter, Arial, sans-serif'; x.lineWidth = 2; x.strokeStyle = '#16181B'; x.textAlign = 'center';
+    for (const L of sd.txt) { x.strokeRect(px, cy + 14, 24, 28); x.fillText(L, px + 12, cy + 29); px += 26; }
+    x.beginPath(); x.ellipse(px + 9, cy + 28, 6, 11, 0, 0, 6.3); x.lineWidth = 3; x.stroke(); x.beginPath(); x.ellipse(px + 9, cy + 28, 3, 7, 0, 0, 6.3); x.fill();
+    // the plate: along the bin's lower edge over the aisle seat, tilted to face down and towards the aisle
+    const ctr = V(rowX[r] - 0.02, sd.y, zf + 1.78), o0 = V(0, 0, 0), n = V(0, sd.dir * 0.5, -0.87).sub(o0).normalize();
+    const along = V(-1, 0, 0).sub(o0).normalize(), right = along.clone().multiplyScalar(sd.dir > 0 ? 1 : -1);   // the text runs along the cabin, upright as seen from the aisle
+    const upv = new T.Vector3().crossVectors(n, right).normalize();   // the edge towards the aisle is the top of the text
+    const hw = 0.13, hh = 0.028, b0 = pos.length / 3, c0 = ctr.clone().addScaledVector(n, 0.003);
+    for (const [sx, sy2] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = c0.clone().addScaledVector(right, sx * hw).addScaledVector(upv, sy2 * hh); pos.push(p.x, p.y, p.z); }
     const u0 = cx / cv.width, u1 = (cx + cw) / cv.width, v0 = 1 - (cy + ch) / cv.height, v1 = 1 - cy / cv.height;
-    for (const along of [-1, 1]) {
-      const n = V(along * 0.75, sd.dir * 0.66, 0).sub(o0).normalize(), right = new T.Vector3().crossVectors(up, n).normalize(), b0 = pos.length / 3;
-      const c0 = ctr.clone().addScaledVector(n, 0.004);
-      for (const [sx, sy2] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = c0.clone().addScaledVector(right, sx * hw).addScaledVector(up, sy2 * hh); pos.push(p.x, p.y, p.z); }
-      uv.push(u0, v0, u1, v0, u1, v1, u0, v1); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
-    }
-    c++;
+    uv.push(u0, v0, u1, v0, u1, v1, u0, v1); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); c++;
   }
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
-  const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
-  const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, fog: false })); m.material.userData.noDim = true;
+  const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
+  const m = new T.Mesh(geo, cabinMat(0xFFFFFF, { map: tex, side: T.DoubleSide }));
   return m;
 }
