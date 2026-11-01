@@ -132,6 +132,7 @@
     "src/screens/v3d-crash.ts",
     "src/screens/v3d-cabin.ts",
     "src/screens/v3d-cabincrew.ts",
+    "src/screens/v3d-walk.ts",
     "src/data/stars.ts",
     "src/screens/v3d-sky.ts",
     "src/ui/qol.ts",

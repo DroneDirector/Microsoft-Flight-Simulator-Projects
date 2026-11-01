@@ -11,7 +11,7 @@ const Updater = {
   pct: -1,
   _listening: false,
 
-  get native(): boolean { return !!appTools(); },
+  get native(): boolean { return !!appTools() || DESKTOP; },   // the phone app installs APKs; the PC app updates itself
 
   init() {
     if (!this.native || !APP.updates) return;
@@ -36,7 +36,8 @@ const Updater = {
         .sort((a, b) => cmpVersion(b.tag_name.slice(APP.updates.tagPrefix.length), a.tag_name.slice(APP.updates.tagPrefix.length)))[0];
       try { localStorage.setItem(UPDATE_CHECK_KEY, String(Date.now())); } catch (e) { /* no storage */ }
       const v = rel ? rel.tag_name.slice(APP.updates.tagPrefix.length) : '';
-      const apk = rel && (rel.assets || []).filter((a: any) => /\.apk$/i.test(a.name))[0];
+      // the phone takes the Android app; the PC its own Windows download
+      const apk = rel && (rel.assets || []).filter((a: any) => DESKTOP ? /^AirlineManagerPro-PC-.*\.zip$/i.test(a.name) : /\.apk$/i.test(a.name))[0];
       if (!rel || !apk || cmpVersion(v, APP.version) <= 0) { this.state = 'latest'; this.info = null; updateChanged(); if (!quiet) toast(`You have the latest version, ${APP.version}`, 'ok'); return; }
       this.info = { version: v, url: apk.browser_download_url, notes: rel.body || '', size: apk.size, page: rel.html_url };
       this.state = 'available'; updateChanged();
@@ -44,11 +45,12 @@ const Updater = {
       else openUpdate();
     } catch (e) {
       this.state = 'failed'; updateChanged();
-      if (!quiet) ErrorLog.add('update', 'Couldn\'t check for updates', (e && e.message) || String(e), 'Check that the phone is online and try again.');
+      if (!quiet) ErrorLog.add('update', 'Couldn\'t check for updates', (e && e.message) || String(e), `Check that the ${DESKTOP ? 'PC' : 'phone'} is online and try again.`);
     }
   },
 
   async install() {
+    if (DESKTOP) return this.installPc();
     const t = appTools();
     if (!t || !this.info) return;
     if (!this._listening) {
@@ -70,6 +72,27 @@ const Updater = {
       this.state = 'failed'; updateChanged();
       ErrorLog.add('update', 'The update couldn\'t be installed', (e && e.message) || String(e));
     }
+  },
+
+  /** On the PC: the PC app downloads its new version, closes, copies it over itself and opens again. */
+  async installPc() {
+    if (!this.info) return;
+    try { Store.save(); Store.flushNative(); } catch (e) { /* saved already */ }
+    try { if (typeof Backup !== 'undefined') Backup.writeFolder(); } catch (e) { /* the regular copy is there */ }
+    const fail = (msg: string) => { this.state = 'failed'; updateChanged(); ErrorLog.add('update', 'The update couldn\'t be installed', msg, `PC app update: ${APP.version} → ${this.info ? this.info.version : '?'}`); };
+    let r: any;
+    try { r = await fetch('/api/update', { method: 'POST', body: JSON.stringify({ version: this.info.version }) }).then(x => x.ok ? x.json() : null); }
+    catch (e) { return fail('The PC app didn\'t answer. Is it still running?'); }
+    if (!r) return fail('This PC app is too old to update itself. Download the new version once from the release page; after that, updates install from here.');
+    if (r.state === 'failed') return fail(r.error || 'The update failed.');
+    this.state = 'downloading'; this.pct = 0; updateChanged();
+    const poll = () => fetch('/api/update').then(x => x.json()).then((s: any) => {
+      if (s.state === 'failed') return fail(s.error || 'The update failed.');
+      if (s.state === 'downloading') { this.state = 'downloading'; this.pct = s.pct; updateChanged(); }
+      if (s.state === 'unpacking' || s.state === 'restarting') { this.state = 'installing'; this.pct = 100; updateChanged(); }
+      setTimeout(poll, 700);
+    }, () => { this.state = 'installing'; updateChanged(); /* the PC app has closed to install: it opens again by itself */ });
+    poll();
   },
 };
 
@@ -109,10 +132,10 @@ function updateStatusText(): string {
     case 'latest': return 'You have the latest version';
     case 'available': return `Version ${u.info.version} is ready to install`;
     case 'downloading': return u.pct >= 0 ? `Downloading version ${u.info.version}, ${u.pct}%` : `Downloading version ${u.info.version}…`;
-    case 'installing': return 'Installing, the app restarts when it\'s done';
+    case 'installing': return DESKTOP ? 'Installing: the PC app closes and opens again with the new version' : 'Installing, the app restarts when it\'s done';
     case 'permission': return 'Waiting for permission to install updates';
     case 'failed': return 'The last update attempt failed, see the error log';
-    default: return u.native ? 'Updates install over this version and keep your airline' : 'Updates install in the Android app';
+    default: return u.native ? 'Updates install over this version and keep your airline' : 'Updates install in the Android app and the PC app';
   }
 }
 
@@ -138,6 +161,6 @@ function updateChanged() {
 }
 
 ACTIONS['update-open'] = el => { const t = el && el.closest('.toast'); if (t) t.remove(); Sound.tick(); openUpdate(); };
-ACTIONS['update-check'] = () => { Sound.tick(); if (!Updater.native) { toast('Updates install in the Android app', 'info'); return; } Updater.check(false); };
+ACTIONS['update-check'] = () => { Sound.tick(); if (!Updater.native) { toast('Updates install in the Android app and the PC app', 'info'); return; } Updater.check(false); };
 ACTIONS['update-install'] = () => { Sound.tick(); Updater.install(); };
 ACTIONS['update-permission'] = () => { closeTop(); const t = appTools(); if (t) t.openInstallPermission().catch((e: any) => ErrorLog.add('update', 'Couldn\'t open the setting', (e && e.message) || String(e))); };

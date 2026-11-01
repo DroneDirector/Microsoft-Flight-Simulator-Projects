@@ -90,7 +90,7 @@ const V3dSound: any = {
     if (!V3d.open || !V3d.cam || document.hidden || !this.on('v3dEngines')) { this.quiet(); return; }
     if (now - this.at < 100) return; this.at = now;
     const out = this.out(); if (!out) return;
-    const ctx = this.ctx, cam = V3d.cam.position, cabin = /^(cabin|winL|winR)$/.test(V3d.mode), inside = cabin || V3d.mode === 'fwd';
+    const ctx = this.ctx, cam = V3d.cam.position, cabin = /^(cabin|walk|winL|winR)$/.test(V3d.mode), inside = cabin || V3d.mode === 'fwd';
     const own = cabin ? ((V3d as any).cabinFwdFor || (V3d as any).cabinFor) : null;
     let jetL = 0, propL = 0, jetN = 0, propN = 0, cabP = -1, cabProp = false, cabKt = 0;
     for (const id in V3d.planes || {}) {

@@ -15,6 +15,7 @@ import { spawn, execFile } from 'child_process';
 import * as https from 'https';
 import { saveFlightPlan } from './installed';
 import { LINK_PORT } from './protocol';
+import { PcUpdate } from './updater';
 
 const TYPES: { [ext: string]: string } = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json',
@@ -48,6 +49,11 @@ export class Desktop {
     const url = (req.url || '/').split('?')[0];
     if (url === '/api/desktop') return this.api(req, res), true;
     if (url === '/api/backup') return this.backup(req, res), true;
+    if (url === '/api/update') {
+      if (req.method === 'POST') return readBody(req, b => { let v = ''; try { v = String(JSON.parse(b).version || ''); } catch (e) { /* none */ }
+        const err = PcUpdate.start(v, () => this.closeWindow()); json(res, Object.assign(PcUpdate.status(), err ? { state: 'failed', error: err } : {})); }), true;
+      json(res, PcUpdate.status()); return true;
+    }
     if (url === '/api/gpus') { listGpus().then(g => json(res, { gpus: g })); return true; }
     if (url === '/api/device') { machineId().then(id => json(res, { id, name: os.hostname() })); return true; }
     if (url === '/api/licence') return this.licence(req, res), true;
@@ -137,6 +143,12 @@ export class Desktop {
     const pr = this.prefs.boost ? os.constants.priority.PRIORITY_ABOVE_NORMAL : os.constants.priority.PRIORITY_NORMAL;
     try { os.setPriority(process.pid, pr); } catch (e) { /* not allowed: stays as it is */ }
     if (this.windowPid) { try { os.setPriority(this.windowPid, pr); } catch (e) { /* the window's own process may refuse */ } }
+  }
+
+  /** Close the app window this PC app opened (before an update restarts everything). */
+  closeWindow() {
+    if (!this.windowPid) return;
+    try { execFile('taskkill', ['/PID', String(this.windowPid), '/T', '/F'], { windowsHide: true }, () => { /* closed */ }); } catch (e) { /* gone */ }
   }
 
   /** Open the app window (Microsoft Edge in app mode, falling back to Chrome or the default browser). */
