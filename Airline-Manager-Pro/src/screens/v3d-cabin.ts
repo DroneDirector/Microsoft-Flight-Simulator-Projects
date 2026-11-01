@@ -404,7 +404,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   let t2 = 0; const qp = new T.Quaternion().setFromEuler(new T.Euler(0, 0, -0.04)).multiply(new T.Quaternion().setFromEuler(new T.Euler(0, Math.PI / 2, 0)));
   for (const key in seatAt) {
     const a = seatAt[key]; if (a.prem) continue;
-    M.compose(V(a.x + 0.392, a.y, zf + 0.8), qp, new T.Vector3(seatW * 0.82, 0.54, 1));   // just behind the shell (its rounded edge reaches 0.38 m back) panel.setMatrixAt(t2++, M);
+    M.compose(V(a.x + 0.37, a.y, zf + 0.8), qp, new T.Vector3(seatW * 0.82, 0.54, 1)); panel.setMatrixAt(t2++, M);   // just behind the shell
   }
   panel.count = t2; g.add(panel);
   g.add(cush, back, head);
