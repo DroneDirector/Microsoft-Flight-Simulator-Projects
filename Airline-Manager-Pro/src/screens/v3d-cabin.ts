@@ -265,7 +265,9 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     prof.push([bd * 0.5, 0], [0, 0]);
     const geo = cabinSweep(prof, len);
     const m = new T.Mesh(geo, mBin); mBin.side = T.DoubleSide; mBin.fog = false;
-    const wallY = ri * 0.88, zb = zc + ri * 0.24, Mb = new T.Matrix4().makeBasis(_av(0, -side, 0), new T.Vector3(0, 1, 0), new T.Vector3(1, 0, 0));
+    // the bins' lower edge about 1.8 m above the floor (head room over the seats), lower in small cabins; they
+    // meet the wall where the curved wall is at that height
+    const zb = Math.min(zf + 1.8, zc + ri * 0.48), wallY = Math.min(ri * 0.9, Math.sqrt(Math.max(0.01, ri * ri - (zb - zc) * (zb - zc))) - 0.02), Mb = new T.Matrix4().makeBasis(_av(0, -side, 0), new T.Vector3(0, 1, 0), new T.Vector3(1, 0, 0));
     Mb.setPosition(V(x0, side * wallY, zb)); m.matrixAutoUpdate = false; m.matrix.copy(Mb);
     g.add(m);
     // underneath: the grey passenger service panel, with a pair of reading lights and air vents over every row
@@ -293,7 +295,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     if (side === -1) V3dCabin.mood = up;
   }
   // the windows along both walls
-  const pitch = Math.max(0.45, s.win.pitch || 0.53), nW = Math.floor((s.win.to - s.win.from) / pitch), zW = zf + 0.95;
+  const pitch = Math.max(0.45, s.win.pitch || 0.53), nW = Math.floor((s.win.to - s.win.from) / pitch), zW = Math.min(zf + 1.12, zc + ri * 0.2);   // window middle about 1.1 m above the floor, as in real cabins
   if (!V3dCabinF.winTex) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 96; const x = cv.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 64, 96); x.fillStyle = '#fff'; x.beginPath(); (x as any).roundRect ? (x as any).roundRect(4, 4, 56, 88, 24) : x.rect(4, 4, 56, 88); x.fill(); V3dCabinF.winTex = new T.CanvasTexture(cv); }
   const winGeo = new T.PlaneGeometry(st.ww * 1.25, st.wh * 1.2), winMat = new T.MeshBasicMaterial({ color: 0xFFFFFF, map: cabinSkyTex(), alphaMap: V3dCabinF.winTex, transparent: true, fog: false }); winMat.userData.noDim = true;
   const wins = new T.InstancedMesh(winGeo, winMat, nW * 2), M = new T.Matrix4(), Q = new T.Quaternion(), S = new T.Vector3(1, 1, 1);
@@ -314,9 +316,13 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   const rowCls: { [r: number]: string } = {}; let maxRow = 0;
   for (const p of list) { const r = parseInt(p.seat, 10); if (r > maxRow) maxRow = r; if (!rowCls[r] || p.cls !== 'Y') rowCls[r] = p.cls; }
   const pitchOf = (c: string) => c === 'F' ? 1.5 : c === 'J' ? 1.0 : 0.79;
+  // every passenger on the list has a seat: the rows fit the cabin, with the seats a little closer together
+  // where needed (down to 28 inches); only beyond that is a passenger left out (never without a seat)
+  let need = 0; for (let r = 1; r <= maxRow; r++) need += pitchOf(rowCls[r] || 'Y');
+  const room = (x1 - 1.6) - (x0 + 1.4), squeeze = need > room ? Math.max(0.89, room / need) : 1;
   let rows = Math.max(maxRow, 1), x = x0 + 1.4; const rowX: number[] = [], rowsCls: string[] = [];
   // empty seats too: as many rows as fit
-  for (let r = 1; x < x1 - 1.6; r++) { const c = rowCls[r] || (r > maxRow ? 'Y' : 'Y'); rowX[r] = x; rowsCls[r] = c; x += pitchOf(c); rows = r; }
+  for (let r = 1; x < x1 - 1.6 + 0.01; r++) { const c = rowCls[r] || 'Y'; rowX[r] = x; rowsCls[r] = c; x += pitchOf(c) * squeeze; rows = r; }
   const width = ri * 2 * 0.9, aisles = blocks.length - 1, aisleW = 0.5, seatW = (width - aisles * aisleW) / abreast;
   const seatY: number[] = []; let yy = -width / 2;
   blocks.forEach((b, bi) => { for (let k = 0; k < b; k++) { seatY.push(yy + seatW * (k + 0.5)); } yy += b * seatW + (bi < aisles ? aisleW : 0); });
@@ -328,8 +334,8 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   if (!V3dCabinF.seatGeo || V3dCabinF.seatQ !== cabinQ()) {
     V3dCabinF.seatQ = cabinQ();
     const pr = [[-0.25, 0.4], [-0.26, 0.5], [-0.2, 0.54], [0.12, 0.55], [0.17, 0.6], [0.21, 0.98], [0.24, 1.05], [0.3, 1.06], [0.32, 1.0], [0.3, 0.62], [0.27, 0.4], [0.22, 0.12], [0.19, 0.12], [0.15, 0.36]];
-    const sh = new T.Shape(cabinSmooth(pr, cabinQv([0, 40, 80, 160])));
-    const geo = new T.ExtrudeGeometry(sh, { depth: 0.86, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.03, bevelSegments: cabinQv([1, 2, 4, 6]), curveSegments: 4 });
+    const sh = new T.Shape(cabinSmooth(pr, cabinQv([0, 36, 60, 96])));
+    const geo = new T.ExtrudeGeometry(sh, { depth: 0.86, bevelEnabled: true, bevelThickness: 0.035, bevelSize: 0.03, bevelSegments: cabinQv([1, 2, 3, 4]), curveSegments: 4 });
     geo.translate(0, 0, -0.43); geo.scale(1, 1, 1 / 0.93);   // centred across, one metre wide before scaling
     { const P = geo.attributes.position; for (let i = 0; i < P.count; i++) { const y = P.getY(i); if (y > 0.75) P.setZ(i, P.getZ(i) * (1 - 0.12 * (y - 0.75) / 0.31)); } geo.computeVertexNormals(); }   // the back narrows towards the shoulders
     V3dCabinF.seatGeo = geo;
@@ -385,6 +391,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   g.add(cush, back, head);
   // the passengers
   if (cabinPeopleOn() && list.length) g.add(cabinPeople(list, seatAt, zf, V));
+  g.userData.pax = { list: list.length, seated: list.filter(p => seatAt[p.seat]).length };
   g.traverse((m: any) => { m.frustumCulled = false; m.renderOrder = 40; });
   g.userData.eye = [x1 - 0.3, aisleY, zf + 1.7]; g.userData.look = [x0 + 2, aisleY, zf + 0.7];
   return g;
