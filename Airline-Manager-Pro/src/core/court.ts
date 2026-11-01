@@ -79,6 +79,7 @@ function maybeCriminal(who: any, role: string): boolean {
 }
 
 function openCourtCase(who: any, role: string, offenceIdx?: number, why?: string) {
+  if (role === 'airline' && !courtOn()) return;   // Settings → Court: the airline is never taken to court
   const S: any = State, list = OFFENCES[role] || OFFENCES.fa;
   const o = offenceIdx != null ? list[offenceIdx] : _pickW(list);
   const base = apt(who.base) || apt(company().hub), country = base ? base.country : '';
@@ -101,6 +102,7 @@ function openCourtCase(who: any, role: string, offenceIdx?: number, why?: string
     ],
   };
   try { courtSetup(c); } catch (e) { /* the basic case still runs */ }
+  try { hearingSetup(c); } catch (e) { /* the case runs without hearings */ }
   S.cases = S.cases || []; S.cases.unshift(c);
   // staff are suspended: off duty, their flights stop
   if (role !== 'pax' && role !== 'airline') { who.status = 'off'; who.suspended = c.id; }
@@ -158,13 +160,17 @@ function courtPunishAirline(c: CourtCase, guilty: boolean) {
 /** Move every open case on to now (also catches up after the app was closed). */
 function courtAdvance() {
   const S: any = State; if (!S.cases) return;
-  if (!conductOn()) return;   // paused while conduct reports are switched off
-  try { courtReleases(); whistleAdvance(); } catch (e) { /* ignore */ }
+  const conduct = conductOn();   // crew cases pause while conduct reports are switched off; the airline's follow Settings → Court
+  if (conduct) try { courtReleases(); whistleAdvance(); } catch (e) { /* ignore */ }
+  try { hearingReminders(); hearingWatchDaily(); } catch (e) { /* ignore */ }
   const now = Date.now(); let changed = false;
   for (const c of S.cases as CourtCase[]) {
     if (c.status !== 'open' && !(c as any).appealing) continue;
+    if (!conduct && c.role !== 'airline') continue;
     for (const st of c.stages) {
       if (st.done || st.at > now) continue;
+      if ((c as any).hear && /^hear[0-9A]$/.test(st.key)) { if (hearingDue(c, st) === 'wait') break; changed = true; continue; }
+      if ((c as any).hear && st.key === 'verdict' && !hearingVerdictReady(c)) break;   // your decisions first
       st.done = true; changed = true;
       if (st.key === 'verdict') courtVerdictApply(c, st);
       if (st.key === 'appeal') courtAppealApply(c, st);
@@ -200,6 +206,7 @@ function courtPopup(id: string) {
           <small class="${c.status === 'guilty' ? 'amber' : c.status === 'acquitted' ? 'green' : ''}">${c.status === 'open' ? (next ? `Next: ${esc(next.title.toLowerCase())}, around ${esc(when(next.at))}` : 'Awaiting the verdict') : c.status === 'guilty' ? `Guilty: ${esc(c.sentence || '')}` : 'Not guilty'}</small></div>
         <div class="say-row">${voiceButton(courtSpeech(c, next), 'legal', 'Play the lawyer\'s update')}${voiceNoteEl('Company lawyer')}</div>
         ${typeof sentenceCardHtml === 'function' ? sentenceCardHtml(c) : ''}
+        ${typeof hearingCaseHtml === 'function' ? hearingCaseHtml(c) : ''}
         ${typeof courtChoicesHtml === 'function' ? courtChoicesHtml(c) : ''}
         ${(c as any).rehireAsk ? `<div class="cc-box"><b class="cc-h">${esc(c.name)} asks for a second chance</b><div class="btn-row"><button class="btn primary sm" data-act="cc-rehire" data-id="${esc(c.id)}" data-v="1">Take them back</button><button class="btn ghost sm" data-act="cc-rehire" data-id="${esc(c.id)}" data-v="0">Decline</button></div></div>` : ''}
         <ol class="court-tl">${c.stages.map(s => `<li class="${s.done ? 'done' : ''}"><time>${s.done || s === next ? esc(when(s.at)) : ''}</time><b>${esc(s.title)}</b>${s.done ? `<p>${esc(s.text)}</p>` : ''}</li>`).join('')}</ol>

@@ -199,6 +199,7 @@ const V3dTerrain = {
     const latOf = (py: number) => { const k = Math.PI - 2 * Math.PI * (r.y0 + py / 256) / n; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
     const aptLL = V3d.icao ? apt(V3d.icao).pos : null, aElev = V3d.elev || 0;
     const pos = new Float32Array((G + 1) * (G + 1) * 3), uv = new Float32Array((G + 1) * (G + 1) * 2), idx: number[] = [], mh = new Float32Array((G + 1) * (G + 1));
+    const flat = new Float32Array((G + 1) * (G + 1));   // 1 where the mesh is water: flat, at the water's level
     const sample = (px: number, py: number) => {
       const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
       const h = H[i] * (1 - fx) * (1 - fy) + H[i + 1] * fx * (1 - fy) + H[i + size] * (1 - fx) * fy + H[i + size + 1] * fx * fy;
@@ -208,11 +209,12 @@ const V3dTerrain = {
     for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
       const px = i / G * size, py = j / G * size, lon = lonOf(px), lat = latOf(py);
       const s = sample(px, py);
-      let h = Math.max(0, s.h);
-      if (s.wet) h = 0;                                  // the sea: perfectly flat, at sea level
-      else if (s.lake != null) h = Math.max(0, s.lake);  // a lake: flat at its own level
+      let h = Math.max(0, s.h), wl = -1;
+      if (s.wet) { h = 0; wl = 0; }                                  // the sea: perfectly flat, at sea level
+      else if (s.lake != null) { h = Math.max(0, s.lake); wl = h; }  // a lake: flat at its own level
       if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
       const p = v3dXY(lon, lat), o = j * (G + 1) + i;
+      flat[o] = wl >= 0 && Math.abs(h - wl) < 0.5 ? 1 : 0;
       // outer rings sit a little lower so the finer ring always shows where they meet
       mh[o] = h - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0);
       pos[o * 3] = p[0]; pos[o * 3 + 1] = mh[o] - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
@@ -230,7 +232,7 @@ const V3dTerrain = {
       const a = j * (G + 1) + i, b = a + 1, d = a + G + 1, e = d + 1; idx.push(a, d, b, b, d, e);
     }
     (r as any).mh = mh; (r as any).G = G;
-    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setIndex(idx);
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setAttribute('aFlat', new T.BufferAttribute(flat, 1)); geo.setIndex(idx);
     // the water as its own picture (the sea and lakes; rivers half), for the living water and the coastline
     const wetTex = v3dWetTexture(size, (i: number) => water(i) ? 255 : river(i) ? 150 : 0);
     r.mesh = new T.Mesh(geo, v3dGroundMat((State.settings as any).v3dSat && r.satTex ? r.satTex : r.mapTex, wetTex));

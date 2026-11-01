@@ -9,11 +9,20 @@ function openLayer(kind: 'modal' | 'drawer' | 'pop', html: string, opts?: { cls?
   wrap.innerHTML = `<div class="scrim" data-act="close-layer"></div><div class="panel" role="dialog" aria-modal="true">${html}</div>`;
   (wrap as any)._onClose = opts && opts.onClose;
   if (opts && opts.anchor && kind === 'pop') {
-    const r = opts.anchor.getBoundingClientRect();
+    const z = (window as any).__uiZoom || 1, r = opts.anchor.getBoundingClientRect();   // rects are in screen pixels, styles in page pixels
     const p = wrap.querySelector('.panel') as HTMLElement;
-    p.style.left = Math.max(8, r.left) + 'px'; p.style.top = (r.bottom + 6) + 'px';
+    p.style.left = Math.max(8, r.left / z) + 'px'; p.style.top = (r.bottom / z + 6) + 'px';
   }
   root.appendChild(wrap);
+  // a menu by a button never runs off the screen: keep it inside the window, above the button if there's no room below
+  if (opts && opts.anchor && kind === 'pop') {
+    const p = wrap.querySelector('.panel') as HTMLElement, z = (window as any).__uiZoom || 1, W = innerWidth / z, H = innerHeight / z;
+    const w = p.offsetWidth, h = p.offsetHeight, ar = opts.anchor.getBoundingClientRect();
+    let l = parseFloat(p.style.left), t = parseFloat(p.style.top);
+    if (l + w > W - 8) l = Math.max(8, W - 8 - w);
+    if (t + h > H - 8) { const above = ar.top / z - 6 - h; t = above >= 8 ? above : Math.max(8, H - 8 - h); }
+    p.style.left = l + 'px'; p.style.top = t + 'px';
+  }
   _layers.push(wrap);
   requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
   return wrap;
@@ -168,6 +177,7 @@ ACTIONS['open-notice'] = el => {
   if ((n as any).tx) ACTIONS['tx-detail']({ getAttribute: () => (n as any).tx } as any, null);
   else if ((n as any).txs) flightsMoneyPopup((n as any).txs);
   else if (n.ref && /^va-/.test(String(n.ref))) vaNoticeOpen(String(n.ref));
+  else if (n.ref && /^case-/.test(String(n.ref))) courtPopup(String(n.ref));
   else if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref && /^scan-/.test(n.ref)) scanPopup(n.ref.slice(5));
@@ -340,9 +350,35 @@ ACTIONS['fine-contest'] = el => {
 };
 
 /* ---------- Crash: register or disregard ---------- */
+/** How bad it was, worked out from the impact: the damage, the parts hit, the injured and the dead, and what it costs.
+ *  The same flight always gives the same answer (it is seeded from the flight). */
+function crashAssess(l: any): { level: 'minor' | 'substantial' | 'destroyed'; label: string; salvage: boolean; parts: string[]; injured: number; dead: number; cost: number; days: number; value: number } {
+  if (l.crash) return l.crash;
+  const a = plane(l.reg), t = a ? acType(a.typeId) : null, fpm = Math.abs(l.landingFpm || 0), g = l.g || 0, pax = l.pax || 0;
+  let seed = 0; for (const ch of String(l.id)) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const cause = String(l.notes || '').toLowerCase();
+  const sev = Math.max((fpm - 600) / 1400, (g - 2) / 3, /terrain|stall|spin|water|cfit|fire/.test(cause) ? 1.1 : 0);
+  const level = sev >= 1 ? 'destroyed' : sev >= 0.45 ? 'substantial' : 'minor';
+  const parts: string[] = [];
+  if (level === 'minor') { parts.push(rnd() < 0.6 ? 'Nose gear' : 'Main gear'); if (rnd() < 0.5) parts.push('Wing tip'); if (rnd() < 0.4) parts.push('Flaps'); }
+  else if (level === 'substantial') { parts.push('Main gear'); if (rnd() < 0.7) parts.push('Nose gear'); parts.push(rnd() < 0.5 ? 'Engine' : 'Engine mounts'); if (rnd() < 0.6) parts.push('Wing'); parts.push('Lower fuselage'); if (rnd() < 0.3) parts.push('Fire'); }
+  else { parts.push('Fuselage broken', 'Wings', 'Engines', 'Landing gear', 'Tail'); if (rnd() < 0.7) parts.push('Fire'); }
+  const dead = level === 'destroyed' ? Math.round(pax * (0.15 + 0.7 * Math.min(1, sev - 1 + rnd() * 0.6))) : level === 'substantial' && rnd() < 0.15 ? 1 + Math.floor(rnd() * 3) : 0;
+  const injured = Math.min(pax - dead, Math.round(pax * (level === 'minor' ? rnd() * 0.08 : level === 'substantial' ? 0.15 + rnd() * 0.3 : 0.5 + rnd() * 0.4)));
+  const value = Math.round(((t && (t as any).price) || 4e7) * 0.6);
+  const salvage = level !== 'destroyed';
+  const cost = salvage ? Math.round(value * (level === 'minor' ? 0.02 + rnd() * 0.03 : 0.12 + rnd() * 0.18) / 1000) * 1000 : 0;
+  const days = level === 'minor' ? 3 + Math.floor(rnd() * 5) : level === 'substantial' ? 20 + Math.floor(rnd() * 40) : 0;
+  const label = level === 'minor' ? 'Minor damage, repairable' : level === 'substantial' ? 'Substantial structural damage, repairable at a cost' : 'Destroyed: a total loss (written off)';
+  l.crash = { level, label, salvage, parts, injured, dead, cost, days, value };
+  return l.crash;
+}
 function crashPopup(logId: string) {
   const l = State.logbook.filter(x => x.id === logId)[0]; if (!l) return;
-  const a = plane(l.reg), c = company(a.companyId);
+  const a = plane(l.reg), c = company(a.companyId), d = crashAssess(l);
+  const ppl = d.dead ? `${d.dead} ${d.dead === 1 ? 'person' : 'people'} died, ${d.injured} injured` : d.injured ? `No one died, ${d.injured} injured` : 'No one died or was hurt';
+  const say = `${l.reg} has crashed on the flight from ${l.from} to ${l.to}, at ${num(Math.abs(l.landingFpm))} feet per minute and ${l.g.toFixed(1)} g, with ${l.pax} passengers on board. ${d.label}. Damaged: ${d.parts.join(', ')}. ${ppl}. ${d.salvage ? `The repair is estimated at ${money(d.cost)} and ${d.days} days.` : 'The aircraft cannot be repaired.'} You need to decide whether to register the crash or disregard it.`;
   openLayer('modal', `
     <div class="modal-head crash"><span class="crash-ic">${icon('alert')}</span><div><h2>Crash detected</h2><small>${esc(l.from)} to ${esc(l.to)}, ${esc(l.reg)}, ${esc(l.date)}</small></div>
       <button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
@@ -354,28 +390,56 @@ function crashPopup(logId: string) {
         <div><small>Passengers</small><b>${l.pax}</b></div>
         <div><small>Cause</small><b>${esc(l.notes || 'Impact')}</b></div>
       </div>
-      <div class="say-row">${voiceButton(`${l.reg} has crashed on the flight from ${l.from} to ${l.to}, at ${num(Math.abs(l.landingFpm))} feet per minute and ${l.g.toFixed(1)} g, with ${l.pax} passengers on board. Cause: ${l.notes || 'impact'}. You need to decide whether to register the crash or disregard it.`, 'ops', 'Play the report')}${voiceNoteEl('Head of operations')}</div>
+      <div class="crash-dmg">
+        <div><small>Damage</small><b class="${d.level === 'minor' ? '' : 'red'}">${esc(d.label)}</b></div>
+        <div><small>People</small><b class="${d.dead ? 'red' : ''}">${esc(ppl)}</b></div>
+        <div><small>${d.salvage ? 'Repair' : 'Loss'}</small><b>${d.salvage ? `${money(d.cost)}, ${d.days} days` : `${money(d.value)} aircraft lost`}</b></div>
+      </div>
+      <small>Damaged parts</small><div class="crash-parts">${d.parts.map(x => `<span>${esc(x)}</span>`).join('')}</div>
+      <div class="say-row">${voiceButton(say, 'ops', 'Play the report')}${voiceNoteEl('Head of operations')}
+        <button class="btn ghost sm" data-act="crash-see" data-id="${l.id}">${icon('focus')} See the damage</button></div>
       <div class="decide">
         <button class="decide-card bad" data-act="crash-decide" data-id="${l.id}" data-d="registered">
-          <b>Register crash</b><small>Goes on your record. Insurance covers part of the repair, reputation drops and ${esc(l.reg)} is out of service.</small></button>
+          <b>Register crash</b><small>Goes on your record. ${d.salvage ? `Insurance covers part of the repair, reputation drops and ${esc(l.reg)} is out of service.` : `${esc(l.reg)} is written off; insurance pays part of its value.`}${d.dead || d.level === 'destroyed' ? ' It will be in the news.' : ''}</small></button>
         <button class="decide-card" data-act="crash-decide" data-id="${l.id}" data-d="disregarded">
           <b>Disregard</b><small>As if it never happened. The flight is voided, so it earns no hours or pay.</small></button>
       </div>
     </div>`, { cls: 'wide', onClose: () => Voice.stop() });
 }
+/** The crash site in 3D: the aircraft where it came to rest, with the parts that broke. */
+function crashSiteFor(l: any) {
+  const a = plane(l.reg), d = crashAssess(l);
+  try { crashSiteAdd({ key: l.id, c: company(a.companyId), typeId: a.typeId, reg: a.reg, to: l.to, dead: d.dead > 0, level: d.level === 'destroyed' ? 'destroyed' : 'damaged', parts: d.parts.map(p => p.toLowerCase()) }); } catch (e) { /* no 3D */ }
+}
+ACTIONS['crash-see'] = el => {
+  const l: any = State.logbook.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!l) return;
+  crashSiteFor(l); const e = document.createElement('b'); e.setAttribute('data-apt', l.to); ACTIONS['crash-3d'](e, null);
+};
 ACTIONS['crash-decide'] = el => {
-  const l = State.logbook.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!l) return;
+  const l: any = State.logbook.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!l) return;
   l.decision = el.getAttribute('data-d') as any;
-  const a = plane(l.reg);
+  const a = plane(l.reg), d = crashAssess(l);
+  if (l.condBefore == null) l.condBefore = a.condition;
   if (l.decision === 'registered') {
-    a.status = 'grounded'; a.condition = 12;
-    State.issues.unshift({ id: uid(), reg: a.reg, title: 'Crash damage', detail: 'Airframe damaged in the crash. Major structural repair needed before the next flight.', source: 'Crash registered by you', severity: 'grounding', cost: 410000, days: 9, status: 'open', date: dateStr(new Date()).slice(0, 10) });
-    company(a.companyId).reputation -= 6;
-    try { setTimeout(() => newsIncident(l.id), 4000); } catch (e) { /* ignore */ }
+    a.status = 'grounded'; a.condition = d.level === 'minor' ? 45 : 12;
+    const co = company(a.companyId);
+    if (d.salvage) {
+      State.issues.unshift({ id: uid(), reg: a.reg, title: d.level === 'minor' ? 'Crash damage' : 'Structural crash damage', detail: `Damaged in the crash: ${d.parts.join(', ')}. ${d.level === 'minor' ? 'Repair before the next flight.' : 'Major structural repair needed before the next flight.'}`, source: 'Crash registered by you', severity: 'grounding', cost: d.cost, days: d.days, status: 'open', date: dateStr(new Date()).slice(0, 10) });
+    } else {
+      try { courtWriteOff(a, { reg: a.reg } as any); } catch (e) { a.status = 'grounded'; }
+    }
+    co.reputation -= d.level === 'minor' ? 3 : d.level === 'substantial' ? 6 : 12 + Math.min(20, d.dead);
+    crashSiteFor(l);
+    if (d.dead || d.level === 'destroyed') {
+      try { setTimeout(() => newsCrash({ key: l.id, c: co, typeId: a.typeId, reg: a.reg, callsign: l.callsign, from: l.from, to: l.to, pax: l.pax, dead: d.dead > 0, cause: d.dead ? `${d.dead} ${d.dead === 1 ? 'person' : 'people'} died and ${d.injured} were injured. ${d.salvage ? 'The aircraft was badly damaged.' : 'The aircraft was destroyed.'}` : undefined }), 4000); } catch (e) { /* ignore */ }
+      try { const nc = (window as any).courtNeglectCheck; if (d.dead && nc) nc(a, l, d); } catch (e) { /* no court */ }
+    }
+  } else {
+    try { const list = crashSites(); const i = list.findIndex(c => c.id === l.id); if (i >= 0) { list.splice(i, 1); Store.save(); } } catch (e) { /* none */ }
   }
   State.notices = State.notices.filter(n => n.ref !== l.id);
   closeAll(); Haptics.pulse(30); refresh();
-  toast(l.decision === 'registered' ? 'Crash registered. The mechanic has opened a repair job.' : 'Crash disregarded. Flight voided.', l.decision === 'registered' ? 'warn' : 'ok');
+  toast(l.decision === 'registered' ? (d.salvage ? 'Crash registered. The mechanic has opened a repair job.' : `Crash registered. ${l.reg} is written off.`) : 'Crash disregarded. Flight voided.', l.decision === 'registered' ? 'warn' : 'ok');
 };
 
 /* ---------- Toggle markup (shared with Settings) ---------- */

@@ -139,6 +139,8 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => payScaleHtml() },
     { type: 'group', title: 'Apron crew' },
     { type: 'choice', key: 'groundHandling', label: 'Apron crew: mechanics, drivers and baggage handlers', hint: 'Your hub and every other base always need your own apron crew: without ground crew there, no aircraft can be unloaded, loaded, fuelled or pushed back, so none can leave. Bases only: everywhere else the local handling company turns your aircraft round for a fee. Every airport: you can also keep your own apron crew at any airport you fly to. Co-pilots and cabin crew are always your own.', options: [['base', 'Bases only'], ['everywhere', 'Every airport']] },
+    { type: 'group', title: 'Court' },
+    { type: 'toggle', key: 'courtOn', label: 'Court hearings', hint: 'When an accident with deaths is blamed on how the airline is run (aircraft not serviced, mechanics underpaid, tired or not qualified), the airline goes to court and you answer the judge\'s questions in the courtroom, over a couple of days. Your answers affect your company rating. Off: the airline is never taken to court, and open hearings finish on their own.' },
     { type: 'group', title: 'Conduct' },
     { type: 'toggle', key: 'conduct', label: 'Conduct reports and behaviour', hint: 'Misconduct, warnings and court cases for your AI crew. Switching off never removes what already happened; court cases pause and carry on when you switch back on.' },
     { type: 'html', html: () => {

@@ -66,10 +66,12 @@ function courtDecide(c: any): { guilty: boolean; r: CourtResult } {
     try { if (groupPayRatio(c.companyId, 'mech').ratio < 0.9) p += 0.1; } catch (e) { /* ignore */ }
     if ((State.issues as any[]).filter(i => (plane(i.reg) || {} as any).companyId === c.companyId && i.status === 'open').length > 3) p += 0.05;
   }
+  if (c.hear) p += c.hear.pAdj || 0;   // what was said in court
   const guilty = ch.plea || Math.random() < clamp(p, 0.05, 0.99);
   const o = courtOffence(c);
   let sev = 1;
   if (ch.plea) sev *= 0.7; sev *= ({ none: 1.1, basic: 1, good: 0.85, top: 0.75 } as any)[ch.lawyer] || 1;
+  if (c.hear) sev *= c.hear.sevK || 1;
   if (ch.settled) sev *= 0.85; if (ch.acted) sev *= 0.85; if (c.role === 'airline' && ch.stance === 'cooperate') sev *= 0.9;
   const r: CourtResult = { prisonM: 0, suspended: false, life: false, servedM: 0, fine: 0, licence: !!o.licence, community: 0, probationM: 0, certDays: 0, releaseM: 0 };
   if (!guilty) return { guilty, r };
@@ -168,6 +170,7 @@ ACTIONS['cc-appeal'] = el => {
   const fee = Math.round(Math.max(LAWYER_FEE[c.ch.lawyer], 8000) * 1.5 * (c.role === 'airline' ? 6 : 1));
   payTxn(c.companyId, `Appeal: ${c.name}`, -fee, 'fees', [['Appeal lawyers and court costs', -fee]]);
   c.ch.appeal = 1; c.status = 'open'; c.appealing = true;
+  if (c.hear) { c.hear.verdictSeen = true; c.stages.push({ at: Date.now() + 14 * H * (0.85 + Math.random() * 0.3), key: 'hearA', title: 'Appeal hearing', text: '' }); }
   c.stages.push({ at: Date.now() + 30 * H * (0.85 + Math.random() * 0.3), key: 'appeal', title: 'Appeal decided', text: '' });
   courtNotice(c, { at: Date.now(), key: 'appeal-filed', title: 'Appeal filed', text: `An appeal has been filed against the verdict. The appeal court will decide in about a day.` });
   Store.save(); Sound.tick(); courtPopup(c.id);
@@ -190,9 +193,10 @@ function courtVerdictApply(c: any, st: any) {
   courtAftermath(c, guilty);
   courtCivil(c, guilty);
   newsCourt(c, 'verdict');
+  try { hearingAftermath(c, guilty); } catch (e) { /* ignore */ }
 }
 function courtAppealApply(c: any, st: any) {
-  const roll = Math.random(), lawyerBonus = ({ none: 0, basic: 0, good: 0.05, top: 0.1 } as any)[c.ch.lawyer] || 0;
+  const roll = Math.random() - (c.hear ? c.hear.appealAdj || 0 : 0), lawyerBonus = ({ none: 0, basic: 0, good: 0.05, top: 0.1 } as any)[c.ch.lawyer] || 0;
   c.appealing = false;
   if (roll < 0.22 + lawyerBonus) { c.status = 'acquitted'; c.res = Object.assign({}, c.res, { prisonM: 0, fine: 0, licence: false, community: 0, certDays: 0, releaseM: 0, life: false }); c.sentence = ''; st.title = 'Appeal: conviction overturned'; st.text = `The appeal court overturned the conviction of ${c.name}.`; }
   else if (roll < 0.6 + lawyerBonus) { const r = c.res; r.prisonM = Math.round(r.prisonM * 0.6); r.fine = Math.round(r.fine * 0.6 / 500) * 500; r.releaseM = Math.round(r.releaseM * 0.55); r.certDays = Math.round(r.certDays * 0.5); c.status = 'guilty'; c.sentence = sentenceLine(r); st.title = 'Appeal: sentence reduced'; st.text = `The appeal court upheld the conviction but reduced the sentence to ${c.sentence}.`; }
@@ -310,7 +314,7 @@ function whistlePopup() {
 }
 ACTIONS['wb-do'] = el => {
   const S: any = State, w = S.whistle; if (!w) return; w.open = false;
-  const v = el.getAttribute('data-v'), p: any = staffById(w.staffId), co = company(w.cid);
+  const v = el.getAttribute('data-v'), p: any = staffById(w.staffId), co = company(w.cid); w.choice = v;
   if (v !== 'fix' && Math.random() < 0.6) { try { newsWhistle(co, p, w.what || 'safety'); } catch (e) { /* ignore */ } }
   if (v === 'fix') { payTxn(w.cid, 'Safety review after a staff report', -150000, 'fees', [['Inspections, staffing and records', -150000]]); staffOf(w.cid).forEach((x: any) => staffMoodAdd(x, 3)); if (p) staffMoodAdd(p, 15); toast('Fixed. Your staff noticed.', 'ok'); }
   else if (v === 'ignore') { if (Math.random() < 0.4 && p) setTimeout(() => { openCourtCase({ id: 'airline-' + co.id, name: co.name, look: null, base: co.hub, companyId: co.id }, 'airline', 2, 'staff warnings about safety were ignored: ' + w.what); }, 2000); }
