@@ -297,11 +297,11 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     const up = new T.Mesh(new T.BoxGeometry(len, 0.02, 0.05), glow); up.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.35), zb + bh + 0.06)); g.add(up);
     // the blue mood lighting: a strip under the bins' lip and one along the wall above the windows, and its glow
     // washing down the wall below the bins
-    const led = new T.MeshBasicMaterial({ color: 0x3C7DFF }); led.userData.noDim = true; (g.userData.leds = g.userData.leds || []).push(led);
-    const lip = new T.Mesh(new T.BoxGeometry(len, 0.012, 0.022), led); lip.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.97), zb - 0.006)); g.add(lip);
+    const led = new T.MeshBasicMaterial({ color: 0x2E6BFF, toneMapped: false }); led.userData.noDim = true; (g.userData.leds = g.userData.leds || []).push(led);
+    const lip = new T.Mesh(new T.BoxGeometry(len, 0.02, 0.04), led); lip.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.97), zb - 0.006)); g.add(lip);
     const wl = new T.Mesh(new T.BoxGeometry(len, 0.016, 0.03), led); wl.position.copy(V(x0 + len / 2, side * (wallY - 0.02), zb - 0.04)); g.add(wl);
-    if (!V3dCabinF.washTex) V3dCabinF.washTex = cabinCanvas(4, 64, (gg) => { const gr = gg.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, 'rgba(70,130,255,.9)'); gr.addColorStop(1, 'rgba(70,130,255,0)'); gg.fillStyle = gr; gg.fillRect(0, 0, 4, 64); });
-    const washM = new T.MeshBasicMaterial({ map: V3dCabinF.washTex, transparent: true, opacity: 0.45, blending: T.AdditiveBlending, depthWrite: false, fog: false }); washM.userData.noDim = true; (g.userData.washes = g.userData.washes || []).push(washM);
+    if (!V3dCabinF.washTex) V3dCabinF.washTex = cabinCanvas(4, 64, (gg) => { const gr = gg.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, 'rgba(40,100,255,1)'); gr.addColorStop(1, 'rgba(40,100,255,0)'); gg.fillStyle = gr; gg.fillRect(0, 0, 4, 64); });
+    const washM = new T.MeshBasicMaterial({ map: V3dCabinF.washTex, transparent: true, opacity: 0.8, blending: T.NormalBlending, depthWrite: false, fog: false }); washM.userData.noDim = true; (g.userData.washes = g.userData.washes || []).push(washM);
     const wash = new T.Mesh(new T.PlaneGeometry(len, 0.55), washM); wash.position.copy(V(x0 + len / 2, side * (wallY - 0.05), zb - 0.3)); if (side < 0) wash.rotation.y = Math.PI; wash.renderOrder = 45; g.add(wash);
     const bwash = new T.Mesh(new T.PlaneGeometry(len, bd * 0.9), washM); bwash.rotation.x = Math.PI / 2; bwash.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.5), zb - 0.012)); bwash.renderOrder = 45; g.add(bwash);   // the bins' underside, lit blue
     if (side === -1) V3dCabin.mood = up;
@@ -404,7 +404,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   let t2 = 0; const qp = new T.Quaternion().setFromEuler(new T.Euler(0, 0, -0.07)).multiply(new T.Quaternion().setFromEuler(new T.Euler(0, Math.PI / 2, 0)));
   for (const key in seatAt) {
     const a = seatAt[key]; if (a.prem) continue;
-    M.compose(V(a.x + 0.322, a.y, zf + 0.76), qp, new T.Vector3(seatW * 0.86, 0.6, 1)); panel.setMatrixAt(t2++, M);
+    M.compose(V(a.x + 0.352, a.y, zf + 0.78), qp, new T.Vector3(seatW * 0.84, 0.58, 1));   // just behind the shell's back panel.setMatrixAt(t2++, M);
   }
   panel.count = t2; g.add(panel);
   g.add(cush, back, head);
@@ -528,8 +528,8 @@ function v3dCabinFwdCam(P: any) {
   CabinLight.warm.value.setRGB(1 - dim * (1 - md.r * 0.75), 0.99 - dim * (1 - md.g * 0.7), 0.98 - dim * (1 - md.b * 0.95));
   for (const gm of G.userData.glows || []) gm.color.setRGB(1, 1, 1).lerp(md.clone().multiplyScalar(0.55), dim);
   // the blue mood lighting stays on, a little softer at night
-  for (const lm of G.userData.leds || []) lm.color.setRGB(0.24, 0.49, 1).multiplyScalar(1 - dim * 0.4);
-  for (const wm of G.userData.washes || []) wm.opacity = 0.45 * (1 - dim * 0.35);
+  for (const lm of G.userData.leds || []) lm.color.setRGB(0.18, 0.42, 1).multiplyScalar(1 - dim * 0.4);
+  for (const wm of G.userData.washes || []) wm.opacity = 0.8 * (1 - dim * 0.35);
   if (Math.abs((G.userData.nightWas == null ? -1 : G.userData.nightWas) - dim) > 0.05) {
     G.userData.nightWas = dim;
     for (const rl of G.userData.rls || []) { const first = !rl.instanceColor; for (let i = 0; i < rl.count; i++) { const on = cloudHash(i, rl.count, 77) < 0.14 || dim < 0.3; rl.setColorAt(i, new T.Color(on ? 0xFFF1D6 : 0x3A3E46)); } if (rl.instanceColor) rl.instanceColor.needsUpdate = true; if (first) rl.material.needsUpdate = true; }
