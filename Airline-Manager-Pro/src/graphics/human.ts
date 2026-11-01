@@ -15,11 +15,11 @@ function humanGesture(mood: any, t: number): any {
   if (mood.kind === 'beg') {
     const g = base([0, 0, 0, 0], [0, 0, 0, 0]); g.calm = 0.3;
     switch (v % 5) {
-      case 0: { const k = 0.05 * f(0.6); g.L = [0.95 + k, 0.12, 0.62, 1.95]; g.R = [0.95 + k, 0.12, 0.62, 1.95]; g.lean = 0.12; g.nod = 0.28; g.bob = -0.01 + 0.006 * f(0.6); break; }   // hands pressed together at the chest
+      case 0: { const k = 0.05 * f(0.6); g.L = [0.62 + k, 0.1, 0.7, 2.15]; g.R = [0.62 + k, 0.1, 0.7, 2.15]; g.lean = 0.12; g.nod = 0.28; g.bob = -0.01 + 0.006 * f(0.6); break; }   // hands pressed together at the chest
       case 1: { g.L = [1.25, 0.04, 0.38, 0.55]; g.R = [1.25, 0.04, 0.38, 0.55]; g.lean = 0.2; g.tilt = 0.18; g.shake = 0.05 * f(0.9); g.nod = 0.1; break; }   // clasped hands held out towards you
       case 2: { g.L = [0.78, 0.38, -0.12, 1.2]; g.R = [0.78, 0.38, -0.12, 1.2]; g.lean = 0.08; g.shake = 0.22 * f(0.55); g.nod = 0.12; break; }   // open palms, shaking the head: "please, no"
-      case 3: { g.R = [0.72, 0.05, 0.95, 2.1]; g.L = [1.1, 0.28, 0.1, 0.3 + 0.1 * f(0.5)]; g.tilt = -0.2; g.lean = 0.1; g.nod = 0.15; break; }   // a hand on the heart, the other reaching out
-      default: { const k = 0.22 * f(1.2), e = 0.25 * f(1.2); g.L = [0.85 + k, 0.12, 0.6, 1.9 + e]; g.R = [0.85 + k, 0.12, 0.6, 1.9 + e]; g.nod = 0.2 + 0.1 * f(1.2); g.lean = 0.15; break; }   // "please, please": hands together, pumping
+      case 3: { g.R = [0.42, 0.05, 1.0, 2.25]; g.L = [1.1, 0.28, 0.1, 0.3 + 0.1 * f(0.5)]; g.tilt = -0.2; g.lean = 0.1; g.nod = 0.15; break; }   // a hand on the heart, the other reaching out
+      default: { const k = 0.18 * f(1.2), e = 0.2 * f(1.2); g.L = [0.62 + k, 0.1, 0.7, 2.1 + e]; g.R = [0.62 + k, 0.1, 0.7, 2.1 + e]; g.nod = 0.2 + 0.1 * f(1.2); g.lean = 0.15; break; }   // "please, please": hands together, pumping
     }
     return g;
   }
@@ -27,12 +27,12 @@ function humanGesture(mood: any, t: number): any {
   const g = base([0, 0, 0, 0], [0, 0, 0, 0]); g.calm = 0.4; g.flush = 0.45 + 0.15 * f(0.4);
   const tr = 0.03 * S(t * 23) + 0.02 * S(t * 31);   // trembling with rage
   switch (v % 10) {
-    case 0: g.L = [-0.2, 0.62, -0.25, 1.55]; g.R = [-0.2, 0.62, -0.25, 1.55]; g.lean = -0.05; g.nod = -0.08; break;   // fists on the hips, chest out
+    case 0: g.L = [0.0, 0.5, 1.3, 1.55]; g.R = [0.0, 0.5, 1.3, 1.55]; g.lean = -0.05; g.nod = -0.08; break;   // fists on the hips, chest out
     case 1: g.L = [0.62, 0.1, 0.95, 2.1]; g.R = [0.55, 0.12, 0.9, 2.05]; g.shake = 0.08 * f(1.1); g.nod = -0.05; break;   // arms crossed tight
     case 2: g.L = [0.05 + tr, 0.13, 0, 0.55]; g.R = [0.05 - tr, 0.13, 0, 0.55]; g.lean = 0.07; g.nod = 0.08; g.bob = 0.003 * S(t * 20); break;   // fists clenched at the sides, shaking
-    case 3: { const jab = Math.max(0, f(1.4)) * 0.18; g.R = [1.35 + jab, 0.1, 0.15, 0.15]; g.L = [0.05, 0.12, 0, 0.6]; g.lean = 0.12 + jab * 0.2; g.nod = 0.05; break; }   // jabbing a finger
+    case 3: { const jab = Math.max(0, f(1.4)) * 0.18; g.R = [1.4 + jab, 0.05, -0.15, 0.1]; g.L = [0.05, 0.12, 0, 0.6]; g.lean = 0.12 + jab * 0.2; g.nod = 0.05; break; }   // jabbing a finger
     case 4: g.L = [1.15, 1.0, 0, 0.4]; g.R = [1.15, 1.0, 0, 0.4]; g.nod = -0.18; g.bob = 0.008 * Math.abs(f(1.6)); break;   // arms flung wide, shouting
-    case 5: { const k = 0.3 * f(3); g.R = [1.6 + k, 0.15, 0.2, 1.6]; g.L = [-0.2, 0.6, -0.25, 1.5]; g.nod = -0.05; break; }   // shaking a fist
+    case 5: { const k = 0.25 * f(3); g.R = [2.25 + k, 0.3, 0.1, 1.2]; g.L = [0.0, 0.5, 1.3, 1.55]; g.nod = -0.05; break; }   // shaking a fist
     case 6: g.L = [2.55, 0.6, 0.4, 2.35]; g.R = [2.55, 0.6, 0.4, 2.35]; g.shake = 0.15 * f(0.9); g.nod = 0.12; break;   // hands on the head
     case 7: { const st = Math.pow(Math.max(0, f(1.5)), 4); g.L = [0.2, 0.15, 0, 0.9]; g.R = [0.2, 0.15, 0, 0.9]; g.lean = 0.1; g.bob = -0.02 * st; break; }   // stamping, fists down
     case 8: g.L = [-0.35, 0.2, 0, 0.6]; g.R = [-0.35, 0.2, 0, 0.6]; g.lean = 0.22; g.nod = 0.1; break;   // leaning in, arms back, squaring up

@@ -43,7 +43,7 @@ function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
   const ww = st.ww, wh = st.wh, r = Math.min(ww, wh) * st.round;
   const rr = (w: number, h: number, rad: number) => { const p = new T.Path(); p.moveTo(-w / 2 + rad, -h / 2); p.lineTo(w / 2 - rad, -h / 2); p.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + rad); p.lineTo(w / 2, h / 2 - rad); p.quadraticCurveTo(w / 2, h / 2, w / 2 - rad, h / 2); p.lineTo(-w / 2 + rad, h / 2); p.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - rad); p.lineTo(-w / 2, -h / 2 + rad); p.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + rad, -h / 2); return p; };
   const shapeWith = (outer: any, hole: any) => { const sh = new T.Shape(outer.getPoints(12)); sh.holes.push(new T.Path(hole.getPoints(12))); return sh; };
-  const mat = (c: number, rough: number, em?: number) => { const m = new T.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0, side: T.DoubleSide, envMapIntensity: 0.25 }); if (em) { m.emissive = new T.Color(0xFFE2B8); m.emissiveIntensity = em; } m.userData.noDim = true; return m; };
+  const mat = (c: number, rough: number, em?: number) => { const m = cabinMat(c, { side: T.DoubleSide }); if (em) { m.emissive = new T.Color(0xFFE2B8); m.emissiveIntensity = em; } void rough; return m; };
   const mWall = mat(st.wall, 0.85), mBezel = mat(0xF3F1EC, 0.5), mReveal = mat(new T.Color(st.wall).multiplyScalar(0.94).getHex(), 0.9), mShade = mat(0xEDEAE3, 0.7), mBin = mat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), 0.6), mSeat = mat(st.seat, 0.95), mTrim = mat(st.trim, 0.45), mDark = mat(0x3A3D42, 0.8);
   // the wall: a large panel with the window cut out, its frame going back through the wall's thickness
   const wall = new T.Mesh(new T.ExtrudeGeometry(shapeWith(rr(4.2, 2.6, 0.08), rr(ww + 0.12, wh + 0.15, r + 0.06)), { depth: 0.02, bevelEnabled: false }), mWall);
@@ -139,14 +139,8 @@ function v3dCabinCam(P: any, mode: string) {
   if (V3d.cam.fov !== 62 || V3d.cam.near > 0.03) { V3d.cam.fov = 62; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
   // the cabin's light: daylight from the window, warm cabin lights at night
   const night = (V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0, amb = (V3dSky as any).amb || 1;
-  const warm = new T.Color(0xFFD9A8);
-  V3dCabin.grp.traverse((m: any) => {
-    const mt = m.material; if (!mt || !mt.isMeshStandardMaterial) return;
-    if (!mt.userData.c0) mt.userData.c0 = mt.color.clone();
-    // daylight through the windows by day, the cabin's own warm lights at night
-    mt.color.copy(mt.userData.c0).multiplyScalar(0.55 + 0.45 * Math.min(1, amb));
-    mt.emissive.copy(mt.userData.c0).lerp(warm, 0.35 + 0.4 * night); mt.emissiveIntensity = 0.32 + 0.2 * night;
-  });
+  CabinLight.self.value = 0.55 + 0.2 * night + 0.0 * amb; CabinLight.warm.value.setRGB(1, 0.97 - 0.06 * night, 0.92 - 0.14 * night);
+
 }
 /** Leaving a window view: the aircraft as it was, the camera's near limit back. */
 function v3dCabinLeave(P: any) {
@@ -164,6 +158,18 @@ function v3dCabinLeave(P: any) {
 // (instanced), so even a full wide-body stays quick. Settings → Graphics → Passengers in the cabin.
 
 const V3dCabinF: any = { key: '', grp: null };
+/** A cabin surface: lit by the cabin's own lights in its own colour (people, seats, walls keep their colours),
+ *  with a little shading from the light outside on top. */
+const CabinLight = { self: { value: 0.8 }, warm: { value: new THREE.Color(1, 1, 1) } };
+function cabinMat(color: number, o?: any): any {
+  const m = new THREE.MeshLambertMaterial(Object.assign({ color, fog: false }, o || {}));
+  m.userData.noDim = true;
+  m.onBeforeCompile = (sh: any) => {
+    sh.uniforms.uSelf = CabinLight.self; sh.uniforms.uWarm = CabinLight.warm;
+    sh.fragmentShader = 'uniform float uSelf; uniform vec3 uWarm;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * uWarm * uSelf;');
+  };
+  return m;
+}
 const _people: any = {};
 function cabinPeopleOn(): boolean { return (State.settings as any).v3dCabinPax !== false; }
 
@@ -175,7 +181,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   const abreast = (t.seats || 150) > 250 ? 9 : (t.seats || 150) > 100 ? 6 : (t.seats || 150) > 40 ? 4 : (t.seats || 150) > 12 ? 3 : 2, blocks = cabinBlocks(abreast), letters = 'ABCDEFGHJK'.slice(0, abreast);
   const zc = s.ground + s.h / 2, ri = Math.min(s.w, s.h) / 2 - 0.12, zf = zc - ri * 0.55, x0 = Math.max(s.nose * 0.7, s.win.from - 0.6), x1 = s.win.to + 0.4, len = x1 - x0;
   const V = (x: number, y: number, z: number) => _av(x, y, z);
-  const mat = (c: number, rough: number) => { const m = new T.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0, envMapIntensity: 0.2, fog: false }); m.userData.noDim = true; return m; };
+  const mat = (c: number, rough: number) => cabinMat(c); void 0;
   // the shell: side walls and ceiling (seen from inside), the floor with its aisle carpet, the front wall
   const shell = new T.Mesh(new T.CylinderGeometry(ri, ri, len, 40, 1, true), mat(st.wall, 0.85)); shell.material.side = T.BackSide;
   shell.rotation.z = Math.PI / 2; shell.position.copy(V(x0 + len / 2, 0, zc)); g.add(shell);
@@ -184,7 +190,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   const door = new T.Mesh(new T.PlaneGeometry(0.8, 1.9), mat(st.trim, 0.6)); door.position.copy(V(x0 + 0.03, 0, zf + 0.95)); door.rotation.y = Math.PI / 2; g.add(door);
   const exitSign = new T.Mesh(new T.BoxGeometry(0.02, 0.1, 0.32), new T.MeshBasicMaterial({ color: 0x18E070 })); exitSign.material.userData.noDim = true; exitSign.position.copy(V(x0 + 0.05, 0, zf + 2.05)); g.add(exitSign);
   // the overhead bins on both sides, with their light strip
-  const M0 = new T.Matrix4(), lam2 = (c: number) => { const m = new T.MeshLambertMaterial({ color: c, fog: false }); m.userData.noDim = true; return m; };
+  const M0 = new T.Matrix4(), lam2 = (c: number) => cabinMat(c);
   const binH = st.bin === 'small' ? 0.3 : 0.42, binD = st.bin === 'small' ? 0.42 : 0.6, mBin = mat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), 0.6);
   if (st.bin !== 'none') for (const side of [-1, 1]) {
     const sh = new T.Shape(); sh.moveTo(0, 0); sh.lineTo(binD, 0); if (st.bin === 'square') sh.lineTo(binD, binH); else sh.quadraticCurveTo(binD + 0.05, binH * 0.6, binD * 0.75, binH); sh.lineTo(0, binH); sh.lineTo(0, 0);
@@ -238,7 +244,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     const hg = new T.ExtrudeGeometry(new T.Shape([[0.15, 0.86], [0.2, 1.06], [0.235, 1.1], [0.205, 0.86]].map(p => new T.Vector2(p[0], p[1]))), { depth: 0.5, bevelEnabled: false }); hg.translate(-0.012, 0, -0.25);
     V3dCabinF.headGeo = hg;
   }
-  const lam = (c: number) => { const m = new T.MeshLambertMaterial({ color: c, fog: false }); m.userData.noDim = true; return m; };
+  const lam = (c: number) => cabinMat(c);
   const cush = new T.InstancedMesh(V3dCabinF.seatGeo, lam(0xFFFFFF), nSeats);
   const back = new T.InstancedMesh(new T.BoxGeometry(0.42, 0.05, 0.05), lam(0x2A2D33), nSeats * 2);   // armrests, along the seat
   const head = new T.InstancedMesh(V3dCabinF.headGeo, lam(0xFFFFFF), nSeats);
@@ -282,7 +288,7 @@ function cabinPeople(list: PaxSeat[], seatAt: any, zf: number, V: (x: number, y:
     _people.ear = new T.ConeGeometry(0.025, 0.06, 6);
   }
   const ok = list.filter(p => seatAt[p.seat]);
-  const n = ok.length, mk = (geo: any, count: number) => { const m = new T.InstancedMesh(geo, new T.MeshStandardMaterial({ roughness: 0.8, metalness: 0, envMapIntensity: 0.2 }), Math.max(1, count)); m.material.userData.noDim = true; m.count = 0; g.add(m); return m; };
+  const n = ok.length, mk = (geo: any, count: number) => { const m = new T.InstancedMesh(geo, cabinMat(0xffffff), Math.max(1, count)); m.material.userData.noDim = true; m.count = 0; g.add(m); return m; };
   const torso = mk(_people.torso, n), headM = mk(_people.head, n), hairM = mk(_people.hair, n), longM = mk(_people.long, n), arms = mk(_people.arm, n * 2), neck = mk(_people.neck, n), thighs = mk(_people.thigh, n * 2);
   const pets = ok.filter(p => p.pet && !p.pet.left && p.pet.where === 'cabin'), petB = mk(_people.petBody, pets.length), petH = mk(_people.petHead, pets.length), ears = mk(_people.ear, pets.length * 2);
   const M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), one = new T.Vector3(1, 1, 1), C = new T.Color();
@@ -338,15 +344,9 @@ function v3dCabinFwdCam(P: any) {
   dir.applyAxisAngle(up, -clamp(V3d.yaw, -0.9, 0.9)).applyAxisAngle(side, clamp(V3d.pitch, -0.4, 0.3));
   V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
   if (V3d.cam.fov !== 70 || V3d.cam.near > 0.03) { V3d.cam.fov = 70; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
-  // light: daylight in the windows by day, dark windows and warm cabin light at night
-  const night = (V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0, amb = (V3dSky as any).amb || 1, warm = new T.Color(0xFFD9A8);
-  G.traverse((m: any) => {
-    const mt = m.material; if (!mt) return;
-    if (mt.isMeshLambertMaterial) { if (!mt.emissive) return; mt.emissive.setRGB(0.1 + 0.12 * night, 0.09 + 0.1 * night, 0.08 + 0.07 * night); return; }
-    if (!mt.isMeshStandardMaterial) return;
-    if (!mt.userData.c0) mt.userData.c0 = mt.color.clone();
-    mt.color.copy(mt.userData.c0).multiplyScalar(0.7 + 0.3 * Math.min(1, amb)); mt.emissive.copy(mt.userData.c0).lerp(warm, 0.3 + 0.4 * night); mt.emissiveIntensity = 0.22 + 0.15 * night;
-  });
+  // light: the cabin's own lights (warmer at night, a touch brighter by day with the windows' light)
+  const night = (V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0, amb = (V3dSky as any).amb || 1;
+  CabinLight.self.value = 0.62 + 0.18 * night; CabinLight.warm.value.setRGB(1, 0.97 - 0.06 * night, 0.92 - 0.14 * night);
   if (G.userData.wins) { const sky = night > 0.5 ? new T.Color(0x0B1220) : new T.Color(0xBFD6EE).multiplyScalar(Math.max(0.3, Math.min(1, amb))); G.userData.wins.material.color.copy(sky); }
 }
 function v3dCabinFwdLeave(P: any) {
