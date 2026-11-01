@@ -74,13 +74,14 @@ function cabinPaxStep(P: any, G: any, dt: number) {
   if (mode !== C.mode) cabinPaxStart(P, G, pg, mode, now);
   if (!C.list) return;
   const at = G.userData.crewAt; if (!at) return;
-  const doorX = at.x0 + 0.7, doorY = -at.half + 0.45, galX = at.firstX - 0.85;
+  const doorX = at.x0 + 0.7, doorY = -at.half + 0.45, galX = doorX;   // the galley, beside the door
   const L: any[] = C.list, aisleOf = (y: number) => { const a = at.aisles && at.aisles.length ? at.aisles : [at.aisleY]; let b = a[0]; for (const v of a) if (Math.abs(v - y) < Math.abs(b - y)) b = v; return b; };
   // who is in each aisle or in the galley, and where (nobody walks through anybody)
-  const inAisle = (e: any) => e.st === 'walk' || e.st === 'stow' || e.st === 'turnIn' || e.st === 'outAisle';
+  // everyone up and about counts as being in the way (in the aisle, the galley or at the door)
+  const inAisle = (e: any) => !/^(seat|away|wait|rise|queue|sit)$/.test(e.st);
   const blockedAhead = (e: any, dir: number) => { for (const o of L) { if (o === e || o.a < 0.3) continue; if (inAisle(o) && Math.abs(o.y - e.y) < 0.3) { const d = (o.x - e.x) * dir; if (d > 0 && d < 0.66) return true; } } return false; };
   const aisleFree = (x: number, y: number, e: any) => { for (const o of L) { if (o === e || o.a < 0.3) continue; if (inAisle(o) && Math.abs(o.y - y) < 0.3 && Math.abs(o.x - x) < 0.62) return false; } return true; };
-  const galleyFree = (e: any, tx: number, ty: number) => { const dx = tx - e.x, dy = ty - e.y, l = Math.hypot(dx, dy) || 1; for (const o of L) { if (o === e || o.a < 0.2 || o.st === 'seat' || o.st === 'away') continue; const ox = o.x - e.x, oy = o.y - e.y, along = (ox * dx + oy * dy) / l, side = Math.abs(ox * dy - oy * dx) / l; if (along > 0 && along < 0.6 && side < 0.4) return false; } return true; };
+  const galleyFree = (e: any, tx: number, ty: number) => { const dx = tx - e.x, dy = ty - e.y, l = Math.hypot(dx, dy) || 1; for (const o of L) { if (o === e || o.a < 0.2 || !inAisle(o)) continue; const ox = o.x - e.x, oy = o.y - e.y, along = (ox * dx + oy * dy) / l, side = Math.abs(ox * dy - oy * dx) / l; if (along > 0 && along < 0.6 && side < 0.4) return false; } return true; };
   const move = (e: any, tx: number, ty: number, v: number) => { const dx = tx - e.x, dy = ty - e.y, d = Math.hypot(dx, dy); if (d < 1e-4) return true; const s = Math.min(d, v * dt); e.x += dx / d * s; e.y += dy / d * s; e.ph += s / 0.7 * Math.PI; return d - s < 0.01; };
   const faceTo = (e: any, dx: number, dy: number) => face(e, Math.atan2(-dy, -dx));   // yaw 0 faces forward (−x)
   const face = (e: any, want: number) => { let d = want - e.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; e.yaw += d * Math.min(1, dt * 5); };
