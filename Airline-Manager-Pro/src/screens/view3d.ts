@@ -93,8 +93,11 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   V3d.root = root; V3d.cv = root.querySelector('.v3d-cv');
   const phone = Math.min(innerWidth, innerHeight) < 600;
   const rg = v3dRange(map && (map as any).cy != null ? undefined : undefined);
-  const r = new T.WebGLRenderer({ canvas: V3d.cv, antialias: !phone, powerPreference: v3dKm() > 300 || gameBoost() ? 'high-performance' : 'low-power', logarithmicDepthBuffer: v3dKm() > 60 });
-  r.setPixelRatio(Math.min(window.devicePixelRatio || 1, phone ? 1 : 1.5));
+  // edge smoothing: on the PC it is chosen in Settings → Display (off, multisampling, or multisampling with the
+  // picture drawn larger and scaled down for the smoothest edges); on phones and tablets the app decides
+  const aa = DESKTOP ? deskAA() : phone ? 0 : 1, dpr = window.devicePixelRatio || 1;
+  const r = new T.WebGLRenderer({ canvas: V3d.cv, antialias: aa > 0, powerPreference: v3dKm() > 300 || gameBoost() || aa >= 3 ? 'high-performance' : 'low-power', logarithmicDepthBuffer: v3dKm() > 60 });
+  r.setPixelRatio(aa >= 2 ? Math.min(Math.max(dpr, 1) * (aa === 4 ? 2 : aa === 3 ? 1.5 : 1.25), 4) : Math.min(dpr, phone ? 1 : 1.5));
   r.outputColorSpace = T.SRGBColorSpace;
   V3d.r = r;
   const sc = new T.Scene(); V3d.scene = sc;
