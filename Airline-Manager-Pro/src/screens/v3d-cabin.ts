@@ -28,10 +28,11 @@ function cabinGeometry(s: ShapeSpec, sy: number, measured?: number[]): { eye: nu
   const W = s.wing, semi = s.span / 2, rootY = s.w / 2 * 0.9;
   const tipX = W.x + (semi - rootY) * Math.tan(W.sweep * D2R) + W.tip * 0.5;
   const tipZ = s.ground + W.z * s.h + (semi - rootY) * Math.tan(W.dih * D2R) + 0.2;
-  // the seat: a little ahead of the wing tip's line, inside the window row, set back from the wall
+  // the seat: inside the window row, set back from the wall
   const seatX = clamp(tipX - semi * 0.5, s.win.from + 0.8, s.win.to - 0.8), eyeY = sy * Math.max(0.3, s.w / 2 - 1.0), eyeZ = s.ground + s.h * 0.57;
   const eye = [seatX, eyeY, eyeZ], tip = measured || [tipX, sy * semi, tipZ];
-  if (measured) eye[0] = clamp(measured[0] - Math.abs(measured[1]) * 0.5, s.win.from + 0.8, s.win.to - 0.8);
+  // the seat right abeam the wing tip: looking straight out through the window, square to it, with the tip in the middle
+  eye[0] = clamp(tip[0], s.win.from + 0.8, s.win.to - 0.8);
   // the window: where the line from the eye to the wing tip passes through the cabin wall
   const wallY = sy * (s.w / 2 - 0.22), t = (wallY - eye[1]) / (tip[1] - eye[1]);
   const win = [eye[0] + (tip[0] - eye[0]) * t, wallY, eye[2] + (tip[2] - eye[2]) * t];
@@ -44,9 +45,12 @@ function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
   const rr = (w: number, h: number, rad: number) => { const p = new T.Path(); p.moveTo(-w / 2 + rad, -h / 2); p.lineTo(w / 2 - rad, -h / 2); p.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + rad); p.lineTo(w / 2, h / 2 - rad); p.quadraticCurveTo(w / 2, h / 2, w / 2 - rad, h / 2); p.lineTo(-w / 2 + rad, h / 2); p.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - rad); p.lineTo(-w / 2, -h / 2 + rad); p.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + rad, -h / 2); return p; };
   const shapeWith = (outer: any, hole: any) => { const sh = new T.Shape(outer.getPoints(12)); sh.holes.push(new T.Path(hole.getPoints(12))); return sh; };
   const mat = (c: number, rough: number, em?: number) => { const m = cabinMat(c, { side: T.DoubleSide }); if (em) { m.emissive = new T.Color(0xFFE2B8); m.emissiveIntensity = em; } void rough; return m; };
-  const mWall = cabinMat(st.wall, { side: T.DoubleSide, map: (() => { const t = cabinSatinTex().clone(); t.needsUpdate = true; t.repeat.set(3, 3); return t; })() }), mBezel = mat(0xF3F1EC, 0.5), mReveal = mat(new T.Color(st.wall).multiplyScalar(0.94).getHex(), 0.9), mShade = mat(0xEDEAE3, 0.7), mBin = cabinMat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), { side: T.DoubleSide, map: cabinSatinTex() }), mSeat = cabinMat(st.seat, { side: T.DoubleSide, map: cabinFabricTex() }), mTrim = mat(st.trim, 0.45), mDark = mat(0x3A3D42, 0.8);
+  const mWall = cabinMat(st.wall, { side: T.DoubleSide, map: (() => { const t = cabinSatinTex().clone(); t.needsUpdate = true; t.repeat.set(6, 3.4); return t; })() }), mBezel = mat(0xF3F1EC, 0.5), mReveal = mat(new T.Color(st.wall).multiplyScalar(0.94).getHex(), 0.9), mShade = mat(0xEDEAE3, 0.7), mBin = cabinMat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), { side: T.DoubleSide, map: cabinSatinTex() }), mSeat = cabinMat(st.seat, { side: T.DoubleSide, map: cabinFabricTex() }), mTrim = mat(st.trim, 0.45), mDark = mat(0x3A3D42, 0.8);
   // the wall: a large panel with the window cut out, its frame going back through the wall's thickness
-  const wall = new T.Mesh(new T.ExtrudeGeometry(shapeWith(rr(4.2, 2.6, 0.08), rr(ww + 0.12, wh + 0.15, r + 0.06)), { depth: 0.02, bevelEnabled: false }), mWall);
+  const wall = new T.Mesh(new T.ExtrudeGeometry(shapeWith(rr(8, 4.6, 0.01), rr(ww + 0.12, wh + 0.15, r + 0.06)), { depth: 0.02, bevelEnabled: false }), mWall);
+  // the rest of the cabin around the seat, closed all round (only the window looks out), so no sky shows through a gap
+  const roomM = [mWall, mWall, cabinMat(0xEDEEEF, { side: T.BackSide }), cabinMat(0x3A3F48, { side: T.BackSide, map: cabinCarpetTex() }), mWall, new T.MeshBasicMaterial({ visible: false })];
+  const room = new T.Mesh(new T.BoxGeometry(8, 4, 3), roomM); room.position.set(0, 0.3, 0.03 + 1.5); g.add(room);
   wall.position.z = 0.02; g.add(wall);
   const bezel = new T.Mesh(new T.ExtrudeGeometry(shapeWith(rr(ww + 0.13, wh + 0.16, r + 0.065), rr(ww + 0.02, wh + 0.03, r + 0.01)), { depth: 0.02, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2 }), mBezel);
   bezel.position.z = 0.015; g.add(bezel);
@@ -68,18 +72,18 @@ function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
     let bin: any;
     if (st.bin === 'sculpted' || st.bin === 'pivot') {   // a rounded, curving bin door
       const sh = new T.Shape(); sh.moveTo(0, 0); sh.lineTo(binD, 0); sh.quadraticCurveTo(binD + 0.04, binH * 0.55, binD * 0.72, binH); sh.lineTo(0, binH); sh.lineTo(0, 0);
-      const geo = new T.ExtrudeGeometry(sh, { depth: 4.2, bevelEnabled: false }); geo.translate(0, 0, -2.1); geo.rotateY(Math.PI / 2);
+      const geo = new T.ExtrudeGeometry(sh, { depth: 8, bevelEnabled: false, curveSegments: cabinQv([6, 12, 24, 48]) }); geo.translate(0, 0, -4); geo.rotateY(Math.PI / 2);
       bin = new T.Mesh(geo, mBin); bin.position.set(0, wh / 2 + 0.4, 0.02);
-    } else { bin = new T.Mesh(new T.BoxGeometry(4.2, binH, binD), mBin); bin.position.set(0, wh / 2 + 0.4 + binH / 2, 0.02 + binD / 2); }
+    } else { bin = new T.Mesh(new T.BoxGeometry(8, binH, binD), mBin); bin.position.set(0, wh / 2 + 0.4 + binH / 2, 0.02 + binD / 2); }
     g.add(bin);
     // the door seams of the bins and the passenger service strip with its reading lights
     for (let k = -1; k <= 1; k++) { const seam = new T.Mesh(new T.BoxGeometry(0.008, binH * 0.9, 0.01), mTrim); seam.position.set(k * 0.85, wh / 2 + 0.4 + binH * 0.5, binD + 0.035); g.add(seam); }
-    const psu = new T.Mesh(new T.BoxGeometry(4.2, 0.03, 0.2), mat(0xDCD8D0, 0.6, 0.25)); psu.position.set(0, wh / 2 + 0.39, binD * 0.75); g.add(psu);
-    const strip = new T.Mesh(new T.BoxGeometry(4.2, 0.012, 0.03), new T.MeshBasicMaterial({ color: st.mood })); strip.material.userData.noDim = true; strip.position.set(0, wh / 2 + 0.38, 0.06); g.add(strip);
+    const psu = new T.Mesh(new T.BoxGeometry(8, 0.03, 0.2), mat(0xDCD8D0, 0.6, 0.25)); psu.position.set(0, wh / 2 + 0.39, binD * 0.75); g.add(psu);
+    const strip = new T.Mesh(new T.BoxGeometry(8, 0.012, 0.03), new T.MeshBasicMaterial({ color: st.mood })); strip.material.userData.noDim = true; strip.position.set(0, wh / 2 + 0.38, 0.06); g.add(strip);
     V3dCabin.mood = strip;
   }
   // the sidewall's lower part and the armrest, the seat in front (its back and headrest)
-  const dado = new T.Mesh(new T.BoxGeometry(4.2, 0.5, 0.06), mWall); dado.position.set(0, -wh / 2 - 0.62, 0.06); dado.rotation.x = 0.15; g.add(dado);
+  const dado = new T.Mesh(new T.BoxGeometry(8, 0.5, 0.06), mWall); dado.position.set(0, -wh / 2 - 0.62, 0.06); dado.rotation.x = 0.15; g.add(dado);
   const arm = new T.Mesh(new T.BoxGeometry(0.62, 0.08, 0.1), mDark); arm.position.set(0.05, -wh / 2 - 0.3, 0.17); g.add(arm);
   const seatBack = new T.Mesh(new T.BoxGeometry(0.12, 0.95, 0.5), mSeat); void mShade; seatBack.position.set(-0.62, -wh / 2 - 0.12, 0.42); g.add(seatBack);
   const head = new T.Mesh(new T.BoxGeometry(0.14, 0.24, 0.42), cabinMat(st.head, { map: cabinLeatherTex() })); head.position.set(-0.62, -wh / 2 + 0.38, 0.42); g.add(head);
