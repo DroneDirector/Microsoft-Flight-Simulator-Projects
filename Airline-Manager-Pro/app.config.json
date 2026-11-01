@@ -19,6 +19,6 @@
   "online": {
     "_comment": "The online register for registration keys and co-op (Supabase). Only the project URL and the public anon key go here, never the secret service_role key.",
     "supabaseUrl": "",
-    "supabaseKey": ""
+    "supabaseKey": "sb_publishable_OprK1Q6M0yOEGK9uUgQP8w_f4LCWaSV"
   }
 }

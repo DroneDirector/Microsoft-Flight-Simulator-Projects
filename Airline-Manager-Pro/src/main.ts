@@ -42,23 +42,26 @@
   try { if (_ui && _ui.scroll && _ui.screen === State.screen) setTimeout(() => { const v = $('#view'); if (v) v.scrollTop = _ui.scroll; }, 60); } catch (e) { /* ignore */ }
   if (!Store.wasEmpty) setTimeout(checkBirthday, SPLASH_MS + 400);   // after the start-up screen (not over the first-start choice)
   scheduleBirthdayNotification();
+  // the airline's clocks: paused while another of your devices runs the airline (Settings → Sync)
+  syncGated(() => {
   startConductClock();
   startCourtClock();
   startStaffing();
   try { startThanks(); } catch (e) { /* ignore */ }
   startProgress();
   startConditionClock();
-  Link.init();
-  Updater.init();
-  Backup.init();
-  Licence.init();
   startAiClock();
   try { modeStart(); } catch (e) { /* ignore */ }
   try { startNewsWatch(); startWarnClock(); } catch (e) { /* ignore */ }
   try { applyDifficultyPrices(); startMarkets(); } catch (e) { /* ignore */ }
   try { startVa(); } catch (e) { /* ignore */ }
-  try { startQol(); } catch (e) { /* ignore */ }
   try { startBiz(); } catch (e) { /* ignore */ }
+  });
+  Link.init();
+  Updater.init();
+  Backup.init();
+  Licence.init().then(() => { try { CloudSync.init(); } catch (e) { /* sync stays off */ } });
+  try { startQol(); } catch (e) { /* ignore */ }
   try { v3dCrashCheck(); } catch (e) { /* ignore */ }
   startCoopClock();
   startBases();

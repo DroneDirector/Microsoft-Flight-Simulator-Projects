@@ -53,6 +53,7 @@ function renderTopbar() {
     <button class="link-pill ${b.pc === 'connected' ? 'ok' : 'warn'}" data-act="link-panel" aria-label="${linkTxt}. Open connection details">
       <i class="link-led"></i>${icon(st === 'connected' && Link.via !== 'wifi' ? 'cell' : 'wifi')}<span>${linkTxt}</span><em>${b.pc === 'connected' && Link.latency ? Link.latency + ' ms' : ''}</em>
     </button>
+    <button class="sync-chip" data-act="settings" data-section="cloud" style="display:none" aria-label="Sync"></button>
     <span class="batt-slot">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
     <div class="top-spacer"></div>
     <button class="balance" data-balance data-act="go" data-screen="finance" aria-label="Balance ${money(c.balance)}. Open Finance"><small>Balance</small><b data-balance-val>${money(c.balance, { compact: true })}</b></button>
@@ -61,6 +62,7 @@ function renderTopbar() {
     <button class="icon-btn bell ${n ? 'has' : ''}" data-act="inbox" aria-label="Notifications, ${n} unread">${icon('bell')}${n ? `<span class="badge">${n}</span>` : ''}</button>
     <button class="icon-btn" data-act="settings" aria-label="Settings">${icon('gear')}</button>
     <button class="icon-btn power-btn" data-act="exit" aria-label="Exit ${esc(APP.name)}">${icon('power')}</button>`);
+  try { renderSyncChip(); } catch (e) { /* sync not loaded */ }
   const dot = $('[data-maint-dot]');
   if (dot) dot.style.display = State.issues.some(i => i.status === 'open' && plane(i.reg) && plane(i.reg).companyId === State.companyId) ? '' : 'none';
 }
