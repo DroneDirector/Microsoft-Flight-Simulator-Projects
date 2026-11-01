@@ -211,7 +211,8 @@ export async function main(replay?: { file: string; speed: number }) {
   source.start();
   redraw();
   // the app on this PC
-  if (process.argv.indexOf('--no-window') < 0 && desktop.prefs.open && desktop.appDir()) setTimeout(() => { if (desktop.openWindow()) log('Opened Airline Manager Pro on this PC'); }, 800);
+  // windows left open by an earlier session (or an older copy) go first, so there is only ever one
+  if (process.argv.indexOf('--no-window') < 0 && desktop.prefs.open && desktop.appDir()) { try { desktop.closeWindow(true); } catch (e) { /* none */ } setTimeout(() => { if (desktop.openWindow()) log('Opened Airline Manager Pro on this PC'); }, 2200); }
   process.stdin.on('data', d => { if (/^\s*a/i.test(String(d)) && desktop.appDir()) desktop.openWindow(); });
   process.on('SIGINT', () => { source.stop(); server.stop(); process.exit(0); });
 }

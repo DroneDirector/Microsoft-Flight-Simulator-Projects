@@ -53,7 +53,7 @@ export class Desktop {
     if (url === '/api/backup') return this.backup(req, res), true;
     if (url === '/api/update') {
       if (req.method === 'POST') return readBody(req, b => { let v = ''; try { v = String(JSON.parse(b).version || ''); } catch (e) { /* none */ }
-        const err = PcUpdate.start(v, () => this.closeWindow()); json(res, Object.assign(PcUpdate.status(), err ? { state: 'failed', error: err } : {})); }), true;
+        const err = PcUpdate.start(v, () => this.closeWindow(), this.windowProfile()); json(res, Object.assign(PcUpdate.status(), err ? { state: 'failed', error: err } : {})); }), true;
       json(res, PcUpdate.status()); return true;
     }
     if (url === '/api/gpus') { listGpus().then(g => json(res, { gpus: g })); return true; }
@@ -155,14 +155,21 @@ export class Desktop {
     if (this.windowPid) { try { os.setPriority(this.windowPid, pr); } catch (e) { /* the window's own process may refuse */ } }
   }
 
-  /** Close the app window this PC app opened (before an update restarts everything). */
-  closeWindow() {
-    if (!this.windowPid) return;
-    // gently first (the window saves and closes as when you close it yourself), then for sure
-    const pid = String(this.windowPid);
-    try { execFile('taskkill', ['/PID', pid, '/T'], { windowsHide: true }, () => { /* asked */ }); } catch (e) { /* gone */ }
-    setTimeout(() => { try { execFile('taskkill', ['/PID', pid, '/T', '/F'], { windowsHide: true }, () => { /* closed */ }); } catch (e) { /* gone */ } }, 4000);
+  /** Close every app window of this PC app (before an update restarts everything, or when another copy takes over).
+   *  Edge (or Chrome) usually hands a new window to a process of its own and the one we started ends at once, so
+   *  the windows are found by the app's own browser profile folder, which nothing else uses. Gently first (the
+   *  window saves and closes as when you close it yourself), then for sure. */
+  closeWindow(now?: boolean) {
+    if (process.platform !== 'win32') return;
+    const prof = path.join(this.dataDir, 'window').replace(/'/g, "''");
+    const ps = `$p = '${prof}'; $l = @(Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'msedge.exe' -or $_.Name -eq 'chrome.exe') -and $_.CommandLine -and $_.CommandLine.Contains($p) });`
+      + (now ? '' : ` foreach ($x in $l) { try { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } } catch {} }; if ($l.Count) { Start-Sleep -Seconds 4 };`)
+      + ` foreach ($x in $l) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }`;
+    try { execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', ps], { windowsHide: true }, () => { /* closed */ }); } catch (e) { /* none */ }
+    if (this.windowPid) { const pid = String(this.windowPid); try { execFile('taskkill', ['/PID', pid, '/T', '/F'], { windowsHide: true }, () => { /* gone */ }); } catch (e) { /* gone */ } }
   }
+  /** The window profile folder (the update closes windows using it too). */
+  windowProfile(): string { return path.join(this.dataDir, 'window'); }
 
   /** Open the app window (Microsoft Edge in app mode, falling back to Chrome or the default browser). */
   openWindow() {
