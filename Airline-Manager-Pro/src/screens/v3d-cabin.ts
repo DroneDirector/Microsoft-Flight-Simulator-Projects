@@ -320,10 +320,15 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   // where needed (down to 28 inches); only beyond that is a passenger left out (never without a seat)
   let need = 0; for (let r = 1; r <= maxRow; r++) need += pitchOf(rowCls[r] || 'Y');
   const room = (x1 - 1.6) - (x0 + 1.4), squeeze = need > room ? Math.max(0.89, room / need) : 1;
+  // as many rows as the aircraft really has (its seats), the empty seats too; the seats are spaced to fill the
+  // cabin a little more generously where it is long, and the rest is galley space at the back
+  const nPrem = list.filter(p => p.cls !== 'Y').length, yStart = (() => { const ys = list.filter(p => p.cls === 'Y').map(p => parseInt(p.seat, 10)); return ys.length ? Math.min(...ys) : maxRow + 1; })();
+  const capRows = Math.max(maxRow, yStart - 1 + Math.ceil(Math.max(0, (t.seats || 150) - nPrem) / abreast));
+  let needCap = 0; for (let r = 1; r <= capRows; r++) needCap += pitchOf(rowCls[r] || 'Y');
+  const stretch = needCap < room ? Math.min(1.12, room / needCap) : 1;
   let rows = Math.max(maxRow, 1), x = x0 + 1.4; const rowX: number[] = [], rowsCls: string[] = [];
-  // empty seats too: as many rows as fit
-  for (let r = 1; x < x1 - 1.6 + 0.01; r++) { const c = rowCls[r] || 'Y'; rowX[r] = x; rowsCls[r] = c; x += pitchOf(c) * squeeze; rows = r; }
-  const width = ri * 2 * 0.9, aisles = blocks.length - 1, aisleW = 0.5, seatW = (width - aisles * aisleW) / abreast;
+  for (let r = 1; r <= capRows && x < x1 - 1.6 + 0.01; r++) { const c = rowCls[r] || 'Y'; rowX[r] = x; rowsCls[r] = c; x += pitchOf(c) * squeeze * stretch; rows = r; }
+  const width = ri * 2 * 0.9, aisles = blocks.length - 1, aisles0 = aisles, aisleW = 0.5, seatW = (width - aisles * aisleW) / abreast;
   const seatY: number[] = []; let yy = -width / 2;
   blocks.forEach((b, bi) => { for (let k = 0; k < b; k++) { seatY.push(yy + seatW * (k + 0.5)); } yy += b * seatW + (bi < aisles ? aisleW : 0); });
   const aisleY = blocks.length > 1 ? -width / 2 + blocks[0] * seatW + aisleW / 2 : 0;
@@ -396,7 +401,9 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   g.userData.eye = [x1 - 0.3, aisleY, zf + 1.7]; g.userData.look = [x0 + 2, aisleY, zf + 0.7];
   // for the cabin crew: the aisle, the floor, the galleys and the rows with passengers in them
   { const paxRows: number[] = []; for (const p of list) { const r = parseInt(p.seat, 10); if (seatAt[p.seat] && paxRows.indexOf(r) < 0) paxRows.push(r); } paxRows.sort((a, b) => a - b);
-    g.userData.crewAt = { aisleY, zf, x0, x1, rowX, paxRows, mood: st.mood }; }
+    const aisles: number[] = []; { let yy2 = -width / 2; blocks.forEach((b, bi) => { yy2 += b * seatW; if (bi < aisles0) { aisles.push(yy2 + aisleW / 2); yy2 += aisleW; } }); }
+    const rk = Object.keys(rowX).map(Number), firstX = rk.length ? rowX[Math.min(...rk)] : x0 + 1.4, lastX = rk.length ? rowX[Math.max(...rk)] : x1 - 1.6;
+    g.userData.crewAt = { aisleY, aisles, zf, x0, x1, rowX, paxRows, mood: st.mood, firstX, lastX, half: width / 2 + 0.05 }; }
   return g;
 }
 
@@ -471,11 +478,14 @@ function v3dCabinFwdCam(P: any) {
   // inside, only the cabin is drawn: the outside of this aircraft is hidden
   for (const c of body.children) if (c !== G && c.visible) { c.visible = false; (c.userData as any).hiddenForCabin = true; }
   P.model.updateMatrixWorld(true);
-  const e = G.userData.eye, l = G.userData.look, at = body.localToWorld(_av(e[0], e[1], e[2])), to = body.localToWorld(_av(l[0], l[1], l[2]));
   const q = P.model.getWorldQuaternion(new T.Quaternion()), up = new T.Vector3(0, 1, 0).applyQuaternion(q);
-  const dir = to.clone().sub(at).normalize(), side = new T.Vector3().crossVectors(dir, up).normalize();
-  dir.applyAxisAngle(up, -clamp(V3d.yaw, -0.9, 0.9)).applyAxisAngle(side, clamp(V3d.pitch, -0.4, 0.3));
-  V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
+  if (V3d.mode === 'walk') cabinWalkCam(P, G, body, up);   // walking about inside (v3d-walk.ts)
+  else {
+    const e = G.userData.eye, l = G.userData.look, at = body.localToWorld(_av(e[0], e[1], e[2])), to = body.localToWorld(_av(l[0], l[1], l[2]));
+    const dir = to.clone().sub(at).normalize(), side = new T.Vector3().crossVectors(dir, up).normalize();
+    dir.applyAxisAngle(up, -clamp(V3d.yaw, -0.9, 0.9)).applyAxisAngle(side, clamp(V3d.pitch, -0.4, 0.3));
+    V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
+  }
   if (V3d.cam.fov !== 70 || V3d.cam.near > 0.03) { V3d.cam.fov = 70; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
   // light: the cabin's own lights (warmer at night, a touch brighter by day with the windows' light)
   const night = (V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0, amb = (V3dSky as any).amb || 1;

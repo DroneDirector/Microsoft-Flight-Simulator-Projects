@@ -59,7 +59,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
-      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['cabin', 'Cabin'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
+      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['cabin', 'Cabin'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera'], ['walk', 'Walk']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
       <span class="v3d-batt">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
       <span class="v3d-clock" title=""></span>
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
@@ -136,8 +136,8 @@ ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
-  V3d.root.classList.toggle('v3d-free', V3d.mode === 'free'); V3d.root.classList.toggle('v3d-win', /^win/.test(V3d.mode));
-  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' || V3d.mode === 'cabin' || /^win/.test(V3d.mode) ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
+  V3d.root.classList.toggle('v3d-free', V3d.mode === 'free'); V3d.root.classList.toggle('v3d-win', /^win/.test(V3d.mode)); V3d.root.classList.toggle('v3d-walk', V3d.mode === 'walk'); if (V3d.mode === 'walk') cabinWalkStart(); else cabinWalkStop();
+  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' || V3d.mode === 'cabin' || V3d.mode === 'walk' || /^win/.test(V3d.mode) ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
 };
 ACTIONS['v3d-next'] = el => {
@@ -174,7 +174,7 @@ function v3dBind() {
     const p = V3d.ptrs[e.pointerId]; if (!p) return;
     const ids = Object.keys(V3d.ptrs);
     if (V3d.mode === 'free') { v3dFreeGesture(e, p, ids); p.x = e.clientX; p.y = e.clientY; return; }
-    if (ids.length === 1) { V3d.yaw -= (e.clientX - p.x) * 0.007; V3d.pitch = clamp(V3d.pitch + (e.clientY - p.y) * 0.005, -0.6, 1.5); }
+    if (ids.length === 1) { V3d.yaw -= (e.clientX - p.x) * 0.007; V3d.pitch = clamp(V3d.pitch + (e.clientY - p.y) * 0.005 * (V3d.mode === 'walk' ? -1 : 1), V3d.mode === 'walk' ? -1.2 : -0.6, V3d.mode === 'walk' ? 1.2 : 1.5); }
     if (ids.length === 2) { const VA: any = V3d; VA.panX = (VA.panX || 0) - (e.clientX - p.x) * 0.5 / 2; VA.panY = (VA.panY || 0) + (e.clientY - p.y) * 0.5 / 2; }
     p.x = e.clientX; p.y = e.clientY;
     if (ids.length === 2) { const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (V3d.pinch0) { if (/^win/.test(V3d.mode)) cabinWinZoomSet((V3d as any).wz0 + (d - V3d.pinch0) / 300); else V3d.dist = clamp(V3d.dist0 * V3d.pinch0 / d, 8, 30000); } }
@@ -203,7 +203,7 @@ function v3dBind() {
 function v3dDist(): number { const p = V3d.planes[V3d.target]; const span = p ? shapeOf(p.type).span : 35; return V3d.dist || (V3d.mode === 'tower' ? 0 : span * 1.9 + 25); }
 
 function v3dTap(x: number, y: number) {
-  if (V3d.mode === 'cabin') { try { if (cabinTap(x, y)) return; } catch (e) { /* the aircraft below */ } }
+  if (V3d.mode === 'cabin' || V3d.mode === 'walk') { try { if (cabinTap(x, y)) return; } catch (e) { /* the aircraft below */ } }
   const T = THREE, ray = new T.Raycaster(), v = new T.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
   ray.setFromCamera(v, V3d.cam);
   const objs: any[] = []; for (const id in V3d.planes) objs.push(V3d.planes[id].model);
@@ -602,11 +602,11 @@ function v3dLoop(now: number) {
     const fwd = new T.Vector3(Math.sin(P.hdg * D2R), 0, -Math.cos(P.hdg * D2R));
     const VW: any = V3d;
     if (VW.cabinFor && (VW.cabinFor !== P.id || !/^win/.test(V3d.mode))) { v3dCabinLeave(V3d.planes[VW.cabinFor]); VW.cabinFor = null; }
-    if (VW.cabinFwdFor && (VW.cabinFwdFor !== P.id || V3d.mode !== 'cabin')) { v3dCabinFwdLeave(V3d.planes[VW.cabinFwdFor]); VW.cabinFwdFor = null; }
+    if (VW.cabinFwdFor && (VW.cabinFwdFor !== P.id || !/^(cabin|walk)$/.test(V3d.mode))) { v3dCabinFwdLeave(V3d.planes[VW.cabinFwdFor]); VW.cabinFwdFor = null; }
     if (V3d.mode === 'winL' || V3d.mode === 'winR') {
       // a window seat over the wing: fixed, looking out at the wing tip (see v3d-cabin.ts)
       VW.cabinFor = P.id; v3dCabinCam(P, V3d.mode);
-    } else if (V3d.mode === 'cabin') {
+    } else if (V3d.mode === 'cabin' || V3d.mode === 'walk') {
       // inside the cabin, from the back of the aisle, looking forward over the seats and passengers
       VW.cabinFwdFor = P.id; v3dCabinFwdCam(P);
     } else if (V3d.mode === 'fwd') {

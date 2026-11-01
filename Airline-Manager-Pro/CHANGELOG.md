@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.47 (2026-11-01)
+
+- PC self-update: pc-bridge updater.ts (/api/update: download the PC zip from the release, Expand-Archive, replace after exit with a cmd script, restart); Updater picks the PC zip on DESKTOP and installs through it
+- v3d-walk: first-person walking mode (keys, pointer lock, touch stick, aisle and galley walkability, crew and trolley collisions, step bob)
+- v3d-cabin: rows limited to the aircraft's capacity, spaced up to 12% wider to fill the cabin; aisles list in crewAt
+
 ## 0.9.46 (2026-11-01)
 
 - core/cloudsync: online sync (encrypted parts, versions, engine lease, realtime nudges, offline choice), Settings > Sync, supabase/sync.sql and setup-all.sql; publishable key headers (supaHeaders)
