@@ -201,7 +201,7 @@ function courtPopup(id: string) {
     <div class="inc">
       <div class="inc-av">${c.role === 'pax' || c.role === 'airline' ? `<span class="pax-av">${icon(c.role === 'airline' ? 'fleet' : 'user')}</span>` : avatarSvg(c.look, c.role === 'pilot' ? 'captain' : c.role as any, { accent: company().color, still: true })}</div>
       <div class="inc-main">
-        <div class="modal-head"><div><small>Criminal case, ${esc(c.court)}</small><h2>${esc(c.offence)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+        <div class="modal-head"><div><small>Criminal case, ${esc(c.court)} · opened ${esc(atText(c.opened))}</small><h2>${esc(c.offence)}</h2></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
         <div class="inc-who"><b>${esc(c.name)}</b><small>${esc(c.role === 'pax' ? 'Passenger' : c.role === 'airline' ? 'The airline, with you as the accountable manager' : ROLE_NAMES[c.role === 'pilot' ? 'captain' : c.role] || 'Crew')}. Charge: ${esc(c.charge)}</small>
           <small class="${c.status === 'guilty' ? 'amber' : c.status === 'acquitted' ? 'green' : ''}">${c.status === 'open' ? (next ? `Next: ${esc(next.title.toLowerCase())}, around ${esc(when(next.at))}` : 'Awaiting the verdict') : c.status === 'guilty' ? `Guilty: ${esc(c.sentence || '')}` : 'Not guilty'}</small></div>
         <div class="say-row">${voiceButton(courtSpeech(c, next), 'legal', 'Play the lawyer\'s update')}${voiceNoteEl('Company lawyer')}</div>

@@ -443,23 +443,9 @@ function ctTalkG(t: number): any {
 }
 
 /* ---------- opening the courtroom ---------- */
-CourtRoom.open = function (c: any, st: any) {
-  const R = CourtRoom; if (R.on) R.close(true);
-  const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
-  R.on = true; R.c = c; R.st = st; R.key = st.key; R.lines = hearingScript(c, st.key); R.i = -1; R.answered = []; R.finished = st.key === 'verdict' ? false : false; R.objected = false;
-  const q = typeof cabinQ === 'function' ? cabinQ() : 2;
-  const appeal = st.key === 'hearA', judges = appeal ? 5 : 3;
-  const root = document.createElement('div'); root.className = 'court3d'; R.root = root;
-  const co = company(c.companyId);
-  root.innerHTML = `<canvas></canvas>
-    <div class="ct-top"><div><small>${esc(appeal ? c.court.replace(/District Court|Crown Court/, 'Court of Appeal') : c.court)}</small><b>${esc(co.name)}: ${esc(st.title)}</b></div></div>
-    <button class="ct-leave" data-ct="leave">${icon('close')}<span>Leave court</span><kbd>Esc</kbd></button>
-    <div class="ct-ex" hidden></div>
-    <div class="ct-rate" hidden></div>
-    <div class="ct-box" hidden><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
-    <div class="ct-load"><b>Preparing the courtroom</b><span>0%</span><i><em></em></i></div>
-    <div class="ct-modal" hidden></div>`;
-  document.body.appendChild(root);
+/** The heavy part of opening: renderer, room, people (behind the loading screen). */
+function ctOpen2(c: any, st: any, root: HTMLElement, q: number, appeal: boolean, judges: number, empty: boolean) {
+  const R = CourtRoom, T = THREE;
   const cv = root.querySelector('canvas') as HTMLCanvasElement;
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' });
   ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1));
@@ -480,7 +466,8 @@ CourtRoom.open = function (c: any, st: any) {
     const top = new T.Mesh(new T.PlaneGeometry(14, 18), new T.MeshBasicMaterial({ color: 0xE8D8BE })); top.position.y = 3.4; top.rotation.x = Math.PI / 2; env.add(top);
     scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
   } catch (e) { /* no reflections */ }
-  const A = ctBuild(scene, judges, q); R.A = A;
+  ctProgress(8, 'Building the hall…');
+  const A = ctBuild(scene, judges, q); R.A = A; ctProgress(empty ? 55 : 22, empty ? 'Lighting the hall…' : 'The court is coming in…');
   // dust in the light
   { const n = q >= 2 ? 500 : 200, g = new T.BufferGeometry(), p = new Float32Array(n * 3), r = ctRng(9);
     for (let i = 0; i < n; i++) { p[i * 3] = -7 + r() * 6; p[i * 3 + 1] = 0.5 + r() * 5.5; p[i * 3 + 2] = -8 + r() * 17; }
@@ -493,25 +480,49 @@ CourtRoom.open = function (c: any, st: any) {
   // looking around: drag
   let drag: any = null;
   cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; cv.setPointerCapture(e.pointerId); });
-  cv.addEventListener('pointermove', e => { if (!drag) return; R.look.yaw = clamp(drag.yaw - (e.clientX - drag.x) * 0.004, -1.2, 1.2); R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -0.5, 0.5); });
+  cv.addEventListener('pointermove', e => { if (!drag) return; R.look.yaw = R.empty ? drag.yaw - (e.clientX - drag.x) * 0.004 : clamp(drag.yaw - (e.clientX - drag.x) * 0.004, -1.2, 1.2); R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, R.empty ? -1.1 : -0.5, R.empty ? 1.1 : 0.5); });
   cv.addEventListener('pointerup', () => { drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-ct]') as HTMLElement; if (b) ctClick(b); });
-  R.key$ = (e: KeyboardEvent) => { if (!R.on) return; if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); ctLeaveAsk(); } else if ((e.key === 'Enter' || e.key === ' ') && !root.querySelector('.ct-modal:not([hidden])')) { const n = root.querySelector('[data-ct="next"]') as HTMLElement; if (n) { e.preventDefault(); ctClick(n); } } };
+  R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; }; window.addEventListener('keyup', R.ku$, true);
+  R.key$ = (e: KeyboardEvent) => { if (!R.on) return; if (R.empty && /^(w|a|s|d|arrow\w+|shift)$/.test(e.key.toLowerCase())) { R.keys[e.key.toLowerCase()] = true; e.preventDefault(); return; } if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); ctLeaveAsk(); } else if ((e.key === 'Enter' || e.key === ' ') && !root.querySelector('.ct-modal:not([hidden])')) { const n = root.querySelector('[data-ct="next"]') as HTMLElement; if (n) { e.preventDefault(); ctClick(n); } } };
   window.addEventListener('keydown', R.key$, true);
-  // the people come in one by one while the room shows
-  ctCast(c, st, judges, q);
-  R.loading = true; R.fc = 0;
-  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (R.loading && (R.fc++ % 12)) return; ctFrame(); };   // while people arrive, draw now and then so they come in quickly
+  // the people come in one by one while the room shows (an empty courtroom has no one in it)
+  if (empty) { R.loading = true; ctEmptyStart(); setTimeout(() => ctLoaded(), 60); } else { ctCast(c, st, judges, q); R.loading = true; }
+  R.fc = 0;
+  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (R.loading) return; ctFrame(); };   // nothing is drawn behind the loading screen, so everything comes in quickly
   R.raf = requestAnimationFrame(loop);
+}
+
+CourtRoom.open = function (c: any, st: any) {
+  const R = CourtRoom; if (R.on) R.close(true);
+  const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
+  const empty = !c; R.empty = empty; R.keys = {}; R.stick = [0, 0];
+  R.on = true; R.c = c; R.st = st; R.key = st.key; R.lines = empty ? [] : hearingScript(c, st.key); R.i = -1; R.answered = []; R.finished = st.key === 'verdict' ? false : false; R.objected = false;
+  const q = typeof cabinQ === 'function' ? cabinQ() : 2;
+  const appeal = st.key === 'hearA', judges = appeal ? 5 : 3;
+  const root = document.createElement('div'); root.className = 'court3d'; R.root = root;
+  const co = company(c ? c.companyId : State.companyId), hub = apt(co.hub), courtName = c ? (appeal ? c.court.replace(/District Court|Crown Court/, 'Court of Appeal') : c.court) : `The District Court in ${hub ? hub.city : 'town'}`;
+  root.innerHTML = `<canvas></canvas>
+    <div class="ct-top"><div><small>${esc(courtName)}</small><b>${esc(c ? co.name + ': ' + st.title : 'The courtroom, empty: no hearing today')}</b></div></div>
+    <button class="ct-leave" data-ct="leave">${icon('close')}<span>Leave court</span><kbd>Esc</kbd></button>
+    <div class="ct-ex" hidden></div>
+    <div class="ct-rate" hidden></div>
+    <div class="ct-box" hidden><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
+    ${empty ? `<div class="ct-spots">${[['bench', 'The bench'], ['witness', 'Witness box'], ['def', 'Defence table'], ['pub', 'Public benches'], ['door', 'The doors']].map(x => `<button data-ct="spot" data-k="${x[0]}">${x[1]}</button>`).join('')}</div><div class="ct-hint">${DESKTOP ? 'W A S D or the arrow keys to walk · drag to look around · Esc to leave' : 'Stick to walk · drag to look around'}</div><div class="walk-pad ct-pad"><i></i></div>` : ''}
+    ${ctLoaderHtml(empty ? 'The courtroom' : st.key === 'verdict' ? 'The verdict' : 'Court is in session', empty ? 'Opening the doors…' : 'The court is preparing…')}
+    <div class="ct-modal" hidden></div>`;
+  document.body.appendChild(root);
+  R.loadT0 = performance.now();
+  setTimeout(() => { if (R.on && R.root === root) ctOpen2(c, st, root, q, appeal, judges, empty); }, 80);
   try { Sound.tick(); } catch (e) { /* silent */ }
 };
 CourtRoom.close = function (quiet?: boolean) {
   const R = CourtRoom; if (!R.on) return; R.on = false;
-  cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('resize', R.fit);
+  cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   try { Voice.stop(); } catch (e) { /* ignore */ }
   try { R.scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m: any) => { for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose(); m.dispose(); }); }); R.ren.dispose(); } catch (e) { /* ignore */ }
   R.root.remove(); R.people = {}; R.crowd = [];
-  if (!quiet) { try { refresh(); courtPopup(R.c.id); } catch (e) { /* ignore */ } }
+  if (!quiet) { try { refresh(); if (R.c) courtPopup(R.c.id); } catch (e) { /* ignore */ } }
 };
 
 /** Who is in court, built a few at a time (the figures are detailed); with a percentage while they arrive. */
@@ -555,11 +566,11 @@ function ctCast(c: any, st: any, judges: number, q: number) {
       const it = list.shift(), main = !it.crowd && !/^police|^press/.test(it.key);
       try { ctPlace(it, Human.build(it.look, it.role, it.role === 'police' ? '#C9A227' : co.color || '#2C8CFF', av3Style(), main ? (q >= 2 ? 0.8 : 0.5) : q >= 2 ? 0.45 : 0.3)); } catch (e) { /* skip this one */ }
     }
-    const pct = Math.round((1 - list.length / R.castN) * 100), ld = R.root.querySelector('.ct-load') as HTMLElement;
-    if (ld) { (ld.querySelector('span') as HTMLElement).textContent = pct + '%'; (ld.querySelector('em') as HTMLElement).style.width = pct + '%'; }
-    if (list.length) setTimeout(go, 16); else { R.loading = false; if (ld) ld.classList.add('done'); setTimeout(() => { if (ld) ld.remove(); }, 700); setTimeout(() => ctNext(), 900); }
+    const k = 1 - list.length / R.castN, who = list[0];
+    ctProgress(22 + k * 68, !list.length ? 'Taking their seats…' : who && /^judge/.test(who.key) ? 'The judges take the bench…' : who && /^police/.test(who.key) ? 'The police take their places…' : who && (who.crowd || /^relative|^press/.test(who.key)) ? 'The public comes in…' : 'Counsel take their seats…');
+    if (list.length) setTimeout(go, 16); else ctLoaded(() => ctNext());
   };
-  if (Human.ready) setTimeout(go, 60); else Human.load().then(() => setTimeout(go, 60), () => { toast('The people could not be loaded', 'warn'); setTimeout(() => ctNext(), 500); });
+  if (Human.ready) setTimeout(go, 60); else Human.load().then(() => setTimeout(go, 60), () => { toast('The people could not be loaded', 'warn'); ctLoaded(() => ctNext()); });
 }
 /** Put a person in their seat (or on their spot), facing the right way, on a pivot at the hips so they sway from there. */
 function ctPlace(it: any, m: any) {
@@ -601,6 +612,7 @@ function ctFrame() {
     p.g = p.g ? cabinLerpG(p.g, gT, Math.min(1, dt * 6)) : gT;
     p.m.pose({ t, yaw: 0, gaze: [p.gazeYaw * 0.4, 0], blink: (t % 4.3) < 0.12 ? 1 : 0, g: p.g });
   }
+  if (R.empty) { ctWalk(dt); R.ren.render(R.scene, R.cam); return; }
   // the camera eases to the shot, and you can look around it
   const sh = R.shot, ease = Math.min(1, dt * 1.6);
   R.cam.position.lerp(sh.pos, ease); R.camAt.lerp(sh.at, ease);
@@ -680,6 +692,7 @@ function ctClick(b: HTMLElement) {
   else if (k === 'stay') (R.root.querySelector('.ct-modal') as HTMLElement).hidden = true;
   else if (k === 'pay') { (R.root.querySelector('.ct-modal') as HTMLElement).hidden = true; ctPayLeave(); }
   else if (k === 'exit') CourtRoom.close();
+  else if (k === 'spot') ctSpot(b.getAttribute('data-k'));
   else if (k === 'object') {
     const ln = R.lines[R.i]; R.objected = true; Voice.stop();
     ctSay('lawyer', 'Objection, your honour. The question is leading, and goes beyond what this witness can fairly be asked.');
@@ -725,7 +738,7 @@ function ctEnd() {
 }
 /** Leaving before the court rises: only with a board member standing in, for a large sum. */
 function ctLeaveAsk() {
-  const R = CourtRoom; if (R.finished || R.key === 'verdict' || (R.c.hear && R.c.hear.standIn)) { CourtRoom.close(); return; }
+  const R = CourtRoom; if (R.empty || R.finished || R.key === 'verdict' || (R.c.hear && R.c.hear.standIn)) { CourtRoom.close(); return; }
   const m = R.root.querySelector('.ct-modal') as HTMLElement, cost = standInCost(R.c), co = company(R.c.companyId);
   m.hidden = false;
   m.innerHTML = `<div class="ct-mbox"><h3>The hearing is not over</h3><p>If you leave the courtroom now, a member of ${esc(co.name)}'s board must take your place for the rest of the case. That costs <b>${money(cost)}</b>. From then on the hearings go ahead without you, but the big decisions (a settlement, a plea, an appeal) still come to you.</p>
@@ -752,4 +765,115 @@ function ctGavel() {
       const s = ac.createBufferSource(), sg = ac.createGain(); s.buffer = n; sg.gain.value = 0.35; s.connect(sg); sg.connect(ac.destination); s.start(t);
     });
   } catch (e) { /* no sound */ }
+}
+
+/* ---------- the empty courtroom: walk about ---------- */
+// Where you can't walk: the bench and its dais, the clerk's desk, the witness box, the tables, the bar (but its
+// gate), the pews and the walls. Rectangles [x0, z0, x1, z1].
+function ctBlocked(x: number, z: number): boolean {
+  if (x < -7.6 || x > 7.6 || z < -8.6 || z > 10.1) return true;
+  const B: number[][] = [[-4.6, -9, 4.6, -5.2], [-1.25, -5.0, 1.25, -3.6], [4.1, -5.8, 5.9, -3.8], [-5.2, -1.75, -1.8, -0.0], [1.8, -1.75, 5.2, -0.0], [-7.2, -0.5, -5.4, 1.2], [-8, 1.45, -0.85, 1.75], [0.85, 1.45, 8, 1.75]];
+  for (const r of B) if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true;
+  if (z > 2.55 && z < 2.55 + 7 * 1.02 && Math.abs(x) > 0.85 && Math.abs(x) < 7.45) {   // the pews (seat front to shelf); you can walk the rows between them
+    const rz = (z - 2.55) / 1.02 - Math.floor((z - 2.55) / 1.02); if (rz < 0.7) return true;
+  }
+  return false;
+}
+function ctEmptyStart() {
+  const R = CourtRoom, T = THREE;
+  R.free = { x: 0, z: 9.2, yaw: 0, bob: 0, v: 0 }; R.look = { yaw: 0, pitch: -0.04 };
+  const pad = R.root.querySelector('.ct-pad') as HTMLElement;
+  if (pad) {
+    const knob = pad.firstElementChild as HTMLElement; let id = -1;
+    const move = (e: PointerEvent) => { const r = pad.getBoundingClientRect(), Rr = r.width / 2; let dx = (e.clientX - r.left - Rr) / Rr, dy = (e.clientY - r.top - Rr) / Rr; const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; } R.stick = [dx, -dy]; knob.style.transform = `translate(${dx * Rr * 0.6}px, ${dy * Rr * 0.6}px)`; };
+    pad.addEventListener('pointerdown', e => { e.stopPropagation(); id = e.pointerId; pad.setPointerCapture(id); move(e); });
+    pad.addEventListener('pointermove', e => { if (e.pointerId === id) move(e); });
+    const up = (e: PointerEvent) => { if (e.pointerId !== id) return; id = -1; R.stick = [0, 0]; knob.style.transform = ''; };
+    pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
+  }
+  setTimeout(() => { const h = R.root && R.root.querySelector('.ct-hint'); if (h) h.classList.add('fade'); }, 7000);
+  void T;
+}
+/** Jump to a spot in the courtroom, looking the natural way from there. */
+function ctSpot(k: string) {
+  const R = CourtRoom, F = R.free; if (!F) return;
+  const S: any = { bench: [0, -6.9, Math.PI, 0.75], witness: [5.0, -4.85, Math.PI - 0.55, 0.3], def: [3.5, -0.2, 0, 0], pub: [-3.0, 5.0, 0, 0], door: [0, 9.2, 0, 0] }[k];
+  if (!S) return; F.x = S[0]; F.z = S[1]; F.floor = S[3]; R.look.yaw = S[2]; R.look.pitch = -0.05; Sound.tick();
+}
+function ctWalk(dt: number) {
+  const R = CourtRoom, F = R.free, K = R.keys || {}, T = THREE;
+  const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], r = (K.d || K.arrowright ? 1 : 0) - (K.a || K.arrowleft ? 1 : 0) + R.stick[0];
+  const mag = Math.min(1, Math.hypot(f, r)), vmax = K.shift ? 2.4 : 1.4;
+  F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
+  const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  let mx = fx * f + rx * r, mz = fz * f + rz * r; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+  const step = F.v * dt;
+  if (step > 0) {
+    if (F.floor && (F.z > -5.2 || Math.abs(F.x) > 4.6)) F.floor = 0;   // stepped down off the dais or out of the box
+    const can = (x: number, z: number) => F.floor ? true : !ctBlocked(x, z);
+    const nx = F.x + mx * step, nz = F.z + mz * step;
+    if (can(nx, nz)) { F.x = nx; F.z = nz; } else if (can(nx, F.z)) F.x = nx; else if (can(F.x, nz)) F.z = nz;
+    F.bob += step;
+  }
+  const eye = 1.64 + (F.floor || 0) + Math.sin(F.bob / 0.65 * Math.PI) * 0.018 * Math.min(1, F.v / 1.2);
+  R.cam.position.set(F.x, eye, F.z);
+  const p = R.look.pitch, dir = new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p));
+  R.cam.lookAt(R.cam.position.clone().add(dir));
+  if (R.dust) { const a = R.dust.geometry.attributes.position, now = performance.now() / 1000; for (let i = 0; i < a.count; i++) { let y = a.getY(i) + dt * 0.02 * Math.sin(i + now * 0.3); if (y > 6) y = 0.5; a.setY(i, y); } a.needsUpdate = true; }
+}
+
+/* ---------- entering the courtroom from the app ---------- */
+/** Into the courtroom: to the hearing if one is on (or a verdict to hear), otherwise the empty room. */
+function courtEnter() {
+  const cases: any[] = ((State as any).cases || []).filter((c: any) => c.hear && c.companyId === State.companyId);
+  for (const c of cases) { const w = hearingWaiting(c); if (w && !c.hear.standIn) { closeAll(); CourtRoom.open(c, w); return; } }
+  for (const c of cases) if (c.hear.verdictReady && !c.hear.verdictSeen) { closeAll(); CourtRoom.open(c, { key: 'verdict', title: 'The verdict' }); return; }
+  closeAll(); CourtRoom.open(null, { key: 'empty', title: 'The courtroom' });
+}
+ACTIONS['court-enter'] = () => courtEnter();
+
+/* ---------- the loading screen ---------- */
+/** The courtroom's loading screen: the scales of justice weighing, in walnut, gold and deep blue, with a
+ *  courthouse front and a progress bar that runs until the room, the people and the light are ready. */
+function ctLoaderHtml(title: string, step: string, emblem?: string): string {
+  const cols = Array.from({ length: 8 }, (_, i) => `<rect x="${118 + i * 40}" y="120" width="16" height="118" rx="3"/>`).join('');
+  return `<div class="ct-loader">
+    <div class="ctl-glow"></div>
+    <svg class="ctl-house" viewBox="0 0 560 260" aria-hidden="true"><path d="M90 116 L280 34 L470 116 Z"/><rect x="96" y="112" width="368" height="10"/>${cols}<rect x="88" y="238" width="384" height="10"/><rect x="72" y="248" width="416" height="12"/></svg>
+    <div class="ctl-rings"><i></i><i></i></div>
+    ${emblem || `<svg class="ctl-scales" viewBox="0 0 200 200" aria-hidden="true">
+      <defs><linearGradient id="ctlG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6DB8E"/><stop offset=".55" stop-color="#C8963E"/><stop offset="1" stop-color="#8A5E22"/></linearGradient></defs>
+      <circle cx="100" cy="100" r="94" fill="#13213A" stroke="url(#ctlG)" stroke-width="4"/><circle cx="100" cy="100" r="86" fill="none" stroke="url(#ctlG)" stroke-width="1.2" opacity=".7"/>
+      ${Array.from({ length: 22 }, (_, i) => { const sd = i < 11 ? -1 : 1, k = i % 11, a = Math.PI / 2 + sd * (0.45 + k * 0.2), x = 100 + Math.cos(a) * 74, y = 100 + Math.sin(a) * 74; return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="7" ry="2.8" fill="url(#ctlG)" transform="rotate(${(a * 180 / Math.PI + sd * 50).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`; }).join('')}
+      <g fill="url(#ctlG)" stroke="url(#ctlG)">
+        <rect x="97" y="52" width="6" height="96" rx="2"/><circle cx="100" cy="48" r="6"/><rect x="80" y="146" width="40" height="6" rx="2"/><rect x="72" y="152" width="56" height="6" rx="2"/>
+        <g class="ctl-beam"><path d="M48 66 Q100 58 152 66" fill="none" stroke-width="4" stroke-linecap="round"/>
+          <g class="ctl-pan l"><path d="M48 66 L32 104 M48 66 L64 104" fill="none" stroke-width="1.5"/><path d="M26 104 Q48 120 70 104 Z"/></g>
+          <g class="ctl-pan r"><path d="M152 66 L136 104 M152 66 L168 104" fill="none" stroke-width="1.5"/><path d="M130 104 Q152 120 174 104 Z"/></g></g>
+      </g></svg>`}
+    <div class="ctl-name"><b>${esc(title)}</b></div>
+    <div class="ctl-load"><div class="ctl-info"><span class="ctl-step">${esc(step)}</span><b class="ctl-pct">0%</b></div>
+      <div class="ctl-bar"><i class="ctl-fill"><span></span></i><span class="ctl-tip"><svg viewBox="0 0 24 24"><path d="M3 19.5 13.5 9l1.6 1.6L4.6 21.1zM12.2 4.6l4-4 7.2 7.2-4 4z" fill="currentColor"/><rect x="11" y="5" width="9" height="5" rx="1" transform="rotate(45 15.5 7.5)" fill="currentColor"/></svg></span></div></div>
+  </div>`;
+}
+function ctProgress(pct: number, step?: string, RR?: any) {
+  const R = RR || CourtRoom, L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (!L) return;
+  pct = Math.max(R.pct || 0, Math.min(100, pct)); R.pct = pct;
+  (L.querySelector('.ctl-pct') as HTMLElement).textContent = Math.round(pct) + '%';
+  (L.querySelector('.ctl-fill') as HTMLElement).style.width = pct + '%'; (L.querySelector('.ctl-tip') as HTMLElement).style.left = pct + '%';
+  if (step) (L.querySelector('.ctl-step') as HTMLElement).textContent = step;
+}
+/** Everything is built: prepare the light and the materials on the graphics card, draw the first picture, then
+ *  open the doors (the screen stays at least a couple of seconds, as the 3D map's does). */
+function ctLoaded(then?: () => void) {
+  const R = CourtRoom; if (!R.on) return;
+  ctProgress(92, 'Lighting the hall…');
+  setTimeout(() => {
+    if (!R.on) return;
+    try { R.ren.compile(R.scene, R.cam); } catch (e) { /* compiled on the first frame */ }
+    R.loading = false; try { ctFrame(); } catch (e) { /* next frame */ }
+    ctProgress(100, 'Ready');
+    const wait = Math.max(300, 2600 - (performance.now() - R.loadT0));
+    setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); } if (then) setTimeout(then, 500); }, wait);
+  }, 40);
 }

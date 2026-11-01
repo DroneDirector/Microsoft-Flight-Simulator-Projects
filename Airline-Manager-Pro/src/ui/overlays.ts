@@ -154,7 +154,7 @@ function inboxHtml(): string {
       <button class="notice ${n.read ? '' : 'unread'} k-${n.kind}" data-act="open-notice" data-id="${n.id}">
         <span class="n-ic">${icon(NOTICE_META[n.kind].icon)}</span>
         <span class="n-t"><b>${esc(n.title)}</b><small>${esc(n.body)}</small></span>
-        <span class="n-time" data-at="${(n as any).at || ''}" title="${(n as any).at ? esc(receivedText((n as any).at)) : ''}">${esc((n as any).at ? agoText((n as any).at) : n.time)}${n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref) ? `<i class="n-map">${icon('pin')}Map</i>` : ''}</span>
+        <span class="n-time" data-at="${(n as any).at || ''}" title="${(n as any).at ? esc(atText((n as any).at)) : ''}">${esc((n as any).at ? receivedText((n as any).at) + ' · ' + agoText((n as any).at) : n.time)}${n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref) ? `<i class="n-map">${icon('pin')}Map</i>` : ''}</span>
       </button>`) : emptyState('Nothing here', 'New messages from your mechanic, pilots and the authorities show up here.')}</div>`;
 }
 
@@ -163,7 +163,7 @@ ACTIONS.inbox = () => { Sound.tick(); openLayer('drawer', inboxHtml(), { cls: 'i
 setInterval(() => {
   for (const el of Array.from(document.querySelectorAll('.n-time[data-at], .n-received[data-at]')) as HTMLElement[]) {
     const at = +el.getAttribute('data-at'); if (!at) continue;
-    const t = el.classList.contains('n-received') ? `Received ${receivedText(at)} · ${agoText(at)}` : agoText(at);
+    const t = el.classList.contains('n-received') ? `Received ${receivedText(at)} · ${agoText(at)}` : `${receivedText(at)} · ${agoText(at)}`;
     const first = el.firstChild; if (first && first.nodeType === 3 && first.nodeValue !== t) first.nodeValue = t;
   }
 }, 20000);

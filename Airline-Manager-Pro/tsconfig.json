@@ -135,9 +135,12 @@
     "src/screens/v3d-cabincrew.ts",
     "src/screens/v3d-walk.ts",
     "src/screens/court3d.ts",
+    "src/screens/office3d.ts",
     "src/data/stars.ts",
     "src/screens/v3d-sky.ts",
     "src/ui/qol.ts",
+    "src/ui/alerts.ts",
+    "src/ui/conduct-detail.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/main.ts"

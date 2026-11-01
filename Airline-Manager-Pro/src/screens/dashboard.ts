@@ -159,6 +159,7 @@ SCREENS.ops = {
         <div class="card-h"><b>Fleet status</b><span class="w-legend"><span><i class="flight"></i>In flight</span><span><i class="avail"></i>Available</span><span><i class="maint"></i>Maintenance</span></span><button class="text-btn" data-act="go" data-screen="fleet">All aircraft</button></div>
         <div class="fs-grid">${fl.map(fleetStatusTile).join('')}</div>
       </div>
+      ${placesCardHtml()}
     </div>`;
   },
   mount(root) {
@@ -236,3 +237,22 @@ ACTIONS['open-crash'] = el => crashPopup(el.getAttribute('data-id'));
 ACTIONS['open-fine'] = el => finePopup(el.getAttribute('data-ref'));
 ACTIONS['open-issue'] = el => mechanicPopup(el.getAttribute('data-id'));
 ACTIONS['ops-sel-close'] = () => { const box = $('#ops-sel'); if (box) box.innerHTML = ''; Sound.tick(); };
+
+/* ---------- Overview: your office and the courtroom ---------- */
+function placesCardHtml(): string {
+  const cases: any[] = ((State as any).cases || []).filter((c: any) => c.hear && c.companyId === State.companyId);
+  const live = cases.filter(c => hearingWaiting(c) && !c.hear.standIn)[0], verdict = cases.filter(c => c.hear.verdictReady && !c.hear.verdictSeen)[0];
+  const reports = ((State as any).incidents || []).filter((x: any) => x.status === 'open' && staffById(x.staffId)).length;
+  return `<div class="card places-card">
+    <button class="place office" data-act="office-open">${icon('jobs')}<span><b>My office</b><small>${reports ? `${reports} conduct ${reports === 1 ? 'report' : 'reports'} to look at: call them in` : 'Your desk, the view, the family photo'}</small></span>${icon('chevron')}</button>
+    <button class="place court ${live || verdict ? 'live' : ''}" data-act="court-enter">${icon('shield')}<span><b>${live ? 'Court is in session' : verdict ? 'The verdict is in' : 'The courtroom'}</b><small>${live ? 'Go to court and answer for the airline' : verdict ? 'Hear it read out in court' : 'No hearing today: walk in and look around'}</small></span>${icon('chevron')}</button>
+  </div>`;
+}
+/** The menu's Court entry lights up while a hearing or a verdict waits for you. */
+setInterval(() => {
+  try {
+    const d = document.querySelector('[data-court-dot]') as HTMLElement; if (!d) return;
+    const on = ((State as any).cases || []).some((c: any) => c.hear && c.companyId === State.companyId && ((hearingWaiting(c) && !c.hear.standIn) || (c.hear.verdictReady && !c.hear.verdictSeen)));
+    d.hidden = !on;
+  } catch (e) { /* not ready */ }
+}, 3000);

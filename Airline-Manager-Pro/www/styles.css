@@ -2848,3 +2848,79 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .ct-mbox .btn-row { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .cc-row.hear-now { border-color: rgba(214,168,92,.5); background: rgba(214,168,92,.08); }
 @media (max-width: 600px) { .ct-text { font-size: 14.5px; } .ct-ex { top: auto; bottom: calc(100% - 60px); display: none; } .ct-top { max-width: calc(100% - 140px); } .ct-leave span { display: none; } }
+/* conduct report: what happened */
+.cd-box { display: grid; gap: 0; margin: 4px 0 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); overflow: hidden; }
+.cd-row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); font-size: 13.5px; line-height: 1.45; }
+.cd-row:first-child { border-top: 0; }
+.cd-row small { color: var(--ink-3); font-size: 12px; padding-top: 1px; }
+.cd-row.quote span { font-style: italic; color: var(--ink); }
+@media (max-width: 600px) { .cd-row { grid-template-columns: 1fr; gap: 2px; } }
+/* the empty courtroom: places to go, the hint, the stick on touch screens */
+.ct-spots { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 180px); }
+.ct-spots button { padding: 8px 13px; border-radius: 99px; background: rgba(28,18,10,.82); border: 1px solid rgba(214,168,92,.4); color: #F3ECE0; font: 600 13px Inter, sans-serif; cursor: pointer; }
+.ct-spots button:hover { background: rgba(60,38,20,.92); }
+.ct-hint { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); padding: 8px 14px; border-radius: 12px; background: rgba(18,12,7,.8); color: #E8DFD0; font-size: 13px; transition: opacity .8s; white-space: nowrap; }
+.ct-hint.fade { opacity: 0; }
+.desktop .ct-pad { display: none; }
+@media (max-width: 700px) { .ct-hint { top: 64px; white-space: normal; text-align: center; max-width: 80%; } .ct-spots { max-width: calc(100% - 170px); left: auto; right: 12px; transform: none; justify-content: flex-end; } }
+/* Crew → Court */
+.court-hero { display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 16px; background: linear-gradient(135deg, #2A1C10, #15100A); border: 1px solid rgba(214,168,92,.4); color: #F3ECE0; margin-bottom: 12px; }
+.court-hero .ic { width: 34px; height: 34px; color: #D6A85C; flex: none; }
+.court-hero div { flex: 1; min-width: 0; } .court-hero b { font: 600 17px Georgia, serif; display: block; } .court-hero small { color: #CDBFA8; }
+.case-list { display: grid; gap: 8px; }
+.case-row { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 13px; background: var(--panel); border: 1px solid var(--line); text-align: left; width: 100%; color: var(--ink); cursor: pointer; }
+.case-row div { flex: 1; min-width: 0; } .case-row b { display: block; font-size: 14px; } .case-row small { color: var(--ink-3); font-size: 12px; }
+.case-row .chip { flex: none; }
+/* the courtroom's loading screen: walnut, gold and deep blue; the scales weighing */
+.ct-loader { position: absolute; inset: 0; z-index: 20; display: grid; place-content: center; justify-items: center; gap: 10px; overflow: hidden; background: radial-gradient(ellipse at 50% 42%, #3B2615 0%, #22160C 45%, #0E0905 100%); transition: opacity .8s ease; }
+.ct-loader.out { opacity: 0; pointer-events: none; }
+.ctl-glow { position: absolute; left: 50%; top: 42%; width: 620px; height: 620px; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(214,168,92,.22), rgba(214,168,92,0) 62%); animation: ctlGlow 3.4s ease-in-out infinite; pointer-events: none; }
+@keyframes ctlGlow { 50% { opacity: .55; transform: translate(-50%, -50%) scale(1.06); } }
+.ctl-house { position: absolute; left: 50%; bottom: -6px; width: min(760px, 120%); transform: translateX(-50%); fill: #2E1E11; opacity: .9; }
+.ctl-rings { position: absolute; left: 50%; top: calc(50% - 46px); width: 0; height: 0; pointer-events: none; }
+.ctl-rings i { position: absolute; left: -125px; top: -125px; width: 250px; height: 250px; border-radius: 50%; border: 1.5px solid rgba(214,168,92,.18); border-top-color: #D6A85C; animation: ctlSpin 3s linear infinite; }
+.ctl-rings i:nth-child(2) { left: -160px; top: -160px; width: 320px; height: 320px; border-color: rgba(70,110,170,.16); border-right-color: #4F78B4; animation-duration: 5s; animation-direction: reverse; }
+@keyframes ctlSpin { to { transform: rotate(360deg); } }
+.ctl-scales { position: relative; width: clamp(130px, calc(30 * var(--vh, 1vh)), 200px); height: auto; filter: drop-shadow(0 0 24px rgba(214,168,92,.35)); animation: rise .8s var(--ease) both; }
+.ctl-beam { transform-origin: 100px 62px; animation: ctlWeigh 3.6s ease-in-out infinite; }
+.ctl-pan { animation: ctlPan 3.6s ease-in-out infinite; }
+.ctl-pan.l { transform-origin: 48px 66px; } .ctl-pan.r { transform-origin: 152px 66px; }
+@keyframes ctlWeigh { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes ctlPan { 0%, 100% { transform: rotate(7deg); } 50% { transform: rotate(-7deg); } }
+.ctl-name b { position: relative; font: 600 clamp(22px, calc(4.6 * var(--vh, 1vh)), 32px)/1.1 Georgia, 'Times New Roman', serif; color: #F2D18A; letter-spacing: .04em; }
+.ctl-load { position: relative; width: min(440px, calc(72 * var(--vw, 1vw))); margin-top: 8px; }
+.ctl-info { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 7px; color: #D9CCB6; font-size: 13.5px; }
+.ctl-info b { color: #F2D18A; font: 700 15px Inter, sans-serif; }
+.ctl-bar { position: relative; height: 6px; border-radius: 6px; background: rgba(255,240,215,.12); }
+.ctl-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 6px; background: linear-gradient(90deg, #8A5E22, #D6A85C, #F6DB8E); transition: width .35s ease; overflow: hidden; }
+.ctl-fill span { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); animation: ctlSheen 1.6s linear infinite; }
+@keyframes ctlSheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.ctl-tip { position: absolute; top: 50%; left: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; color: #F6DB8E; transition: left .35s ease; filter: drop-shadow(0 0 6px rgba(214,168,92,.7)); }
+.ctl-tip svg { width: 100%; height: 100%; }
+/* the office */
+.of-tell { margin: -4px 0 8px; color: #C9B48E; font-style: italic; font-size: 13px; }
+.of-tell:empty { display: none; }
+.of-aim { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,.8); font: 600 18px Inter, sans-serif; text-shadow: 0 1px 4px rgba(0,0,0,.6); pointer-events: none; }
+.of-aim.on { font-size: 13px; padding: 6px 12px; border-radius: 10px; background: rgba(18,12,7,.8); border: 1px solid rgba(214,168,92,.5); color: #F2D18A; }
+.of-dec { align-self: center; margin-right: auto; color: #C9B48E; font-size: 13px; }
+.ct-ctl .btn.danger { background: rgba(170,50,40,.85); color: #fff; }
+.ct-spots button.on { background: #D6A85C; color: #1A120A; border-color: #D6A85C; }
+.office3d .ct-box { max-height: 52%; overflow: auto; }
+.of-invite { margin: 2px 0 10px; }
+.pilot-hero { position: relative; }
+.ph-office { position: absolute; right: 14px; top: 12px; z-index: 2; }
+.office3d .ctl-house { display: none; }
+/* Overview: your office and the courtroom */
+.places-card { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; }
+.place { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; text-align: left; color: #F3ECE0; border: 1px solid rgba(214,168,92,.35); cursor: pointer; transition: transform .15s var(--ease), border-color .15s; }
+.place.office { background: linear-gradient(135deg, #1D2E45, #142034); }
+.place.court { background: linear-gradient(135deg, #2A1C10, #17100A); }
+.place.court.live { border-color: #D6A85C; box-shadow: 0 0 0 1px rgba(214,168,92,.4), 0 0 22px rgba(214,168,92,.25); }
+.place:hover { transform: translateY(-1px); border-color: rgba(214,168,92,.7); }
+.place > .ic:first-child { width: 28px; height: 28px; color: #D6A85C; flex: none; }
+.place span { flex: 1; min-width: 0; } .place b { display: block; font: 600 16px Georgia, serif; } .place small { color: #CDBFA8; font-size: 12.5px; }
+@media (max-width: 700px) { .places-card { grid-template-columns: 1fr; } }
+/* in the office the conversation sits at the side, so you see the person you're talking to */
+.office3d .ct-box { left: auto; right: 16px; bottom: 16px; transform: none; width: min(440px, calc(100% - 32px)); max-height: calc(100% - 90px); overflow: auto; }
+.office3d .ct-ctl { flex-wrap: wrap; }
+@media (max-width: 700px) { .office3d .ct-box { left: 8px; right: 8px; width: auto; max-height: 48%; } }
