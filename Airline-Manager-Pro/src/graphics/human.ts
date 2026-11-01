@@ -4,6 +4,43 @@
 // moustaches, glasses, caps and shoes all come from the person's look. The figure's proportions
 // (natural, in-between or stylised) follow Settings → Crew figures.
 
+/** Body language for a figure: each arm [forward raise, sideways raise, inwards turn, elbow bend] (radians),
+ *  the body's lean and bob, the head's nod, shake and tilt, and a flush of the face. mood: begging (5 ways)
+ *  or angry (10 ways); otherwise standing at ease with a little natural movement. */
+function humanGesture(mood: any, t: number): any {
+  const S = Math.sin, base = (L: number[], R: number[]) => ({ L, R, lean: 0, bob: 0, roll: 0, nod: 0, shake: 0, tilt: 0, flush: 0, calm: 1 });
+  const ease = 0.06 + 0.02 * S(t * 0.7);   // at rest: arms hanging, the slightest swing
+  if (!mood || !mood.kind) return base([0.04 + 0.02 * S(t * 0.6), 0.08, 0, 0.12 + ease], [0.04 + 0.02 * S(t * 0.6 + 1), 0.08, 0, 0.12 + ease]);
+  const v = mood.v || 0, f = (hz: number, ph?: number) => S(t * hz * Math.PI * 2 + (ph || 0));
+  if (mood.kind === 'beg') {
+    const g = base([0, 0, 0, 0], [0, 0, 0, 0]); g.calm = 0.3;
+    switch (v % 5) {
+      case 0: { const k = 0.05 * f(0.6); g.L = [0.62 + k, 0.1, 0.7, 2.15]; g.R = [0.62 + k, 0.1, 0.7, 2.15]; g.lean = 0.12; g.nod = 0.28; g.bob = -0.01 + 0.006 * f(0.6); break; }   // hands pressed together at the chest
+      case 1: { g.L = [1.25, 0.04, 0.38, 0.55]; g.R = [1.25, 0.04, 0.38, 0.55]; g.lean = 0.2; g.tilt = 0.18; g.shake = 0.05 * f(0.9); g.nod = 0.1; break; }   // clasped hands held out towards you
+      case 2: { g.L = [0.78, 0.38, -0.12, 1.2]; g.R = [0.78, 0.38, -0.12, 1.2]; g.lean = 0.08; g.shake = 0.22 * f(0.55); g.nod = 0.12; break; }   // open palms, shaking the head: "please, no"
+      case 3: { g.R = [0.42, 0.05, 1.0, 2.25]; g.L = [1.1, 0.28, 0.1, 0.3 + 0.1 * f(0.5)]; g.tilt = -0.2; g.lean = 0.1; g.nod = 0.15; break; }   // a hand on the heart, the other reaching out
+      default: { const k = 0.18 * f(1.2), e = 0.2 * f(1.2); g.L = [0.62 + k, 0.1, 0.7, 2.1 + e]; g.R = [0.62 + k, 0.1, 0.7, 2.1 + e]; g.nod = 0.2 + 0.1 * f(1.2); g.lean = 0.15; break; }   // "please, please": hands together, pumping
+    }
+    return g;
+  }
+  // angry
+  const g = base([0, 0, 0, 0], [0, 0, 0, 0]); g.calm = 0.4; g.flush = 0.45 + 0.15 * f(0.4);
+  const tr = 0.03 * S(t * 23) + 0.02 * S(t * 31);   // trembling with rage
+  switch (v % 10) {
+    case 0: g.L = [0.0, 0.5, 1.3, 1.55]; g.R = [0.0, 0.5, 1.3, 1.55]; g.lean = -0.05; g.nod = -0.08; break;   // fists on the hips, chest out
+    case 1: g.L = [0.62, 0.1, 0.95, 2.1]; g.R = [0.55, 0.12, 0.9, 2.05]; g.shake = 0.08 * f(1.1); g.nod = -0.05; break;   // arms crossed tight
+    case 2: g.L = [0.05 + tr, 0.13, 0, 0.55]; g.R = [0.05 - tr, 0.13, 0, 0.55]; g.lean = 0.07; g.nod = 0.08; g.bob = 0.003 * S(t * 20); break;   // fists clenched at the sides, shaking
+    case 3: { const jab = Math.max(0, f(1.4)) * 0.18; g.R = [1.4 + jab, 0.05, -0.15, 0.1]; g.L = [0.05, 0.12, 0, 0.6]; g.lean = 0.12 + jab * 0.2; g.nod = 0.05; break; }   // jabbing a finger
+    case 4: g.L = [1.15, 1.0, 0, 0.4]; g.R = [1.15, 1.0, 0, 0.4]; g.nod = -0.18; g.bob = 0.008 * Math.abs(f(1.6)); break;   // arms flung wide, shouting
+    case 5: { const k = 0.25 * f(3); g.R = [2.25 + k, 0.3, 0.1, 1.2]; g.L = [0.0, 0.5, 1.3, 1.55]; g.nod = -0.05; break; }   // shaking a fist
+    case 6: g.L = [2.55, 0.6, 0.4, 2.35]; g.R = [2.55, 0.6, 0.4, 2.35]; g.shake = 0.15 * f(0.9); g.nod = 0.12; break;   // hands on the head
+    case 7: { const st = Math.pow(Math.max(0, f(1.5)), 4); g.L = [0.2, 0.15, 0, 0.9]; g.R = [0.2, 0.15, 0, 0.9]; g.lean = 0.1; g.bob = -0.02 * st; break; }   // stamping, fists down
+    case 8: g.L = [-0.35, 0.2, 0, 0.6]; g.R = [-0.35, 0.2, 0, 0.6]; g.lean = 0.22; g.nod = 0.1; break;   // leaning in, arms back, squaring up
+    default: { const up = Math.max(0, f(0.7)); g.L = [0.9 + 0.5 * up, 0.55, 0, 0.9]; g.R = [0.9 + 0.5 * up, 0.55, 0, 0.9]; g.tilt = 0.12 * f(0.7); break; }   // throwing the hands up
+  }
+  return g;
+}
+
 const Human = (function () {
   /* ================= data ================= */
   let DATA = null, loading = null, NBS = null;
@@ -132,11 +169,15 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       uBrowT: { value: c.female ? 0.0028 : 0.0038 }, uElbowS: { value: I.armLen * 0.56 }, uKneeY: { value: I.kneeY }, uCrotchY: { value: I.crotchY },
       uLegX: { value: c.legX }, uSideZ: { value: 0 }, uMech: { value: c.mech ? 1 : 0 }, uPockets: { value: c.pockets ? 1 : 0 },
       uHeadRot: { value: new THREE.Matrix3() }, uNeckP: { value: v3(I.neckPivot) }, uBlink: { value: 0 },
+      // arms: shoulder and elbow turns (left arm at +x), for gestures and body language
+      uShL: { value: v3(I.J['upperarm01.L']) }, uShR: { value: v3(I.J['upperarm01.R']) },
+      uElL: { value: v3(I.J['upperarm01.L']).lerp(v3(I.J['wrist.L']), 0.56 / 0.97) }, uElR: { value: v3(I.J['upperarm01.R']).lerp(v3(I.J['wrist.R']), 0.56 / 0.97) },
+      uArmL: { value: new THREE.Matrix3() }, uArmR: { value: new THREE.Matrix3() }, uElbL: { value: new THREE.Matrix3() }, uElbR: { value: new THREE.Matrix3() }, uFlush: { value: 0 },
     };
     m.userData.U = U;
     m.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, U);
-      const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP; uniform mat3 uHeadRot;
+      const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR; uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR; uniform float uFlush;
         uniform float uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink;
         varying vec3 vRest; varying vec3 vF; varying vec3 vON; varying vec4 vA; varying vec4 vB; varying float vBeard;
         float hairlineAt(float az){ float a = abs(az);
@@ -148,7 +189,9 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       `;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec3 rest; attribute vec3 fpos; attribute vec4 fa; attribute vec4 fb; attribute float beardW;\n' + decl)
         .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
-          objectNormal = normalize(mix(objectNormal, uHeadRot * objectNormal, smoothstep(0.15, 0.85, fa.w)));`)
+          objectNormal = normalize(mix(objectNormal, uHeadRot * objectNormal, smoothstep(0.15, 0.85, fa.w)));
+          if (fa.y > 0.5) { bool lf = rest.x > 0.0; float ke = smoothstep(uElbowS - 0.03, uElbowS + 0.03, fa.x), ks = smoothstep(0.0, 0.06, fa.x);
+            objectNormal = normalize(mix(objectNormal, (lf ? uElbL : uElbR) * objectNormal, ke)); objectNormal = normalize(mix(objectNormal, (lf ? uArmL : uArmR) * objectNormal, ks)); }`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           vRest = rest; vF = fpos; vA = fa; vB = fb; vON = objectNormal; vBeard = beardW;
           float hm = hairMask(fb, fa.w);
@@ -161,13 +204,18 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
               if (el > -0.15) { float k = smoothstep(-0.15, 0.08, el); float ne = mix(el, -0.1, uBlink * wr * k);
                 vec3 hd = normalize(vec3(d.x, 0.0, d.z)); transformed = c + hd * cos(ne) * r + vec3(0.0, sin(ne) * r, 0.0); } } }
           // head turn
-          transformed = mix(transformed, uNeckP + uHeadRot * (transformed - uNeckP), smoothstep(0.15, 0.85, fa.w));`);
+          transformed = mix(transformed, uNeckP + uHeadRot * (transformed - uNeckP), smoothstep(0.15, 0.85, fa.w));
+          // arms: the forearm turns at the elbow, then the whole arm at the shoulder
+          if (fa.y > 0.5) { bool lf = rest.x > 0.0; vec3 sp = lf ? uShL : uShR, ep = lf ? uElL : uElR;
+            float ke = smoothstep(uElbowS - 0.03, uElbowS + 0.03, fa.x), ks = smoothstep(0.0, 0.06, fa.x);
+            transformed = mix(transformed, ep + (lf ? uElbL : uElbR) * (transformed - ep), ke);
+            transformed = mix(transformed, sp + (lf ? uArmL : uArmR) * (transformed - sp), ks); }`);
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + decl + GLSL_NOISE)
         .replace('#include <color_fragment>', `#include <color_fragment>
           vec3 R = vRest; float onArm = step(0.5, vA.y), headW = vA.w;
           // under a skirt the hips and thighs are hidden, so they can never show through it
           if (uSkirt > 0.5 && onArm < 0.5 && headW < 0.5 && R.y < uHemY && R.y > uKneeY + 0.06) discard;
-          vec3 col = uSkin; float rough = 0.55, metal = 0.0, isSkin = 1.0;
+          vec3 col = mix(uSkin, uSkin * vec3(1.12, 0.78, 0.74), uFlush); float rough = 0.55, metal = 0.0, isSkin = 1.0;
           float low = fbm(R * 22.0), mid = fbm(R * 90.0);
           col *= 0.95 + 0.1 * low;
           col = mix(col, col * vec3(1.06, 0.93, 0.9), 0.35 * mid);
@@ -1141,9 +1189,15 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       /** Breathing, a gentle sway, head and eye movement, blinking. */
       pose(p) {
         const t = p.t;
-        root.rotation.y = p.yaw; root.rotation.z = Math.sin(t * 2 * Math.PI / 6.2) * 0.008;
+        root.rotation.y = p.yaw; root.rotation.z = Math.sin(t * 2 * Math.PI / 6.2) * 0.008; root.rotation.x = 0; root.position.y = 0;
         root.scale.y = 1 + Math.sin(t * 2 * Math.PI / 4.2) * 0.0015;
-        eul.set(Math.sin(t * 0.31 + 1) * 0.035 - 0.01, Math.sin(t * 0.43) * 0.13 + Math.sin(t * 0.17) * 0.06 + p.gaze[0] * 0.25, Math.sin(t * 0.23 + 2) * 0.02);
+        // body language: the arms (a little life even at rest), the lean, the head
+        const g = humanGesture(p.mood, t);
+        const arm = (a, sd) => { const m = new THREE.Matrix4().makeRotationY(sd * -a[2]).multiply(new THREE.Matrix4().makeRotationZ(sd * a[1])).multiply(new THREE.Matrix4().makeRotationX(-a[0])); return new THREE.Matrix3().setFromMatrix4(m); };
+        const elb = (b) => new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(-b));
+        U.uArmL.value.copy(arm(g.L, 1)); U.uArmR.value.copy(arm(g.R, -1)); U.uElbL.value.copy(elb(g.L[3])); U.uElbR.value.copy(elb(g.R[3])); U.uFlush.value = g.flush;
+        root.rotation.x = g.lean; root.position.y = g.bob; root.rotation.z += g.roll;
+        eul.set(Math.sin(t * 0.31 + 1) * 0.035 - 0.01 + g.nod, Math.sin(t * 0.43) * 0.13 * g.calm + Math.sin(t * 0.17) * 0.06 * g.calm + p.gaze[0] * 0.25 + g.shake, Math.sin(t * 0.23 + 2) * 0.02 + g.tilt);
         headPivot.quaternion.setFromEuler(eul); rot.copy(headPivot.quaternion);
         U.uHeadRot.value.setFromMatrix4(m4.makeRotationFromQuaternion(rot));
         U.uBlink.value = p.blink;

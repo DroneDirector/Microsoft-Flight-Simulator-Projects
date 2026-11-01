@@ -76,6 +76,7 @@ function newsStrike(cid: string, g: PayGroup, why: string, stage: 'start' | 'end
 /* ---------- flights ---------- */
 /** A crash in the papers: any of the airline's aircraft, your own flight or a hired pilot's. */
 function newsCrash(o: { key: string; c: Company; typeId: string; reg: string; callsign?: string; from?: string; to: string; pax?: number; dead?: boolean; cause?: string }) {
+  try { crashSiteAdd(o); } catch (e) { /* no crash site */ }
   if (!o.c || !newsOnce('crash:' + o.key, 'crash', 0)) return;
   const t = acType(o.typeId), model = t ? t.model : 'aircraft', at = newsCity(o.to), fl = o.callsign ? `flight ${o.callsign}` : o.reg;
   const onBoard = o.pax ? `On board were ${num(o.pax)} passengers and the crew.` : '';

@@ -172,6 +172,7 @@ ACTIONS['open-notice'] = el => {
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref && /^scan-/.test(n.ref)) scanPopup(n.ref.slice(5));
   else if (n.kind === 'flight' && n.ref) crashPopup(n.ref);
+  else if (n.kind === 'pilot' && n.ref && /^crash3d-/.test(n.ref)) { const e = document.createElement('b'); e.setAttribute('data-apt', n.ref.slice(8)); ACTIONS['crash-3d'](e, null); }
   else if (n.kind === 'pilot' && n.ref && /^cjo-/.test(n.ref)) coopOfferPopup(n.ref);
   else if (n.kind === 'pilot' && n.ref && State.live.some(f => f.id === n.ref)) showFlightOnMap(n.ref);
   else if (n.kind === 'staff' && n.ref === 'badges') { closeAll(); go('ranking'); }
@@ -260,7 +261,7 @@ function mechanicPopup(issueId: string) {
 
 /** In a dialogue that just opened, the person starts talking (when voices are on). */
 function autoSpeak(wrap: HTMLElement) {
-  if (!State.settings.mechanicVoice || State.settings.muteAll) return;
+  if (!State.settings.mechanicVoice || State.settings.muteAll || (State.settings as any).autoVoice !== true) return;
   // everyone in the dialogue speaks in turn, like a conversation
   const turn = (i: number) => {
     if (!wrap || !wrap.isConnected) return;

@@ -50,6 +50,26 @@ public class AppToolsPlugin extends Plugin {
     private BroadcastReceiver statusReceiver;
     private volatile boolean busy = false;
 
+    /* ---------- Full screen and Game Booster (kept on the phone) ---------- */
+
+    @PluginMethod
+    public void display(PluginCall call) {
+        JSObject r = new JSObject();
+        try {
+            MainActivity a = (MainActivity) getActivity();
+            if (call.getData().has("fullScreen")) a.setFullScreen(call.getBoolean("fullScreen", true));
+            if (call.getData().has("boost")) a.setBoost(call.getBoolean("boost", false));
+            r.put("fullScreen", a.fullScreen()); r.put("boost", a.boost());
+            boolean sustained = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) { android.os.PowerManager pm = (android.os.PowerManager) getContext().getSystemService(Context.POWER_SERVICE); sustained = pm != null && pm.isSustainedPerformanceModeSupported(); }
+            r.put("sustained", sustained);
+            int mode = 0;   // Android's game mode for this app: 1 standard, 2 performance, 3 battery (Android 12+)
+            if (Build.VERSION.SDK_INT >= 31) { android.app.GameManager gm = (android.app.GameManager) getContext().getSystemService(Context.GAME_SERVICE); if (gm != null) mode = gm.getGameMode(); }
+            r.put("gameMode", mode);
+        } catch (Exception e) { r.put("error", String.valueOf(e.getMessage())); }
+        call.resolve(r);
+    }
+
     /* ---------- Battery ---------- */
 
     /** Charge level, whether it is charging, and how: cable (AC or USB), wireless or not plugged in. */

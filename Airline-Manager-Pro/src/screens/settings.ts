@@ -3,7 +3,8 @@
 type SetItem =
   | { type: 'toggle'; key: string; label: string; hint?: string; when?: () => boolean }
   | { type: 'choice'; key: string; label: string; hint?: string; options: string[][]; when?: () => boolean }
-  | { type: 'html'; html: () => string };
+  | { type: 'html'; html: () => string }
+  | { type: 'group'; title: string };   // starts a part of a section; with two or more, a switch shows one at a time
 
 interface SetSection { id: string; title: string; icon: string; items: SetItem[] }
 
@@ -12,7 +13,11 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => `<div class="set-card"><span class="brand-lg">${brandMark()}</span><span><b>${esc(APP.name)}</b><small>Version ${esc(APP.version)}</small></span><button class="btn ghost sm" data-act="whats-new">${icon('star')}What's new</button></div>` },
     { type: 'choice', key: 'units', label: 'Units', options: [['imperial', 'Feet, knots, nm'], ['metric', 'Metres, km/h, km']] },
     { type: 'toggle', key: 'clock24', label: '24-hour clock' },
+    { type: 'html', html: () => typeof DESKTOP !== 'undefined' && DESKTOP ? '' : `<label class="tg-row"><span><b>Full screen</b><small>The phone's status bar and navigation buttons stay hidden. A swipe from the edge shows them for a moment (and the notification panel can still be pulled down); they hide again by themselves. Remembered by the phone.</small></span><button class="tg ${fullScreenOn() ? 'on' : ''}" role="switch" aria-checked="${fullScreenOn()}" data-act="fullscreen-toggle"><i></i></button></label>` },
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
+  ] },
+  { id: 'booster', title: 'Game Booster', icon: 'power', items: [
+    { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
   ] },
   { id: 'licence', title: 'Registration', icon: 'key', items: [
     { type: 'html', html: () => licenceHtml() },
@@ -22,7 +27,8 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'aiSpeed', label: 'Virtual pilot speed', hint: 'Real time is how long the flight takes in the real world. Faster speeds also shorten turnarounds and rest. Only your hired pilots are affected, never your own flights.', options: [['1', 'Real time'], ['2', '2×'], ['4', '4×'], ['10', '10×'], ['30', '30×']] },
     { type: 'toggle', key: 'aiNotify', label: 'Notify me when my pilots land', hint: 'A phone notification when a hired pilot reaches the gate, even when the app is closed.' },
   ] },
-  { id: 'view3d', title: '3D view', icon: 'map', items: [
+  { id: 'view3d', title: 'Graphics', icon: 'map', items: [
+    { type: 'group', title: 'Distance and clouds' },
     { type: 'html', html: () => {
       const km = v3dKm();
       const note = km >= 400 ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: more ground to load and draw, a warmer device and more battery use.</p>`
@@ -42,6 +48,7 @@ const SETTINGS: SetSection[] = [
         <input type="range" class="cl-d" min="1" max="4" step="1" value="${d}" aria-label="Cloud detail">
         <div class="v3d-scale"><span>Light</span><span>Normal</span><span>Detailed</span><span>Very detailed</span></div>${note}</div>`;
     } },
+    { type: 'group', title: 'Sky and water' },
     { type: 'html', html: () => {
       const S: any = State.settings, wm = v3dWaterMode();
       const row = (k: string, label: string, hint: string) => `<label class="tg-row"><span><b>${label}</b><small>${hint}</small></span><button class="tg ${S[k] !== false ? 'on' : ''}" role="switch" aria-checked="${S[k] !== false}" data-act="v3d-opt" data-key="${k}"><i></i></button></label>`;
@@ -49,12 +56,19 @@ const SETTINGS: SetSection[] = [
         + (wm === 'mirror' ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: the 3D view is drawn twice for every picture.</p>` : '')
         + row('v3dDayNight', 'Day and night', 'The real sun for the place and time you look at: sunrise, sunset, twilight and night as they are there. Off: always daylight.')
         + row('v3dSky', 'Sun, moon and stars', 'The sun and the moon at their true size and place, the moon in its phase, and the real stars at night.')
+        + row('v3dCabinPax', 'Passengers in the cabin', 'In the Cabin view: the passengers in their own seats from the passenger list, each looking as they do there, with pets on their owners\' laps. Off: empty seats (quicker on slower devices).')
+        + row('v3dFlare', 'Lens flare', 'Looking towards the sun, its light catches in the camera lens: a glare and a row of soft rings and spots across the picture.')
+        + row('v3dPrecip', 'Rain and snow', 'From the real-world weather reports (or Flight Simulator\'s weather when linked): falling around you under a raining cloud, and in grey curtains below the clouds in the distance.')
+        + row('v3dLightning', 'Lightning', 'Storm clouds flash from inside, with bolts to the ground now and then; at night the whole area lights up for an instant.')
+        + row('v3dRainbow', 'Rainbows', 'Where it rains with the sun low behind you, a rainbow: a full arc or part of one, sometimes with a fainter second bow outside it.')
+        + row('v3dAurora', 'Northern and southern lights', 'The aurora from the real space-weather forecast (NOAA), where and as strong as it is forecast, on dark nights.')
         + row('v3dCity', 'Town lights at night', 'The lights of towns and roads from NASA\'s night pictures of the Earth.')
         + row('v3dAptLights', 'Airport lights', 'Runway, approach and taxiway lights, and floodlit aprons, at night and in poor light.')
         + row('v3dAcLights', 'Aircraft lights', 'Navigation lights, strobes, beacons and landing lights, as each flight would have them on.')
         + row('v3dSimTime', 'The simulator\'s time', 'When linked, the sky shows the time in the simulator (so it matches your flight). Off: always the real time.')
         + row('mapNight', 'Day and night on the map', 'The night side of the Earth shaded on the map, moving with the sun.');
     } },
+    { type: 'group', title: 'Satellite' },
     { type: 'toggle', key: 'v3dSat', label: 'Satellite imagery', hint: 'Shows the real ground from space (Sentinel-2 cloudless by EOX) instead of the map look. Can also be switched in the 3D view.' },
     { type: 'html', html: () => {
       if (!(State.settings as any).v3dSat) return '';
@@ -107,27 +121,38 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'sttQuality', label: 'Speech recognition quality', hint: 'Higher quality uses more of your PC while you fly.', options: [['light', 'Light'], ['balanced', 'Balanced'], ['accurate', 'Accurate']], when: () => State.settings.atcSource === 'beyondatc' && State.settings.atcListen },
   ] },
   { id: 'services', title: 'Passenger services', icon: 'pax', items: [
+    { type: 'html', html: () => { const S: any = State.settings, on = S.cateringStore !== false; return `<label class="tg-row"><span><b>Catering storage</b><small>Buy hot meals, food, snacks, drinks and alcohol into your own storage (Finance → Storage) at the day's prices; the ground crew load each flight from it. You can load a flight yourself while it boards (tap it on the map → Catering); otherwise they do it, very rarely coming up short. Off: each flight buys its catering at the airport.${Mode.coop() ? ' In a co-op the storage is the co-op airline\'s; only the owner buys stock, and everyone\'s flights are loaded from it.' : ''}</small></span><button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="v3d-opt" data-key="cateringStore"><i></i></button></label>`; } },
     { type: 'html', html: () => servicesHtml() },
   ] },
   { id: 'staff', title: 'Staff', icon: 'pilots', items: [
+    { type: 'group', title: 'Pay' },
     { type: 'html', html: () => payScaleHtml() },
+    { type: 'group', title: 'Apron crew' },
     { type: 'choice', key: 'groundHandling', label: 'Apron crew: mechanics, drivers and baggage handlers', hint: 'Your hub and every other base always need your own apron crew: without ground crew there, no aircraft can be unloaded, loaded, fuelled or pushed back, so none can leave. Bases only: everywhere else the local handling company turns your aircraft round for a fee. Every airport: you can also keep your own apron crew at any airport you fly to. Co-pilots and cabin crew are always your own.', options: [['base', 'Bases only'], ['everywhere', 'Every airport']] },
+    { type: 'group', title: 'Conduct' },
     { type: 'toggle', key: 'conduct', label: 'Conduct reports and behaviour', hint: 'Misconduct, warnings and court cases for your AI crew. Switching off never removes what already happened; court cases pause and carry on when you switch back on.' },
+    { type: 'html', html: () => {
+      const v = conductLevel(), names = ['Never', 'Rarely', 'Less often', 'Normal', 'Often'];
+      return `<div class="set-card col"><div class="sc-h">${icon('pilots')}<span><b class="cr-h">Conduct reports: ${names[v]}</b><small>How often your staff get into trouble at all. All the way down: never.</small></span></div>
+        <input type="range" class="cr-range" min="0" max="4" step="1" value="${v}" aria-label="How often conduct reports happen">
+        <div class="v3d-scale"><span>Never</span><span>Rarely</span><span>Less often</span><span>Normal</span><span>Often</span></div></div>`;
+    } },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Most of the time your staff behave well. Choose how often someone steps out of line. You'll be asked to discipline or dismiss them when it happens.</p>` },
     { type: 'html', html: () => [['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['ground', 'Ground staff'], ['fo', 'Co-pilots']].map(r => `<div class="ch-row"><span><b>${r[1]}</b><small>How often they misbehave</small></span><div class="seg">${[['never', 'Never'], ['rare', 'Rarely'], ['normal', 'Sometimes'], ['often', 'Often']].map(o => `<button class="${(State.settings as any).misconduct[r[0]] === o[0] ? 'on' : ''}" data-act="set-misconduct" data-r="${r[0]}" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>`).join('') },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Rarely is about 2% of the time, sometimes about 5–10%, often about 20%.</p>` },
   ] },
-  { id: 'realism', title: 'Damage and realism', icon: 'shield', items: [
+  { id: 'realism', title: 'Realism', icon: 'shield', items: [
+    { type: 'group', title: 'Damage' },
     { type: 'toggle', key: 'damage', label: 'Damage detection', hint: 'Tail strikes, hard landings, overspeed, engine failures and overstress the simulator can detect.' },
     { type: 'toggle', key: 'turbulence', label: 'Severe turbulence damage', hint: 'Only extreme turbulence counts, with realistic results: inspections, overstress, cabin damage.' },
     { type: 'toggle', key: 'crashPrompt', label: 'Ask me before registering a crash', hint: 'Choose to register or disregard each crash.' },
-    { type: 'toggle', key: 'tfcRealNames', label: 'Real airline names on other aircraft', hint: 'Other airlines\' aircraft on the map and in the 3D view fly as real airlines (British Airways, Lufthansa, Emirates…) from their real home airports, with their flight codes and registrations. Off: made-up airlines. The league, takeovers and the newspaper always use made-up airlines.' },
     { type: 'choice', key: 'repairTime', label: 'Repair time', hint: 'Instant: the aircraft is ready to fly as soon as you pay. Decided by the app: it stays in the hangar for 5, 10, 15, 20, 25, 30, 40, 50, 60 or 90 minutes, depending on the job and how good your mechanics are.', options: [['instant', 'Instant'], ['auto', 'Decided by the app']] },
-  ] },
-  { id: 'economy', title: 'Economy', icon: 'finance', items: [
+    { type: 'group', title: 'Economy' },
     { type: 'html', html: () => difficultySettingsHtml() } as any,
     { type: 'toggle', key: 'realMarkets', label: 'Real-world fuel and parts prices', hint: 'Jet fuel follows the real US Gulf Coast jet fuel price (U.S. Energy Information Administration) and spare parts the real US producer price index for aircraft parts (U.S. Bureau of Labor Statistics), updated daily. Off, or offline: a simulated market with its own news.' } as any,
     { type: 'toggle', key: 'pilotLocation', label: 'Pilot location and jumpseat', hint: 'Your next flight starts where you last landed. Flying from somewhere else means a jumpseat ride first, paid from your wallet. Always on in co-op.' } as any,
+    { type: 'group', title: 'Other airlines' },
+    { type: 'toggle', key: 'tfcRealNames', label: 'Real airline names on other aircraft', hint: 'Other airlines\' aircraft on the map and in the 3D view fly as real airlines (British Airways, Lufthansa, Emirates…) from their real home airports, with their flight codes and registrations. Off: made-up airlines. The league, takeovers and the newspaper always use made-up airlines.' },
   ] },
   { id: 'news', title: 'News', icon: 'news', items: [
     { type: 'choice', key: 'newsMode', label: 'Newspaper articles', hint: 'When your airline makes the papers. Every article is also in the inbox and under Newspaper in the menu.', options: [['popup', 'Open by themselves, animated'], ['notify', 'Only in the inbox, animated when opened'], ['plain', 'Only in the inbox, without animation']] },
@@ -136,9 +161,11 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'mechanicVoice', label: 'People speak their messages', hint: 'The mechanic, the gate agent, passengers and the head of operations read their messages aloud, word for word, with a play button to hear them again: women with women\'s voices, men with men\'s, angry people sound angry, apologies sound sorry. Everything runs on this device.' },
     { type: 'choice', key: 'voiceEngine', label: 'Voice', hint: 'Natural voices sound like real people. Until they are downloaded, the device\'s own voice reads the messages.', options: [['neural', 'Natural voices'], ['device', 'Device voice']], when: () => State.settings.mechanicVoice },
     { type: 'html', html: () => State.settings.mechanicVoice && (State.settings as any).voiceEngine !== 'device' ? voicePackCard() : '' },
+    { type: 'toggle', key: 'autoVoice', label: 'Read messages aloud automatically', hint: 'Off: messages from your staff and from ATC stay quiet until you press their play button. On: they start speaking as soon as they open.', when: () => State.settings.mechanicVoice },
     { type: 'html', html: () => State.settings.mechanicVoice ? `<div class="btn-row">${VOICE_TESTS.map(t => `<button class="btn ghost sm" data-act="voice-test" data-k="${t[0]}">${icon('play')}${esc(t[1])}</button>`).join('')}</div>` : '' },
   ] },
   { id: 'sound', title: 'Sound and feel', icon: 'volume', items: [
+    { type: 'group', title: 'App' },
     { type: 'toggle', key: 'muteAll', label: 'Mute all sounds', hint: 'Silences every sound in the app, voices too.' },
     { type: 'toggle', key: 'mechanicVoice', label: 'Voices in dialogues', hint: 'The mechanic, the gate agent, passengers and the head of operations speak their messages. Off: no voices and no play buttons, the messages are only written.', when: () => !State.settings.muteAll },
     { type: 'toggle', key: 'onlyVoices', label: 'Only the voices', hint: 'Every other sound is off (purchases, payments, taps, chimes), but the people in the dialogues still speak. Switch off to have all sounds again.', when: () => !State.settings.muteAll },
@@ -149,6 +176,16 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'uiSounds', label: 'Interface sounds', when: () => !State.settings.muteAll && !(State.settings as any).onlyVoices },
     { type: 'toggle', key: 'haptics', label: 'Vibration feedback' },
     { type: 'toggle', key: 'reduceMotion', label: 'Reduce motion', hint: 'Shorter animations and a still map.' },
+    { type: 'group', title: '3D view' },
+    { type: 'html', html: () => {
+      const S: any = State.settings, v = Math.round((S.v3dVol == null ? 0.7 : +S.v3dVol) * 100);
+      const row = (k: string, label: string, hint: string) => `<label class="tg-row"><span><b>${label}</b><small>${hint}</small></span><button class="tg ${S[k] !== false ? 'on' : ''}" role="switch" aria-checked="${S[k] !== false}" data-act="v3d-opt" data-key="${k}"><i></i></button></label>`;
+      if (State.settings.muteAll || S.onlyVoices) return `<p class="v3d-note">${icon('info')}Sounds are off (Mute all sounds, or Only the voices, above).</p>`;
+      return row('v3dEngines', 'Engine sounds', 'The aircraft near the camera: the roar and whine of jets, the beat of propellers, louder with power and the nearer they are. Quieter from the forward view.')
+        + row('v3dThunder', 'Thunder', 'After each flash of lightning, arriving as late as real thunder does (about 3 seconds a kilometre), heard out to about 16 km: a sharp crack close by, a low rumble far away.')
+        + `<div class="set-card col"><div class="sc-h">${icon('volume')}<span><b class="v3v-h">3D view volume: ${v}%</b><small>Engines and thunder together. The app's other sounds keep their own level.</small></span></div>
+        <input type="range" class="v3d-vol" min="0" max="100" step="5" value="${v}" aria-label="3D view volume"></div>`;
+    } },
   ] },
   { id: 'profiles', title: 'Profiles and companies', icon: 'pilots', items: [
     { type: 'choice', key: 'appMode', label: 'How pilots and companies relate', options: [['shared', 'One pilot, several companies'], ['separate', 'A pilot per company']] },
@@ -261,14 +298,24 @@ ACTIONS['lic-react'] = () => {
   });
 };
 
+/** The parts of a section (the items after each 'group' marker); one part when it has none. */
+function setGroups(sec: SetSection): { title: string; items: SetItem[] }[] {
+  const out: { title: string; items: SetItem[] }[] = [];
+  for (const it of sec.items) { if (it.type === 'group') out.push({ title: it.title, items: [] }); else { if (!out.length) out.push({ title: '', items: [] }); out[out.length - 1].items.push(it); } }
+  return out;
+}
+function setSubOf(id: string, n: number): number { const S: any = State.settings, v = (S.setSub || {})[id] || 0; return clamp(v, 0, n - 1); }
+ACTIONS['set-sub'] = el => { const S: any = State.settings; S.setSub = S.setSub || {}; S.setSub[_setSection] = +el.getAttribute('data-g'); Store.soon(); Sound.tick(); rerenderSettingsBody(true); };
 function settingsBody(): string {
   const sec = SETTINGS.filter(s => s.id === _setSection)[0];
-  const S: any = State.settings;
-  return `<h2>${esc(sec.title)}</h2>` + sec.items.map(it => {
+  const S: any = State.settings, groups = setGroups(sec), gi = setSubOf(sec.id, groups.length);
+  // two or more parts: a switch at the top, one part shown at a time
+  const sw = groups.length > 1 ? `<div class="seg set-sub" role="tablist">${groups.map((g, i) => `<button class="${i === gi ? 'on' : ''}" role="tab" aria-selected="${i === gi}" data-act="set-sub" data-g="${i}">${esc(g.title)}</button>`).join('')}</div>` : '';
+  return `<h2>${esc(sec.title)}</h2>` + sw + groups[gi].items.map(it => {
     if ((it as any).when && !(it as any).when()) return '';
     if (it.type === 'toggle') return `<label class="tg-row"><span><b>${esc(it.label)}</b>${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span>${toggle(it.key, !!S[it.key])}</label>`;
     if (it.type === 'choice') return `<div class="ch-row"><span><b>${esc(it.label)}</b>${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span><div class="seg">${it.options.map(o => `<button class="${S[it.key] === o[0] ? 'on' : ''}" data-act="set-choice" data-key="${it.key}" data-v="${o[0]}">${esc(o[1])}</button>`).join('')}</div></div>`;
-    return it.html();
+    return it.type === 'html' ? it.html() : '';
   }).join('');
 }
 
@@ -473,6 +520,11 @@ document.addEventListener('change', e => {
   else return;
   Store.save(); rerenderSettingsBody();
 });
+// how often conduct reports happen
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-vol')) return; (State.settings as any).v3dVol = +el.value / 100; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.v3v-h'); if (h) h.textContent = '3D view volume: ' + el.value + '%'; });
+document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (el && el.classList && el.classList.contains('v3d-vol')) Store.save(); });
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('cr-range')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.cr-h'); if (h) h.textContent = 'Conduct reports: ' + ['Never', 'Rarely', 'Less often', 'Normal', 'Often'][+el.value]; });
+document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('cr-range')) return; (State.settings as any).conductLevel = +el.value; Store.save(); rerenderSettingsBody(); });
 // the 3D view distance slider: the value shows while dragging, it's kept when let go
 document.addEventListener('input', e => {
   const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-range')) return;

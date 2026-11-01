@@ -1,5 +1,5 @@
 // The ground in the 3D view, in rings of detail: the finest heights around the aircraft (about 30 m
-// apart), coarser further out, as far as the view distance chosen in Settings → 3D view. The earth's
+// apart), coarser further out, as far as the view distance chosen in Settings → Graphics. The earth's
 // curvature is included, so distant mountains sink below the horizon as they do in reality.
 //
 // Coastlines, fjords, lakes and rivers come from the OpenStreetMap water outlines (OpenMapTiles via
@@ -9,11 +9,11 @@
 //
 // Heights: Terrain Tiles on AWS (Mapzen / Tilezen terrarium tiles), credited in Settings → About.
 
-/** The view distance chosen in Settings → 3D view (km), 20 to 800. */
+/** The view distance chosen in Settings → Graphics (km), 20 to 800. */
 function v3dKm(): number { return clamp(+(State.settings as any).v3dKm || 150, 20, 800); }
 const EARTH_R = 6371000;
 const SAT_URL = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/';
-/** Satellite detail, 0 (standard) to 3 (highest); Settings → 3D view. */
+/** Satellite detail, 0 (standard) to 3 (highest); Settings → Graphics. */
 /** The biggest single picture this device's graphics can safely hold. Phones and tablets share their memory
  *  between the app and the graphics, and Android closes an app that asks for too much without a word, so
  *  they get 4096 pixels (2048 with little memory); a PC can take 8192. */
@@ -49,7 +49,7 @@ const V3dTerrain = {
     const next = (i: number) => {
       if (gen !== this.gen || !V3d.open) return;
       if (i >= zs.length) { this.done = true; return; }   // every ring within the view distance is in
-      this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; if (this.rings.length === 1 && (V3d as any).lastL && V3d.icao && (V3d as any).lastL.icao === V3d.icao) { try { v3dBuildAirport((V3d as any).lastL); } catch (e) { /* ignore */ } } } next(i + 1); });
+      this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; if (this.rings.length === 1 && (V3d as any).lastL && V3d.icao && (V3d as any).lastL.icao === V3d.icao) { try { v3dBuildAirport((V3d as any).lastL); } catch (e) { /* ignore */ } } } setTimeout(() => next(i + 1), V3d.loaded ? 30 : 90); });
     };
     next(0);
   },
@@ -75,6 +75,10 @@ const V3dTerrain = {
       if (gen !== this.gen || !V3d.open) return null;
       if (!H) { H = new Float32Array(size * size); if (!inner) H.fill(V3d.elev || 0); }
       ring.H = H; ring.mask = mask; ring.ok = true;
+      // the heavy work in its own turn, after a frame has been drawn, so the screen never freezes for long
+      return new Promise<void>(res => requestAnimationFrame(() => setTimeout(res, 0)));
+    }).then(() => {
+      if (!ring.ok || gen !== this.gen || !V3d.open) return null;
       this.build(ring);
       if (z === 12) this.prog.got++;
       if ((State.settings as any).v3dSat) this.loadSat(ring);
@@ -260,6 +264,17 @@ const V3dTerrain = {
     for (const r of this.rings) { if (on) this.loadSat(r); else if (r.mesh) { r.mesh.material.map = r.mapTex; r.mesh.material.needsUpdate = true; } }
   },
 
+  /** Is this point on the sea (from the finest ring that covers it)? */
+  isSea(lon: number, lat: number): boolean {
+    for (const r of this.rings) {
+      const n = 1 << r.z, px = ((lon + 180) / 360 * n - r.x0) * 256, py = ((1 - Math.log(Math.tan(lat * D2R) + 1 / Math.cos(lat * D2R)) / Math.PI) / 2 * n - r.y0) * 256;
+      if (px < 0 || py < 0 || px >= r.size - 1 || py >= r.size - 1) continue;
+      const i = Math.floor(py) * r.size + Math.floor(px), R: any = r;
+      return R.sea ? R.sea[i] === 1 : !!(r.mask && r.mask[i * 4] > 110 && r.H[i] < 3);
+    }
+    return false;
+  },
+
   /** Ground height above the sea (m) at a point, from the finest ring that covers it. */
   ground(lon: number, lat: number): number {
     for (const r of this.rings) {
@@ -393,18 +408,30 @@ function v3dDespike(H: Float32Array, size: number) {
     if (low >= 6) { nb.sort((a, b) => a - b); H[i] = Math.min(h, nb[3]); }   // the middle of its neighbours
   }
 }
-/** Where the sea is (1) and isn't (0): water on the map that is near sea level, plus water on the map that
- *  is mostly surrounded by such sea (so a stray high value in the middle of the sea is flattened too).
- *  Land where the map and the heights disagree over a wide area stays land. */
+/** Where the sea is (1) and isn't (0). The sea is the map's water that joins up with water at sea level:
+ *  all of it is the sea, so wrong heights out in the water (spikes, common near steep islands such as the
+ *  Faroes) are flattened, however high and however many. Only right at the shore is a high value kept
+ *  (a cliff that the map's outline overlaps by a pixel), so the coast keeps its shape. Lakes (water that
+ *  never reaches sea level) are not touched. */
 function v3dSeaMap(H: Float32Array, size: number, mapWater: (i: number) => boolean): Uint8Array {
-  const s = new Uint8Array(size * size);
-  for (let i = 0; i < size * size; i++) s[i] = mapWater(i) && H[i] <= 8 ? 1 : 0;
-  const out = s.slice(), R = 3;
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const i = y * size + x; if (s[i] || !mapWater(i)) continue;
-    let n = 0, t = 0;
-    for (let dy = -R; dy <= R; dy++) { const yy = y + dy; if (yy < 0 || yy >= size) continue; for (let dx = -R; dx <= R; dx++) { const xx = x + dx; if (xx < 0 || xx >= size) continue; t++; n += s[yy * size + xx]; } }
-    if (n >= t * 0.6) out[i] = 1;
+  const N = size * size, wet = new Uint8Array(N);
+  for (let i = 0; i < N; i++) wet[i] = mapWater(i) ? 1 : 0;
+  // distance (in pixels) from the nearest land on the map
+  const dist = new Float32Array(N);
+  for (let i = 0; i < N; i++) dist[i] = wet[i] ? 1e6 : 0;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) { const i = y * size + x; if (!dist[i]) continue;
+    if (x > 0) dist[i] = Math.min(dist[i], dist[i - 1] + 1); if (y > 0) dist[i] = Math.min(dist[i], dist[i - size] + 1); }
+  for (let y = size - 1; y >= 0; y--) for (let x = size - 1; x >= 0; x--) { const i = y * size + x; if (!dist[i]) continue;
+    if (x < size - 1) dist[i] = Math.min(dist[i], dist[i + 1] + 1); if (y < size - 1) dist[i] = Math.min(dist[i], dist[i + size] + 1); }
+  // the water connected to water at sea level
+  const s = new Uint8Array(N), q = new Int32Array(N); let qh = 0, qt = 0;
+  for (let i = 0; i < N; i++) if (wet[i] && H[i] <= 8) { s[i] = 1; q[qt++] = i; }
+  while (qh < qt) {
+    const i = q[qh++], x = i % size, y = (i / size) | 0;
+    const go = (j: number) => { if (!s[j] && wet[j]) { s[j] = 1; q[qt++] = j; } };
+    if (x > 0) go(i - 1); if (x < size - 1) go(i + 1); if (y > 0) go(i - size); if (y < size - 1) go(i + size);
   }
-  return out;
+  // at the shore itself, a high value is the land (the outline and the heights a pixel apart)
+  for (let i = 0; i < N; i++) if (s[i] && H[i] > 8 && dist[i] <= 2 && H[i] > 40) s[i] = 0;
+  return s;
 }

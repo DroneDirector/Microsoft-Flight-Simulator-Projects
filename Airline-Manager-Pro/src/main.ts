@@ -6,6 +6,7 @@
   Store.load();
   Store.restoreIfEmpty();
   if (DESKTOP) { Desk.init(); SETTINGS.unshift({ id: 'display', title: 'Display', icon: 'pc', items: [{ type: 'html', html: desktopSettingsHtml }] } as any); }
+  setTimeout(() => { try { boosterSync(); } catch (e) { /* the device keeps its own settings */ } }, 1500);   // the device's own full screen and boost settings, as chosen here
   loadKnownAirports();
   World.load();
   World.loadRunways();   // runways in use, for departures and approaches

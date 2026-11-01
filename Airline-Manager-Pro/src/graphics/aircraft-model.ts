@@ -306,6 +306,16 @@ function cylBetween(a: number[], b: number[], r: number, mat: any, seg?: number)
 
 const _acMats: { [k: string]: any } = {};
 function acMat(key: string, make: () => any) { return _acMats[key] || (_acMats[key] = make()); }
+/** Wings that flex: the tips move up and down with the bending (more towards the tip), set per aircraft just
+ *  before it is drawn (userData.flex on the model, in metres at the tip; userData.semi, the half span). */
+function wingFlex(m: any): any {
+  m.userData.flex = { value: 0 }; m.userData.semi = { value: 15 };
+  m.onBeforeCompile = (sh: any) => {
+    sh.uniforms.uFlex = m.userData.flex; sh.uniforms.uSemi = m.userData.semi;
+    sh.vertexShader = 'uniform float uFlex; uniform float uSemi;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  { float sf = clamp(abs(position.y) / max(1.0, uSemi), 0.0, 1.2); transformed.z += uFlex * sf * sf; }');
+  };
+  return m;
+}
 
 /** Build the model of a type in a livery. userData.set({ flaps: 0..1, gear: 0..1, prop: angle }) moves its parts. */
 function buildAircraftModel(typeId: string, lv: Livery): any {
@@ -314,21 +324,30 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   const tex = new T.CanvasTexture(paintFuselage(s, lv)); tex.flipY = false; tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
   const finTex = new T.CanvasTexture(paintFin(lv)); finTex.flipY = false; finTex.colorSpace = T.SRGBColorSpace;
   const std = (o: any) => new T.MeshStandardMaterial(Object.assign({ roughness: 0.42, metalness: 0.08 }, o));
-  const mBody = std({ map: tex, side: T.DoubleSide });
-  const mFin = std({ map: finTex, side: T.DoubleSide });
-  const mWing = acMat('wing', () => std({ color: 0xAFB9C5, roughness: 0.5, metalness: 0.25, side: T.DoubleSide }));
-  const mWingTop = acMat('wing2', () => std({ color: 0xB7C0CB, roughness: 0.55, metalness: 0.2, side: T.DoubleSide }));
+  // the painted fuselage, tail and engines are glossy (they reflect the sky and the sun); the wings stay satin
+  const mBody = std({ map: tex, side: T.DoubleSide, roughness: 0.24, metalness: 0.12 });
+  const mFin = std({ map: finTex, side: T.DoubleSide, roughness: 0.26, metalness: 0.12 });
+  const mWing = acMat('wing', () => wingFlex(std({ color: 0xAFB9C5, roughness: 0.5, metalness: 0.25, side: T.DoubleSide, envMapIntensity: 0.35 })));
+  const mWingTop = acMat('wing2', () => std({ color: 0xB7C0CB, roughness: 0.55, metalness: 0.2, side: T.DoubleSide, envMapIntensity: 0.35 }));
   const engCol = lv.engines === 'c1' ? lv.c1 : lv.engines === 'c2' ? lv.c2 : lv.engines === 'body' ? lv.body : '#C9D1DA';
-  const mEng = std({ color: new T.Color(engCol), roughness: 0.35, metalness: lv.engines === 'metal' ? 0.5 : 0.1 });
+  const mEng = std({ color: new T.Color(engCol), roughness: 0.22, metalness: lv.engines === 'metal' ? 0.6 : 0.18 });
   const mMetal = acMat('metal', () => std({ color: 0x9BA4AE, roughness: 0.35, metalness: 0.7 }));
   const mFloat = acMat('float', () => std({ color: 0xD9DEE4, roughness: 0.45, metalness: 0.3 }));
   const mDark = acMat('dark', () => std({ color: 0x1A1F26, roughness: 0.7, metalness: 0.1 }));
   const mTyre = acMat('tyre', () => std({ color: 0x16191D, roughness: 0.9, metalness: 0 }));
   const mBlade = acMat('blade', () => std({ color: 0x23282F, roughness: 0.6, metalness: 0.2 }));
   const mDisc = acMat('disc', () => new T.MeshBasicMaterial({ color: 0xC8D2DC, transparent: true, opacity: 0.16, depthWrite: false, side: T.DoubleSide }));
-  const add = (geo: any, mat: any, parent?: any) => { const m = new T.Mesh(geo, mat); (parent || root).add(m); return m; };
+  const flexSemi = s.span / 2;
+  const add = (geo: any, mat: any, parent?: any) => {
+    const m = new T.Mesh(geo, mat); (parent || root).add(m);
+    if (mat === mWing) m.onBeforeRender = () => {   // this aircraft's wing bending, from its model
+      let o: any = m, f = 0; while (o) { if (typeof o.userData.flex === 'number') { f = o.userData.flex; break; } o = o.parent; }
+      mWing.userData.flex.value = f; mWing.userData.semi.value = flexSemi; mWing.uniformsNeedUpdate = true;
+    };
+    return m;
+  };
 
-  add(buildFuselage(s), mBody);
+  add(buildFuselage(s), mBody).userData.fus = true;   // hidden from the cabin window views (you sit inside it)
 
   /* wings, both sides */
   const W = s.wing, semi = s.span / 2, rootY = s.w / 2 * 0.9;
@@ -429,9 +448,10 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   }
 
   /* engines */
-  const props: any[] = [];
+  const props: any[] = [], revParts: any[] = [], engPts: any[] = [];
   for (const E of s.eng) for (const side of E.y ? [1, -1] : [1]) {
     const y = side * E.y, d = E.d, L = E.l;
+    engPts.push({ y, mid: _av(E.x + L * 0.55, y, E.z), exh: _av(E.x + L * (E.kind === 'tprop' ? 0.9 : 1.08), y, E.z), d });
     if (E.kind === 'fan' || E.kind === 'rear') {
       const prof = [[0, d * 0.43], [L * 0.012, d * 0.495], [L * 0.06, d * 0.5], [L * 0.42, d * 0.5], [L * 0.7, d * 0.44], [L * 0.86, d * 0.34], [L * 0.9, d * 0.31]];
       add(latheX(prof, [E.x, y, E.z], 26, 1, s.cockpit === 'b737' ? 0.9 : 1), mEng);
@@ -439,6 +459,13 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
       // the fan behind the intake
       const fan = new T.Mesh(new T.CircleGeometry(d * 0.44, 24), mDark); fan.position.copy(_av(E.x + L * 0.05, y, E.z)); fan.rotation.y = -Math.PI / 2; root.add(fan);
       add(latheX([[L * 0.04, d * 0.12], [L * 0.09, 0.02]], [E.x, y, E.z], 14), mMetal);
+      // thrust reverser (jet airliners): the cowl's sleeve slides back and opens the cascade vanes
+      if (s.cockpit !== 'ga') {
+        const casc = add(latheX([[L * 0.4, d * 0.503], [L * 0.6, d * 0.49]], [E.x, y, E.z], 26), acMat('cascade', () => std({ color: 0x24282E, roughness: 0.9, metalness: 0.3 })));
+        const sleeve = add(latheX([[L * 0.4, d * 0.508], [L * 0.7, d * 0.448], [L * 0.72, d * 0.43]], [E.x, y, E.z], 26, 1, s.cockpit === 'b737' ? 0.9 : 1), mEng);
+        casc.visible = false;
+        revParts.push({ casc, sleeve, slide: _av(L * 0.2, 0, 0).sub(_av(0, 0, 0)), at: _av(E.x + L * 0.5, y, E.z) });
+      }
       if (E.kind === 'fan') {
         // pylon up to the wing
         const wzAt = zAt(Math.abs(E.y)), wle = leAt(Math.abs(E.y));
@@ -454,11 +481,11 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
       // the nacelle's top flows into the wing
       const wle = leAt(Math.abs(E.y));
       add(panelGeo([E.x + L * 0.1, y, E.z + d * 0.4], L * 0.75, [wle, y, zAt(Math.abs(E.y)) + 0.02], chordAt(Math.abs(E.y)) * 0.9, 0.5, 0.2, 'y'), mEng);
-      props.push(makeProp(E, [E.x - 0.2, y, E.z], side, mBlade, mDisc, mEng, root));
+      props.push(Object.assign(makeProp(E, [E.x - 0.2, y, E.z], side, mBlade, mDisc, mEng, root), { y }));
     } else {
       // engine in the nose: the fuselage is the cowling; a propeller in front (and a ring cowl for a radial)
       if (E.kind === 'radial') add(latheX([[0, d * 0.42], [0.05, d * 0.5], [E.l, d * 0.5], [E.l + 0.3, d * 0.44]], [E.x + 0.1, 0, E.z], 24), mEng);
-      props.push(makeProp(E, [E.x - 0.08, 0, E.z], 1, mBlade, mDisc, mEng, root));
+      props.push(Object.assign(makeProp(E, [E.x - 0.08, 0, E.z], 1, mBlade, mDisc, mEng, root), { y: 0 }));
     }
   }
 
@@ -511,7 +538,12 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   root.userData.flaps = flapParts;
   root.userData.props = props;
   /** Flaps 0..1 (full), gear 0 (up) .. 1 (down), propellers turning. */
-  root.userData.set = (o: { flaps?: number; gear?: number; spin?: number; spoilers?: number }) => {
+  root.userData.revPts = revParts.map(r => r.at);
+  // engines numbered as in the simulator: from the left wing tip to the right
+  engPts.sort((a, b) => a.y - b.y); root.userData.engPts = engPts;
+  const propIdx = props.map(p => engPts.findIndex(e => Math.abs(e.y - p.y) < 0.01));
+  root.userData.set = (o: { flaps?: number; gear?: number; spin?: number; spoilers?: number; reverse?: number }) => {
+    if (o.reverse != null) for (const r of revParts) { const k = clamp(o.reverse, 0, 1); r.sleeve.position.copy(r.slide).multiplyScalar(k); r.casc.visible = k > 0.01; }
     if (o.spoilers != null) for (const p of spoilerParts) { const k = clamp(o.spoilers, 0, 1); p.visible = k > 0.02; p.quaternion.setFromAxisAngle(p.userData.axis, k * 0.85); }
     if (o.flaps != null) for (const p of flapParts) {
       const k = clamp(o.flaps, 0, 1);
@@ -519,7 +551,7 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
       p.children[0].position.copy(p.userData.slide).multiplyScalar(k);
     }
     if (o.gear != null && !s.gear.fixed && !s.gear.floats) { gearG.visible = o.gear > 0.02; gearG.scale.y = 0.2 + 0.8 * clamp(o.gear, 0, 1); gearG.position.y = (1 - clamp(o.gear, 0, 1)) * s.ground * 0.55; }
-    if (o.spin != null) for (const p of props) { p.blades.rotation.x = o.spin; p.disc.visible = true; }
+    if (o.spin != null) props.forEach((p, i) => { const out = (o as any).stopped === propIdx[i]; if (!out) p.blades.rotation.x = o.spin; p.disc.visible = !out; });   // a stopped engine's propeller stands still (feathered)
   };
   return root;
 }

@@ -6,6 +6,9 @@ amp-market.json on the amp-market-data branch (the app reads it from there).
   public domain), series DJFUELUSGULF via FRED.
 - Spare parts: Producer Price Index by Industry, Other Aircraft Parts and Equipment Manufacturing, monthly
   (US Bureau of Labor Statistics, public domain), series PCU336413336413 via FRED.
+- Catering: US consumer price indices, monthly (US Bureau of Labor Statistics, public domain): food away from
+  home (hot meals, CUUR0000SEFV), food at home (other food, CUUR0000SAF11), candy and chewing gum (sweets
+  and snacks, CUUR0000SEFR02), non-alcoholic beverages (CUUR0000SAF114), alcoholic beverages (CUUR0000SAF116).
 """
 import csv, io, json, sys, urllib.request, datetime
 
@@ -46,6 +49,36 @@ def bls_parts():
     rows = d["Results"]["series"][0]["data"]
     out = [[f"{x['year']}-{x['period'][1:]}-01", round(float(x["value"]), 4)] for x in rows if x["period"].startswith("M") and x["period"] != "M13"]
     return sorted(out)
+
+CATERING = {"hot": ("CUUR0000SEFV", "Food away from home"), "food": ("CUUR0000SAF11", "Food at home"), "candy": ("CUUR0000SEFR02", "Candy and chewing gum"),
+            "soft": ("CUUR0000SAF114", "Non-alcoholic beverages"), "liquor": ("CUUR0000SAF116", "Alcoholic beverages")}
+
+def bls_many(ids):
+    """Several monthly BLS series in one request (public API, no key): {id: [[date, value], ...]}."""
+    now = datetime.datetime.utcnow().year
+    body = json.dumps({"seriesid": ids, "startyear": str(now - 4), "endyear": str(now)}).encode()
+    req = urllib.request.Request("https://api.bls.gov/publicAPI/v1/timeseries/data/", data=body, headers={"Content-Type": "application/json", "User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=90) as r:
+        d = json.load(r)
+    out = {}
+    for sr in d.get("Results", {}).get("series", []):
+        rows = [[f"{x['year']}-{x['period'][1:]}-01", round(float(x["value"]), 3)] for x in sr.get("data", []) if x["period"].startswith("M") and x["period"] != "M13" and x["value"] not in ("-", "")]
+        out[sr["seriesID"]] = sorted(rows)
+    return out
+
+def catering():
+    """The five catering price indices (BLS, FRED as a fallback for any that are missing)."""
+    got = {}
+    try: got = bls_many([v[0] for v in CATERING.values()])
+    except Exception as e: print(f"::warning::BLS catering: {e!r}")
+    out = {}
+    for k, (sid, name) in CATERING.items():
+        s = got.get(sid) or []
+        if len(s) < 13:
+            try: s = series(sid)[-60:]
+            except Exception as e: print(f"::warning::FRED {sid}: {e!r}")
+        if len(s) >= 13: out[k] = {"name": f"US consumer price index, {name.lower()}", "id": sid, "series": s[-48:]}
+    return out
 
 def first(*fns):
     for f in fns:
@@ -106,6 +139,7 @@ data = {
     "fuel": {"name": "US Gulf Coast jet fuel spot price", "unit": "$/gal", "source": "U.S. Energy Information Administration (public domain)", "series": fuel},
     "outlook": {"name": "EIA Short-Term Energy Outlook, jet fuel (monthly, $ a gallon)", "source": "U.S. Energy Information Administration (public domain)", "series": steo_jet_fuel()[-36:]},
     "parts": {"name": "US producer price index, aircraft parts and equipment", "unit": "index", "source": "U.S. Bureau of Labor Statistics (public domain)", "series": parts},
+    "catering": catering(),
 }
 json.dump(data, open(sys.argv[1] if len(sys.argv) > 1 else "amp-market.json", "w"), separators=(",", ":"))
 print("fuel", fuel[-1], "parts", parts[-1])

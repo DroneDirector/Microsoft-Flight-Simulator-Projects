@@ -45,6 +45,11 @@ function aiUpdate(f: LiveFlight, now: number) {
   // the boarding scan, while the flight is still at the gate (only while you are watching)
   if (!F.scanned && el < 600 && now - F.depAt < 15 * 60000) { F.scanned = true; try { boardingScan(f); } catch (e) { /* ignore */ } }
   if (F.medical && !F.medical.noted && el > 1200) { try { medicalNote(F); } catch (e) { /* ignore */ } }
+  if (F.emerg && !F.emerg.noted && el > F.emerg.at) { try { failureNote(F); } catch (e) { /* ignore */ } }
+  // the ground crew load the catering from the storage before the doors close (unless you did it by hand)
+  if (!F.catLoaded && !F.ferry && f.pax && /take-?off|climb|cruise|lift/i.test(f.phase || '') && typeof cateringOn === 'function' && cateringOn()) {
+    try { const a = plane(f.reg), pJF = (F.paxJ || 0) + (F.paxF || 0), r = catLoad(F, a ? a.companyId : State.companyId, catNeed(f.pax - pJF, pJF, Math.round((F.durMs || 3600e3) / 60000))); F.catStockUsd = r.stockUsd; } catch (e) { /* bought at the airport */ }
+  }
   if (F.wxDivert && !F.wxDivert.noted && F.toGoS < 1800) { try { wxDivertNote(F); } catch (e) { /* ignore */ } }
   const td = p.pts.filter(x => x.ph === 'Landing')[0];
   F.toTdS = td ? (Math.max(0, td.s - el) + extra) / (F.spd || 1) : F.toGoS;
@@ -191,7 +196,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
   const burnKg = Math.round(prof.airS / 3600 * burnH + burnH * 0.08 * (prof.totalS - prof.airS) / 900);
   const m = f.from === f.to
     ? (() => { const fuel = Math.round(burnKg * 0.95), crew = Math.round(t.costPerHr * blockMin / 60 * 0.35); return { net: -(fuel + crew), revenue: 0, costs: fuel + crew, lines: [['Test flight fuel', -fuel], ['Aircraft and crew time', -crew]] } as any; })()
-    : legEconomics(a.typeId, f.from, f.to, f.pax, F.cargoKg || 0, blockMin, burnKg, false, { book: true, reg: a.reg, paxJ: F.paxJ, paxF: F.paxF, ferry: !!F.ferry, job: F.job ? jobPayFor(F.job) : undefined });
+    : legEconomics(a.typeId, f.from, f.to, f.pax, F.cargoKg || 0, blockMin, burnKg, false, { book: true, cat: F.catStockUsd, reg: a.reg, paxJ: F.paxJ, paxF: F.paxF, ferry: !!F.ferry, job: F.job ? jobPayFor(F.job) : undefined });
   const net = m.net, d = new Date(at), ds = dateStr(d);
   const txId = uid(); (summary.tx = summary.tx || []).push(txId);
   State.txns.unshift({ id: txId, companyId: c.id, date: ds.slice(0, 10), time: ds.slice(11), label: `${f.from === f.to ? 'Test flight ' + f.reg + ' at ' + f.from : (F.ferry ? 'Ferry ' : F.job ? 'Charter ' : '') + f.callsign + ' ' + f.from + ' to ' + f.to}${p ? ' (' + p.name.split(' ')[0] + ')' : ''}`,
@@ -330,6 +335,8 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       // rarely, a passenger falls ill on the way: the flight will divert (planned now, told when it happens)
       if (!test && maybeMedical(f, a)) { f.medical.from = n.from; prof = aiProfile({ reg: n.reg, from: n.from, to: f.to, depAt }); f.durMs = prof.totalS * 1000; }
       if (!test) assignDelays(f, prof);
+      // very rarely, something fails on the way (decided now, shown when it happens)
+      if (!test) { try { if (maybeFailure(f, a, prof)) f.durMs = prof.totalS * 1000 + (f.holds || []).reduce((s2: number, h: Hold) => s2 + h.s, 0) * 1000; } catch (e) { /* no failure */ } }
       // real weather on the way: reroutes, holding, or a diversion to an alternate
       if (!test && ev.at > now - 30 * 60e3) {
         try {

@@ -6,10 +6,20 @@
 function skyOpt(k: string): boolean { return (State.settings as any)[k] !== false; }
 function v3dWaterMode(): string { const v = (State.settings as any).v3dWater; return v === 'simple' || v === 'mirror' ? v : 'living'; }
 /** The time the sky shows: the simulator's when linked (and switched on), otherwise now. */
+/** The time the sky shows. Linked to Flight Simulator (and the setting on): the simulator's own time, which
+ * keeps running from where it was if the link drops for a while; otherwise this device's clock. It never
+ * flips back and forth: a change (linking, unlinking, a time jump in the simulator) is eased in over a few
+ * seconds, so the sun and the light move there instead of jumping. */
+const SkyClock = { off: 0, target: 0, at: 0, simAt: 0 };
 function skyTime(): number {
-  const L: any = typeof Link !== 'undefined' ? (Link as any).sim : null;
-  if (skyOpt('v3dSimTime') && L && L.simTime && L.t && Date.now() - L.t < 20000) return L.simTime + (Date.now() - L.t);
-  return Date.now();
+  const now = Date.now(), L: any = typeof Link !== 'undefined' ? (Link as any).sim : null;
+  if (skyOpt('v3dSimTime') && L && L.simTime && L.t && now - L.t < 20000) { SkyClock.target = L.simTime - L.t; SkyClock.simAt = now; }
+  else if (!skyOpt('v3dSimTime') || now - SkyClock.simAt > 5 * 60e3) SkyClock.target = 0;   // not linked any more: back to this device's time
+  const dt = SkyClock.at ? Math.min(5000, now - SkyClock.at) : 1e9; SkyClock.at = now;
+  const d = SkyClock.target - SkyClock.off;
+  if (Math.abs(d) < 2000 || dt >= 1e9) SkyClock.off = SkyClock.target;
+  else SkyClock.off += d * Math.min(1, 1 - Math.exp(-dt / 2500));
+  return now + SkyClock.off;
 }
 
 /* ---------- where the sun and the moon are ---------- */
@@ -147,6 +157,8 @@ function v3dGroundMat(map: any, wetTex: any): any {
 uniform sampler2D uWet; uniform sampler2D uCity; uniform float uCityOn;
 uniform vec3 uSunCol; uniform float uSunVis; uniform float uMoonVis; uniform float uAmb; uniform float uNight; uniform float uTime;
 uniform float uWind; uniform float uWindDir; uniform float uWater; uniform float uMirror; uniform float uMirrorPass; uniform sampler2D uMirrorTex; uniform mat4 uMirrorMat;
+float wh(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float wvn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(wh(i), wh(i + vec2(1.0, 0.0)), f.x), mix(wh(i + vec2(0.0, 1.0)), wh(i + vec2(1.0, 1.0)), f.x), f.y); }
 ${SKY_GLSL}
 ${SPOT_GLSL}
 ` + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
@@ -159,25 +171,38 @@ ${SPOT_GLSL}
     vec3 V = normalize(cameraPosition - vWpos); float dist = length(cameraPosition - vWpos); vec2 P = vWpos.xz; float w = uWind;
     vec2 g = vec2(0.0);
     float foot = dist * 0.0012 / max(V.y, 0.03);   // the size of a pixel on the water there (long at a low angle)
-    // many waves of different lengths and directions (so no pattern shows), each faded out where it
-    // would be smaller than a few pixels on screen
-    for (int i = 0; i < 9; i++) {
-      float fi = float(i), r1 = fract(sin(fi * 12.9898) * 43758.5453), r2 = fract(sin(fi * 78.233) * 12345.678);
-      float lam = 150.0 * pow(0.62, fi) * mix(0.6, 1.3, w) * (0.85 + 0.3 * r1);
-      float ang = uWindDir + (r2 - 0.5) * 2.2;
+    // the sea's surface: many waves of different lengths, heights and directions, on a slowly wandering grid
+    // (so no straight lines or repeating pattern show), plus irregular small ripples; waves too small to
+    // see from here are faded out and turn into a rougher, softer sheen instead of a striped one
+    vec2 Pw = P + vec2(sin(P.y * 0.0091 + uTime * 0.05) + sin(P.y * 0.0037 - P.x * 0.002), sin(P.x * 0.0083 - uTime * 0.04) + sin(P.x * 0.0029 + P.y * 0.0031)) * 22.0;
+    float tot = 0.0, seen = 0.0;
+    for (int i = 0; i < 14; i++) {
+      float fi = float(i), r1 = fract(sin(fi * 12.9898 + 1.3) * 43758.5453), r2 = fract(sin(fi * 78.233 + 4.1) * 12345.678), r3 = fract(sin(fi * 39.425 + 7.7) * 24634.634);
+      float lam = 170.0 * pow(0.71, fi) * mix(0.6, 1.3, w) * (0.7 + 0.6 * r1);
+      float ang = uWindDir + (r2 - 0.5) * (1.6 + fi * 0.18);
       vec2 dir = vec2(cos(ang), sin(ang)); float k = 6.2831853 / lam;
-      float ph = dot(dir, P) * k - uTime * sqrt(9.81 * k) + r1 * 6.2831853;
-      float amp = mix(0.03, 0.13, w) * smoothstep(foot * 5.0, foot * 18.0, lam);
-      g += dir * cos(ph) * amp;
+      float ph = dot(dir, Pw) * k - uTime * sqrt(9.81 * k) + r3 * 6.2831853;
+      float a0 = mix(0.025, 0.11, w) * (0.55 + 0.9 * r3), vis = smoothstep(foot * 4.0, foot * 16.0, lam);
+      g += dir * cos(ph) * a0 * vis; tot += a0; seen += a0 * vis;
     }
+    // small irregular ripples (noise), drifting with the wind
+    vec2 wd = vec2(cos(uWindDir), sin(uWindDir)) * uTime * (0.6 + 1.5 * w);
+    for (int j = 0; j < 2; j++) {
+      float sc = j == 0 ? 6.5 : 2.2, vis = smoothstep(foot * 3.0, foot * 12.0, sc);
+      vec2 q = (P - wd * (j == 0 ? 1.0 : 1.7)) / sc, e = vec2(0.37, 0.0);
+      g += vec2(wvn(q + e.xy) - wvn(q - e.xy), wvn(q + e.yx) - wvn(q - e.yx)) * mix(0.18, 0.5, w) * vis * (j == 0 ? 1.0 : 0.6);
+      tot += 0.08; seen += 0.08 * vis;
+    }
+    float rough = 1.0 - seen / max(tot, 1e-4);   // how much of the surface's detail is too small to see from here
     vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
     float F = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
     vec3 R = reflect(-V, N); R.y = abs(R.y) + 0.002; R = normalize(R);
-    vec3 refl = pow(skyCol(R), vec3(2.2));
-    if (uMirror > 0.5) { vec4 mp = uMirrorMat * vec4(vWpos, 1.0); vec2 st = mp.xy / mp.w * 0.5 + 0.5 + N.xz * 0.05; if (mp.w > 0.0 && st.x > 0.0 && st.x < 1.0 && st.y > 0.0 && st.y < 1.0) refl = texture2D(uMirrorTex, st).rgb; }
+    // far away, the unseen ripples blur the reflection: the sky a little higher up and softer
+    vec3 refl = pow(skyCol(normalize(R + vec3(0.0, rough * 0.12 * (0.4 + w), 0.0))), vec3(2.2));
+    if (uMirror > 0.5) { vec4 mp = uMirrorMat * vec4(vWpos, 1.0); vec2 st = mp.xy / mp.w * 0.5 + 0.5 + N.xz * 0.05; if (mp.w > 0.0 && st.x > 0.0 && st.x < 1.0 && st.y > 0.0 && st.y < 1.0) refl = mix(texture2D(uMirrorTex, st).rgb, refl, rough * 0.35); }
     vec3 body = vec3(0.006, 0.03, 0.045) * uAmb;
     vec3 wc = mix(body, refl, F);
-    float shn = mix(2200.0, 260.0, w);
+    float shn = mix(2200.0, 260.0, w) * (1.0 - 0.75 * rough);
     wc += uSunCol * pow(max(dot(R, uSun), 0.0), shn) * mix(40.0, 7.0, w) * uSunVis;
     wc += vec3(0.55, 0.6, 0.7) * pow(max(dot(R, uMoon), 0.0), shn * 0.6) * mix(3.0, 1.0, w) * uMoonVis;
     float shore = smoothstep(0.28, 0.45, wet) * (1.0 - smoothstep(0.45, 0.7, wet));
@@ -230,7 +255,7 @@ void main() {
   gl_Position = projectionMatrix * mv;
   #include <logdepthbuf_vertex>
 }`;
-const SUN_GLOW = 14;   // the sun's picture reaches this many sun radii (the disc in the middle, its glow around it)
+const SUN_GLOW = 40;   // the sun's picture reaches this many sun radii (the disc in the middle, its glow around it)
 const MOON_GLOW = 1.6;
 function v3dSkyInit() {
   const T = THREE, U = v3dSkyUniforms(), sc = V3d.scene;
@@ -243,18 +268,31 @@ function v3dSkyInit() {
   dome.renderOrder = -1000; dome.frustumCulled = false; sc.add(dome); V3dSky.dome = dome;
   // the sun: its disc at its true size (about half a degree), and the glow around it
   const sun = new T.Mesh(new T.PlaneGeometry(1, 1), new T.ShaderMaterial({
-    uniforms: { uSize: { value: 1 }, uCol: { value: new T.Color(1, 1, 1) }, uVis: { value: 1 } }, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false,
+    uniforms: { uSize: { value: 1 }, uCol: { value: new T.Color(1, 1, 1) }, uVis: { value: 1 }, uFlat: { value: 1 }, uHaze: { value: 0 }, uTime: { value: 0 } },
+    transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false,
     vertexShader: SKY_BILLBOARD_VS,
     fragmentShader: `#include <common>
 #include <logdepthbuf_pars_fragment>
-uniform vec3 uCol; uniform float uVis; varying vec2 vUv;
+uniform vec3 uCol; uniform float uVis; uniform float uFlat; uniform float uHaze; uniform float uTime; varying vec2 vUv;
 void main() {
   #include <logdepthbuf_fragment>
-  float r = length(vUv - 0.5) * 2.0 * ${SUN_GLOW.toFixed(1)};
-  float disc = 1.0 - smoothstep(0.92, 1.06, r), limb = 0.62 + 0.38 * sqrt(max(0.0, 1.0 - min(r, 1.0) * min(r, 1.0)));
-  float glow = exp(-r * 0.42) * 0.42 + exp(-r * 0.11) * 0.1;
-  vec3 c = uCol * (disc * limb * 2.2 + glow);
-  gl_FragColor = vec4(c, uVis * clamp(disc + glow * 1.4, 0.0, 1.0) * (1.0 - smoothstep(0.85, 1.0, length(vUv - 0.5) * 2.0)));
+  vec2 q = (vUv - 0.5) * 2.0 * ${SUN_GLOW.toFixed(1)};
+  float r = length(q);
+  // the disc, squashed near the horizon by the air bending its light, with darker edges (limb darkening)
+  float rd = length(vec2(q.x, q.y / uFlat));
+  float disc = 1.0 - smoothstep(0.94, 1.04, rd);
+  float limb = 0.55 + 0.45 * pow(max(0.0, 1.0 - min(rd, 1.0) * min(rd, 1.0)), 0.4);
+  // too bright to look at: white-hot in the middle, its colour only in the glare around it
+  vec3 core = mix(uCol, vec3(1.0), 0.75 - 0.55 * uHaze) * disc * limb * (3.2 - 1.6 * uHaze);
+  // glare and bloom: a tight bright halo and a wide soft one; wider and softer in haze
+  float bloom = exp(-r * (0.55 - 0.25 * uHaze)) * 0.85 + exp(-r * (0.16 - 0.06 * uHaze)) * 0.28 + exp(-r * 0.045) * 0.1 * (1.0 + uHaze);
+  // faint rays from the glare, slowly shimmering
+  float a = atan(q.y, q.x);
+  float rays = pow(abs(cos(a * 3.0 + 0.3)), 40.0) * 0.6 + pow(abs(cos(a * 7.0 + uTime * 0.05)), 60.0) * 0.35 + pow(abs(cos(a * 11.0 - uTime * 0.03)), 80.0) * 0.25;
+  rays *= exp(-r * 0.12) * (1.0 - smoothstep(0.0, 1.0, uHaze)) * smoothstep(1.0, 2.5, r);
+  vec3 c = core + uCol * (bloom + rays * 0.5);
+  float edge = 1.0 - smoothstep(0.8, 1.0, length(vUv - 0.5) * 2.0);
+  gl_FragColor = vec4(c * uVis * edge, 1.0);
 }` }));
   sun.renderOrder = -990; sun.frustumCulled = false; sc.add(sun); V3dSky.sun = sun;
   // the moon: a lit ball, its phase from where the sun is, and faint dark patches (the seas)
@@ -319,8 +357,9 @@ void main() {
   V3dSky.astroAt = 0; V3dSky.dimAt = 0;
 }
 function v3dSkyClear() {
+  if (V3dSky.envRt) { try { V3dSky.envRt.dispose(); } catch (e) { /* gone */ } V3dSky.envRt = null; } V3dSky.envKey = ''; V3dSky.envAt = 0; if (V3dSky.pm) { try { V3dSky.pm.dispose(); } catch (e) { /* gone */ } V3dSky.pm = null; }
   if (V3dSky.rt) { try { V3dSky.rt.dispose(); } catch (e) { /* gone */ } }
-  V3dSky.dome = V3dSky.sun = V3dSky.moon = V3dSky.stars = V3dSky.rt = V3dSky.mcam = null;
+  V3dSky.dome = V3dSky.sun = V3dSky.moon = V3dSky.stars = V3dSky.rt = V3dSky.mcam = null; V3dSky.bow = null; V3dSky.bowK = 0; V3dSky.aurora = null;
 }
 
 /** The weather nearest the view: wind (0–1 and the direction it blows to) and how overcast it is. */
@@ -328,13 +367,24 @@ function v3dSkyWeather(lon: number, lat: number): { wind: number; dir: number; c
   const L: any = typeof Link !== 'undefined' ? (Link as any).sim : null;
   let kt = -1, from = 0, cloud = 0, visM = -1;
   if (L && L.wx && L.lat && gcDistanceNm([L.lon, L.lat], [lon, lat]) < 30) { kt = L.wx.windKt; from = L.wx.windDir; visM = L.wx.inCloud ? 300 : L.wx.visM || -1; }
-  let best = 1e9, w: any = null; const cache: any = LiveWx.cache;
-  for (const k in cache) { const A = apt(k); if (!A) continue; const d = gcDistanceNm(A.pos, [lon, lat]); if (d < best && d < 120) { best = d; w = cache[k]; } }
-  if (w) {
-    if (kt < 0) { kt = w.kt || 0; from = w.dir >= 0 ? w.dir : 0; }
-    // the report's visibility is in statute miles ("10+" is ten or more)
-    if (visM < 0) { const mi = parseFloat(String(w.vis || '')); if (isFinite(mi)) visM = /\+/.test(String(w.vis)) ? 16000 : mi * 1609; if (/FG|BR|HZ/.test(w.wx || '')) visM = Math.min(visM < 0 ? 5000 : visM, /FG/.test(w.wx || '') ? 800 : 4000); }
-    for (const c of w.clouds || []) cloud = Math.max(cloud, c.cover === 'OVC' ? 1 : c.cover === 'BKN' ? 0.6 : c.cover === 'SCT' ? 0.2 : 0);
+  // the reports nearby, blended by distance, so the weather changes smoothly between airports
+  const cache: any = LiveWx.cache, near: [number, any][] = [];
+  for (const k in cache) { const A = apt(k); if (!A) continue; const d = gcDistanceNm(A.pos, [lon, lat]); if (d < 120) near.push([d, cache[k]]); }
+  near.sort((a, b) => a[0] - b[0]);
+  let sw = 0, skt = 0, sx = 0, sy = 0, scl = 0, svis = 0;
+  for (const [d, w] of near.slice(0, 4)) {
+    const k = 1 / (Math.max(3, d) * Math.max(3, d));
+    let v = 16000; const mi = parseFloat(String(w.vis || ''));   // the report's visibility is in statute miles ("10+" is ten or more)
+    if (isFinite(mi)) v = /\+/.test(String(w.vis)) ? 16000 : mi * 1609;
+    if (/FG|BR|HZ/.test(w.wx || '')) v = Math.min(v, /FG/.test(w.wx || '') ? 800 : 4000);
+    let c = 0; for (const q of w.clouds || []) c = Math.max(c, q.cover === 'OVC' ? 1 : q.cover === 'BKN' ? 0.6 : q.cover === 'SCT' ? 0.2 : 0);
+    const dir = (w.dir >= 0 ? w.dir : 0) * D2R;
+    sw += k; skt += k * (w.kt || 0); sx += k * Math.sin(dir); sy += k * Math.cos(dir); scl += k * c; svis += k * v;
+  }
+  if (sw > 0) {
+    if (kt < 0) { kt = skt / sw; from = (Math.atan2(sx, sy) / D2R + 360) % 360; }
+    if (visM < 0) visM = svis / sw;
+    cloud = scl / sw;
   }
   if (kt < 0) kt = 8;
   // the waves run with the wind: towards where it blows (x east, z south)
@@ -362,7 +412,14 @@ function v3dSkyStep(now: number) {
     // the stars: the sky's turning as one rotation (the equator's axes as seen from here)
     const e = (ra: number, dec: number) => { const q = astroAltAz(ra, dec, ll[1], lst); return astroVec(q.alt, q.az); };
     const ex = e(0, 0), ey = e(90, 0), ez = e(0, 90);
-    const wx = v3dSkyWeather(ll[0], ll[1]);
+    // the weather eases from one state to the next over half a minute or so, never in a jump
+    const w1 = v3dSkyWeather(ll[0], ll[1]), w0 = V3dSky.a && V3dSky.a.wx, dt = V3dSky.wxAt ? now - V3dSky.wxAt : 0; V3dSky.wxAt = now;
+    let wx = w1;
+    if (w0 && dt > 0) {
+      const k = 1 - Math.exp(-dt / 9000), lerp = (a: number, b: number) => a + (b - a) * k;
+      let dd = w1.dir - w0.dir; while (dd > Math.PI) dd -= 2 * Math.PI; while (dd < -Math.PI) dd += 2 * Math.PI;
+      wx = { wind: lerp(w0.wind, w1.wind), dir: w0.dir + dd * k, cloud: lerp(w0.cloud, w1.cloud), visM: Math.exp(lerp(Math.log(w0.visM), Math.log(w1.visM))) };
+    }
     V3dSky.a = { sunAlt, moonAlt, sv, mv, illum, ex, ey, ez, wx };
   }
   const A = V3dSky.a, sunAlt = A.sunAlt, moonAlt = A.moonAlt;
@@ -390,7 +447,7 @@ function v3dSkyStep(now: number) {
   U.uSunCol.value.setRGB(sunCol[0], sunCol[1], sunCol[2], T.SRGBColorSpace);
   // the light on everything: daylight, warm at sunset, blue-grey moonlight at night
   const day = sstep(-7, 14, sunAlt) * (1 - 0.32 * A.wx.cloud), moon = U.uMoonK.value * 0.09, amb = 0.055 + day * 0.945 + moon;
-  const warm = clamp(1 - Math.abs(sunAlt - 2) / 10, 0, 1) * (1 - A.wx.cloud * 0.7);
+  const warm = sstep(-6, 0, sunAlt) * (1 - sstep(2, 9, sunAlt)) * (1 - A.wx.cloud * 0.7);   // golden light only with the sun low
   const nightTint = [0.62, 0.7, 0.95], dayTint = [1, 1, 1], warmTint = [1, 0.8, 0.62];
   const tint = [0, 1, 2].map(i => (nightTint[i] + (dayTint[i] - nightTint[i]) * sstep(-6, 6, sunAlt)) * (1 - warm * 0.6) + warmTint[i] * warm * 0.6);
   V3dSky.amb = amb; V3dSky.tint = tint;
@@ -419,6 +476,11 @@ function v3dSkyStep(now: number) {
   V3dSky.sun.material.uniforms.uSize.value = 2 * Dd * Math.tan(0.2666 * D2R) * SUN_GLOW;
   V3dSky.sun.material.uniforms.uCol.value.setRGB(sunCol[0], sunCol[1], sunCol[2]);
   V3dSky.sun.material.uniforms.uVis.value = sstep(-1.5, 0.5, sunAlt) * (1 - 0.92 * A.wx.cloud);
+  { const su = V3dSky.sun.material.uniforms;
+    su.uFlat.value = 1 - 0.18 * (1 - sstep(-0.5, 4, sunAlt));                                   // flattened just above the horizon
+    su.uHaze.value = clamp((1 - sstep(0, 12, sunAlt)) * 0.7 + U.uMist.value * 0.5 + A.wx.cloud * 0.3, 0, 1);   // low sun, mist, thin cloud: diffused
+    su.uTime.value = now / 1000; }
+  try { v3dFlareStep(cam, A, sstep(-0.5, 1.5, sunAlt) * (1 - 0.95 * A.wx.cloud) * (show ? 1 : 0)); } catch (e) { /* no flare */ }
   V3dSky.moon.visible = show && moonAlt > -1;
   V3dSky.moon.position.set(cp.x + A.mv[0] * Dd * 0.98, cp.y + A.mv[1] * Dd * 0.98, cp.z + A.mv[2] * Dd * 0.98);
   V3dSky.moon.material.uniforms.uSize.value = 2 * Dd * 0.98 * Math.tan(0.259 * D2R) * MOON_GLOW;
@@ -441,6 +503,9 @@ function v3dSkyStep(now: number) {
       const k = 0.08 + 0.92 * sstep(-8, 10, sunAlt) + U.uMoonK.value * 0.08;
       C.material.uniforms.uLight.value.setRGB(0.97 * k * (tint[0] * 0.7 + 0.3), 0.98 * k * (tint[1] * 0.7 + 0.3), k * (tint[2] * 0.7 + 0.3));
       C.material.uniforms.uDark.value.setRGB(0.5 * k * tint[0], 0.55 * k * tint[1], 0.63 * k * tint[2]);
+      const useSun = sunAlt > -4 || !(moonUp > 0), v = useSun ? A.sv : A.mv;
+      C.material.uniforms.uSun.value.set(v[0], Math.max(0.03, v[1]), v[2]).normalize();
+      C.material.uniforms.uSunK.value = useSun ? sstep(-4, 3, sunAlt) : moonUp * A.illum * 0.35;
     }
   } catch (e) { /* no clouds */ }
   // everything drawn without lighting (the ground, runways, the airport's paint) is dimmed and tinted the same way
@@ -472,6 +537,14 @@ function v3dSkyStep(now: number) {
     const f = new T.Vector3(0, 0, -1).applyQuaternion(cam.quaternion); f.y = -f.y;
     const up = new T.Vector3(0, 1, 0).applyQuaternion(cam.quaternion); up.y = -up.y;
     mc.position.copy(p); mc.up.copy(up); mc.lookAt(p.clone().add(f)); mc.updateMatrixWorld(); mc.updateProjectionMatrix();
+    // nothing below the water's surface may show in the mirror (land dipping away with the Earth's curve, the
+    // undersides of flat ground pieces): the camera's near plane is tilted to lie on the surface itself
+    { const pl = new T.Plane(new T.Vector3(0, 1, 0), 0.5).applyMatrix4(mc.matrixWorldInverse);
+      const cp = new T.Vector4(pl.normal.x, pl.normal.y, pl.normal.z, pl.constant), e = mc.projectionMatrix.elements;
+      const q = new T.Vector4((Math.sign(cp.x) + e[8]) / e[0], (Math.sign(cp.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
+      cp.multiplyScalar(2 / cp.dot(q));
+      e[2] = cp.x; e[6] = cp.y; e[10] = cp.z + 1; e[14] = cp.w;
+      mc.projectionMatrixInverse.copy(mc.projectionMatrix).invert(); }
     U.uMirrorMat.value.multiplyMatrices(mc.projectionMatrix, mc.matrixWorldInverse);
     U.uMirrorPass.value = 1;
     R.setRenderTarget(V3dSky.rt); R.render(V3d.scene, mc); R.setRenderTarget(null);
@@ -589,17 +662,93 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
     for (let d = 0; d < len; d += 30) add(a[0] + ux * d, a[1] + uz * d, 0.6, GRN, 1.3);
     if (p[0] === 1) for (let d = 0; d < len; d += 60) for (const sd of [-wd, wd]) add(a[0] + ux * d - uz * sd, a[1] + uz * d + ux * sd, 0.6, BLU, 1.3);
   }
-  // aprons: floodlights on masts around the edge
-  for (const ar of L.areas || []) {
-    if (ar.k !== 'apron' || ar.pts.length < 3) continue;
-    for (let i = 0; i < ar.pts.length; i++) {
-      const P1 = loc(ar.pts[i][0], ar.pts[i][1]), P2 = loc(ar.pts[(i + 1) % ar.pts.length][0], ar.pts[(i + 1) % ar.pts.length][1]), len = Math.hypot(P2[0] - P1[0], P2[1] - P1[1]);
-      for (let d = 0; d < len; d += 90) { const t = d / len; add(P1[0] + (P2[0] - P1[0]) * t, P1[1] + (P2[1] - P1[1]) * t, 24, FLOOD.map(v => v * 0.6), 16); }
+  // aprons: floodlight masts as at real airports, well apart (about 120–150 m), beside the stands on the
+  // terminal side (in the gaps between stands, near the stands' noses) and never on a taxiway or a stand
+  const masts = v3dApronMasts(L, loc);
+  for (const m of masts) add(m[0], m[1], 27, FLOOD.map(v => v * 0.75), 7);
+  if (!size.length) return null;
+  const pts = v3dLightPoints(pos, col, size, kind, dirs, phs);
+  if (!masts.length) return pts;
+  const grp = new THREE.Group(); grp.add(pts); grp.add(v3dMastMeshes(masts, gy));
+  return grp;
+}
+
+/** Where the apron floodlight masts stand ([x, z] in the view). */
+function v3dApronMasts(L: AirportLayout, loc: (x: number, y: number) => number[]): number[][] {
+  const segs: number[][] = [];   // taxiways: [ax, az, bx, bz, half width]
+  for (const p of L.paths || []) {
+    const A = L.points[p[2]], B = L.points[p[3]]; if (!A || !B) continue;
+    const a = loc(A[0], A[1]), b = loc(B[0], B[1]); segs.push([a[0], a[1], b[0], b[1], (p[1] || 18) / 2]);
+  }
+  const stands = (L.parks || []).map(k => { const q = loc(k[0], k[1]); return [q[0], q[1], k[2], Math.max(12, k[3] || 20)]; });
+  const terms = (L.areas || []).filter(a => a.k === 'terminal' && a.pts.length >= 3).map(a => a.pts.map(p => loc(p[0], p[1])));
+  const segD = (x: number, z: number, g: number[]) => {
+    const dx = g[2] - g[0], dz = g[3] - g[1], l2 = dx * dx + dz * dz || 1, t = clamp(((x - g[0]) * dx + (z - g[1]) * dz) / l2, 0, 1);
+    return Math.hypot(x - g[0] - dx * t, z - g[1] - dz * t);
+  };
+  const inPoly = (x: number, z: number, P: number[][]) => { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) if ((P[i][1] > z) !== (P[j][1] > z) && x < (P[j][0] - P[i][0]) * (z - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0]) c = !c; return c; };
+  const ok = (x: number, z: number) => {
+    for (const g of segs) if (segD(x, z, g) < g[4] + 9) return false;          // clear of every taxiway and taxilane
+    for (const t of stands) if (Math.hypot(x - t[0], z - t[1]) < t[3] + 4) return false;   // never on a stand
+    for (const P of terms) if (inPoly(x, z, P)) return false;                  // not inside the building
+    return true;
+  };
+  const cand: number[][] = [];   // [x, z, preference]
+  // beside each stand's nose (the terminal side), in the gap to the next stand
+  for (const t of stands) {
+    const h = t[2] * D2R, fx = Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = Math.sin(h);
+    for (const side of [-1, 1]) for (const ahead of [0.85, 0.5]) {
+      const x = t[0] + fx * t[3] * ahead + rx * side * (t[3] + 6), z = t[1] + fz * t[3] * ahead + rz * side * (t[3] + 6);
+      cand.push([x, z, ahead]);
     }
   }
-  if (!size.length) return null;
-  return v3dLightPoints(pos, col, size, kind, dirs, phs);
+  // no stands mapped: along the apron's edge, the stretches nearest the terminal first
+  if (!stands.length) for (const ar of L.areas || []) {
+    if (ar.k !== 'apron' || ar.pts.length < 3) continue;
+    const P = ar.pts.map(p => loc(p[0], p[1]));
+    for (let i = 0; i < P.length; i++) {
+      const P1 = P[i], P2 = P[(i + 1) % P.length], len = Math.hypot(P2[0] - P1[0], P2[1] - P1[1]);
+      for (let d = 10; d < len; d += 40) {
+        const x = P1[0] + (P2[0] - P1[0]) * d / len, z = P1[1] + (P2[1] - P1[1]) * d / len;
+        let near = 1e9; for (const T of terms) for (const q of T) near = Math.min(near, Math.hypot(x - q[0], z - q[1]));
+        if (terms.length && near > 300) continue;
+        cand.push([x, z, -near / 1000]);
+      }
+    }
+  }
+  cand.sort((a, b) => b[2] - a[2]);
+  const out: number[][] = [], SEP = 130;
+  for (const c of cand) {
+    if (!ok(c[0], c[1])) continue;
+    if (out.some(o => Math.hypot(o[0] - c[0], o[1] - c[1]) < SEP)) continue;
+    out.push([c[0], c[1]]);
+    if (out.length >= 80) break;
+  }
+  return out;
 }
+
+/** The masts themselves: a tall grey pole with a head of lamps, and a pool of light on the apron beneath at night. */
+function v3dMastMeshes(masts: number[][], gy: (x: number, z: number) => number): any {
+  const T = THREE, U = v3dSkyUniforms(), g = new T.Group(), n = masts.length, M = new T.Matrix4();
+  const pole = new T.InstancedMesh(new T.CylinderGeometry(0.25, 0.45, 27, 6).translate(0, 13.5, 0), new T.MeshLambertMaterial({ color: 0x9AA1A8 }), n);
+  const head = new T.InstancedMesh(new T.BoxGeometry(3.2, 1.1, 1.6).translate(0, 27.4, 0), new T.MeshLambertMaterial({ color: 0x6E757C }), n);
+  const poolMat = new T.ShaderMaterial({
+    uniforms: { uOn: U.uLightsOn }, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
+    vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);\n#include <logdepthbuf_vertex>\n}',
+    fragmentShader: '#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform float uOn; varying vec2 vUv; void main() {\n#include <logdepthbuf_fragment>\nfloat r = length(vUv - 0.5) * 2.0; float k = (1.0 - smoothstep(0.0, 1.0, r)); k *= k; gl_FragColor = vec4(vec3(1.0, 0.78, 0.5) * k * 0.28 * uOn, 1.0); }',
+    polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8,
+  });
+  const pool = new T.InstancedMesh(new T.PlaneGeometry(90, 90).rotateX(-Math.PI / 2), poolMat, n);
+  masts.forEach((m, i) => {
+    const y = gy(m[0], m[1]), r = cloudHash(Math.round(m[0]), Math.round(m[1]), 7) * Math.PI;
+    M.makeRotationY(r).setPosition(m[0], y, m[1]); pole.setMatrixAt(i, M); head.setMatrixAt(i, M);
+    M.makeTranslation(m[0], y + 0.7, m[1]); pool.setMatrixAt(i, M);
+  });
+  pole.renderOrder = head.renderOrder = 9; pool.renderOrder = 8;
+  g.add(pole, head, pool);
+  return g;
+}
+
 
 /* ---------- aircraft lights ---------- */
 /** Navigation lights (red left, green right, white tail), white strobes, red beacons and landing lights, on the model itself. */
@@ -697,17 +846,20 @@ function v3dPlaneLightsSet(model: any, ph: string, agl: number, onGround: boolea
   const landing = toRoll || (!onGround && low) || (onRwyLanding && (gs == null || gs > 30)) ? 1 : 0;
   const gearDown = onGround || /final|landing|approach|lift-?off|take-?off/.test(ph) || agl < 2000;
   const nose = push ? 0 : taxi || lineUp || toRoll || onRwyLanding || (!onGround && gearDown && low && !/climb/.test(ph)) ? 1 : 0;
+  // the light sits on the nose gear: only lit when that gear is fully down (never while it is retracting or stowed)
+  const gearNow = model && model.userData ? model.userData.gearNow : null;
+  const noseOn = gearNow == null || gearNow > 0.97 ? nose : 0;
   const logo = onGround || low ? 1 : 0;
   L.material.uniforms.uFlags.value.set(nav, strobe, beacon, landing);
-  L.material.uniforms.uFlags2.value.set(nose, logo, 0, 0);
+  L.material.uniforms.uFlags2.value.set(noseOn, logo, 0, 0);
   // the light they throw on the ground, and their beams in mist
   const src = body.userData.lightSrc, U = v3dSkyUniforms();
-  if (src && (landing || nose) && U.uLightsOn.value > 0.02) {
+  if (src && (landing || noseOn) && U.uLightsOn.value > 0.02) {
     body.updateMatrixWorld();
     const T = THREE, at = (p: any) => p.clone().applyMatrix4(body.matrixWorld), dirOf = (d: number[]) => new T.Vector3(d[0], d[1], d[2]).transformDirection(body.matrixWorld);
     const a = at(src.land[0]), b = at(src.land[1]);
     if (landing) V3dSky.spots.push({ pos: a.add(b).multiplyScalar(0.5), dir: dirOf(src.landDir), k: 1, range: 420 });
-    if (nose) V3dSky.spots.push({ pos: at(src.nose), dir: dirOf(src.taxiDir), k: landing ? 0.45 : 0.8, range: 110 });
+    if (noseOn) V3dSky.spots.push({ pos: at(src.nose), dir: dirOf(src.taxiDir), k: landing ? 0.45 : 0.8, range: 110 });
   }
   const beams = body.userData.beams;
   if (beams) { const k = landing * U.uMist.value * U.uLightsOn.value; body.userData.beamMat.uniforms.uK.value = k; for (const m of beams) m.visible = k > 0.01; }
@@ -739,4 +891,238 @@ function nightMapDraw(c: CanvasRenderingContext2D, m: any) {
   }
   if (!MapNight.cv) return;
   c.save(); c.imageSmoothingEnabled = true; c.drawImage(MapNight.cv, 0, 0, W, H); c.restore();
+}
+
+/* ---------- the lens flare ---------- */
+
+/** Looking towards the sun: a glare and a row of soft rings and spots along the line from the sun through
+ * the middle of the picture, as in a camera lens. Drawn on top of the view; fades as the sun leaves the
+ * picture, sets or goes behind cloud. */
+const FLARE_PARTS: [number, number, string, number][] = [   // position along the line (1 = sun, -1 = mirrored), size (share of picture height), colour, strength
+  [1, 0.55, '255,240,215', 0.22], [0.62, 0.05, '255,200,140', 0.35], [0.38, 0.09, '170,220,255', 0.18], [0.12, 0.03, '255,255,255', 0.4],
+  [-0.15, 0.13, '150,255,190', 0.12], [-0.32, 0.05, '255,170,120', 0.3], [-0.55, 0.2, '170,190,255', 0.1], [-0.78, 0.07, '255,220,170', 0.25], [-1.05, 0.3, '255,160,200', 0.07],
+];
+function v3dFlareStep(cam: any, A: any, vis: number) {
+  const host = V3d.r && V3d.r.domElement && V3d.r.domElement.parentElement; if (!host) return;
+  let el: HTMLElement = V3dSky.flare;
+  const on = skyOpt('v3dFlare') && vis > 0.01 && !(A.wx && A.wx.visM < 1500) && V3d.mode !== 'cabin';
+  if (!on) { if (el) el.style.opacity = '0'; return; }
+  if (!el || el.parentElement !== host) {
+    el = document.createElement('div'); el.className = 'v3d-flare';
+    el.style.cssText = 'position:absolute;inset:0;pointer-events:none;overflow:hidden;mix-blend-mode:screen;z-index:2;transition:opacity .25s';
+    el.innerHTML = FLARE_PARTS.map(() => '<i style="position:absolute;border-radius:50%;left:0;top:0"></i>').join('');
+    host.appendChild(el); V3dSky.flare = el;
+  }
+  const T = THREE, p = new T.Vector3(A.sv[0], A.sv[1], A.sv[2]).multiplyScalar(1e5).add(cam.position).project(cam);
+  if (p.z > 1 || Math.abs(p.x) > 1.6 || Math.abs(p.y) > 1.6) { el.style.opacity = '0'; return; }
+  // what hides the sun: the ground or the aircraft in front of it (checked a few times a second)
+  const now = performance.now();
+  if (!V3dSky.flareAt || now - V3dSky.flareAt > 250) {
+    V3dSky.flareAt = now;
+    let hit = false;
+    try {
+      // hills and mountains: walk along the line towards the sun and compare with the ground
+      const d = new T.Vector3(A.sv[0], A.sv[1], A.sv[2]).normalize(), c = cam.position;
+      if (V3dTerrain.rings.length) for (let t = 60; t < 60000 && !hit; t *= 1.25) {
+        const x = c.x + d.x * t, y = c.y + d.y * t, z = c.z + d.z * t, ll = v3dLonLat(x, z);
+        if (y < V3dTerrain.ground(ll[0], ll[1]) - v3dCurve(x, z)) hit = true;
+      }
+      // aircraft in front of the sun
+      if (!hit) {
+        const objs: any[] = []; for (const k in V3d.planes || {}) { const P = (V3d.planes as any)[k]; if (P && P.model && P.model.position.distanceTo(c) < 3000) objs.push(P.model); }
+        hit = new T.Raycaster(c.clone(), d, 0.5, 5000).intersectObjects(objs, true).length > 0;
+      }
+    } catch (e) { /* nothing to test against */ }
+    V3dSky.flareHid = hit;
+  }
+  const w = host.clientWidth, h = host.clientHeight, sx = (p.x * 0.5 + 0.5) * w, sy = (0.5 - p.y * 0.5) * h, cx = w / 2, cy = h / 2;
+  const edge = 1 - clamp((Math.max(Math.abs(p.x), Math.abs(p.y)) - 0.9) / 0.7, 0, 1);
+  const k = vis * edge * (V3dSky.flareHid ? 0 : 1);
+  el.style.opacity = k.toFixed(3);
+  const items = el.children;
+  for (let i = 0; i < FLARE_PARTS.length; i++) {
+    const f = FLARE_PARTS[i], x = cx + (sx - cx) * f[0], y = cy + (sy - cy) * f[0], s = f[1] * h, it = items[i] as HTMLElement;
+    const ring = i === 2 || i === 6;
+    it.style.width = it.style.height = s + 'px';
+    it.style.transform = `translate(${(x - s / 2).toFixed(1)}px,${(y - s / 2).toFixed(1)}px)`;
+    it.style.background = ring ? `radial-gradient(circle, rgba(${f[2]},0) 55%, rgba(${f[2]},${f[3]}) 68%, rgba(${f[2]},0) 74%)`
+      : `radial-gradient(circle, rgba(${f[2]},${f[3]}) 0%, rgba(${f[2]},${(f[3] * 0.5).toFixed(3)}) 35%, rgba(${f[2]},0) 70%)`;
+  }
+}
+
+/* ---------- reflections on the aircraft ---------- */
+
+/** The sky as the aircraft reflect it: worked out from the sky's own colours (with the sun's glow), the
+ *  ground below dark, made again as the light changes (sunrise, sunset, cloud, night). */
+function v3dEnvStep(now: number) {
+  const T = THREE, U = v3dSkyUniforms(); if (!V3d.r || !V3d.scene) return;
+  const tint = V3dSky.tint || [1, 1, 1], amb = V3dSky.amb || 1, key = [tint[0], tint[1], tint[2], amb].map(v => Math.round(v * 20)).join(',');
+  if (V3dSky.envKey === key && V3d.scene.environment && now - (V3dSky.envAt || 0) < 120000) return;
+  if (V3dSky.envAt && now - V3dSky.envAt < 4000) return;
+  V3dSky.envKey = key; V3dSky.envAt = now;
+  try {
+    const geo = new T.SphereGeometry(1, 32, 16), pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const d = [pos.getX(i), pos.getY(i), pos.getZ(i)];
+      let c: number[];
+      if (d[1] >= -0.02) c = skyColJs([d[0], Math.max(0.02, d[1]), d[2]], U).map(v => Math.pow(Math.max(0, v), 2.2));   // the sky's colours are screen colours: to light
+      else { const k = amb * 0.22; c = [0.32 * k * tint[0], 0.34 * k * tint[1], 0.36 * k * tint[2]]; }
+      col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+    }
+    geo.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+    const sc = new T.Scene(); sc.add(new T.Mesh(geo, new T.MeshBasicMaterial({ vertexColors: true, side: T.BackSide })));
+    // the sun as a bright spot, so it glints on the fuselage
+    const a = V3dSky.a; if (a && a.sunAlt > -2) { const sun = new T.Mesh(new T.SphereGeometry(0.06, 8, 6), new T.MeshBasicMaterial({ color: new T.Color(4, 3.8, 3.4) })); sun.position.set(a.sv[0] * 0.9, a.sv[1] * 0.9, a.sv[2] * 0.9); sc.add(sun); }
+    if (!V3dSky.pm) V3dSky.pm = new T.PMREMGenerator(V3d.r);
+    const rt = V3dSky.pm.fromScene(sc, 0.03);
+    if (V3dSky.envRt) V3dSky.envRt.dispose();
+    V3dSky.envRt = rt; V3d.scene.environment = rt.texture;
+    geo.dispose();
+  } catch (e) { /* no reflections */ }
+}
+
+/* ---------- rainbows ---------- */
+
+/** A rainbow: with the sun low behind you (under 42°) and not hidden by cloud, where rain is falling in
+ *  front of you. The main bow at about 42° from the point opposite the sun (red outside, violet inside),
+ *  the fainter second bow at about 51° with its colours the other way round, and the sky a little brighter
+ *  inside the main bow. A full arc when you are in the rain; parts of one where the rain is only in some
+ *  directions. */
+function v3dRainbowStep() {
+  const T = THREE, cam = V3d.cam, A = V3dSky.a; if (!cam || !A) return;
+  let M = V3dSky.bow;
+  if (!M || M.parent !== V3d.scene) {
+    M = V3dSky.bow = new T.Mesh(new T.SphereGeometry(1, 64, 32), new T.ShaderMaterial({
+      uniforms: { uAnti: { value: new T.Vector3() }, uK: { value: 0 }, uFull: { value: 0 }, uShafts: { value: Array.from({ length: 8 }, () => new T.Vector3()) } },
+      vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n#include <logdepthbuf_vertex>\n}',
+      fragmentShader: `#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform vec3 uAnti; uniform float uK; uniform float uFull; uniform vec3 uShafts[8]; varying vec3 vDir;
+vec3 spec(float h) { return clamp(abs(fract(h + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0); }
+void main() {
+  #include <logdepthbuf_fragment>
+  vec3 d = normalize(vDir);
+  float th = degrees(acos(clamp(dot(d, uAnti), -1.0, 1.0)));
+  // where along the bow the rain is: everywhere, or only towards the rain curtains around you
+  float m = uFull;
+  vec2 hz = normalize(d.xz + 1e-5);
+  for (int i = 0; i < 8; i++) { if (uShafts[i].z <= 0.0) continue; float a = acos(clamp(dot(hz, uShafts[i].xy), -1.0, 1.0)); m = max(m, 1.0 - smoothstep(uShafts[i].z * 0.6, uShafts[i].z, a)); }
+  float b1 = 1.0 - smoothstep(0.0, 1.0, abs(th - 41.5) / 1.1);   // the main bow, about 2° wide
+  float b2 = 1.0 - smoothstep(0.0, 1.0, abs(th - 51.9) / 1.6);   // the second bow
+  vec3 c = spec(clamp((th - 40.4) / 2.2, 0.0, 1.0) * 0.78) * b1 + spec(clamp((54.0 - th) / 3.4, 0.0, 1.0) * 0.78) * b2 * 0.42;
+  c += vec3(0.05) * (1.0 - smoothstep(38.0, 41.0, th));   // brighter inside the bow
+  c *= m * uK * smoothstep(-0.02, 0.06, d.y + 0.03);
+  gl_FragColor = vec4(c, 1.0);
+}`,
+      side: T.BackSide, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false,
+    }));
+    M.renderOrder = 6; M.frustumCulled = false; V3d.scene.add(M);
+  }
+  // how much rain there is in front of you, and where
+  const U = M.material.uniforms, cp = cam.position, sunAlt = A.sunAlt;
+  const anti = new T.Vector3(-A.sv[0], -A.sv[1], -A.sv[2]).normalize();
+  const shafts = ((V3dClouds as any).list || []).filter((p: any) => p.m === 3 && p.dies == null && !p.dx);   // rain curtains (not snow)
+  const dirs: number[][] = [];
+  for (const p of shafts) {
+    const dx = p.x - cp.x, dz = p.z - cp.z, d = Math.hypot(dx, dz); if (d < 800 || d > 25000) continue;
+    if (dx * anti.x + dz * anti.z < 0) continue;   // only on the side away from the sun
+    dirs.push([dx / d, dz / d, Math.min(0.6, Math.atan2(p.s * 0.7, d)), d]);
+  }
+  dirs.sort((a, b) => a[3] - b[3]);
+  const here = V3dWx.snow1 ? 0 : V3dWx.k;
+  for (let i = 0; i < 8; i++) { const s = dirs[i]; U.uShafts.value[i].set(s ? s[0] : 0, s ? s[1] : 0, s ? s[2] : 0); }
+  const sunOk = sunAlt > 0 && sunAlt < 42 ? Math.min(1, sunAlt / 3) * (1 - Math.max(0, sunAlt - 36) / 6) : 0;
+  const wantK = skyOpt('v3dRainbow') ? sunOk * (1 - 0.85 * (A.wx ? A.wx.cloud : 0)) * Math.min(1, here * 1.5 + Math.min(1, dirs.length / 2) * 0.8) * 0.4 : 0;
+  V3dSky.bowK = (V3dSky.bowK || 0) + (wantK - (V3dSky.bowK || 0)) * 0.03;   // forms and fades over a few seconds
+  U.uK.value = V3dSky.bowK; U.uFull.value = Math.min(1, here * 2); U.uAnti.value.copy(anti);
+  M.visible = V3dSky.bowK > 0.003;
+  M.position.copy(cp); M.scale.setScalar(Math.min(cam.far * 0.8, 20000));
+}
+
+/* ---------- the northern and southern lights ---------- */
+
+/** NOAA's aurora forecast (OVATION, from the Space Weather Prediction Center: US government data, public
+ *  domain): the chance of aurora overhead on a 1° grid, renewed every few minutes. Kept as a small picture
+ *  the sky shader looks up. */
+const AuroraData: any = { tex: null, at: 0, busy: false, max: 0 };
+function auroraFetch() {
+  if (AuroraData.busy || Date.now() - AuroraData.at < 15 * 60e3) return;
+  AuroraData.busy = true;
+  Net.json('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json').then((j: any) => {
+    const pts: number[][] = (j && j.coordinates) || []; if (!pts.length) return;
+    const W = 360, H = 181, d = new Uint8Array(W * H * 4); let max = 0;
+    for (const p of pts) {
+      const lon = ((Math.round(p[0]) % 360) + 360) % 360, lat = Math.round(p[1]) + 90, v = clamp(+p[2] || 0, 0, 100);
+      if (lat < 0 || lat >= H) continue;
+      const i = (lat * W + lon) * 4; d[i] = Math.round(v * 2.55); d[i + 3] = 255; max = Math.max(max, v);
+    }
+    auroraSetGrid(d, W, H); AuroraData.max = max; AuroraData.at = Date.now();
+  }).catch(() => { AuroraData.at = Date.now() - 10 * 60e3; /* try again in five minutes */ }).then(() => { AuroraData.busy = false; });
+}
+function auroraSetGrid(d: Uint8Array, W: number, H: number) {
+  const T = THREE, tex = new T.DataTexture(d, W, H, T.RGBAFormat);
+  tex.wrapS = T.RepeatWrapping; tex.wrapT = T.ClampToEdgeWrapping; tex.magFilter = T.LinearFilter; tex.minFilter = T.LinearFilter; tex.needsUpdate = true;
+  if (AuroraData.tex) AuroraData.tex.dispose();
+  AuroraData.tex = tex;
+  if (V3dSky.aurora) V3dSky.aurora.material.uniforms.uOv.value = tex;
+}
+
+function v3dAuroraStep(now: number) {
+  const T = THREE, cam = V3d.cam, U = v3dSkyUniforms(); if (!cam || !V3dSky.a) return;
+  const night = U.uNight.value, A = V3dSky.a;
+  if (!skyOpt('v3dAurora') || night < 0.05) { if (V3dSky.aurora) V3dSky.aurora.visible = false; return; }
+  auroraFetch();
+  if (!AuroraData.tex || AuroraData.max < 3) { if (V3dSky.aurora) V3dSky.aurora.visible = false; return; }
+  let M = V3dSky.aurora;
+  if (!M || M.parent !== V3d.scene) {
+    M = V3dSky.aurora = new T.Mesh(new T.SphereGeometry(1, 64, 32), new T.ShaderMaterial({
+      uniforms: { uOv: { value: AuroraData.tex }, uLL: { value: new T.Vector2() }, uH: { value: 0 }, uK: { value: 0 }, uTime: { value: 0 } },
+      vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n#include <logdepthbuf_vertex>\n}',
+      fragmentShader: `#include <common>
+#include <logdepthbuf_pars_fragment>
+uniform sampler2D uOv; uniform vec2 uLL; uniform float uH; uniform float uK; uniform float uTime; varying vec3 vDir;
+float h31(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(h31(i), h31(i + vec3(1, 0, 0)), f.x), mix(h31(i + vec3(0, 1, 0)), h31(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(h31(i + vec3(0, 0, 1)), h31(i + vec3(1, 0, 1)), f.x), mix(h31(i + vec3(0, 1, 1)), h31(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
+void main() {
+  #include <logdepthbuf_fragment>
+  vec3 d = normalize(vDir);
+  if (d.y < -0.08) discard;
+  float e = asin(clamp(d.y, -1.0, 1.0)), az = atan(d.x, -d.z), R = 6371.0;
+  float la1 = uLL.y, lo1 = uLL.x;
+  vec3 col = vec3(0.0);
+  float jit = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);   // a different start for every pixel: no bands
+  for (int i = 0; i < 12; i++) {
+    float H = 95.0 + (float(i) + jit) * 18.0;
+    // where the line of sight is at this height (over the curved Earth), and the forecast there
+    float g = acos(clamp((R + uH) / (R + H) * cos(e), -1.0, 1.0)) - e;
+    float la2 = asin(sin(la1) * cos(g) + cos(la1) * sin(g) * cos(az));
+    float lo2 = lo1 + atan(sin(az) * sin(g) * cos(la1), cos(g) - sin(la1) * sin(la2));
+    float p = texture2D(uOv, vec2(fract(lo2 / 6.2831853), (degrees(la2) + 90.0) / 181.0 + 0.5 / 181.0)).r;
+    if (p < 0.02) continue;
+    // curtains: bright vertical rays in slowly moving folds along the oval
+    float fold = sin(lo2 * 45.0 + sin(la2 * 25.0 + uTime * 0.04) * 3.0 + uTime * 0.03);
+    float rays = pow(vn(vec3(lo2 * 260.0 + fold * 2.0, la2 * 40.0, uTime * 0.12)), 3.5) * 2.0 + 0.05 * (0.5 + 0.5 * fold);
+    float band = smoothstep(0.25, 0.9, 0.5 + 0.5 * sin(la2 * 220.0 + fold * 1.5 + uTime * 0.02));   // separate curtains, not one glow
+    rays *= 0.35 + 0.65 * band;
+    float hf = (H - 95.0) / 200.0;
+    vec3 c = mix(vec3(0.12, 1.0, 0.38), vec3(0.85, 0.12, 0.32), smoothstep(0.4, 0.85, hf));   // green low down (oxygen, 558 nm), red high up (630 nm)
+    float prof = exp(-hf * 3.2) + 0.3 * smoothstep(0.35, 0.7, hf) * (1.0 - hf);
+    col += c * smoothstep(0.02, 0.5, p) * rays * prof;
+  }
+  col *= uK / 6.0 * smoothstep(-0.06, 0.05, d.y);
+  gl_FragColor = vec4(col, 1.0);
+}`,
+      side: T.BackSide, transparent: true, depthWrite: false, depthTest: false, blending: T.AdditiveBlending, fog: false,
+    }));
+    M.renderOrder = -985; M.frustumCulled = false; V3d.scene.add(M);
+  }
+  const ll = v3dLonLat(cam.position.x, cam.position.z), u = M.material.uniforms;
+  u.uLL.value.set(ll[0] * D2R, ll[1] * D2R); u.uH.value = Math.max(0, (cam.position.y + v3dCurve(cam.position.x, cam.position.z)) / 1000);
+  u.uTime.value = now / 1000;
+  // only on dark nights, dimmed by the moon and hidden by overcast
+  u.uK.value = night * (1 - 0.5 * (U.uMoonK ? U.uMoonK.value : 0)) * (1 - 0.92 * (A.wx ? A.wx.cloud : 0)) * 1.05;
+  M.visible = u.uK.value > 0.01;
+  M.position.copy(cam.position); M.scale.setScalar(cam.far * 0.88);
 }

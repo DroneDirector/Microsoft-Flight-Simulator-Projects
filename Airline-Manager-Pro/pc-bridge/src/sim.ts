@@ -37,6 +37,7 @@ const MAIN_VARS: [string, string][] = [
   ['G FORCE', 'GForce'], ['PLANE PITCH DEGREES', 'degrees'], ['SIM ON GROUND', 'bool'], ['BRAKE PARKING POSITION', 'bool'],
   ['NUMBER OF ENGINES', 'number'], ['GENERAL ENG COMBUSTION:1', 'bool'], ['GENERAL ENG COMBUSTION:2', 'bool'], ['GENERAL ENG COMBUSTION:3', 'bool'], ['GENERAL ENG COMBUSTION:4', 'bool'],
   ['ENG FAILED:1', 'bool'], ['ENG FAILED:2', 'bool'], ['ENG FAILED:3', 'bool'], ['ENG FAILED:4', 'bool'],
+  ['ENG ON FIRE:1', 'bool'], ['ENG ON FIRE:2', 'bool'], ['ENG ON FIRE:3', 'bool'], ['ENG ON FIRE:4', 'bool'],
   ['FLAPS HANDLE INDEX', 'number'], ['GEAR HANDLE POSITION', 'bool'], ['FLAP SPEED EXCEEDED', 'bool'], ['GEAR SPEED EXCEEDED', 'bool'],
   ['FUEL TOTAL QUANTITY WEIGHT', 'pounds'], ['EMPTY WEIGHT', 'pounds'], ['TOTAL WEIGHT', 'pounds'], ['MAX GROSS WEIGHT', 'pounds'],
   ['PLANE TOUCHDOWN NORMAL VELOCITY', 'feet per second'], ['PLANE TOUCHDOWN PITCH DEGREES', 'degrees'], ['PAYLOAD STATION COUNT', 'number'],
@@ -45,6 +46,8 @@ const MAIN_VARS: [string, string][] = [
   ['SEA LEVEL PRESSURE', 'millibars'], ['AMBIENT PRECIP STATE', 'mask'], ['AMBIENT PRECIP RATE', 'millimeters of water'], ['AMBIENT IN CLOUD', 'bool'],
   // the simulator's own date and time (seconds since 1 January of year 1), for the sun and moon in the 3D view
   ['ABSOLUTE TIME', 'seconds'],
+  // the local time where the aircraft is (seconds after midnight), for the clock in the 3D view
+  ['LOCAL TIME', 'seconds'],
 ];
 const GSX_VARS: [string, string][] = [
   ['L:FSDT_GSX_COUATL_STARTED', 'number'], ['L:FSDT_GSX_BOARDING_STATE', 'number'],
@@ -227,6 +230,10 @@ export class SimConnectSource extends EventEmitter implements SimSource {
       const comb = [v[i++], v[i++], v[i++], v[i++]], failed = [v[i++], v[i++], v[i++], v[i++]];
       s.enginesRunning = comb.slice(0, Math.max(1, s.engines)).filter(x => x > 0.5).length;
       (s as any)._failed = failed.slice(0, Math.max(1, s.engines)).map(x => x > 0.5);
+      // engine fires and failures, as the simulator has them, for the 3D view and the emergency on the phone
+      const fire = [v[i++], v[i++], v[i++], v[i++]];
+      (s as any).fires = fire.slice(0, Math.max(1, s.engines)).map(x => x > 0.5);
+      (s as any).engFailed = (s as any)._failed;
       s.flapsIndex = v[i++]; s.gearDown = v[i++] > 0.5;
       (s as any)._flapOverspeed = v[i++] > 0.5; (s as any)._gearOverspeed = v[i++] > 0.5;
       s.fuelKg = v[i++] * LB_TO_KG; s.emptyKg = v[i++] * LB_TO_KG; s.totalKg = v[i++] * LB_TO_KG; s.mtowKg = v[i++] * LB_TO_KG;
@@ -238,6 +245,12 @@ export class SimConnectSource extends EventEmitter implements SimSource {
         precip: (pState & 8) ? 'snow' : (pState & 4) ? 'rain' : 'none', precipMm: Math.round(pRate * 10) / 10, inCloud: cloud > 0.5, turb: 'none' };
       const abs = v[i++];
       (s as any).simTime = abs > 6e10 ? Math.round((abs - 62135596800) * 1000) : 0;
+      const loc = v[i++];
+      if ((s as any).simTime && loc >= 0) {
+        // the local time's offset from UTC, in minutes (to the nearest quarter hour), worked out from the two clocks
+        const utcSec = ((s as any).simTime / 1000) % 86400; let off = loc - utcSec; if (off > 43200) off -= 86400; if (off < -43200) off += 86400;
+        (s as any).simTz = Math.round(off / 900) * 15;
+      }
       if (!s.inFlight && (s.lat !== 0 || s.lon !== 0) && s.totalKg > 0) s.inFlight = true;
       s.t = Date.now();
       this.emit('snapshot', Object.assign({}, s, { stations: s.stations.slice() }));

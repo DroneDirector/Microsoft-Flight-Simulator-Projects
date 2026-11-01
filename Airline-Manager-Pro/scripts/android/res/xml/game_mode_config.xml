@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app is a game: Android's game mode and the phone maker's game booster can run it in performance mode. -->
+<game-mode-config xmlns:android="http://schemas.android.com/apk/res/android"
+    android:supportsPerformanceGameMode="true"
+    android:supportsBatteryGameMode="true"
+    android:allowGameAngleDriver="true"
+    android:allowGameDownscaling="false"
+    android:allowGameFpsOverride="true" />

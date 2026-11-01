@@ -1,6 +1,6 @@
 // Badge reveal: when you earn a badge, and when you tap one to look at it again, it's revealed like a
 // special card: the screen dims, beams of light in the badge's colour sweep up, the card drops in face
-// down, spins and flips to show the badge, a shine runs across it and sparks fly; then its details.
+// down, spins and flips to show the badge, a shine runs across it, sparks fly and confetti bursts out; then its details.
 // Higher tiers get a longer, brighter show. Our own design; tap anywhere to skip to the end.
 
 const TIER_LOOK: [string, string, string][] = [   // main colour, deep colour, glow
@@ -41,6 +41,7 @@ function badgeRevealNext() {
   document.body.appendChild(el);
   try { Sound.tick(); setTimeout(() => { try { Sound.purchase(); } catch (e) { /* ignore */ } }, dur * 0.62); } catch (e) { /* no sound */ }
   try { Haptics.success(); } catch (e) { /* no haptics */ }
+  if (!calm) setTimeout(() => { if (el.isConnected) badgeConfetti(el, L[0], t); }, dur * 0.62);
   requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('go')));
   const end = setTimeout(() => el.classList.add('done'), dur);
   let closing = false;
@@ -49,5 +50,36 @@ function badgeRevealNext() {
     if (closing) return; closing = true;
     el.classList.add('out'); setTimeout(() => { el.remove(); badgeRevealNext(); }, 380);
   });
+}
+/** Confetti bursting out from behind the card as it turns over: paper pieces that flutter, spin and fall. */
+function badgeConfetti(host: HTMLElement, main: string, tier: number) {
+  const cv = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1), W = window.innerWidth, H = window.innerHeight;
+  cv.className = 'bdr-confetti'; cv.width = W * dpr; cv.height = H * dpr;
+  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:3';
+  host.appendChild(cv);
+  const g = cv.getContext('2d'); if (!g) return; g.scale(dpr, dpr);
+  const cols = [main, main, '#FFFFFF', '#FFD34D', '#FF6B6B', '#4DD8FF', '#7CF29A', '#B9A6FF'];
+  const n = 90 + tier * 40, cx = W / 2, cy = H * 0.45, P: any[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = 6 + Math.random() * (9 + tier * 1.5);
+    P.push({ x: cx + Math.cos(a) * 20, y: cy + Math.sin(a) * 30, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 5 - Math.random() * 5, r: Math.random() * 6.3, vr: (Math.random() - 0.5) * 0.4,
+      w: 5 + Math.random() * 6, h: 3 + Math.random() * 4, c: cols[Math.floor(Math.random() * cols.length)], f: Math.random() * 6.3, round: Math.random() < 0.25 });
+  }
+  const t0 = performance.now(), life = 3200 + tier * 300;
+  const step = (now: number) => {
+    const k = now - t0; if (!cv.isConnected || k > life) { cv.remove(); return; }
+    g.clearRect(0, 0, W, H);
+    const fade = 1 - Math.max(0, (k - life * 0.7) / (life * 0.3));
+    for (const p of P) {
+      p.vx *= 0.975; p.vy = p.vy * 0.975 + 0.32; p.f += 0.12;
+      p.x += p.vx + Math.sin(p.f) * 0.9; p.y += p.vy; p.r += p.vr;
+      g.save(); g.globalAlpha = fade; g.translate(p.x, p.y); g.rotate(p.r); g.scale(1, Math.abs(Math.cos(p.f)) * 0.9 + 0.1);
+      g.fillStyle = p.c;
+      if (p.round) { g.beginPath(); g.arc(0, 0, p.h * 0.8, 0, Math.PI * 2); g.fill(); } else g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      g.restore();
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 ACTIONS['badge-open'] = el => { const b = badgeDefs().filter(x => x.id === el.getAttribute('data-id'))[0]; if (b) badgeReveal([b]); };

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.44 (2026-11-01)
+
+- v3d-clouds: world-fixed 3D puffs (sphere impostors, world-space noise and lighting) and sheets, per-puff ids with fade in/out, rain shafts (mode 3), storm towers, lightning glow uniforms
+- v3d-weather: precipitation particles (reports or sim precip), lightning scheduling, bolts, flash overlay; v3d-sound: synthesised thunder (delay d/343) and engine voices, settings v3dEngines/v3dThunder/v3dVol
+- v3d-sky: SkyClock (eased offset), blended and eased weather, sunset window, sun shader, lens flare (v3dFlare), rainbow (v3dRainbow), aurora from SWPC OVATION (v3dAurora), sky env map (PMREM), mirror oblique clipping, wave spectrum without stripes, apron masts (v3dApronMasts), nose light follows gearNow
+- view3d: flare/AoA pitch, main gear first lift, smoke by elapsed time, reverse thrust (userData.set reverse), turbulence motion and wing flex, clock (simTz), throttled drawing while loading, follow traffic flights, cabin modes (cabin, winL, winR)
+- v3d-crash: crash sites (land/sea), map marker and notice link, emergency effects (engine fire, fire crews, tug)
+- v3d-cabin: window views with family cabin styles, forward cabin with instanced seats and passengers (v3dCabinPax)
+- core/failures: random failures for hired flights, runway stop holds, notices and issues; pc-bridge: ENG ON FIRE, LOCAL TIME (simTz), engine-fire damage
+- core/catering: storage, loading (manual/auto/GSX), economics integration, storage card, BLS catering series in tools/market/fetch.py
+- airport-view: rounded taxi corners, heading blend, layoutParkingFill; worldmap: idle throttling, cached traffic positions, taps for weather marks, any airport and traffic (trafficCard)
+- settings: groups and sub-section buttons (Graphics, Realism, Staff, Sound), conductLevel slider, autoVoice, Game Booster (ui/booster.ts), fullScreen; Android: game_mode_config, appCategory game, display() plugin, sustained performance; PC: boost flags and priority
+- human: shoulder/elbow joints in the body shader, humanGesture (5 begging, 10 angry), live figures up to six
+
 ## 0.9.43 (2026-11-01)
 
 - Setting tfcRealNames: traffic shown as real airlines (REAL_AIRLINES bases, ICAO codes, realReg, fleets), REAL_SCHEMES colour schemes in 3D; league/news unchanged

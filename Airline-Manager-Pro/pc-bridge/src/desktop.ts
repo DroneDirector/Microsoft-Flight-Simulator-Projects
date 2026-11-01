@@ -21,8 +21,8 @@ const TYPES: { [ext: string]: string } = {
   '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.mjs': 'text/javascript; charset=utf-8', '.onnx': 'application/octet-stream', '.gz': 'application/gzip', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.png': 'image/png', '.svg': 'image/svg+xml', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
 };
 
-export interface DesktopPrefs { open: boolean; mode: 'window' | 'borderless' | 'fullscreen'; gpu: 'auto' | 'high' | 'low'; width: number; height: number }
-const DEFAULTS: DesktopPrefs = { open: true, mode: 'window', gpu: 'auto', width: 1600, height: 900 };
+export interface DesktopPrefs { open: boolean; mode: 'window' | 'borderless' | 'fullscreen'; gpu: 'auto' | 'high' | 'low'; width: number; height: number; boost: boolean }
+const DEFAULTS: DesktopPrefs = { open: true, mode: 'window', gpu: 'auto', width: 1600, height: 900, boost: false };
 
 export class Desktop {
   prefs: DesktopPrefs;
@@ -70,7 +70,7 @@ export class Desktop {
   }
 
   private api(req: http.IncomingMessage, res: http.ServerResponse) {
-    if (req.method === 'PUT') return readBody(req, b => { try { const p = JSON.parse(b); for (const k of Object.keys(DEFAULTS)) if (k in p) (this.prefs as any)[k] = p[k]; this.save(); } catch (e) { /* ignore */ } json(res, this.prefs); });
+    if (req.method === 'PUT') return readBody(req, b => { try { const p = JSON.parse(b); const was = this.prefs.boost; for (const k of Object.keys(DEFAULTS)) if (k in p) (this.prefs as any)[k] = p[k]; this.save(); if (was !== this.prefs.boost) this.applyBoost(); } catch (e) { /* ignore */ } json(res, this.prefs); });
     json(res, Object.assign({ desktop: true, backupDir: this.backupDir() }, this.prefs));
   }
 
@@ -130,6 +130,15 @@ export class Desktop {
     vp.busy = false; vp.file = '';
   }
 
+  windowPid = 0;
+  /** Game Booster: the PC app and its window run at a higher priority than other programs (above normal,
+   *  never real-time, so Windows and Flight Simulator stay responsive); off: normal priority again. */
+  applyBoost() {
+    const pr = this.prefs.boost ? os.constants.priority.PRIORITY_ABOVE_NORMAL : os.constants.priority.PRIORITY_NORMAL;
+    try { os.setPriority(process.pid, pr); } catch (e) { /* not allowed: stays as it is */ }
+    if (this.windowPid) { try { os.setPriority(this.windowPid, pr); } catch (e) { /* the window's own process may refuse */ } }
+  }
+
   /** Open the app window (Microsoft Edge in app mode, falling back to Chrome or the default browser). */
   openWindow() {
     const url = `http://127.0.0.1:${LINK_PORT}/`;
@@ -138,14 +147,18 @@ export class Desktop {
       `--window-size=${this.prefs.width},${this.prefs.height}`, '--autoplay-policy=no-user-gesture-required'];
     if (this.prefs.mode === 'borderless') args.push('--start-fullscreen');
     if (this.prefs.mode === 'fullscreen') args.push('--kiosk', '--edge-kiosk-type=fullscreen');
-    if (this.prefs.gpu === 'high') args.push('--force_high_performance_gpu');
+    if (this.prefs.gpu === 'high' || (this.prefs.boost && this.prefs.gpu !== 'low')) args.push('--force_high_performance_gpu');
     if (this.prefs.gpu === 'low') args.push('--force_low_power_gpu');
+    // Game Booster: the graphics card does the drawing, nothing is slowed down in the background, and
+    // Windows doesn't put the window into its power-saving (efficiency) mode
+    if (this.prefs.boost) args.push('--enable-gpu-rasterization', '--enable-zero-copy', '--ignore-gpu-blocklist', '--disable-renderer-backgrounding',
+      '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-features=UseEcoQoSForBackgroundProcess,CalculateNativeWinOcclusion');
     const pf = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', pf2 = process.env.ProgramFiles || 'C:\\Program Files', la = process.env.LOCALAPPDATA || '';
     const candidates = [path.join(pf, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path.join(pf2, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
       path.join(pf2, 'Google', 'Chrome', 'Application', 'chrome.exe'), path.join(pf, 'Google', 'Chrome', 'Application', 'chrome.exe'), path.join(la, 'Google', 'Chrome', 'Application', 'chrome.exe')];
     const exe = candidates.filter(c => c && fs.existsSync(c))[0];
     try {
-      if (exe) spawn(exe, args, { detached: true, stdio: 'ignore' }).unref();
+      if (exe) { const ch = spawn(exe, args, { detached: true, stdio: 'ignore' }); ch.unref(); this.windowPid = ch.pid || 0; this.applyBoost(); }
       else if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
       return !!exe;
     } catch (e) { return false; }

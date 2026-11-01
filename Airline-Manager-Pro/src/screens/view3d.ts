@@ -15,7 +15,7 @@ interface V3dPlane { id: string; model: any; type: string; pos: any; tgt: any; h
 const V3d: any = {
   open: false, root: null as HTMLElement, cv: null as HTMLCanvasElement, r: null as any, scene: null as any, cam: null as any,
   origin: null as number[], elev: 0, icao: '', target: '', planes: {} as { [id: string]: V3dPlane },
-  terrain: null as any, airport: null as any, aptScene: null as any, raf: 0, last: 0, mode: 'chase' as 'chase' | 'tower' | 'side',
+  terrain: null as any, airport: null as any, aptScene: null as any, raf: 0, last: 0, mode: 'chase' as 'chase' | 'tower' | 'side' | 'fwd' | 'winL' | 'winR' | 'free' | string,
   yaw: 0, pitch: 0.28, dist: 0, drag: null as any, ptrs: {} as any, pinch0: 0, dist0: 0, loading: 0, heights: null as any, map: null as WorldMap,
 };
 
@@ -41,11 +41,17 @@ function v3dOpenAirport(icao: string) {
 }
 ACTIONS['apt-3d'] = el => v3dOpenAirport(el.getAttribute('data-icao'));
 /** At an airport without following an aircraft: a stand-in "flight" parked at the airport. */
+/** The flight the view follows: yours or your airline's, or another airline's aircraft opened from the map. */
+function v3dTargetFlight(): any {
+  const id = V3d.target, f = State.live.filter(x => x.id === id)[0]; if (f) return f;
+  if (/^tfc-/.test(String(id || '')) && typeof Traffic !== 'undefined' && Traffic.on()) return Traffic.live().filter((x: any) => x.id === id)[0] || null;
+  return null;
+}
 function v3dAptOnly(): any { const k = String(V3d.target || ''); if (k.indexOf('apt:') !== 0) return null; const icao = k.slice(4), A = apt(icao); return A ? { id: k, from: icao, to: icao, real: true, pos: A.pos, alt: 0, hdg: 0, phase: 'Parked', callsign: icao } : null; }
 function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
-  V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null;
+  V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null; V3d.shown = 0;   // the loading bar starts from nothing every time
   v3dCrashGuard(true);
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
@@ -53,8 +59,9 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
-      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
+      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['cabin', 'Cabin'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
       <span class="v3d-batt">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
+      <span class="v3d-clock" title=""></span>
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
     <div class="v3d-info"></div>
     <div class="v3d-status"></div>
@@ -85,7 +92,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   V3d.root = root; V3d.cv = root.querySelector('.v3d-cv');
   const phone = Math.min(innerWidth, innerHeight) < 600;
   const rg = v3dRange(map && (map as any).cy != null ? undefined : undefined);
-  const r = new T.WebGLRenderer({ canvas: V3d.cv, antialias: !phone, powerPreference: v3dKm() > 300 ? 'high-performance' : 'low-power', logarithmicDepthBuffer: v3dKm() > 60 });
+  const r = new T.WebGLRenderer({ canvas: V3d.cv, antialias: !phone, powerPreference: v3dKm() > 300 || gameBoost() ? 'high-performance' : 'low-power', logarithmicDepthBuffer: v3dKm() > 60 });
   r.setPixelRatio(Math.min(window.devicePixelRatio || 1, phone ? 1 : 1.5));
   r.outputColorSpace = T.SRGBColorSpace;
   V3d.r = r;
@@ -115,7 +122,7 @@ function v3dClose() {
   } catch (e) { /* gone */ }
   if (V3d.root) V3d.root.remove();
   try { V3dTerrain.clear(); V3dTerrain.gen++; } catch (e) { /* none */ }
-  v3dCloudsClear(); v3dSkyClear();
+  v3dCloudsClear(); v3dSkyClear(); v3dWeatherClear(); v3dCrashClear();
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
 // closing from the free camera: back to the normal Overview
@@ -125,7 +132,7 @@ ACTIONS['v3d-mode'] = el => {
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
   V3d.root.classList.toggle('v3d-free', V3d.mode === 'free');
-  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
+  V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' || V3d.mode === 'cabin' || /^win/.test(V3d.mode) ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
 };
 ACTIONS['v3d-next'] = el => {
@@ -206,7 +213,7 @@ function v3dTap(x: number, y: number) {
 function v3dShowInfo() {
   if (!V3d.root) return;
   if (v3dAptOnly()) { const nm = V3d.root.querySelector('.v3d-name') as HTMLElement; if (nm) nm.textContent = String(V3d.target).slice(4); return; }
-  const f = State.live.filter(x => x.id === V3d.target)[0];
+  const f: any = v3dTargetFlight();
   const box = V3d.root.querySelector('.v3d-info') as HTMLElement, name = V3d.root.querySelector('.v3d-name') as HTMLElement;
   if (name) name.textContent = f ? f.callsign : '';
   if (box) box.innerHTML = f ? `<div class="sel-pop">${flightCard(f)}</div>` : '';
@@ -288,6 +295,7 @@ function v3dBuildAirport(L: AirportLayout) {
   }
   // the airport's ground paint, drawn from its own layout into one picture and laid over the terrain like a sheet
   try { const lt = v3dAirportLights(L, loc, gy); if (lt) g.add(lt); } catch (e) { /* no lights */ }
+  try { v3dCrashBuild(L, loc, gy, g); } catch (e) { /* no crash site */ }
   try { g.add(v3dGroundPaint(L, loc, gy)); } catch (x) { try { const sheet = airportSheet(L, loc, gy); if (sheet) g.add(sheet); } catch (y) { /* never stop the view */ } }
   // runways: strips that follow the ground, painted with the markings their size calls for, numbers always
   for (const r of L.runways) {
@@ -423,9 +431,9 @@ function v3dRecentre(f: LiveFlight, w: { lon: number; lat: number }) {
 function v3dLoop(now: number) {
   if (!V3d.open) return;
   V3d.raf = requestAnimationFrame(v3dLoop);
-  if (document.hidden || now - V3d.last < 1000 / V3D_FPS - 2) return;
+  if (document.hidden || now - V3d.last < 1000 / (gameBoost() ? 60 : V3D_FPS) - 2) return;
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
-  const T = THREE, f: any = v3dAptOnly() || State.live.filter(x => x.id === V3d.target)[0];
+  const T = THREE, f: any = v3dAptOnly() || v3dTargetFlight();
   if (!f) { const st = V3d.root.querySelector('.v3d-status'); if (st) st.textContent = 'This flight has ended'; V3d.r.render(V3d.scene, V3d.cam); return; }
   const w0 = v3dWhere(f);
   // the centre: follow the aircraft to the next airport, or move with it over open country
@@ -495,9 +503,24 @@ function v3dLoop(now: number) {
     const wantBank = w.smooth && w.turn != null ? clamp(w.turn * 8, -25, 25) : clamp(dh * 1.6, -25, 25);
     P.bank += (wantBank * (w.onGround ? 0 : 1) - P.bank) * Math.min(1, dt * 1.2);
     const vs = w.vs != null ? w.vs : (g as any).vs || 0, gs = Math.max(60, g.gs || 140);
-    P.pitch += (clamp(Math.atan2(vs / 196.85, gs * 0.5144) / D2R + (w.onGround ? 0 : 2.5), -6, 15) - P.pitch) * Math.min(1, dt * 1.5);
-    // flaps and gear by phase (the type's own speeds in flight-configs when available)
     const ph = w.phase.toLowerCase();
+    (P as any).ph = ph; (P as any).kt = g.gs || 0;
+    // touchdown: the flare raises the nose over the last few metres, the main wheels touch first, the nose
+    // stays up for a moment and is then lowered onto the runway
+    const PS: any = P, agl = w.altM - ground;
+    if (!w.onGround && agl > 3) PS.air = true;
+    let touched = false;
+    if (w.onGround && PS.air && (g.gs || 140) > 50 && s.gear && !s.gear.fixed) { PS.air = false; PS.tdAt = now; touched = true; }
+    const landing = /final|landing|touchdown|flare/.test(ph) && !/take-?off|lift-?off|climb/.test(ph);
+    // in the air: the flight path plus the wing's angle of attack (about 5° slow with flaps out, 2.5° at cruise),
+    // so an airliner on a 3° approach flies about 2° nose up, as real ones do
+    const slow = landing || /approach|take-?off|lift-?off|initial/.test(ph) || gs < 190;
+    let pitchT = clamp(Math.atan2(vs / 196.85, gs * 0.5144) / D2R + (w.onGround ? 0 : slow ? 5 : 2.5), -6, 15);
+    const flareDeg = s.gear && s.gear.fixed ? 4 : 5.5;
+    if (!w.onGround && landing && agl < 25) pitchT = Math.max(pitchT, 2.5 + (flareDeg - 2.5) * clamp((25 - agl) / 20, 0, 1));
+    if (w.onGround && PS.tdAt && now - PS.tdAt < 6000) pitchT = Math.max(pitchT, flareDeg * clamp(1 - (now - PS.tdAt - 1200) / 3500, 0, 1));
+    P.pitch += (pitchT - P.pitch) * Math.min(1, dt * (w.onGround && PS.tdAt && now - PS.tdAt < 6000 ? 2.5 : 1.5));
+    // flaps and gear by phase (the type's own speeds in flight-configs when available)
     try { v3dPlaneLightsSet(P.model, ph, (w.altM - ground) / 0.3048, w.onGround, w.altM / 0.3048, g.gs); } catch (e) { /* no lights */ }
     const cfg = flightConfig(P.type, ph, (g as any).ias || g.gs || 0, (w.altM - ground) / 0.3048, w.onGround);
     // your own flight: the flaps and gear as they are in the simulator
@@ -505,10 +528,26 @@ function v3dLoop(now: number) {
     const wantF = simCfg ? simCfg.f : cfg ? cfg.flaps : /final|landing|touchdown|roll/.test(ph) ? 1 : /approach|take-?off|lift-?off/.test(ph) ? 0.4 : /taxi|pushback|gate|boarding/.test(ph) ? (/out/.test(ph) ? 0.3 : 0) : 0;
     const wantG = simCfg ? simCfg.g : cfg ? cfg.gear : w.onGround || /final|landing|touchdown|lift-?off|take-?off/.test(ph) || (w.altM - ground < 600 && !/cruise|climb/.test(ph)) ? 1 : 0;
     P.flaps += (wantF - P.flaps) * Math.min(1, dt * 0.35); P.gear += (wantG - P.gear) * Math.min(1, dt * 0.25);
+    (P.model.userData as any).gearNow = P.gear;
     // spoilers: only up on the runway after touchdown, down again as the aircraft slows to taxi speed
     const PSp: any = P, wantSp = w.onGround && /touchdown|landing|roll/.test(ph) && !/take-?off/.test(ph) && (g.gs || 0) > 35 ? 1 : 0;
     PSp.spoil = (PSp.spoil || 0) + (wantSp - (PSp.spoil || 0)) * Math.min(1, dt * (wantSp ? 6 : 1.5));
-    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil });
+    // reverse thrust: jet airliners open their reversers two seconds after touchdown and close them again
+    // as the aircraft slows to about 70 kt (types without reversers have none to open)
+    const PR: any = P, revPts = P.model.userData.body && P.model.userData.body.userData.revPts;
+    const wantRev = revPts && revPts.length && w.onGround && PR.tdAt && now - PR.tdAt > 2000 && /touchdown|landing|roll/.test(ph) && (g.gs || 0) > 70 ? 1 : 0;
+    PR.rev = (PR.rev || 0) + (wantRev - (PR.rev || 0)) * Math.min(1, dt * (wantRev ? 2.2 : 1.1));
+    // failures and emergencies: an engine on fire, a stopped engine, fire crews on the runway, the tow in
+    let fireI = -1, outI = -1, feI: any = null;
+    try { const FF: any = g; feI = FF.depAt && !FF.real && !FF.you ? flightEl(FF, Date.now()) : null; fireI = engineFire(FF, feI ? feI.el : undefined); outI = engineOut(FF, feI ? feI.el : undefined); } catch (e) { /* none */ }
+    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI } as any);
+    try { v3dEmergencyStep(P, g, fireI, feI, now, ground, w); } catch (e) { /* no effects */ }
+    // the air blown forward out of the open reversers kicks up spray and dust from the runway
+    if (PR.rev > 0.6 && now - (PR.revAt || 0) > 90) {
+      PR.revAt = now; const body = P.model.userData.body; body.updateMatrixWorld();
+      const h = P.hdg * D2R, fx = Math.sin(h), fz = -Math.cos(h);
+      for (const lp of revPts) { const wp = body.localToWorld(lp.clone()); v3dSmokePuff(wp.x + fx * 4, ground + 0.8, wp.z + fz * 4, 0.55 * PR.rev); }
+    }
     // on the ground the aircraft is placed by its nose wheel (on the line, on the stand's stop mark), in the
     // air by the middle of the fuselage; between the two it blends over the last 30 m, so nothing jumps
     const PG: any = P, gwT = w.onGround ? 1 : clamp(1 - (w.altM - ground) / 30, 0, 1);
@@ -516,17 +555,27 @@ function v3dLoop(now: number) {
     const bodyO = P.model.userData.body; if (bodyO) bodyO.position.x = -s.L / 2 + noseWheelAhead(P.type) * PG.gw;
     // place it: nose (−x of the model) along the heading, at the right height
     P.model.position.copy(P.pos);
+    // nose up near the ground: the model turns about its nose wheel, so lift it until the main wheels are on the surface
+    { const xm = (bodyO ? bodyO.position.x : -s.L / 2) + (s.gear ? s.gear.main : s.L * 0.55);
+      if (P.pitch > 0 && xm > 0) P.model.position.y += PG.gw * xm * Math.sin(P.pitch * D2R); }
     P.model.rotation.set(0, 0, 0);
     P.model.rotateY(-(P.hdg + 90) * D2R);
-    P.model.rotateZ(-P.pitch * D2R);   // nose up
-    P.model.rotateX(-P.bank * D2R);   // a turn to the right lowers the right wing
+    // turbulence: the aircraft bumps, rolls a little and its wings flex (only what you see; the flight itself is unchanged)
+    let tm = [0, 0, 0, 0];
+    if (!w.onGround) { try { tm = v3dTurbMotion(P, v3dTurbAt(P, w.lon, w.lat, w.altM / 0.3048, (w.altM - ground) / 0.3048, !!g.you), now / 1000); } catch (e) { /* calm */ } }
+    P.model.position.y += tm[0];
+    P.model.rotateZ(-(P.pitch + tm[2]) * D2R);   // nose up
+    P.model.rotateX(-(P.bank + tm[1]) * D2R);   // a turn to the right lowers the right wing
+    (P.model.userData as any).flex = tm[3] * Math.max(0.5, shapeOf(P.type).span / 30);
     // touchdown: tyre smoke from the main wheels (left behind on the runway as the aircraft rolls on)
-    const PS: any = P, agl = w.altM - ground;
-    if (!w.onGround && agl > 3) PS.air = true;
-    if (w.onGround && PS.air && (g.gs || 140) > 50 && s.gear && !s.gear.fixed) { PS.air = false; PS.smokeUntil = now + 350; PS.smokeK = g.you && (State as any).lastTouchdown ? clamp(Math.abs((State as any).lastTouchdown.fpm || 150) / 200, 0.6, 2) : 1; }
-    if (PS.smokeUntil > now && (PS.smokeTick = !PS.smokeTick)) {
+    if (touched) { PS.smokeUntil = now + 900; PS.smokeAt = 0; PS.smokeK = g.you && (State as any).lastTouchdown ? clamp(Math.abs((State as any).lastTouchdown.fpm || 150) / 200, 0.7, 2) : 1; }
+    if (PS.smokeUntil > now && now - (PS.smokeAt || 0) > 40) {
+      // the same amount of smoke however fast the screen is drawn: a puff for every 40 ms that has passed
+      const nP = PS.smokeAt ? Math.min(6, Math.floor((now - PS.smokeAt) / 40)) : 3;
+      PS.smokeAt = now;
       const h = P.hdg * D2R, fx = Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = Math.sin(h), bx = bodyO ? bodyO.position.x : -s.L / 2, back = bx + s.gear.main;
-      for (const side of [-1, 1]) v3dSmokePuff(P.pos.x - fx * back + rx * side * s.gear.track / 2, P.pos.y + 0.4, P.pos.z - fz * back + rz * side * s.gear.track / 2, PS.smokeK || 1);
+      const fresh = 1 - (PS.smokeUntil - now) / 900;   // thickest at the moment of touchdown
+      for (let n = 0; n < nP; n++) for (const side of [-1, 1]) v3dSmokePuff(P.pos.x - fx * (back + n * 2) + rx * side * s.gear.track / 2, P.pos.y + 0.6, P.pos.z - fz * (back + n * 2) + rz * side * s.gear.track / 2, (PS.smokeK || 1) * (1.15 - fresh * 0.5));
     }
     void s;
   }
@@ -545,7 +594,16 @@ function v3dLoop(now: number) {
   else if (P) {
     const s = shapeOf(P.type), centre = P.pos.clone().add(new T.Vector3(0, s.ground + s.h / 2, 0));
     const fwd = new T.Vector3(Math.sin(P.hdg * D2R), 0, -Math.cos(P.hdg * D2R));
-    if (V3d.mode === 'fwd') {
+    const VW: any = V3d;
+    if (VW.cabinFor && (VW.cabinFor !== P.id || !/^win/.test(V3d.mode))) { v3dCabinLeave(V3d.planes[VW.cabinFor]); VW.cabinFor = null; }
+    if (VW.cabinFwdFor && (VW.cabinFwdFor !== P.id || V3d.mode !== 'cabin')) { v3dCabinFwdLeave(V3d.planes[VW.cabinFwdFor]); VW.cabinFwdFor = null; }
+    if (V3d.mode === 'winL' || V3d.mode === 'winR') {
+      // a window seat over the wing: fixed, looking out at the wing tip (see v3d-cabin.ts)
+      VW.cabinFor = P.id; v3dCabinCam(P, V3d.mode);
+    } else if (V3d.mode === 'cabin') {
+      // inside the cabin, from the back of the aisle, looking forward over the seats and passengers
+      VW.cabinFwdFor = P.id; v3dCabinFwdCam(P);
+    } else if (V3d.mode === 'fwd') {
       // forward: out of the front of the aircraft, from the cockpit, turning, climbing and banking with it;
       // a drag looks around a little. The aircraft itself is not drawn (you sit in it).
       const body = P.model.userData.body, eye = new T.Vector3(-0.6, s.ground + s.h * 0.78, 0);   // just ahead of the windscreen
@@ -583,15 +641,25 @@ function v3dLoop(now: number) {
     }
   }
   try { v3dCloudsStep(now); } catch (e) { /* no clouds this frame */ }
+  try { v3dWeatherStep(now); } catch (e) { /* no weather this frame */ }
+  try { V3dSound.step(now); } catch (e) { /* no sound this frame */ }
+  try { v3dCrashStep(now); v3dCrashFocusStep(); } catch (e) { /* the crash site as it was */ }
   try { v3dSkyStep(now); } catch (e) { /* the sky as it was */ }
-  V3d.r.render(V3d.scene, V3d.cam);
+  try { v3dEnvStep(now); } catch (e) { /* the reflections as they were */ }
+  try { v3dRainbowStep(); } catch (e) { /* no rainbow */ }
+  try { v3dAuroraStep(now); } catch (e) { /* no aurora */ }
+  // while the loading screen covers the view, the scene is drawn only a few times a second: the loading
+  // screen stays smooth and the device's time goes to loading instead
+  const VL: any = V3d;
+  if (V3d.loaded || !VL.drawnAt || now - VL.drawnAt > 450) { VL.drawnAt = now; V3d.r.render(V3d.scene, V3d.cam); }
 
+  v3dClockStep(now);
   // callsigns over the aircraft
   const v = new T.Vector3();
   for (const id in V3d.planes) {
     const Q = V3d.planes[id], s = shapeOf(Q.type);
     v.copy(Q.pos); v.y += s.H + 4; v.project(V3d.cam);
-    const on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && !(V3d.mode === 'fwd' && id === V3d.target);
+    const on = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && !((V3d.mode === 'fwd' || V3d.mode === 'cabin' || /^win/.test(V3d.mode)) && id === V3d.target);
     Q.label.style.display = on ? '' : 'none';
     if (on) { Q.label.style.transform = `translate(${((v.x + 1) / 2 * innerWidth).toFixed(0)}px, ${((1 - v.y) / 2 * innerHeight).toFixed(0)}px) translate(-50%, -100%)`; Q.label.classList.toggle('on', id === V3d.target); }
   }
@@ -660,7 +728,7 @@ function v3dLoaderTick(now: number) {
   // the airports of the flight within the view distance: their layouts are loaded before the view opens
   if (!VL.pre && V3d.origin) {
     VL.pre = { want: 0, got: 0 };
-    const f: any = v3dAptOnly() || State.live.filter(x => x.id === V3d.target)[0], km = v3dKm();
+    const f: any = v3dAptOnly() || v3dTargetFlight(), km = v3dKm();
     const ids = f ? [f.from, f.noDest ? '' : f.to].filter((k: string, i: number, a: string[]) => k && a.indexOf(k) === i && k !== V3d.icao) : [];
     for (const k of ids) {
       const A = apt(k); if (!A || gcDistanceNm(V3d.origin, A.pos) * 1.852 > km) continue;
@@ -877,32 +945,37 @@ function v3dCrashCheck() {
   try { ErrorLog.add('3d', 'The app was closed by the system during the 3D view', `Satellite ${m.sat ? 'on, detail ' + names[m.q] : 'off'}; graphics limit ${m.cap}px; device memory ${m.mem || '?'} GB`, `The 3D view was open (version ${m.ver}) when Android closed the app, most likely because the graphics ran out of memory.`); } catch (e) { /* ignore */ }
   let lowered = '';
   if (m.sat && (S.v3dSatQ == null ? 1 : S.v3dSatQ) > 0) { S.v3dSatQ = Math.max(0, (S.v3dSatQ == null ? 1 : S.v3dSatQ) - 1); lowered = names[S.v3dSatQ]; Store.soon(); }
-  State.notices.unshift({ id: uid(), kind: 'mechanic' as any, title: 'The 3D view closed the app', body: `Your device ran out of graphics memory in the 3D view.${lowered ? ` Satellite detail is now ${lowered}; you can raise it again in Settings → 3D view.` : ''} The details are in Settings → Updates and errors.`, time: 'Now', at: Date.now(), read: false } as any);
+  State.notices.unshift({ id: uid(), kind: 'mechanic' as any, title: 'The 3D view closed the app', body: `Your device ran out of graphics memory in the 3D view.${lowered ? ` Satellite detail is now ${lowered}; you can raise it again in Settings → Graphics.` : ''} The details are in Settings → Updates and errors.`, time: 'Now', at: Date.now(), read: false } as any);
 }
 
 /* ---------- tyre smoke at touchdown ---------- */
 let _smokeTex: any = null;
 const _smoke: { sp: any; age: number; life: number; k: number; vx: number; vz: number }[] = [];
-function v3dSmokePuff(x: number, y: number, z: number, k: number) {
+function v3dSmokePuff(x: number, y: number, z: number, k: number, col?: number) {
   const T = THREE;
   if (!_smokeTex) {
     const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 31);
     gr.addColorStop(0, 'rgba(235,235,235,1)'); gr.addColorStop(0.45, 'rgba(220,220,220,.55)'); gr.addColorStop(1, 'rgba(210,210,210,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
     _smokeTex = new T.CanvasTexture(c);
   }
-  if (_smoke.length > 160) return;
-  const sp = new T.Sprite(new T.SpriteMaterial({ map: _smokeTex, transparent: true, depthWrite: false, opacity: 0.6 }));
+  if (_smoke.length > 220) return;
+  const sp = new T.Sprite(new T.SpriteMaterial({ map: _smokeTex, transparent: true, depthWrite: false, opacity: 0.8 }));
+  sp.material.userData.noDim = true;   // lit by hand in v3dSmokeStep
+  if (col != null) sp.userData.col = new T.Color(col);
   sp.position.set(x + (Math.random() - 0.5) * 0.8, y, z + (Math.random() - 0.5) * 0.8); sp.scale.set(1.5, 1.5, 1.5); sp.renderOrder = 12;
   V3d.scene.add(sp);
-  _smoke.push({ sp, age: 0, life: 2.2 + Math.random() * 1.4, k, vx: (Math.random() - 0.5) * 1.2, vz: (Math.random() - 0.5) * 1.2 });
+  _smoke.push({ sp, age: 0, life: 3 + Math.random() * 2.5, k, vx: (Math.random() - 0.5) * 2, vz: (Math.random() - 0.5) * 2 });
 }
 function v3dSmokeStep(dt: number) {
   for (let i = _smoke.length - 1; i >= 0; i--) {
     const p = _smoke[i]; p.age += dt; const t = p.age / p.life;
     if (t >= 1 || !V3d.scene) { if (V3d.scene) V3d.scene.remove(p.sp); p.sp.material.dispose(); _smoke.splice(i, 1); continue; }
-    const sz = (1.2 + Math.sqrt(t) * 6.5) * p.k; p.sp.scale.set(sz, sz, sz);
-    p.sp.position.x += p.vx * dt; p.sp.position.z += p.vz * dt; p.sp.position.y += (0.6 + t * 0.8) * dt;
-    p.sp.material.opacity = 0.6 * Math.min(1, 0.6 + p.k * 0.3) * (1 - t) * (1 - t);
+    const sz = (2 + Math.sqrt(t) * 13) * p.k; p.sp.scale.set(sz, sz * 0.8, sz);
+    p.sp.position.x += p.vx * dt; p.sp.position.z += p.vz * dt; p.sp.position.y += (0.8 + t * 1.2) * dt;
+    p.sp.material.opacity = 0.8 * Math.min(1, 0.65 + p.k * 0.3) * (1 - t) * (1 - t * 0.6);
+    // the light of the moment: grey-white by day, dim at night (lit a little by the landing lights)
+    const tint = (V3dSky as any).tint || [1, 1, 1], amb = Math.max(0.18, (V3dSky as any).amb || 1);
+    const cc = p.sp.userData.col; p.sp.material.color.setRGB((cc ? cc.r * 3 : 1) * tint[0] * amb, (cc ? cc.g * 3 : 1) * tint[1] * amb, (cc ? cc.b * 3 : 1) * tint[2] * amb);
   }
 }
 
@@ -949,6 +1022,13 @@ function v3dGroundPaint(L: AirportLayout, loc: (x: number, y: number) => number[
       const contour = ar.pts.map(p => new T.Vector2(p[0], p[1])), faces = T.ShapeUtils.triangulateShape(contour, []);
       for (const f of faces) { const [a, b, c] = f.map((i: number) => v(ar.pts[i][0], ar.pts[i][1], 0.15)); tri('apron', a, c, b); }
     } catch (e) { /* an odd outline: left out */ }
+  }
+  // the parking areas: paved all over (stands, lead-ins, taxilanes), also where the map has no apron outline
+  for (const poly of layoutParkingFill(L)) {
+    try {
+      const faces = T.ShapeUtils.triangulateShape(poly.map(p => new T.Vector2(p[0], p[1])), []);
+      for (const f of faces) { const [a, b, c] = f.map((i: number) => v(poly[i][0], poly[i][1], 0.15)); tri('apron', a, c, b); }
+    } catch (e) { /* skip */ }
   }
   // taxiways: shoulder, then asphalt (with round joints)
   const joints: { [i: number]: number } = {};
@@ -1008,4 +1088,21 @@ function v3dGroundPaint(L: AirportLayout, loc: (x: number, y: number) => number[
     }
   }
   return g;
+}
+
+/** The clock beside the battery: Flight Simulator's local time where your aircraft is, when it is running and
+ *  linked; otherwise this device's own time, as everywhere else in the app. */
+function v3dClockStep(now: number) {
+  const VC: any = V3d; if (VC.clockAt && now - VC.clockAt < 1000) return; VC.clockAt = now;
+  const el = V3d.root && V3d.root.querySelector('.v3d-clock') as HTMLElement; if (!el) return;
+  const L: any = typeof Link !== 'undefined' ? (Link as any).sim : null, t = Date.now();
+  const sim = !!(L && L.simTime && L.t && t - L.t < 60000 && Link.status === 'connected');
+  let txt: string;
+  if (sim) {
+    const ms = L.simTime + (t - L.t) + (L.simTz != null ? L.simTz * 60000 : -new Date().getTimezoneOffset() * 60000), d = new Date(ms);
+    txt = String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+  } else { const d = new Date(t); txt = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  const title = sim ? 'Flight Simulator time' + (L.simTz != null ? '' : ' (in this device\'s time zone)') : 'This device\'s time';
+  if (el.textContent !== txt) el.innerHTML = `${icon('clock')}<b>${txt}</b>`;
+  if (el.title !== title) { el.title = title; el.classList.toggle('sim', sim); }
 }

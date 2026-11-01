@@ -126,7 +126,7 @@ ACTIONS['tfc-toggle'] = () => {
   toast(Traffic.on() ? 'Other airlines\' aircraft shown' : 'Other airlines\' aircraft hidden', 'info');
   try { if (typeof v3dTrafficSync === 'function') v3dTrafficSync(); } catch (e) { /* ignore */ }
 };
-/** Other airlines' aircraft shown with real airline names (Settings → Damage and realism); only how they are
+/** Other airlines' aircraft shown with real airline names (Settings → Realism); only how they are
  * labelled: the league, takeovers and the papers keep the made-up airlines. */
 function tfcRealNames(): boolean { return !!(State.settings as any).tfcRealNames; }
 /** The airline name shown on another airline's aircraft. */

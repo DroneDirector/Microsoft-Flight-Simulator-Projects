@@ -350,15 +350,32 @@ class AirportView {
     }
     const cornerKt: { [i: number]: number } = {};
     path.forEach((q, i) => { const a = turnAt[i]; if (a > 60) cornerKt[i] = 8; else if (a > 30) cornerKt[i] = 12; else if (a > 15) cornerKt[i] = 18; });
-    for (let i = 0; i < path.length - 1; i++) {
-      const L = segLen(i), n = Math.max(1, Math.round(L / 10));
-      const top = straight[i] > 700 ? 30 : straight[i] > 300 ? 25 : 18;
-      for (let k = 0; k < n; k++) {
-        const f = k / n; pts.push([path[i][0] + (path[i + 1][0] - path[i][0]) * f, path[i][1] + (path[i + 1][1] - path[i][1]) * f]);
-        vmax.push(k === 0 && cornerKt[i] ? cornerKt[i] : top);
+    // round every corner into a curve (about 35 m turning radius, less where the stretches are short), so the
+    // aircraft turns smoothly through it instead of pivoting at the node
+    const rp: number[][] = [], rseg: number[] = [], rc: number[] = [];
+    if (path.length) { rp.push(path[0].slice(0, 2)); rseg.push(0); rc.push(0); }
+    for (let i = 1; i < path.length - 1; i++) {
+      const P = path[i - 1], Q = path[i], N = path[i + 1], ang = turnAt[i];
+      if (ang < 4) { rp.push(Q.slice(0, 2)); rseg.push(i); rc.push(0); continue; }
+      const L1 = Math.hypot(Q[0] - P[0], Q[1] - P[1]) || 1, L2 = Math.hypot(N[0] - Q[0], N[1] - Q[1]) || 1;
+      const th = Math.min(ang, 150) * Math.PI / 180, d = Math.min(35 * Math.tan(th / 2), 0.45 * Math.min(L1, L2));
+      const T1 = [Q[0] - (Q[0] - P[0]) / L1 * d, Q[1] - (Q[1] - P[1]) / L1 * d], T2 = [Q[0] + (N[0] - Q[0]) / L2 * d, Q[1] + (N[1] - Q[1]) / L2 * d];
+      const steps = Math.max(2, Math.ceil(2 * d / 3));
+      for (let k = 0; k <= steps; k++) {
+        const t = k / steps, a = (1 - t) * (1 - t), b = 2 * t * (1 - t), c = t * t;
+        rp.push([a * T1[0] + b * Q[0] + c * T2[0], a * T1[1] + b * Q[1] + c * T2[1]]); rseg.push(t < 0.5 ? i - 1 : i); rc.push(cornerKt[i] || 0);
       }
     }
-    if (path.length) { pts.push(path[path.length - 1].slice(0, 2)); vmax.push(endKt); }
+    if (path.length > 1) { rp.push(path[path.length - 1].slice(0, 2)); rseg.push(path.length - 2); rc.push(0); }
+    for (let j = 0; j < rp.length - 1; j++) {
+      const L = Math.hypot(rp[j + 1][0] - rp[j][0], rp[j + 1][1] - rp[j][1]), n = Math.max(1, Math.round(L / 10));
+      const st = straight[rseg[j]] || 0, top = st > 700 ? 30 : st > 300 ? 25 : 18;
+      for (let k = 0; k < n; k++) {
+        const f = k / n; pts.push([rp[j][0] + (rp[j + 1][0] - rp[j][0]) * f, rp[j][1] + (rp[j + 1][1] - rp[j][1]) * f]);
+        vmax.push(rc[j] && rc[j + 1] ? rc[j] : top);
+      }
+    }
+    if (rp.length) { pts.push(rp[rp.length - 1]); vmax.push(endKt); }
     // the last 100 m before the runway or the stand: 5-10 kt
     let back = 0; for (let i = pts.length - 1; i > 0 && back < 100; i--) { vmax[i] = Math.min(vmax[i], back < 40 ? 6 : 9); back += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); }
     // speeding up and slowing down at about 0.6 m/s² and 1 m/s²
@@ -371,6 +388,7 @@ class AirportView {
     return (C[key] = { p: pts, t, v: v.map(x => x / KT), total: t[t.length - 1] });
   }
   timedCache: any = null;
+  _park: number[][][] = null; _parkL: AirportLayout = null;
   /** Where along a timed route the aircraft is after `s` seconds: [x, y, heading], and its speed. */
   timedAt(r: { p: number[][]; t: number[]; v: number[]; total: number }, s: number): { pos: number[]; kt: number } {
     const p = r.p; if (!p || !p.length) return null;
@@ -380,7 +398,11 @@ class AirportView {
     const last = Math.min(r.t.length, p.length) - 1;
     let i = 1; while (i < last && r.t[i] < s) i++;
     const k = clamp((s - r.t[i - 1]) / ((r.t[i] - r.t[i - 1]) || 1), 0, 1), a = p[i - 1], b = p[i];
-    return { pos: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI], kt: s >= r.total || !r.v || r.v[i] == null ? 0 : Math.round(r.v[i - 1] + (r.v[i] - r.v[i - 1]) * k) };
+    // the heading turns gradually from one short piece to the next, so it never steps
+    let hd = Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI;
+    if (i + 1 <= last && k > 0.5) { const c = p[i + 1], h2 = Math.atan2(c[0] - b[0], c[1] - b[1]) * 180 / Math.PI; hd += (((h2 - hd) + 540) % 360 - 180) * (k - 0.5); }
+    else if (i >= 2 && k < 0.5) { const z = p[i - 2], h0 = Math.atan2(a[0] - z[0], a[1] - z[1]) * 180 / Math.PI; hd += (((h0 - hd) + 540) % 360 - 180) * (0.5 - k); }
+    return { pos: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, (hd + 360) % 360], kt: s >= r.total || !r.v || r.v[i] == null ? 0 : Math.round(r.v[i - 1] + (r.v[i] - r.v[i - 1]) * k) };
   }
 
   computePlanes(now: number) {
@@ -526,7 +548,13 @@ class AirportView {
     const sat = this.embedded && State.settings.mapStyle === 'satellite';
     if (sat) c.globalAlpha = 0.62;
     const g = this.graph;
-    // aprons and terminal buildings
+    // the paved parking areas (stands, lead-ins, taxilanes), then the mapped aprons and terminal buildings
+    if (g && !g.schematic) {
+      if (!this._park || this._parkL !== L) { this._park = layoutParkingFill(L); this._parkL = L; }
+      c.fillStyle = '#0f2238'; c.beginPath();
+      for (const poly of this._park) poly.forEach((q, i) => { const p = this.scr(q[0], q[1]); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); });
+      c.fill('nonzero');
+    }
     for (const ar of L.areas || []) {
       c.beginPath(); ar.pts.forEach((q, i) => { const p = this.scr(q[0], q[1]); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath();
       if (ar.k === 'apron') { c.fillStyle = '#0f2238'; c.fill(); c.strokeStyle = 'rgba(147,169,193,.18)'; c.lineWidth = 1; c.stroke(); }
@@ -625,6 +653,7 @@ class AirportView {
     const P = (pts: number[][], close?: boolean) => { const q = new Path2D(); pts.forEach((p, i) => i ? q.lineTo(p[0], p[1]) : q.moveTo(p[0], p[1])); if (close) q.closePath(); return q; };
     const pc: any = { aprons: new Path2D(), terms: new Path2D(), pave: {} as { [w: string]: Path2D }, centre: new Path2D(), lanes: new Path2D(), bars: new Path2D(), leads: new Path2D(), dots: new Path2D() };
     for (const ar of L.areas || []) (ar.k === 'apron' ? pc.aprons : pc.terms).addPath(P(ar.pts, true));
+    pc.park = new Path2D(); if (!g.schematic) for (const poly of layoutParkingFill(L)) pc.park.addPath(P(poly, true));
     const seg = (to: Path2D, a: number[], b: number[]) => { to.moveTo(a[0], a[1]); to.lineTo(b[0], b[1]); };
     const pave = (w: number) => { const k = String(Math.max(5, Math.round(w / 5) * 5)); return pc.pave[k] || (pc.pave[k] = new Path2D()); };
     if (!g.schematic) {
@@ -677,7 +706,7 @@ class AirportView {
     c.globalAlpha = fade * (sat ? 0.62 : 1);
     c.lineCap = 'round'; c.lineJoin = 'round';
     const px = (n: number) => n / s;   // n screen pixels, in metres
-    c.fillStyle = '#0f2238'; c.fill(pc.aprons); c.strokeStyle = 'rgba(147,169,193,.18)'; c.lineWidth = px(1); c.stroke(pc.aprons);
+    c.fillStyle = '#0f2238'; if (pc.park) c.fill(pc.park, 'nonzero'); c.fill(pc.aprons); c.strokeStyle = 'rgba(147,169,193,.18)'; c.lineWidth = px(1); c.stroke(pc.aprons);
     c.fillStyle = '#1a3352'; c.fill(pc.terms); c.strokeStyle = 'rgba(63,208,232,.35)'; c.stroke(pc.terms);
     for (const w of Object.keys(pc.pave)) { c.strokeStyle = this.graph.schematic ? '#122840' : '#1a3554'; c.lineWidth = Math.max(px(1.5), +w); c.stroke(pc.pave[w]); }
     if (s > 0.25 && !this.graph.schematic) { c.strokeStyle = 'rgba(242,179,61,.45)'; c.lineWidth = px(1.5); c.stroke(pc.centre); }
