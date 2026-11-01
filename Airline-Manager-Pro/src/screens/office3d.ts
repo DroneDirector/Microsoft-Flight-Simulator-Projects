@@ -257,12 +257,14 @@ function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   const meL = me && me.look ? Object.assign({}, me.look, { civil: true, top: 'shirt', uniform: 4, hat: 'none', neck: 'open', bottom: 'trousers' }) : ctLook('me', 'm', 'public');
   const partnerSex: 'm' | 'f' = meL.sex === 'f' ? 'm' : 'f', base = (me && me.id) || 'me';
   const fam = [{ L: meL, x: -0.38, s: 1 }, { L: Object.assign(ctLook('partner-' + base, partnerSex, 'public'), { top: partnerSex === 'f' ? 'blouse' : 'shirt' }), x: 0.38, s: 0.97 },
-    { L: ctLook('kid1-' + base, 'f', 'public'), x: -0.2, s: 0.66, z: 0.45 }, { L: ctLook('kid2-' + base, 'm', 'public'), x: 0.24, s: 0.56, z: 0.5 }];
-  const built: any[] = [];
+    { L: ctLook('kid1-' + base, 'f', 'public'), x: -0.16, s: 0.62, z: 0.55 }, { L: ctLook('kid2-' + base, 'm', 'public'), x: 0.2, s: 0.54, z: 0.6 }];
+  // the children: no beards or grey hair, and their skin between their parents'
+  for (const f of fam.slice(2)) { const L: any = f.L, a = fam[0].L.skin || 2, b = fam[1].L.skin || 2; L.facial = 'none'; L.glasses = 'none'; L.skin = Math.round((a + b) / 2 + (Math.random() - 0.5)); if (L.hairColor >= 8) L.hairColor = fam[Math.random() < 0.5 ? 0 : 1].L.hairColor < 8 ? fam[0].L.hairColor : 1; }
+  const built: any[] = [];   // each figure is scaled from outside: it sets its own scale as it breathes
   try {
-    for (const f of fam) { const m = Human.build(f.L, 'exec', '#2C8CFF', av3Style(), 0.5); m.root.position.set(f.x, 0, f.z || 0); m.root.scale.setScalar(f.s); scene.add(m.root); m.pose({ t: 1, yaw: 0, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) }); built.push(m); }
+    for (const f of fam) { const m = Human.build(f.L, 'exec', '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); g.position.set(f.x, 0, f.z || 0); g.scale.setScalar(f.s); scene.add(g); m.pose({ t: 1, yaw: 0, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) }); built.push(m); }
   } catch (e) { /* the photo without people */ }
-  cam.position.set(0, 1.15, 3.6); cam.lookAt(0, 1.0, 0);
+  cam.position.set(0, 1.05, 3.9); cam.lookAt(0, 0.95, 0);
   const rt = new T.WebGLRenderTarget(512, 384, { samples: 4 }); rt.texture.colorSpace = T.SRGBColorSpace;
   ren.setRenderTarget(rt); ren.render(scene, cam); ren.setRenderTarget(null);
   // keep it as a picture (so the figures aren't built again next time)
@@ -530,7 +532,7 @@ function ofVisitUi(afterInterview?: boolean) {
 function ofSpot(k: string) {
   const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true;
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
-  else if (k === 'photo') { R.seat = true; R.look = { yaw: -0.33, pitch: -0.62 }; }
+  else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
   else if (k === 'free') { R.seat = false; R.free = { x: 0.9, z: 1.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.05 }; }
   else { R.seat = false; const S: any = { paint: [-1.4, 0.4, Math.PI / 2 - 0.05, 0.05], window: [1.6, -0.4, -Math.PI / 2, -0.04], map: [0, -2.1, 0, 0.08] }[k]; R.free = { x: S[0], z: S[1], v: 0, bob: 0 }; R.look = { yaw: S[2], pitch: S[3] }; }
   ofVisitUi(true);

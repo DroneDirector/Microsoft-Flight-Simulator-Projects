@@ -250,6 +250,7 @@ SCREENS.career = {
   render() {
     const tabs: [string, string][] = [['profile', 'Profile'], ['board', 'Flight board'], ['events', 'Events and challenges'], ['brief', 'Airport briefings']];
     return `<div class="screen-head"><div><h1>My career</h1><p class="sub">${esc(myPilot().name)}${coopOn() ? ' · co-op' : ''}</p></div></div>
+      ${typeof placesCardHtml === 'function' ? placesCardHtml() : ''}
       <div class="filter-row">${tabs.map(t => `<button class="fchip ${_carTab === t[0] ? 'on' : ''}" data-act="car-tab" data-t="${t[0]}">${t[1]}</button>`).join('')}</div>
       ${_carTab === 'board' ? flightBoardHtml() : _carTab === 'events' ? eventsHtml() : _carTab === 'brief' ? briefingsEditHtml() : profileHtml()}`;
   },

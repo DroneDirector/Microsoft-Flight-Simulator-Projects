@@ -167,7 +167,24 @@ export async function main(replay?: { file: string; speed: number }) {
   const redraw = () => banner(server, status, phones, lines);
   const log = (s: string) => { writeLog(s); lines.push(new Date().toTimeString().slice(0, 8) + '  ' + s); if (lines.length > 200) lines.shift(); redraw(); };
   try { await server.start(); }
-  catch (e) { fatal(`Port ${LINK_PORT} is in use. Is the PC app already running?`, e); return; }
+  catch (e) {
+    // the port is taken: by an older copy of this app (left running, or from before an update), by this same
+    // version (opened twice), or by another program
+    const other = await runningCopy();
+    if (other && verCmp(other.version, VERSION) >= 0) {
+      console.log(`Airline Manager Pro ${other.version} is already running on this PC. Opening its window.`);
+      try { if (desktop.appDir()) desktop.openWindow(); } catch (err) { /* it is open already */ }
+      setTimeout(() => process.exit(0), 2500); return;
+    }
+    if (other) {
+      writeLog(`An older copy (${other.version}) is running; closing it so ${VERSION} can start`);
+      console.log(`Closing the older Airline Manager Pro ${other.version} that is still running…`);
+      await closeOldCopy();
+    } else await closeOldCopy(true);
+    let ok = false;
+    for (let i = 0; i < 12 && !ok; i++) { await new Promise(r => setTimeout(r, 750)); try { await server.start(); ok = true; } catch (err) { /* not yet free */ } }
+    if (!ok) { fatal(other ? `An older Airline Manager Pro (${other.version}) is still running and couldn't be closed. Close it in the Task Manager and start this one again.` : `Port ${LINK_PORT} is used by another program. Close that program, or restart the PC, and start Airline Manager Pro again.`, e); return; }
+  }
   let source: SimSource;
   if (replay) {
     try { source = new ReplaySim(loadRecording(replay.file), replay.speed); } catch (e) { fatal('That flight recording can\'t be read: ' + replay.file, e); return; }
@@ -209,3 +226,37 @@ export function loadSimConnect(): any {
   return require('node-simconnect');
 }
 
+
+/** Another copy of this app answering on the port, with its version; null when it's something else. */
+function runningCopy(): Promise<{ version: string } | null> {
+  return new Promise(ok => {
+    const http = require('http');
+    const req = http.get({ host: '127.0.0.1', port: LINK_PORT, path: '/info', timeout: 2500 }, (r: any) => {
+      let b = ''; r.on('data', (d: any) => b += d); r.on('end', () => { try { const j = JSON.parse(b); ok(j && j.app === 'Airline Manager Pro' ? { version: String(j.version || '0') } : null); } catch (e) { ok(null); } });
+    });
+    req.on('timeout', () => { req.destroy(); ok(null); }); req.on('error', () => ok(null));
+  });
+}
+function verCmp(a: string, b: string): number { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; }
+/** Make the older copy quit: ask it (versions that understand), then end the process holding the port. */
+async function closeOldCopy(onlyIfOurs?: boolean): Promise<void> {
+  if (onlyIfOurs) return;   // not ours: leave other programs alone
+  await new Promise<void>(ok => {
+    const http = require('http');
+    const req = http.request({ host: '127.0.0.1', port: LINK_PORT, path: '/api/quit', method: 'POST', timeout: 2000 }, (r: any) => { r.resume(); r.on('end', () => ok()); });
+    req.on('timeout', () => { req.destroy(); ok(); }); req.on('error', () => ok()); req.end('{}');
+  });
+  await new Promise(r => setTimeout(r, 1800));
+  if (process.platform !== 'win32') return;
+  // older versions don't know /api/quit: find the process listening on the port and end it (only our own app answers /info)
+  if (!(await runningCopy())) return;
+  await new Promise<void>(ok => {
+    const { execFile } = require('child_process');
+    execFile('netstat', ['-ano', '-p', 'TCP'], { windowsHide: true }, (err: any, out: string) => {
+      const line = String(out || '').split(/\r?\n/).filter(l => new RegExp(`:${LINK_PORT}\\s`).test(l) && /LISTENING/i.test(l))[0];
+      const pid = line ? line.trim().split(/\s+/).pop() : '';
+      if (!pid || !/^\d+$/.test(pid) || +pid === process.pid) { ok(); return; }
+      execFile('taskkill', ['/PID', pid, '/T', '/F'], { windowsHide: true }, () => ok());
+    });
+  });
+}
