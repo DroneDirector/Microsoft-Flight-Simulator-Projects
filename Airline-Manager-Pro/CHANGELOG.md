@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.52 (2026-11-01)
+
+- pc-bridge: on EADDRINUSE ask /info; same or newer version opens its window and exits; older is asked to quit (/api/quit) or ended by PID from netstat; retry the port
+- office3d: family photo children scaled by a parent group, kid looks; photo spot aimed at it; dialogue at the side; laptop, notepad and lamp placed again
+- career: places card (office, courtroom)
+
 ## 0.9.51 (2026-11-01)
 
 - office3d: drawn-texture office, family photo rendered once and kept, visit spots and free walk (chair and door by raycast), interview with attitudes and an answer library, body language, decisions through discipline/dismiss-inc; Settings officeAutoVoice
