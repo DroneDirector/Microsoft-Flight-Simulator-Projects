@@ -340,15 +340,17 @@ function v3dBuildAirport(L: AirportLayout) {
   // terminals and other buildings
   // generic airport buildings: glass and steel terminal fronts (large buildings) or office windows (smaller
   // ones), a light roof with plant on it; the windows lit at night
-  const bTex = v3dBuildingTextures();
+  let bTex: any = null; try { bTex = v3dBuildingTextures(); } catch (e) { /* plain buildings */ }
   for (const a of L.areas || []) {
     if (a.k === 'apron' || a.pts.length < 3) continue;
+    try {   // one odd building outline never stops the rest of the airport
     const sh = new T.Shape(a.pts.map(p => { const q = loc(p[0], p[1]); return new T.Vector2(q[0], -q[1]); }));
     const c = loc(a.pts[0][0], a.pts[0][1]);
     let area = 0; for (let i = 0, n = a.pts.length; i < n; i++) { const p = a.pts[i], q = a.pts[(i + 1) % n]; area += p[0] * q[1] - q[0] * p[1]; } area = Math.abs(area) / 2;
     const big = area > 6000, hgt = big ? 16 : area > 1500 ? 12 : 9;
     const geo = new T.ExtrudeGeometry(sh, { depth: hgt, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, gy(c[0], c[1]) - 0.5, 0);
-    const bm = new T.Mesh(geo, [bTex.roof, big ? bTex.terminal : bTex.office]); bm.renderOrder = 9; g.add(bm);
+    const bm = new T.Mesh(geo, bTex ? [bTex.roof, big ? bTex.terminal : bTex.office] : new T.MeshLambertMaterial({ color: 0xC9CDD2 })); bm.renderOrder = 9; g.add(bm);
+    } catch (e) { /* skip this building */ }
   }
   // the airport's ground paint, drawn from its own layout into one picture and laid over the terrain like a sheet
   try { const lt = v3dAirportLights(L, loc, gy); if (lt) g.add(lt); } catch (e) { /* no lights */ }
@@ -365,7 +367,8 @@ function v3dBuildAirport(L: AirportLayout) {
     const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 })); m.renderOrder = 4;
     g.add(m);
   }
-  if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }
+  // the airport built before goes (its geometry and its own pictures; the buildings' shared facade materials stay)
+  if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { try { if (o.geometry) o.geometry.dispose(); if (o.material && !Array.isArray(o.material) && o.material.map && o.material.map.dispose) o.material.map.dispose(); } catch (e) { /* gone already */ } }); }
   try { g.traverse((o: any) => { if (o.isMesh && o.material && o.material.isMeshBasicMaterial) v3dSpotHook(o.material); }); } catch (e) { /* plain */ }
   V3d.airport = g; V3d.scene.add(g);
   try { v3dAirportPatch(); } catch (x) { /* never stop the view */ }
