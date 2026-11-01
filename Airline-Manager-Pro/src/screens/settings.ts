@@ -143,6 +143,7 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'courtOn', label: 'Court hearings', hint: 'When an accident with deaths is blamed on how the airline is run (aircraft not serviced, mechanics underpaid, tired or not qualified), the airline goes to court and you answer the judge\'s questions in the courtroom, over a couple of days. Your answers affect your company rating. Off: the airline is never taken to court, and open hearings finish on their own.' },
     { type: 'html', html: () => `<div class="set-card">${icon('shield')}<span><b>The courtroom</b><small>Walk into the courtroom any time. With no hearing on it is empty; during a hearing everyone is there.</small></span><button class="btn ghost sm" data-act="court-enter">Enter the courtroom</button></div>` },
     { type: 'group', title: 'Conduct' },
+    { type: 'toggle', key: 'officeAutoVoice', label: 'Play answers aloud in the office', hint: 'When you call someone into your office over a conduct report, their answers play by themselves. Off: tap the play button to hear them.' },
     { type: 'toggle', key: 'conduct', label: 'Conduct reports and behaviour', hint: 'Misconduct, warnings and court cases for your AI crew. Switching off never removes what already happened; court cases pause and carry on when you switch back on.' },
     { type: 'html', html: () => {
       const v = conductLevel(), names = ['Never', 'Rarely', 'Less often', 'Normal', 'Often'];

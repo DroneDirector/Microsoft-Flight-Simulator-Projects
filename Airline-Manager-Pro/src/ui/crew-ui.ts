@@ -193,6 +193,7 @@ function incidentPopup(id: string) {
         <div class="say-row">${voiceButton(inc.text + conductDetailSpeech(inc, p), 'ops', 'Play the report')}${voiceNoteEl('Head of operations')}</div>
         <p class="speech">${esc(inc.text)}</p>
         ${conductDetailHtml(inc, p)}
+        ${inc.status === 'open' ? `<button class="btn ghost of-invite" data-act="office-invite" data-id="${inc.id}">${icon('user')}Invite ${esc(p.name.replace(/^Capt\.\s*/, '').split(/\s+/)[0])} to my office</button>` : ''}
         <div class="inc-who"><b>${esc(p.name)}</b><small>${ROLE_NAMES[role]}, ${natLabel(p.nat)}, ${ageOf(p.dob)}, base ${esc(p.base)}</small><small class="${p.warnings ? 'amber' : ''}">${p.warnings ? `Already ${p.warnings} warning${p.warnings > 1 ? 's' : ''} on record: ${esc(warnSummary(p))}` : 'No earlier warnings'}</small><small>This report: <b class="sev-${inc.sev || 'moderate'}">${esc(inc.sev || 'moderate')}</b></small></div>
         ${warnHistory(p)}
         ${inc.status === 'open' ? `<div class="decide">

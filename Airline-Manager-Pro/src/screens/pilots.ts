@@ -68,6 +68,7 @@ SCREENS.pilots = {
       </div>`;
     return `
     <div class="pilot-hero">
+      <button class="btn ghost sm ph-office" data-act="office-open">${icon('jobs')}My office</button>
       <button class="ph-fig" data-act="edit-my-look" aria-label="Change your pilot's look">${avatarSvg(me.look, 'captain', { accent: c.color })}<span class="ph-edit">${icon('user')}Change look</span></button>
       <div class="ph-main">
         <small>Your pilot, synced with your simulator flights</small>
