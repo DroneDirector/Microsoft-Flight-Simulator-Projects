@@ -48,6 +48,15 @@ const SETTINGS: SetSection[] = [
         <input type="range" class="cl-d" min="1" max="4" step="1" value="${d}" aria-label="Cloud detail">
         <div class="v3d-scale"><span>Light</span><span>Normal</span><span>Detailed</span><span>Very detailed</span></div>${note}</div>`;
     } },
+    { type: 'group', title: 'Cabin' },
+    { type: 'html', html: () => {
+      const q = cabinQ();
+      const note = q === 3 ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: the cabin is drawn at your screen's full sharpness with the finest curves, a warmer device and more battery use.</p>`
+        : q === 0 ? `<p class="v3d-note ok">${icon('info')}Low settings might improve performance on slower phones and PCs.</p>` : '';
+      return `<div class="set-card col"><div class="sc-h">${icon('layers')}<span><b class="cq-h">Cabin quality: ${CABIN_Q_NAMES[q]}</b><small>How finely the cabin views are made: the curves of the overhead bins, walls, seats, headrests and passengers. Extreme is the very best: the smoothest curves, the cabin drawn at your screen's full sharpness and the sharpest textures.</small></span></div>
+        <input type="range" class="v3d-cabq" min="0" max="3" step="1" value="${q}" aria-label="Cabin quality">
+        <div class="v3d-scale"><span>Low</span><span>Medium</span><span>High</span><span>Extreme</span></div>${note}</div>`;
+    } },
     { type: 'group', title: 'Sky and water' },
     { type: 'html', html: () => {
       const S: any = State.settings, wm = v3dWaterMode();
@@ -178,13 +187,15 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'reduceMotion', label: 'Reduce motion', hint: 'Shorter animations and a still map.' },
     { type: 'group', title: '3D view' },
     { type: 'html', html: () => {
-      const S: any = State.settings, v = Math.round((S.v3dVol == null ? 0.7 : +S.v3dVol) * 100);
+      const S: any = State.settings, v = Math.round((S.v3dVol == null ? 0.7 : +S.v3dVol) * 100), cv = Math.round((S.v3dCabinVol == null ? 0.7 : +S.v3dCabinVol) * 100);
       const row = (k: string, label: string, hint: string) => `<label class="tg-row"><span><b>${label}</b><small>${hint}</small></span><button class="tg ${S[k] !== false ? 'on' : ''}" role="switch" aria-checked="${S[k] !== false}" data-act="v3d-opt" data-key="${k}"><i></i></button></label>`;
       if (State.settings.muteAll || S.onlyVoices) return `<p class="v3d-note">${icon('info')}Sounds are off (Mute all sounds, or Only the voices, above).</p>`;
-      return row('v3dEngines', 'Engine sounds', 'The aircraft near the camera: the roar and whine of jets, the beat of propellers, louder with power and the nearer they are. Quieter from the forward view.')
+      return row('v3dEngines', 'Engine sounds', 'The aircraft near the camera: the roar and whine of jets, the beat of propellers, louder with power and the nearer they are. Quieter from the forward view, and muffled from inside the cabin.')
         + row('v3dThunder', 'Thunder', 'After each flash of lightning, arriving as late as real thunder does (about 3 seconds a kilometre), heard out to about 16 km: a sharp crack close by, a low rumble far away.')
         + `<div class="set-card col"><div class="sc-h">${icon('volume')}<span><b class="v3v-h">3D view volume: ${v}%</b><small>Engines and thunder together. The app's other sounds keep their own level.</small></span></div>
-        <input type="range" class="v3d-vol" min="0" max="100" step="5" value="${v}" aria-label="3D view volume"></div>`;
+        <input type="range" class="v3d-vol" min="0" max="100" step="5" value="${v}" aria-label="3D view volume"></div>`
+        + `<div class="set-card col"><div class="sc-h">${icon('volume')}<span><b class="v3c-h">Cabin sound: ${cv ? cv + '%' : 'Muted'}</b><small>Inside the cabin and at the window seats: the deep rumble and drone of your own engines through the hull, the air rushing past, louder on the engine's side at a window. All the way down mutes it.</small></span></div>
+        <input type="range" class="v3d-cvol" min="0" max="100" step="5" value="${cv}" aria-label="Cabin sound volume"></div>`;
     } },
   ] },
   { id: 'profiles', title: 'Profiles and companies', icon: 'pilots', items: [
@@ -497,6 +508,15 @@ document.addEventListener('change', e => {
 });
 ACTIONS['discord-test'] = () => { Online.test().then(() => toast('Test message sent to Discord', 'ok'), (e: any) => toast((e && e.message) || 'Not sent', 'warn')); };
 
+// the cabin quality slider: kept when let go (the cabin is made again the next time you look at it)
+document.addEventListener('input', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-cabq')) return;
+  const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.cq-h'); if (h) h.textContent = 'Cabin quality: ' + CABIN_Q_NAMES[+el.value];
+});
+document.addEventListener('change', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-cabq')) return;
+  (State.settings as any).v3dCabinQ = +el.value; Store.save(); rerenderSettingsBody();
+});
 // the satellite detail slider: kept when let go
 document.addEventListener('input', e => {
   const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-satq')) return;
@@ -522,7 +542,8 @@ document.addEventListener('change', e => {
 });
 // how often conduct reports happen
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-vol')) return; (State.settings as any).v3dVol = +el.value / 100; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.v3v-h'); if (h) h.textContent = '3D view volume: ' + el.value + '%'; });
-document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (el && el.classList && el.classList.contains('v3d-vol')) Store.save(); });
+document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (el && el.classList && (el.classList.contains('v3d-vol') || el.classList.contains('v3d-cvol'))) Store.save(); });
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-cvol')) return; (State.settings as any).v3dCabinVol = +el.value / 100; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.v3c-h'); if (h) h.textContent = 'Cabin sound: ' + (+el.value ? el.value + '%' : 'Muted'); });
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('cr-range')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.cr-h'); if (h) h.textContent = 'Conduct reports: ' + ['Never', 'Rarely', 'Less often', 'Normal', 'Often'][+el.value]; });
 document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('cr-range')) return; (State.settings as any).conductLevel = +el.value; Store.save(); rerenderSettingsBody(); });
 // the 3D view distance slider: the value shows while dragging, it's kept when let go
