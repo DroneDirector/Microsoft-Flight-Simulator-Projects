@@ -272,7 +272,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     // the bins' lower edge about 1.8 m above the floor (head room over the seats), lower in small cabins; they
     // meet the wall where the curved wall is at that height
     const zb = Math.min(zf + 1.8, zc + ri * 0.48), wallY = Math.min(ri * 0.9, Math.sqrt(Math.max(0.01, ri * ri - (zb - zc) * (zb - zc))) - 0.02), Mb = new T.Matrix4().makeBasis(_av(0, -side, 0), new T.Vector3(0, 1, 0), new T.Vector3(1, 0, 0));
-    Mb.setPosition(V(x0, side * wallY, zb)); m.matrixAutoUpdate = false; m.matrix.copy(Mb);
+    Mb.setPosition(V(x0, side * wallY, zb)); m.matrixAutoUpdate = false; m.matrix.copy(Mb); g.userData.bin = { zb, lip: wallY - bd };   // where the bins' lower edge is (for the seat placards)
     g.add(m);
     // underneath: the grey passenger service panel, with a pair of reading lights and air vents over every row
     const psu = new T.Mesh(new T.BoxGeometry(len, 0.035, bd * 0.95), lam2(0xA4A9AF)); psu.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.475), zb)); g.add(psu);
@@ -295,9 +295,20 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     // light: a bright line where the bin meets the ceiling, and one along the wall above the windows
     const glow = new T.MeshBasicMaterial({ color: 0xFFFFFF }); glow.userData.noDim = true; (g.userData.glows = g.userData.glows || []).push(glow);
     const up = new T.Mesh(new T.BoxGeometry(len, 0.02, 0.05), glow); up.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.35), zb + bh + 0.06)); g.add(up);
-    const wl = new T.Mesh(new T.BoxGeometry(len, 0.018, 0.03), glow); wl.position.copy(V(x0 + len / 2, side * (wallY - 0.02), zb - 0.04)); g.add(wl);
+    // the blue mood lighting: a strip under the bins' lip and one along the wall above the windows, and its glow
+    // washing down the wall below the bins
+    const led = new T.MeshBasicMaterial({ color: 0x3C7DFF }); led.userData.noDim = true; (g.userData.leds = g.userData.leds || []).push(led);
+    const lip = new T.Mesh(new T.BoxGeometry(len, 0.012, 0.022), led); lip.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.97), zb - 0.006)); g.add(lip);
+    const wl = new T.Mesh(new T.BoxGeometry(len, 0.016, 0.03), led); wl.position.copy(V(x0 + len / 2, side * (wallY - 0.02), zb - 0.04)); g.add(wl);
+    if (!V3dCabinF.washTex) V3dCabinF.washTex = cabinCanvas(4, 64, (gg) => { const gr = gg.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, 'rgba(70,130,255,.9)'); gr.addColorStop(1, 'rgba(70,130,255,0)'); gg.fillStyle = gr; gg.fillRect(0, 0, 4, 64); });
+    const washM = new T.MeshBasicMaterial({ map: V3dCabinF.washTex, transparent: true, opacity: 0.45, blending: T.AdditiveBlending, depthWrite: false, fog: false }); washM.userData.noDim = true; (g.userData.washes = g.userData.washes || []).push(washM);
+    const wash = new T.Mesh(new T.PlaneGeometry(len, 0.55), washM); wash.position.copy(V(x0 + len / 2, side * (wallY - 0.05), zb - 0.3)); if (side < 0) wash.rotation.y = Math.PI; wash.renderOrder = 45; g.add(wash);
+    const bwash = new T.Mesh(new T.PlaneGeometry(len, bd * 0.9), washM); bwash.rotation.x = Math.PI / 2; bwash.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.5), zb - 0.012)); bwash.renderOrder = 45; g.add(bwash);   // the bins' underside, lit blue
     if (side === -1) V3dCabin.mood = up;
   }
+  // the ceiling: two long white light lines down the middle
+  { const glow2 = new T.MeshBasicMaterial({ color: 0xFFFFFF }); glow2.userData.noDim = true; (g.userData.glows = g.userData.glows || []).push(glow2);
+    for (const sy of [-0.34, 0.34]) { const cz = zc + Math.sqrt(Math.max(0.01, ri * ri - sy * sy)) - 0.04; const ln = new T.Mesh(new T.BoxGeometry(len, 0.008, 0.06), glow2); ln.position.copy(V(x0 + len / 2, sy, cz)); g.add(ln); } }
   // the windows along both walls
   const pitch = Math.max(0.45, s.win.pitch || 0.53), nW = Math.floor((s.win.to - s.win.from) / pitch), zW = Math.min(zf + 1.12, zc + ri * 0.2);   // window middle about 1.1 m above the floor, as in real cabins
   if (!V3dCabinF.winTex) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 96; const x = cv.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 64, 96); x.fillStyle = '#fff'; x.beginPath(); (x as any).roundRect ? (x as any).roundRect(4, 4, 56, 88, 24) : x.rect(4, 4, 56, 88); x.fill(); V3dCabinF.winTex = new T.CanvasTexture(cv); }
@@ -315,6 +326,12 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   const bez = new T.InstancedMesh(new T.PlaneGeometry(st.ww * 1.9, st.wh * 1.65), cabinMat(0xFFFFFF, { map: V3dCabinF.bezTex, transparent: true, alphaTest: 0.5 }), nW * 2);
   for (let i = 0; i < nW * 2; i++) { wins.getMatrixAt(i, M); const e = new T.Matrix4().makeTranslation(0, 0, 0.012); M.multiply(e); bez.setMatrixAt(i, M); }
   g.add(bez);
+  // window shades: some pulled down here and there, as passengers do; never over the wing, so it stays in view
+  { const Wg: any = (s as any).wing || {}, wx0 = (Wg.x || 0) - 0.9, wx1 = (Wg.x || 0) + (Wg.root || 3) * 0.95;
+    const shTex = cabinCanvas(32, 48, (gg) => { const gr = gg.createLinearGradient(0, 0, 0, 48); gr.addColorStop(0, '#E8EAED'); gr.addColorStop(1, '#CDD1D6'); gg.fillStyle = gr; gg.fillRect(0, 0, 32, 48); gg.fillStyle = '#B9BEC4'; gg.fillRect(8, 42, 16, 3); });
+    const shades = new T.InstancedMesh(new T.PlaneGeometry(st.ww * 1.22, st.wh * 1.18), cabinMat(0xFFFFFF, { map: shTex }), nW * 2); let ns = 0;
+    for (let i = 0; i < nW * 2; i++) { const wxp = s.win.from + Math.floor(i / 2) * pitch; if (wxp > wx0 && wxp < wx1) continue; if (cloudHash(i, nW, 41) > 0.3) continue; wins.getMatrixAt(i, M); M.multiply(new T.Matrix4().makeTranslation(0, 0, 0.006)); shades.setMatrixAt(ns++, M); }
+    shades.count = ns; if (ns) g.add(shades); }
   // the seats, row by row, from the passenger list's layout (first class and business at the front, wider)
   const list: PaxSeat[] = f ? (() => { try { return manifestOf(f); } catch (e) { return []; } })() : [];
   const rowCls: { [r: number]: string } = {}; let maxRow = 0;
@@ -336,7 +353,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   const seatY: number[] = []; let yy = -width / 2;
   blocks.forEach((b, bi) => { for (let k = 0; k < b; k++) { seatY.push(yy + seatW * (k + 0.5)); } yy += b * seatW + (bi < aisles ? aisleW : 0); });
   const aisleY = blocks.length > 1 ? -width / 2 + blocks[0] * seatW + aisleW / 2 : 0;
-  const seatColor = new T.Color(0x34373D), premColor = new T.Color(st.seat).lerp(new T.Color(0x1C2433), 0.4), headColor = new T.Color(st.head); void headColor;
+  const seatColor = new T.Color(0xD5D8DC), headDark = new T.Color(0x2B2E34), premColor = new T.Color(st.seat).lerp(new T.Color(0x1C2433), 0.4), headColor = new T.Color(st.head); void headColor;
   const nSeats = rows * abreast;
   // a seat seen from the side (forward is −x): cushion, a back curving to a rounded top, the shell behind;
   // drawn out across the seat's width, its edges softly rounded
@@ -372,7 +389,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
       const sy = seatY[i] + (prem && abreast === 6 ? (i < 3 ? 0.12 : -0.12) * (i === 0 || i === 5 ? -1 : 1) : 0), wS = prem ? seatW * 1.35 : seatW * 0.94, X = rowX[r];
       const q = new T.Quaternion(), pk = prem ? 1.25 : 1;
       M.compose(V(X, sy, zf), q, new T.Vector3(pk, pk, wS)); cush.setMatrixAt(k, M); cush.setColorAt(k, prem ? premColor : seatColor);
-      M.compose(V(X, sy, zf), q, new T.Vector3(pk, pk, wS * 0.98)); head.setMatrixAt(k, M); head.setColorAt(k, prem ? premColor : seatColor);
+      M.compose(V(X, sy, zf), q, new T.Vector3(pk, pk, wS * 0.98)); head.setMatrixAt(k, M); head.setColorAt(k, prem ? premColor : headDark);
       M.compose(V(X + 0.312 * pk, sy, zf + 1.13 * pk), new T.Quaternion().setFromEuler(new T.Euler(0, Math.PI / 2, 0)), new T.Vector3(wS / 0.4, 1, 1)); cover.setMatrixAt(k, M);
       for (const sd of [-1, 1]) { const ai = k * 2 + (sd > 0 ? 1 : 0); M.compose(V(X - 0.02, sy + sd * wS * 0.5, zf + 0.66), q, new T.Vector3(1, 1, 1)); back.setMatrixAt(ai, M); back.setColorAt(ai, new T.Color(0xC9CDD2)); M.compose(V(X - 0.02, sy + sd * wS * 0.5, zf + 0.7), q, new T.Vector3(1, 1, 1)); pad.setMatrixAt(ai, M); }
       seatAt[r + letters[i]] = { x: X, y: sy, prem }; k++;
@@ -381,22 +398,15 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   cush.count = head.count = cover.count = k; back.count = pad.count = k * 2; g.add(pad, cover);
   // the back of every seat: the tray table and its latch, the pocket, and on long-haul cabins the screen
   const longHaul = abreast >= 7 || /a350|b777|b787|b747/.test(s.cockpit);
-  const tray = new T.InstancedMesh(new T.BoxGeometry(0.014, 0.3, 0.36), cabinMat(0x9EA3AA, { map: cabinSatinTex() }), k);
-  const latch = new T.InstancedMesh(new T.BoxGeometry(0.02, 0.025, 0.05), cabinMat(0x3A3D42), k);
-  const pocket = new T.InstancedMesh(new T.BoxGeometry(0.02, 0.2, 0.38), cabinMat(0x2A2E35, { map: cabinFabricTex() }), k);
-  const scr = longHaul ? new T.InstancedMesh(new T.BoxGeometry(0.012, 0.15, 0.24), new T.MeshBasicMaterial({ color: 0x1D4E7A, fog: false }), k) : null;
-  if (scr) scr.material.userData.noDim = true;
-  let t2 = 0; const one = new T.Vector3(1, 1, 1), q0 = new T.Quaternion().setFromEuler(new T.Euler(0, 0, -0.07));
+  // the back of every seat: a light moulded shell with the screen (long haul) or a phone holder, the tray table
+  // with its latch, the pocket and a coat hook, as on a modern slimline seat
+  const backTex = cabinSeatBackTex(longHaul), panel = new T.InstancedMesh(new T.PlaneGeometry(1, 1), cabinMat(0xFFFFFF, { map: backTex }), k);
+  let t2 = 0; const qp = new T.Quaternion().setFromEuler(new T.Euler(0, 0, -0.07)).multiply(new T.Quaternion().setFromEuler(new T.Euler(0, Math.PI / 2, 0)));
   for (const key in seatAt) {
-    const a = seatAt[key], bx = a.x + (a.prem ? 0.43 : 0.335);
-    M.compose(V(bx, a.y, zf + (scr ? 0.72 : 0.82)), q0, one); tray.setMatrixAt(t2, M);
-    M.compose(V(bx + 0.006, a.y, zf + (scr ? 0.86 : 0.96)), q0, one); latch.setMatrixAt(t2, M);
-    M.compose(V(bx - 0.03, a.y, zf + 0.5), q0, one); pocket.setMatrixAt(t2, M);
-    if (scr) { M.compose(V(bx + 0.012, a.y, zf + 0.98), q0, one); scr.setMatrixAt(t2, M); }
-    t2++;
+    const a = seatAt[key]; if (a.prem) continue;
+    M.compose(V(a.x + 0.322, a.y, zf + 0.76), qp, new T.Vector3(seatW * 0.86, 0.6, 1)); panel.setMatrixAt(t2++, M);
   }
-  tray.count = latch.count = pocket.count = t2; if (scr) scr.count = t2;
-  g.add(tray, latch, pocket); if (scr) g.add(scr);
+  panel.count = t2; g.add(panel);
   g.add(cush, back, head);
   // the passengers
   if (cabinPeopleOn() && list.length) { const pg = cabinPeople(list, seatAt, zf, V); g.add(pg); g.userData.people = pg; }
@@ -410,7 +420,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     g.userData.crewAt = { aisleY, aisles, zf, x0, x1, rowX, paxRows, mood: st.mood, firstX, lastX, half: width / 2 + 0.05 };
     // the row numbers and seat letters, on a lit placard under the bins at the aisle side of each block of seats,
     // as on board (passengers find their seats by them)
-    try { const lab = cabinRowLabels(rowX, blocks, letters, seatY, seatW, aisles, zf, V); if (lab) g.add(lab); } catch (e) { /* no placards */ } }
+    try { const lab = cabinRowLabels(rowX, blocks, letters, seatY, seatW, aisles, zf, V, g.userData.bin); if (lab) g.add(lab); } catch (e) { /* no placards */ } }
   return g;
 }
 
@@ -517,6 +527,9 @@ function v3dCabinFwdCam(P: any) {
   const md = new T.Color(G.userData.crewAt ? G.userData.crewAt.mood : 0xBFD8FF);
   CabinLight.warm.value.setRGB(1 - dim * (1 - md.r * 0.75), 0.99 - dim * (1 - md.g * 0.7), 0.98 - dim * (1 - md.b * 0.95));
   for (const gm of G.userData.glows || []) gm.color.setRGB(1, 1, 1).lerp(md.clone().multiplyScalar(0.55), dim);
+  // the blue mood lighting stays on, a little softer at night
+  for (const lm of G.userData.leds || []) lm.color.setRGB(0.24, 0.49, 1).multiplyScalar(1 - dim * 0.4);
+  for (const wm of G.userData.washes || []) wm.opacity = 0.45 * (1 - dim * 0.35);
   if (Math.abs((G.userData.nightWas == null ? -1 : G.userData.nightWas) - dim) > 0.05) {
     G.userData.nightWas = dim;
     for (const rl of G.userData.rls || []) { const first = !rl.instanceColor; for (let i = 0; i < rl.count; i++) { const on = cloudHash(i, rl.count, 77) < 0.14 || dim < 0.3; rl.setColorAt(i, new T.Color(on ? 0xFFF1D6 : 0x3A3E46)); } if (rl.instanceColor) rl.instanceColor.needsUpdate = true; if (first) rl.material.needsUpdate = true; }
@@ -641,20 +654,38 @@ function cabinSkyTex(): any {
 /** The headrest cover: a light cloth with a bold pattern of our own in the airline's colour (a woven chevron
  *  and lines), like the covers airlines use; never another airline's design. */
 function cabinCoverTex(color: string): any {
-  const key = 'cover' + color; if (CabinTex[key]) return CabinTex[key];
+  const key = 'cover2' + color; if (CabinTex[key]) return CabinTex[key];
   return (CabinTex[key] = cabinCanvas(128, 104, (g) => {
-    g.fillStyle = '#F4F1EC'; g.fillRect(0, 0, 128, 104);
-    g.strokeStyle = color; g.lineWidth = 3.2; g.lineCap = 'round';
-    for (let k = -3; k < 7; k++) { g.beginPath(); const y = k * 16; g.moveTo(0, y + 20); g.lineTo(32, y + 4); g.lineTo(64, y + 20); g.lineTo(96, y + 4); g.lineTo(128, y + 20); g.stroke(); }
-    g.globalAlpha = 0.5; g.lineWidth = 1.2; for (let k = -3; k < 7; k++) { g.beginPath(); const y = k * 16 + 8; g.moveTo(0, y + 20); g.lineTo(32, y + 4); g.lineTo(64, y + 20); g.lineTo(96, y + 4); g.lineTo(128, y + 20); g.stroke(); }
-    g.globalAlpha = 1; for (let i = 0; i < 1400; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.05})`; g.fillRect(Math.random() * 128, Math.random() * 104, 1, 1); }   // the weave
+    g.fillStyle = '#2E3137'; g.fillRect(0, 0, 128, 104);
+    g.fillStyle = color; g.fillRect(0, 0, 128, 12);   // the airline's colour along the top, as piping
+    g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(0, 12, 128, 2);
+    for (let i = 0; i < 1600; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},${Math.random() * 0.06})`; g.fillRect(Math.random() * 128, Math.random() * 104, 1, 1); }   // the leather grain
+  }));
+}
+/** The back of a slimline seat: light grey moulding, the screen (or a phone holder), the tray table and latch, the
+ *  pocket and a coat hook. */
+function cabinSeatBackTex(screen: boolean): any {
+  const key = 'seatback' + screen; if (CabinTex[key]) return CabinTex[key];
+  return (CabinTex[key] = cabinCanvas(192, 256, (g) => {
+    const rr = (x: number, y: number, w: number, h: number, r: number) => { g.beginPath(); (g as any).roundRect(x, y, w, h, r); };
+    const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#E9EBEE'); gr.addColorStop(1, '#D3D7DB'); g.fillStyle = gr; g.fillRect(0, 0, 192, 256);
+    // the screen (or a phone holder) at the top
+    if (screen) { rr(26, 14, 140, 82, 8); g.fillStyle = '#16191E'; g.fill(); const s2 = g.createLinearGradient(26, 14, 166, 96); s2.addColorStop(0, 'rgba(255,255,255,.12)'); s2.addColorStop(0.5, 'rgba(255,255,255,0)'); g.fillStyle = s2; rr(30, 18, 132, 74, 6); g.fill(); g.fillStyle = '#2C6FB5'; g.globalAlpha = 0.35; rr(34, 22, 124, 66, 4); g.fill(); g.globalAlpha = 1; }
+    else { rr(66, 20, 60, 40, 6); g.fillStyle = '#5A6068'; g.fill(); }
+    // the tray table: a panel outline with its latch at the top
+    rr(18, 108, 156, 78, 10); g.strokeStyle = 'rgba(80,88,98,.55)'; g.lineWidth = 3; g.stroke();
+    rr(82, 102, 28, 12, 4); g.fillStyle = '#9AA1A9'; g.fill(); g.fillStyle = '#5B6168'; g.fillRect(89, 106, 14, 4);
+    // the pocket below, in dark fabric, and a coat hook
+    rr(20, 198, 152, 50, 8); g.fillStyle = '#3A3F47'; g.fill(); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(24, 200, 144, 3);
+    g.fillStyle = '#7C838B'; rr(150, 124, 10, 18, 3); g.fill();
+    for (let i = 0; i < 1800; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.03})`; g.fillRect(Math.random() * 192, Math.random() * 256, 1, 1); }
   }));
 }
 
 /** The placards with the row number and the seat letters, as on board: a white plate along the bin's lower edge,
  *  facing down towards the aisle, with the row number, a person (the aisle), the seat letters in boxes from the
  *  aisle seat out to the window seat, and a window. All in one mesh drawn from one picture. */
-function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters: string, seatY: number[], seatW: number, aisles: number[], zf: number, V: (x: number, y: number, z: number) => any): any {
+function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters: string, seatY: number[], seatW: number, aisles: number[], zf: number, V: (x: number, y: number, z: number) => any, bin?: { zb: number; lip: number }): any {
   const T = THREE, rows = Object.keys(rowX).map(Number).sort((a, b) => a - b); if (!rows.length || !aisles.length) return null;
   // which blocks face which aisle, and their letters from the aisle seat to the window seat
   const sides: { y: number; dir: number; txt: string }[] = []; let i0 = 0;
@@ -677,7 +708,8 @@ function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters
     for (const L of sd.txt) { x.strokeRect(px, cy + 14, 24, 28); x.fillText(L, px + 12, cy + 29); px += 26; }
     x.beginPath(); x.ellipse(px + 9, cy + 28, 6, 11, 0, 0, 6.3); x.lineWidth = 3; x.stroke(); x.beginPath(); x.ellipse(px + 9, cy + 28, 3, 7, 0, 0, 6.3); x.fill();
     // the plate: along the bin's lower edge over the aisle seat, tilted to face down and towards the aisle
-    const ctr = V(rowX[r] - 0.02, sd.y, zf + 1.78), o0 = V(0, 0, 0), n = V(0, sd.dir * 0.5, -0.87).sub(o0).normalize();
+    const pz = bin ? bin.zb - 0.03 : zf + 1.7, py = bin && aisles.length === 1 ? Math.sign(sd.y - aisles[0]) * (bin.lip + 0.1) : sd.y;   // on the panel under the bin, near its edge over the aisle seat
+    const ctr = V(rowX[r] - 0.02, py, pz), o0 = V(0, 0, 0), n = V(0, sd.dir * 0.5, -0.87).sub(o0).normalize();
     const along = V(-1, 0, 0).sub(o0).normalize(), right = along.clone().multiplyScalar(sd.dir > 0 ? 1 : -1);   // the text runs along the cabin, upright as seen from the aisle
     const upv = new T.Vector3().crossVectors(n, right).normalize();   // the edge towards the aisle is the top of the text
     const hw = 0.13, hh = 0.028, b0 = pos.length / 3, c0 = ctr.clone().addScaledVector(n, 0.003);
@@ -687,6 +719,6 @@ function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters
   }
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
   const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
-  const m = new T.Mesh(geo, cabinMat(0xFFFFFF, { map: tex, side: T.DoubleSide }));
+  const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, side: T.DoubleSide, fog: false })); m.material.userData.noDim = true;
   return m;
 }
