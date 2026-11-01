@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.43 (2026-11-01)
+
+- Setting tfcRealNames: traffic shown as real airlines (REAL_AIRLINES bases, ICAO codes, realReg, fleets), REAL_SCHEMES colour schemes in 3D; league/news unchanged
+
 ## 0.9.42 (2026-10-31)
 
 - Flight card fixed layout (fc-ph, fc-vs, three-line on-board items)
