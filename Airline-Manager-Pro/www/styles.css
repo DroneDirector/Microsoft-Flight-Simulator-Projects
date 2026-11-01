@@ -2910,3 +2910,13 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .pilot-hero { position: relative; }
 .ph-office { position: absolute; right: 14px; top: 12px; z-index: 2; }
 .office3d .ctl-house { display: none; }
+/* Overview: your office and the courtroom */
+.places-card { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; }
+.place { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; text-align: left; color: #F3ECE0; border: 1px solid rgba(214,168,92,.35); cursor: pointer; transition: transform .15s var(--ease), border-color .15s; }
+.place.office { background: linear-gradient(135deg, #1D2E45, #142034); }
+.place.court { background: linear-gradient(135deg, #2A1C10, #17100A); }
+.place.court.live { border-color: #D6A85C; box-shadow: 0 0 0 1px rgba(214,168,92,.4), 0 0 22px rgba(214,168,92,.25); }
+.place:hover { transform: translateY(-1px); border-color: rgba(214,168,92,.7); }
+.place > .ic:first-child { width: 28px; height: 28px; color: #D6A85C; flex: none; }
+.place span { flex: 1; min-width: 0; } .place b { display: block; font: 600 16px Georgia, serif; } .place small { color: #CDBFA8; font-size: 12.5px; }
+@media (max-width: 700px) { .places-card { grid-template-columns: 1fr; } }

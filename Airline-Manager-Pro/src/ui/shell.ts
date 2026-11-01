@@ -18,6 +18,8 @@ function renderShell() {
         <button class="rail-btn" data-act="go" data-screen="${k}" aria-label="${esc(SCREENS[k].title)}">
           ${icon(SCREENS[k].icon)}<span>${esc(SCREENS[k].title)}</span>${k === 'maint' ? `<i class="rail-dot" data-maint-dot></i>` : ''}
         </button>`).join('')}
+        <button class="rail-btn" data-act="office-open" aria-label="My office">${icon('jobs')}<span>Office</span></button>
+        <button class="rail-btn" data-act="court-enter" aria-label="The courtroom">${icon('shield')}<span>Court</span><i class="rail-dot" data-court-dot hidden></i></button>
       </div>
       <button class="rail-more down" data-act="rail-scroll" data-d="1" aria-label="More in the menu below">${icon('down')}</button>
       <button class="rail-btn rail-set" data-act="settings" aria-label="Settings">${icon('gear')}<span>Settings</span></button>

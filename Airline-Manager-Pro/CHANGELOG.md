@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.51 (2026-11-01)
+
+- office3d: drawn-texture office, family photo rendered once and kept, visit spots and free walk (chair and door by raycast), interview with attitudes and an answer library, body language, decisions through discipline/dismiss-inc; Settings officeAutoVoice
+- court3d: empty courtroom any time (walk, spots); loading screen (scales, progress) for the courtroom and the office
+- menu: Office and Court; Overview places card; Crew → Court tab with every case
+- conduct-detail: said/did, reported by, witnesses, their side; alerts.ts: phone and Windows notifications, received time on every message
+
 ## 0.9.50 (2026-11-01)
 
 - court-hearing: airline cases with hearings (hear1-3, hearA), questions from the records, lawyer suggestions and objections, stand-in, absences, reminders, press, aftermath (audit, watch, premium), memorial; Settings courtOn
