@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.48 (2026-11-01)
+
+- v3d-terrain tiles(): three retries with backoff, then the parent tile (up to four levels up) enlarged; ring imagery canvases pre-filled with a ground colour
+
 ## 0.9.47 (2026-11-01)
 
 - PC self-update: pc-bridge updater.ts (/api/update: download the PC zip from the release, Expand-Archive, replace after exit with a cmd script, restart); Updater picks the PC zip on DESKTOP and installs through it
