@@ -668,14 +668,19 @@ function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters
     x.fillStyle = '#F2F4F6'; x.font = 'bold 24px Inter, Arial, sans-serif'; x.textBaseline = 'middle'; x.fillText(String(r), cx + 8, cy + ch / 2 + 1);
     x.font = '600 18px Inter, Arial, sans-serif'; x.fillStyle = '#C9D2DC'; x.fillText(sd.txt.split('').join(' '), cx + 46, cy + ch / 2 + 1);
     // a small plate facing the aisle, its text reading left to right from there
-    const ctr = V(rowX[r] - 0.05, sd.y, zf + 1.66), n = V(0, sd.dir, 0).sub(V(0, 0, 0)).normalize(), right = new T.Vector3().crossVectors(up, n).normalize();
-    const hw = 0.11, hh = 0.034, b0 = pos.length / 3;
-    for (const [sx, sy2] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = ctr.clone().addScaledVector(right, sx * hw).addScaledVector(up, sy2 * hh); pos.push(p.x, p.y, p.z); }
+    // two faces in a shallow V towards the aisle: one readable walking to the back (boarding), one walking forward
+    const ctr = V(rowX[r] - 0.05, sd.y, zf + 1.66), o0 = V(0, 0, 0), hw = 0.11, hh = 0.034;
     const u0 = cx / cv.width, u1 = (cx + cw) / cv.width, v0 = 1 - (cy + ch) / cv.height, v1 = 1 - cy / cv.height;
-    uv.push(u0, v0, u1, v0, u1, v1, u0, v1); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); c++;
+    for (const along of [-1, 1]) {
+      const n = V(along * 0.75, sd.dir * 0.66, 0).sub(o0).normalize(), right = new T.Vector3().crossVectors(up, n).normalize(), b0 = pos.length / 3;
+      const c0 = ctr.clone().addScaledVector(n, 0.004);
+      for (const [sx, sy2] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = c0.clone().addScaledVector(right, sx * hw).addScaledVector(up, sy2 * hh); pos.push(p.x, p.y, p.z); }
+      uv.push(u0, v0, u1, v0, u1, v1, u0, v1); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+    }
+    c++;
   }
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
   const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
-  const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, side: T.DoubleSide, fog: false })); m.material.userData.noDim = true;
+  const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, fog: false })); m.material.userData.noDim = true;
   return m;
 }
