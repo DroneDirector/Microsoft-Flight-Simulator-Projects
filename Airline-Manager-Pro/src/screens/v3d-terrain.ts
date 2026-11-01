@@ -87,20 +87,36 @@ const V3dTerrain = {
   },
 
   /** N × N tiles of a tile service into one canvas (null when none could be loaded). */
-  tiles(base: string, z: number, x0: number, y0: number, N: number, ext: string): Promise<HTMLCanvasElement> {
+  tiles(base: string, z: number, x0: number, y0: number, N: number, ext: string, fill?: string): Promise<HTMLCanvasElement> {
     const n = 1 << z, cv = document.createElement('canvas'); cv.width = cv.height = 256 * N;
     const c = cv.getContext('2d');
     if (ext === 'png') { c.fillStyle = 'rgb(128,0,0)'; c.fillRect(0, 0, cv.width, cv.height); }   // terrarium 0 m
+    else if (fill) { c.fillStyle = fill; c.fillRect(0, 0, cv.width, cv.height); }   // never black where a picture is missing
+    const url = (zz: number, x: number, y: number) => base.indexOf('{z}') >= 0 ? base.replace('{z}', String(zz)).replace('{x}', String(x)).replace('{y}', String(y)) : ext === 'png' ? `${base}${zz}/${x}/${y}.png` : `${base}${zz}/${y}/${x}.jpg`;
     let left = N * N, got = 0;
     return new Promise(ok => {
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-        const im = new Image(); im.crossOrigin = 'anonymous';
-        const done = () => { if (z === 12 && ext === 'png') this.prog.got++; if (--left === 0) ok(got ? cv : null); };
-        im.onload = () => { try { c.drawImage(im, i * 256, j * 256); got++; } catch (e) { /* out of memory: skip this tile */ } done(); };
-        let tried = false;
-        im.onerror = () => { if (!tried && ext !== 'png') { tried = true; setTimeout(() => { im.src = im.src.indexOf('?') < 0 ? im.src + '?r=1' : im.src + '&r=1'; }, 1200 + Math.random() * 1500); return; } done(); };
         const x = (x0 + i + n) % n, y = y0 + j;
-        im.src = base.indexOf('{z}') >= 0 ? base.replace('{z}', String(z)).replace('{x}', String(x)).replace('{y}', String(y)) : ext === 'png' ? `${base}${z}/${x}/${y}.png` : `${base}${z}/${y}/${x}.jpg`;
+        const done = () => { if (z === 12 && ext === 'png') this.prog.got++; if (--left === 0) ok(got ? cv : null); };
+        // a picture that won't come (the imagery server busy, or a gap in it): tried again a few times, then
+        // the same place from the less detailed imagery above it, enlarged, so there is never a black square
+        let tries = 0, up = 0;
+        const im = new Image(); im.crossOrigin = 'anonymous';
+        im.onload = () => {
+          try {
+            if (!up) c.drawImage(im, i * 256, j * 256);
+            else { const k = 1 << up, sx = (x % k) * 256 / k, sy = (y % k) * 256 / k; c.drawImage(im, sx, sy, 256 / k, 256 / k, i * 256, j * 256, 256, 256); }
+            got++;
+          } catch (e) { /* out of memory: skip this tile */ }
+          done();
+        };
+        im.onerror = () => {
+          if (ext === 'png') { done(); return; }
+          if (tries < 3) { tries++; setTimeout(() => { im.src = url(z - up, x >> up, y >> up) + (tries ? (url(z, x, y).indexOf('?') < 0 ? '?r=' : '&r=') + tries : ''); }, 900 * tries + Math.random() * 1500); return; }
+          if (up < 4 && z - up > 2) { up++; tries = 0; im.src = url(z - up, x >> up, y >> up); return; }
+          done();
+        };
+        im.src = url(z, x, y);
       }
     });
   },
@@ -239,7 +255,7 @@ const V3dTerrain = {
     this._satBusy = true; const gen = this.gen;
     const next = () => { this._satBusy = false; const n2 = (this._satQ || []).shift(); if (n2 && gen === this.gen && V3d.open) this.loadSat(n2); };
     const z = r.z + k, N = r.N << k;
-    this.tiles(SAT_URL, z, r.x0 << k, r.y0 << k, N, 'jpg').then(cv0 => {
+    this.tiles(SAT_URL, z, r.x0 << k, r.y0 << k, N, 'jpg', '#5E6B55').then(cv0 => {
       if (!V3d.open || gen !== this.gen || !cv0) { next(); return; }
       this.finishSat(r, cv0, maxTex, gen, next);
     });
