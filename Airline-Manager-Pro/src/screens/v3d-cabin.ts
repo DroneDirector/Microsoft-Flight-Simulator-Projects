@@ -407,7 +407,10 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   { const paxRows: number[] = []; for (const p of list) { const r = parseInt(p.seat, 10); if (seatAt[p.seat] && paxRows.indexOf(r) < 0) paxRows.push(r); } paxRows.sort((a, b) => a - b);
     const aisles: number[] = []; { let yy2 = -width / 2; blocks.forEach((b, bi) => { yy2 += b * seatW; if (bi < aisles0) { aisles.push(yy2 + aisleW / 2); yy2 += aisleW; } }); }
     const rk = Object.keys(rowX).map(Number), firstX = rk.length ? rowX[Math.min(...rk)] : x0 + 1.4, lastX = rk.length ? rowX[Math.max(...rk)] : x1 - 1.6;
-    g.userData.crewAt = { aisleY, aisles, zf, x0, x1, rowX, paxRows, mood: st.mood, firstX, lastX, half: width / 2 + 0.05 }; }
+    g.userData.crewAt = { aisleY, aisles, zf, x0, x1, rowX, paxRows, mood: st.mood, firstX, lastX, half: width / 2 + 0.05 };
+    // the row numbers and seat letters, on a lit placard under the bins at the aisle side of each block of seats,
+    // as on board (passengers find their seats by them)
+    try { const lab = cabinRowLabels(rowX, blocks, letters, seatY, seatW, aisles, zf, V); if (lab) g.add(lab); } catch (e) { /* no placards */ } }
   return g;
 }
 
@@ -423,18 +426,29 @@ function cabinPeople(list: PaxSeat[], seatAt: any, zf: number, V: (x: number, y:
     _people.arm = new T.CylinderGeometry(0.045, 0.04, 0.44, Math.max(6, sg >> 1));
     _people.neck = new T.CylinderGeometry(0.045, 0.05, 0.1, Math.max(6, sg >> 1));
     _people.thigh = new T.CylinderGeometry(0.07, 0.06, 0.42, Math.max(6, sg >> 1));
+    _people.shin = new T.CylinderGeometry(0.055, 0.045, 0.42, Math.max(6, sg >> 1));   // lower legs (they walk in and out)
     _people.petBody = new T.SphereGeometry(0.1, 12, 8).scale(1.5, 0.9, 0.9);
     _people.petHead = new T.SphereGeometry(0.065, 12, 8);
     _people.ear = new T.ConeGeometry(0.025, 0.06, 6);
   }
   const ok = list.filter(p => seatAt[p.seat]);
-  const n = ok.length, mk = (geo: any, count: number) => { const m = new T.InstancedMesh(geo, cabinMat(0xffffff), Math.max(1, count)); m.material.userData.noDim = true; m.count = 0; g.add(m); return m; };
-  const torso = mk(_people.torso, n), headM = mk(_people.head, n), hairM = mk(_people.hair, n), longM = mk(_people.long, n), arms = mk(_people.arm, n * 2), neck = mk(_people.neck, n), thighs = mk(_people.thigh, n * 2);
+  // each part's own copy of the shape, with a fade for every person (they fade in and out at the door)
+  const n = ok.length, mk = (geo0: any, count: number) => {
+    const geo = geo0.clone(), cnt = Math.max(1, count), fade = new T.InstancedBufferAttribute(new Float32Array(cnt).fill(1), 1); fade.setUsage(T.DynamicDrawUsage); geo.setAttribute('aFade', fade);
+    const mt = cabinMat(0xffffff); mt.alphaHash = true; mt.userData.noDim = true;
+    const ob = mt.onBeforeCompile; mt.onBeforeCompile = (sh: any, r: any) => { ob(sh, r);
+      sh.vertexShader = 'attribute float aFade;\nvarying float vFade;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFade = aFade;');
+      sh.fragmentShader = 'varying float vFade;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.a *= vFade;'); };
+    mt.customProgramCacheKey = () => 'cabin-pax';
+    const m = new T.InstancedMesh(geo, mt, cnt); m.count = 0; g.add(m); return m; };
+  const torso = mk(_people.torso, n), headM = mk(_people.head, n), hairM = mk(_people.hair, n), longM = mk(_people.long, n), arms = mk(_people.arm, n * 2), neck = mk(_people.neck, n), thighs = mk(_people.thigh, n * 2), shins = mk(_people.shin, n * 2);
   const pets = ok.filter(p => p.pet && !p.pet.left && p.pet.where === 'cabin'), petB = mk(_people.petBody, pets.length), petH = mk(_people.petHead, pets.length), ears = mk(_people.ear, pets.length * 2);
   const M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), one = new T.Vector3(1, 1, 1), C = new T.Color();
   const put = (m: any, pos: any, rot: number[], sc: any, col: any) => { E.set(rot[0], rot[1], rot[2]); Q.setFromEuler(E); M.compose(pos, Q, sc); m.setMatrixAt(m.count, M); m.setColorAt(m.count, col); m.count++; return m.count - 1; };
   // who is where: for tapping a passenger, and for turning their head when the crew talks to them
   const who: any[] = []; g.userData.who = who; g.userData.meshes = { torso, head: headM, hair: hairM };
+  // every person's parts, so they can stand up, walk and sit down (v3d-cabinpax.ts)
+  const figs: any[] = []; g.userData.figs = figs; g.userData.parts = { torso, neck, head: headM, hair: hairM, long: longM, arms, thighs, shins, petB, petH, ears }; g.userData.seatAt = seatAt; g.userData.zf = zf;
   for (const p of ok) {
     const at = seatAt[p.seat], L = p.look || {}, kid = p.age < 12 ? 0.72 : p.age < 16 ? 0.88 : 1, fem = p.sex === 'f' ? 0.93 : 1, sc = kid * fem;
     const skin = new T.Color(SKIN_TONES[L.skin == null ? 2 : L.skin] || '#D9A07A'), hairC = new T.Color(HAIR_COLORS[L.hairColor == null ? 1 : L.hairColor] || '#3A2A1E');
@@ -445,20 +459,23 @@ function cabinPeople(list: PaxSeat[], seatAt: any, zf: number, V: (x: number, y:
     const shoulderZ = seatZ + 0.56 * sc, headX = bx + Math.sin(-lean) * 0.6 * sc;
     put(neck, V(headX, y, shoulderZ + 0.05 * sc), [0, 0, lean], new T.Vector3(sc, sc, sc), skin);
     const hp = V(headX - 0.01, y, shoulderZ + 0.16 * sc);
-    const hi = put(headM, hp, [0, 0, lean * 0.5], new T.Vector3(sc, sc, sc), skin); let ri = -1;
+    const fig: any = { p, at, sc, fem: p.sex === 'f' ? 0.92 : 1, lean, ti: torso.count - 1, ni: neck.count - 1, hi: -1, ri: -1, li: -1, ai: arms.count, gi: thighs.count, si: shins.count, pet: null, hairK: L.hair === 'afro' ? 1 : L.hair === 'buzz' ? 2 : 0 };
+    const hi = put(headM, hp, [0, 0, lean * 0.5], new T.Vector3(sc, sc, sc), skin); let ri = -1; fig.hi = hi;
     who.push({ p, hi, head: hp.clone(), sc, lean, seatY: at.y });
     if (L.hair !== 'bald' && L.hair !== 'buzz') {
       ri = put(hairM, V(headX + 0.012, y, shoulderZ + 0.175 * sc), [0, 0, lean * 0.5 - 0.25], new T.Vector3(sc * (L.hair === 'afro' ? 1.25 : 1), sc * (L.hair === 'afro' ? 1.2 : 1), sc * (L.hair === 'afro' ? 1.25 : 1)), hairC);
-      if (/long|wavy|braids|ponytail|curly/.test(L.hair || '') && p.sex === 'f') put(longM, V(headX + 0.05, y, shoulderZ + 0.04 * sc), [0, 0, lean], new T.Vector3(sc, sc, sc), hairC);
+      if (/long|wavy|braids|ponytail|curly/.test(L.hair || '') && p.sex === 'f') fig.li = put(longM, V(headX + 0.05, y, shoulderZ + 0.04 * sc), [0, 0, lean], new T.Vector3(sc, sc, sc), hairC);
     } else if (L.hair === 'buzz') ri = put(hairM, V(headX + 0.012, y, shoulderZ + 0.17 * sc), [0, 0, lean * 0.5 - 0.25], new T.Vector3(sc * 0.97, sc * 0.97, sc * 0.97), C.copy(hairC).lerp(skin, 0.4));
-    who[who.length - 1].ri = ri;
+    who[who.length - 1].ri = ri; fig.ri = ri; figs.push(fig);
     for (const sd of [-1, 1]) {
       put(arms, V(bx - 0.06, y + sd * 0.2 * sc, seatZ + 0.3 * sc), [sd * 0.08, 0, -0.5], new T.Vector3(sc, sc, sc), cloth);
       put(thighs, V(at.x - 0.12, y + sd * 0.09 * sc, seatZ + 0.03), [0, 0, Math.PI / 2], new T.Vector3(sc, sc, sc), C.set(0x2E3540));
+      put(shins, V(at.x - 0.33, y + sd * 0.09 * sc, zf + 0.265), [0, 0, 0], new T.Vector3(sc, 0.53 / 0.42, sc), C.set(0x2E3540));
     }
     // a pet on the lap, looking about
     if (p.pet && !p.pet.left && p.pet.where === 'cabin') {
       const pc = new T.Color(p.pet.color || '#8B5A2B'), dog = p.pet.kind === 'dog';
+      fig.pet = { b: petB.count, h: petH.count, e: ears.count };
       put(petB, V(at.x - 0.18, y, seatZ + 0.17), [0, 0.4, 0], new T.Vector3(dog ? 1 : 0.85, 1, 1), pc);
       put(petH, V(at.x - 0.3, y + 0.04, seatZ + 0.27), [0, 0, 0], one, pc);
       for (const sd of [-1, 1]) put(ears, V(at.x - 0.3, y + 0.04 + sd * 0.04, seatZ + 0.34), [dog ? sd * 0.5 : 0, 0, 0], new T.Vector3(1, dog ? 0.8 : 1.1, 1), pc);
@@ -505,6 +522,7 @@ function v3dCabinFwdCam(P: any) {
     for (const rl of G.userData.rls || []) { const first = !rl.instanceColor; for (let i = 0; i < rl.count; i++) { const on = cloudHash(i, rl.count, 77) < 0.14 || dim < 0.3; rl.setColorAt(i, new T.Color(on ? 0xFFF1D6 : 0x3A3E46)); } if (rl.instanceColor) rl.instanceColor.needsUpdate = true; if (first) rl.material.needsUpdate = true; }
   }
   try { cabinCrewStep(P, G, night); } catch (e) { /* the crew stays where it is */ }
+  try { const tn = performance.now() / 1000, CP: any = CabinPax; const dtp = Math.min(0.1, Math.max(0, tn - (CP.lastT || tn))); CP.lastT = tn; cabinPaxStep(P, G, dtp); } catch (e) { /* passengers stay where they are */ }
   if (G.userData.wins) { const k = Math.max(0.08, Math.min(1, amb)); G.userData.wins.material.color.setRGB(k * (1 - 0.6 * night), k * (1 - 0.5 * night), k); }
 }
 function v3dCabinFwdLeave(P: any) {
@@ -631,4 +649,33 @@ function cabinCoverTex(color: string): any {
     g.globalAlpha = 0.5; g.lineWidth = 1.2; for (let k = -3; k < 7; k++) { g.beginPath(); const y = k * 16 + 8; g.moveTo(0, y + 20); g.lineTo(32, y + 4); g.lineTo(64, y + 20); g.lineTo(96, y + 4); g.lineTo(128, y + 20); g.stroke(); }
     g.globalAlpha = 1; for (let i = 0; i < 1400; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.05})`; g.fillRect(Math.random() * 128, Math.random() * 104, 1, 1); }   // the weave
   }));
+}
+
+/** The placards with the row number and the seat letters, all in one mesh drawn from one picture. */
+function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters: string, seatY: number[], seatW: number, aisles: number[], zf: number, V: (x: number, y: number, z: number) => any): any {
+  const T = THREE, rows = Object.keys(rowX).map(Number).sort((a, b) => a - b); if (!rows.length || !aisles.length) return null;
+  // which blocks face which aisle, and with which letters
+  const sides: { y: number; dir: number; txt: string }[] = []; let i0 = 0;
+  blocks.forEach(b => { const ys = seatY.slice(i0, i0 + b), lt = letters.slice(i0, i0 + b), lo = Math.min(...ys) - seatW / 2, hi = Math.max(...ys) + seatW / 2;
+    for (const a of aisles) { if (a > hi && a - hi < 0.6) sides.push({ y: hi + 0.04, dir: 1, txt: lt }); if (a < lo && lo - a < 0.6) sides.push({ y: lo - 0.04, dir: -1, txt: lt }); }
+    i0 += b; });
+  const cells = rows.length * sides.length, cols = 8, cw = 128, ch = 40, cv = document.createElement('canvas'); cv.width = cols * cw; cv.height = Math.ceil(cells / cols) * ch;
+  const x = cv.getContext('2d') as CanvasRenderingContext2D; x.fillStyle = '#1C2026'; x.fillRect(0, 0, cv.width, cv.height);
+  const pos: number[] = [], uv: number[] = [], idx: number[] = []; let c = 0;
+  const up = new T.Vector3(0, 1, 0);
+  for (const r of rows) for (const sd of sides) {
+    const cx = (c % cols) * cw, cy = Math.floor(c / cols) * ch;
+    x.fillStyle = '#F2F4F6'; x.font = 'bold 24px Inter, Arial, sans-serif'; x.textBaseline = 'middle'; x.fillText(String(r), cx + 8, cy + ch / 2 + 1);
+    x.font = '600 18px Inter, Arial, sans-serif'; x.fillStyle = '#C9D2DC'; x.fillText(sd.txt.split('').join(' '), cx + 46, cy + ch / 2 + 1);
+    // a small plate facing the aisle, its text reading left to right from there
+    const ctr = V(rowX[r] - 0.05, sd.y, zf + 1.66), n = V(0, sd.dir, 0).sub(V(0, 0, 0)).normalize(), right = new T.Vector3().crossVectors(up, n).normalize();
+    const hw = 0.11, hh = 0.034, b0 = pos.length / 3;
+    for (const [sx, sy2] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = ctr.clone().addScaledVector(right, sx * hw).addScaledVector(up, sy2 * hh); pos.push(p.x, p.y, p.z); }
+    const u0 = cx / cv.width, u1 = (cx + cw) / cv.width, v0 = 1 - (cy + ch) / cv.height, v1 = 1 - cy / cv.height;
+    uv.push(u0, v0, u1, v0, u1, v1, u0, v1); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); c++;
+  }
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+  const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+  const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, side: T.DoubleSide, fog: false })); m.material.userData.noDim = true;
+  return m;
 }

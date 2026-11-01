@@ -64,7 +64,11 @@ function onBoardParked(a: Aircraft, now?: number): OnBoard {
   const fuelIn = A.lastFuelKg || 0, nextFuel = legFuel(a.typeId, booked, next.from, next.to).to;
   const seg = (a0: number, a1: number) => clamp((k - a0) / (a1 - a0), 0, 1);
   // a real turnaround: off, clean, cater and fuel, then the next passengers on with their bags
-  const deb = seg(0, 0.2), clean = seg(0.15, 0.45), cat = seg(0.2, 0.5), fuel = seg(0.25, 0.6), board = seg(0.55, 0.96);
+  // as in real life, from the number of people: the door opens about a minute after arrival and some 22 people a
+  // minute leave; boarding takes about a minute for every 10 people and ends five minutes before departure (doors
+  // closed). The cleaning, catering and fuelling fit in between.
+  const MIN = 60e3, debEnd = Math.min(0.45, (MIN + (A.lastPax || 0) / 22 * MIN) / W), brdLen = Math.min(0.5, (booked / 10 * MIN + MIN) / W), brdEnd = Math.max(debEnd + 0.1, 1 - 5 * MIN / W), brdStart = Math.max(debEnd + 0.05, brdEnd - brdLen);
+  const deb = seg(Math.min(MIN / W, debEnd * 0.5), debEnd), clean = seg(debEnd * 0.75, brdStart), cat = seg(debEnd, Math.max(debEnd + 0.05, brdStart - 0.02)), fuel = seg(debEnd + 0.02, Math.max(debEnd + 0.08, brdStart)), board = seg(brdStart, brdEnd);
   const stage = deb < 1 ? 'Deboarding' : board > 0 ? (board < 1 ? 'Boarding' : 'Doors closed') : fuel > 0 && fuel < 1 ? 'Refuelling' : clean < 1 || cat < 1 ? 'Cleaning and catering' : 'Ready for boarding';
   const pax = deb < 1 ? Math.round((A.lastPax || 0) * (1 - deb)) : Math.round(booked * board);
   return { stage, pax, paxMax: t.seats, fuelKg: Math.round(fuelIn + (Math.max(fuelIn, nextFuel) - fuelIn) * fuel), fuelTo: nextFuel,

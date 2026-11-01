@@ -266,6 +266,7 @@ function cabinLerpG(a: any, b: any, k: number): any {
 function cabinTurnHead() {
   const C = CabinCrew, th = C.talkHead, G = V3dCabinF.grp; if (!th || !G || !G.userData.people) return;
   const ms = G.userData.people.userData.meshes, w = th.w, on = Date.now() < th.until, T = THREE;
+  if (CabinPax.list) { const e = CabinPax.list.filter((x: any) => x.f.hi === w.hi)[0]; if (e && e.st !== 'seat') { C.talkHead = null; return; } }   // not while they're up
   const yaw = on ? th.sign * 0.55 : 0, M = new T.Matrix4(), Q = new T.Quaternion().setFromEuler(new T.Euler(0, yaw, w.lean * 0.5));
   M.compose(w.head, Q, new T.Vector3(w.sc, w.sc, w.sc)); ms.head.setMatrixAt(w.hi, M); ms.head.instanceMatrix.needsUpdate = true;
   if (w.ri >= 0) { const hm = new T.Matrix4(), p = new T.Vector3(), q = new T.Quaternion(), s = new T.Vector3(); ms.hair.getMatrixAt(w.ri, hm); hm.decompose(p, q, s); q.setFromEuler(new T.Euler(0, yaw, w.lean * 0.5 - 0.25)); hm.compose(p, q, s); ms.hair.setMatrixAt(w.ri, hm); ms.hair.instanceMatrix.needsUpdate = true; }
