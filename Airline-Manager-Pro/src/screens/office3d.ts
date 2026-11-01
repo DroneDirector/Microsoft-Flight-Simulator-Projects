@@ -168,22 +168,24 @@ function ofBuild(scene: any, q: number) {
   for (const s of [-1, 1]) { bx(0.5, 0.72, 0.85, mat.walnutM, s * 0.78, 0.36, 0); for (let i = 0; i < 3; i++) { bx(0.44, 0.2, 0.02, mat.walnut, s * 0.78, 0.13 + i * 0.23, 0.43); bx(0.1, 0.018, 0.03, mat.brass, s * 0.78, 0.17 + i * 0.23, 0.45); } }
   bx(1.06, 0.5, 0.03, mat.walnutM, 0, 0.45, -0.12);   // modesty panel, set back
   // things on the desk
-  const lt = new T.Group(); lt.position.set(0.45, 0.775, 0.22); lt.rotation.y = -0.45; root.add(lt);
+  const lt = new T.Group(); lt.position.set(0.72, 0.775, 0.02); lt.rotation.y = -0.6; root.add(lt);
   bx(0.34, 0.015, 0.24, mat.chrome, 0, 0.008, 0, 0, lt); const scr = new T.Group(); scr.position.set(0, 0.015, -0.115); scr.rotation.x = -0.28; lt.add(scr);
   bx(0.34, 0.23, 0.008, mat.chrome, 0, 0.115, 0, 0, scr);
   const lsm = new T.Mesh(new T.PlaneGeometry(0.31, 0.2), new T.MeshBasicMaterial({ map: ctTex(ofLaptop(co)), toneMapped: false })); lsm.position.set(0, 0.115, 0.006); scr.add(lsm);
   // the banker's lamp: brass stand, green glass shade, a warm light
   add(new T.CylinderGeometry(0.07, 0.08, 0.02, 24), mat.brass, -0.72, 0.785, -0.18); add(new T.CylinderGeometry(0.008, 0.008, 0.3, 8), mat.brass, -0.72, 0.94, -0.18);
-  const shade = add(new T.CylinderGeometry(0.035, 0.14, 0.09, 24, 1, true, 0, Math.PI), mat.greenGlass, -0.72, 1.1, -0.17); shade.rotation.set(0, Math.PI, Math.PI / 2); shade.rotation.order = 'YXZ'; shade.rotation.set(Math.PI / 2, Math.PI / 2, 0);
-  bx(0.3, 0.02, 0.1, mat.greenGlass, -0.72, 1.1, -0.17);
+  const shade = add(new T.CylinderGeometry(0.06, 0.06, 0.32, 28, 1, true, 0, Math.PI), mat.greenGlass, -0.72, 1.1, -0.17); shade.rotation.set(0, 0, Math.PI / 2);   // a half tube, open below
+  shade.material = mat.greenGlass.clone(); shade.material.side = T.DoubleSide;
+  for (const s2 of [-1, 1]) add(new T.CylinderGeometry(0.008, 0.008, 0.02, 8), mat.brass, -0.72 + s2 * 0.16, 1.1, -0.17).rotation.z = Math.PI / 2;
+  add(new T.CylinderGeometry(0.004, 0.004, 0.12, 6), mat.brass, -0.72, 1.04, -0.17);
   const lampL = new T.PointLight(0xFFD7A0, 1.6, 3, 1.6); lampL.position.set(-0.72, 1.05, -0.12); root.add(lampL);
   // the family photo, the phone, notes, coffee, pens
   A.photoAt = new T.Group(); A.photoAt.position.set(-0.42, 0.775, 0.3); A.photoAt.rotation.y = 0.5;   // turned towards you root.add(A.photoAt);
-  bx(0.24, 0.015, 0.17, mat.white, 0.2 - 0.2, 0.008, 0.33, 0.1);   // a notepad
+  bx(0.24, 0.015, 0.17, mat.white, 0.0, 0.783, 0.33, 0.1);   // a notepad
   add(new T.CylinderGeometry(0.006, 0.006, 0.15, 8), mat.black, 0.06, 0.79, 0.3).rotation.set(Math.PI / 2, 0, 0.6);
   add(new T.CylinderGeometry(0.04, 0.035, 0.09, 20), mat.white, 0.78, 0.82, 0.32); add(new T.TorusGeometry(0.025, 0.007, 8, 16), mat.white, 0.82, 0.82, 0.32).rotation.y = 0;
   add(new T.CylinderGeometry(0.036, 0.036, 0.004, 20), M({ color: 0x3A2216 }), 0.78, 0.862, 0.32);
-  bx(0.2, 0.05, 0.22, mat.black, 0.75, 0.8, -0.1, 0.3); bx(0.18, 0.025, 0.05, mat.black, 0.73, 0.84, -0.18, 0.3);
+  bx(0.2, 0.05, 0.22, mat.black, 0.5, 0.8, -0.28, 0.3); bx(0.18, 0.025, 0.05, mat.black, 0.48, 0.84, -0.36, 0.3);
   add(new T.CylinderGeometry(0.035, 0.035, 0.1, 18), mat.brass, -0.85, 0.825, 0.25); for (let i = 0; i < 4; i++) add(new T.CylinderGeometry(0.004, 0.004, 0.15, 6), [mat.black, mat.co, mat.brass, mat.black][i], -0.85 + (i - 1.5) * 0.012, 0.9, 0.25 + (i % 2) * 0.01).rotation.z = (i - 1.5) * 0.08;
   // your nameplate, facing the visitor
   { const [c, x] = ctCanvas(512, 96); x.fillStyle = '#1A120A'; x.fillRect(0, 0, 512, 96); x.fillStyle = '#F2D18A'; x.font = '600 34px Georgia, serif'; x.textAlign = 'center'; x.fillText((me && me.name) || 'Chief Executive', 256, 46); x.font = '18px Inter, Arial, sans-serif'; x.fillText('Chief Executive · ' + co.name, 256, 78);
