@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.50 (2026-11-01)
+
+- court-hearing: airline cases with hearings (hear1-3, hearA), questions from the records, lawyer suggestions and objections, stand-in, absences, reminders, press, aftermath (audit, watch, premium), memorial; Settings courtOn
+- court3d: drawn-texture courtroom, judges, clerk, counsel, witnesses, relatives, public, press, police; sway from the hips, gaze at the speaker; Esc asks for a stand-in
+- crash report: crashAssess (level, parts, injured, dead, repair or loss), See the damage, level-based costs, news for fatal or destroyed
+- PC: --vh/--vw follow the root zoom; anchored menus kept inside the window; narrower windows
+- 3D: water mask only on flat water-level ground, floodlight pools 270 m, building facades with night windows, terrain clearance for app-flown aircraft, procedure prefetch for the network and Nordic airports
+
 ## 0.9.49 (2026-11-01)
 
 - backup confirmRestore: backup and current side by side, older-backup warning

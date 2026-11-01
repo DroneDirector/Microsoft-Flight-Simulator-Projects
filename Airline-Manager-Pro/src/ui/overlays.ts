@@ -177,6 +177,7 @@ ACTIONS['open-notice'] = el => {
   if ((n as any).tx) ACTIONS['tx-detail']({ getAttribute: () => (n as any).tx } as any, null);
   else if ((n as any).txs) flightsMoneyPopup((n as any).txs);
   else if (n.ref && /^va-/.test(String(n.ref))) vaNoticeOpen(String(n.ref));
+  else if (n.ref && /^case-/.test(String(n.ref))) courtPopup(String(n.ref));
   else if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref && /^scan-/.test(n.ref)) scanPopup(n.ref.slice(5));
@@ -418,6 +419,7 @@ ACTIONS['crash-decide'] = el => {
   const l: any = State.logbook.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!l) return;
   l.decision = el.getAttribute('data-d') as any;
   const a = plane(l.reg), d = crashAssess(l);
+  if (l.condBefore == null) l.condBefore = a.condition;
   if (l.decision === 'registered') {
     a.status = 'grounded'; a.condition = d.level === 'minor' ? 45 : 12;
     const co = company(a.companyId);
