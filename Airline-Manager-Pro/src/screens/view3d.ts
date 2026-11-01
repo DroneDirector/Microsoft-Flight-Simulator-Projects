@@ -174,7 +174,8 @@ function v3dBind() {
     const p = V3d.ptrs[e.pointerId]; if (!p) return;
     const ids = Object.keys(V3d.ptrs);
     if (V3d.mode === 'free') { v3dFreeGesture(e, p, ids); p.x = e.clientX; p.y = e.clientY; return; }
-    if (ids.length === 1) { V3d.yaw -= (e.clientX - p.x) * 0.007; V3d.pitch = clamp(V3d.pitch + (e.clientY - p.y) * 0.005 * (V3d.mode === 'walk' ? -1 : 1), V3d.mode === 'walk' ? -1.2 : -0.6, V3d.mode === 'walk' ? 1.2 : 1.5); }
+    if (ids.length === 1) { const fp = V3d.mode === 'cabin';   // in the cabin seat the view follows the finger or mouse, as in a game
+      V3d.yaw += (e.clientX - p.x) * 0.007 * (fp ? 1 : -1); V3d.pitch = clamp(V3d.pitch + (e.clientY - p.y) * 0.005 * (V3d.mode === 'walk' || fp ? -1 : 1), V3d.mode === 'walk' ? -1.2 : -0.6, V3d.mode === 'walk' ? 1.2 : 1.5); }
     if (ids.length === 2) { const VA: any = V3d; VA.panX = (VA.panX || 0) - (e.clientX - p.x) * 0.5 / 2; VA.panY = (VA.panY || 0) + (e.clientY - p.y) * 0.5 / 2; }
     p.x = e.clientX; p.y = e.clientY;
     if (ids.length === 2) { const a = V3d.ptrs[ids[0]], b = V3d.ptrs[ids[1]]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (V3d.pinch0) { if (/^win/.test(V3d.mode)) cabinWinZoomSet((V3d as any).wz0 + (d - V3d.pinch0) / 300); else V3d.dist = clamp(V3d.dist0 * V3d.pinch0 / d, 8, 30000); } }

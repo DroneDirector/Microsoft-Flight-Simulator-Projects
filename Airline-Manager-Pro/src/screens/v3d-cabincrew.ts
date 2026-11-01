@@ -43,7 +43,7 @@ function cabinCrewEnsure(P: any, G: any): boolean {
   const co = company(), accent = co.color || '#2C8CFF', style = av3Style(), q = cabinQ() >= 2 ? 1 : 0.6;
   C.light = new T.HemisphereLight(0xFFFFFF, 0x6E747C, 1.0); g.add(C.light);
   // the seats: front left and right (facing the cabin), back left and right (facing forward)
-  const fx = at.x0 + 0.45, bx = at.x1 - 0.12;
+  const fx = at.x0 + 0.45, bx = at.x1 - 0.4;   // the back seats' backrests stay inside the rear wall
   C.seats = [[fx, -0.34, 1], [fx, 0.34, 1], [bx, -0.34, -1], [bx, 0.34, -1]];
   const seatMat = cabinMat(0x3A3E46, { map: cabinLeatherTex() });
   for (const s of C.seats) {
@@ -266,6 +266,7 @@ function cabinLerpG(a: any, b: any, k: number): any {
 function cabinTurnHead() {
   const C = CabinCrew, th = C.talkHead, G = V3dCabinF.grp; if (!th || !G || !G.userData.people) return;
   const ms = G.userData.people.userData.meshes, w = th.w, on = Date.now() < th.until, T = THREE;
+  if (CabinPax.list) { const e = CabinPax.list.filter((x: any) => x.f.hi === w.hi)[0]; if (e && e.st !== 'seat') { C.talkHead = null; return; } }   // not while they're up
   const yaw = on ? th.sign * 0.55 : 0, M = new T.Matrix4(), Q = new T.Quaternion().setFromEuler(new T.Euler(0, yaw, w.lean * 0.5));
   M.compose(w.head, Q, new T.Vector3(w.sc, w.sc, w.sc)); ms.head.setMatrixAt(w.hi, M); ms.head.instanceMatrix.needsUpdate = true;
   if (w.ri >= 0) { const hm = new T.Matrix4(), p = new T.Vector3(), q = new T.Quaternion(), s = new T.Vector3(); ms.hair.getMatrixAt(w.ri, hm); hm.decompose(p, q, s); q.setFromEuler(new T.Euler(0, yaw, w.lean * 0.5 - 0.25)); hm.compose(p, q, s); ms.hair.setMatrixAt(w.ri, hm); ms.hair.instanceMatrix.needsUpdate = true; }

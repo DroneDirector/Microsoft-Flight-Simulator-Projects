@@ -20,7 +20,7 @@ export const PcUpdate = {
   status() { return { state: this.state, pct: this.pct, error: this.error, version: this.version, packaged: packaged() }; },
 
   /** Start updating to version v (as published); closeWindow is called just before the PC app closes. */
-  start(v: string, closeWindow: () => void): string {
+  start(v: string, closeWindow: () => void, profile?: string): string {
     if (!/^\d+\.\d+\.\d+$/.test(v)) return 'That isn\'t a version number.';
     if (!packaged()) return 'Updates install in the packaged PC app (AirlineManagerPro-PC.exe).';
     if (this.state === 'downloading' || this.state === 'unpacking' || this.state === 'restarting') return '';
@@ -37,10 +37,15 @@ export const PcUpdate = {
       const dst = path.dirname(process.execPath), exe = path.join(dst, path.basename(process.execPath));
       const args = process.argv.slice(2).map(a => '"' + a.replace(/"/g, '') + '"').join(' ');
       // wait for this PC app to close, copy the new version over it, start it again, tidy up
+      const prof = String(profile || '').replace(/'/g, "''"), exeName = path.basename(process.execPath);
       const cmd = [
         '@echo off',
         `:wait`,
         `tasklist /FI "PID eq ${process.pid}" 2>nul | find "${process.pid}" >nul && (timeout /t 1 /nobreak >nul & goto wait)`,
+        // nothing of the old version may stay open: other copies of the PC app, and its app windows
+        `taskkill /F /IM "${exeName}" >nul 2>&1`,
+        prof ? `powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "$p='${prof}'; Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'msedge.exe' -or $_.Name -eq 'chrome.exe') -and $_.CommandLine -and $_.CommandLine.Contains($p) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"` : 'rem',
+        `timeout /t 1 /nobreak >nul`,
         `robocopy "${src}" "${dst}" /E /R:5 /W:1 /NFL /NDL /NJH /NJS /NP >nul`,
         `start "" "${exe}" ${args}`,
         `cd /d "%TEMP%"`,
