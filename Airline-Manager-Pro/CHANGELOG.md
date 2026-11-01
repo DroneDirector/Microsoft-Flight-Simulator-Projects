@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.49 (2026-11-01)
+
+- backup confirmRestore: backup and current side by side, older-backup warning
+- voice: PC manifest via /api/voicepack?manifest=1 (pc-bridge fetches pack.json), VOICE_PACK_LIST fallback
+- pc-bridge: closeWindow asks the window to close before forcing it; exit after 5 s on update
+- human: 'bow' gesture; birthdayPopup bows once per birthday (birthdayBowed)
+
 ## 0.9.48 (2026-11-01)
 
 - v3d-terrain tiles(): three retries with backoff, then the parent tile (up to four levels up) enlarged; ring imagery canvases pre-filled with a ground colour

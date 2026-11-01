@@ -309,12 +309,15 @@ function checkBirthday() {
 }
 function birthdayPopup(me: any) {
   const age = ageOf(me.dob);
+  // a thank-you bow, once for each birthday
+  const S: any = State, yr = companyDate().getFullYear(); S.birthdayBowed = S.birthdayBowed || {};
+  const bow = S.birthdayBowed[me.id] !== yr; if (bow) { S.birthdayBowed[me.id] = yr; Store.soon(); }
   const confetti = Array.from({ length: 36 }, (_, i) => `<i style="--x:${Math.random() * 100}%;--d:${(Math.random() * 1.2).toFixed(2)}s;--r:${Math.round(Math.random() * 360)}deg;--c:${['#3FD0E8', '#E04BD6', '#F2B33D', '#3DDC97', '#FF7A7E', '#9C7CFF'][i % 6]}"></i>`).join('');
   Sound.chime(); Haptics.success();
   openLayer('modal', `
     <div class="bday">
       <div class="bday-confetti">${confetti}</div>
-      <div class="bday-av">${avatarSvg(me.look, 'captain', { accent: company().color })}</div>
+      <div class="bday-av">${avatarSvg(me.look, 'captain', Object.assign({ accent: company().color }, bow ? { mood: { kind: 'bow', v: Math.floor(Date.now() / 1000) } } : {}))}</div>
       <div class="bday-txt">
         <small>${esc(company().name)}</small>
         <h2>Happy birthday, ${esc(me.name.replace(/^Capt\.\s*/, ''))}!</h2>

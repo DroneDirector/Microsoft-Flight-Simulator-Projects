@@ -2772,3 +2772,15 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .desktop .walk-pad { display: none; }
 .walk-hint { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); padding: 8px 14px; border-radius: 12px; background: rgba(8, 20, 36, .78); color: #DCE8F4; font: 600 13px Inter, sans-serif; z-index: 6; transition: opacity 1s; pointer-events: none; text-align: center; max-width: calc(100vw - 32px); }
 .walk-hint.fade { opacity: 0; }
+
+/* Restore: the backup and what it replaces, side by side */
+.rs-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 12px; }
+.rs-card { display: grid; gap: 5px; padding: 14px; border-radius: 14px; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); }
+.rs-card.from { border-color: rgba(63, 208, 232, .45); }
+.rs-card.to { border-color: rgba(255, 180, 60, .4); }
+.rs-card .rs-k { text-transform: uppercase; letter-spacing: .08em; font-size: 11px; color: #8FA6BD; }
+.rs-card span { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
+.rs-card span small { color: #8AA0B6; }
+.rs-card em { font-style: normal; font-size: 12px; margin-top: 4px; color: #9FE6F2; }
+.rs-card.to em { color: #FFD08A; }
+@media (max-width: 600px) { .rs-cards { grid-template-columns: 1fr; } }
