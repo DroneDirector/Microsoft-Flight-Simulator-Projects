@@ -100,6 +100,7 @@ class AirportView {
 
   /** Taxi network: from the simulator's taxi paths, or a schematic parallel taxiway and apron. */
   buildGraph() {
+    (this as any)._adjFull = null;
     const L = this.L, adj: { [k: string]: [string, number][] } = {};
     const link = (a: string, b: string, d: number) => { (adj[a] = adj[a] || []).push([b, d]); (adj[b] = adj[b] || []).push([a, d]); };
     if ((L.source !== 'runways' || L.gen) && L.points.length && L.paths.length) {
@@ -275,6 +276,36 @@ class AirportView {
     const hold = path.slice(0, seg + 1).concat([[hp[0], hp[1]]]), line = [[hp[0], hp[1]]].concat(path.slice(seg + 1));
     return { hold, line };
   }
+  /** The heading of an aircraft parked at stand i: its nose wheel on the stop mark and its main wheels on the
+   *  lead-in line behind it (a wheelbase back along the painted line), so both sit on the line, also where the
+   *  line curves into the stand. Falls back to the stand's own heading where there is no line to follow. */
+  standHdg(i: number, typeId: string): number {
+    const g = this.graph, pk = g && g.parks[i]; if (!pk) return 0;
+    const own = pk[2] || 0;
+    if (g.schematic || !this.L || !this.L.paths) return own;
+    const S0 = shapeOf(typeId), wb = S0 && S0.gear ? Math.max(1.5, S0.gear.main - S0.gear.nose) : 12;
+    const adj: any = (this as any)._adjFull || ((this as any)._adjFull = (() => { const a: any = {}; const P = this.L.points;
+      for (const p of this.L.paths) { const [type, , st, en] = p;
+        if (type === 3) { (a['p' + en] = a['p' + en] || []).push('n' + st); (a['n' + st] = a['n' + st] || []).push('p' + en); }
+        else if ((type === 9 || type === 1 || type === 4) && P[st] && P[en]) { (a['n' + st] = a['n' + st] || []).push('n' + en); (a['n' + en] = a['n' + en] || []).push('n' + st); } }
+      return a; })());
+    // walk back from the stand along the line, keeping straight on at each junction
+    const S = [pk[0], pk[1]], line: number[][] = [S];
+    let cur = 'p' + i, prev = '', run = 0, guard = 0;
+    while (run < wb && guard++ < 40) {
+      const nb: string[] = (adj[cur] || []).filter((k: string) => k !== prev && k[0] === 'n'); if (!nb.length) break;
+      const here = this.nodeXY(cur), last = line.length > 1 ? line[line.length - 2] : null;
+      let best = nb[0], bestTurn = 1e9;
+      if (last) for (const k of nb) { const q = this.nodeXY(k), a1 = Math.atan2(here[0] - last[0], here[1] - last[1]), a2 = Math.atan2(q[0] - here[0], q[1] - here[1]); let d = Math.abs(a2 - a1) % (2 * Math.PI); if (d > Math.PI) d = 2 * Math.PI - d; if (d < bestTurn) { bestTurn = d; best = k; } }
+      const q = this.nodeXY(best), seg = Math.hypot(q[0] - here[0], q[1] - here[1]);
+      if (run + seg >= wb && seg > 0) { const t = (wb - run) / seg; line.push([here[0] + (q[0] - here[0]) * t, here[1] + (q[1] - here[1]) * t]); run = wb; break; }
+      line.push(q); run += seg; prev = cur; cur = best;
+    }
+    if (run < Math.min(wb, 4)) return own;
+    const Q = line[line.length - 1], h = (Math.atan2(S[0] - Q[0], S[1] - Q[1]) * 180 / Math.PI + 360) % 360;
+    let d = Math.abs(h - own) % 360; if (d > 180) d = 360 - d;
+    return d > 100 ? own : h;   // a line from an odd side: keep the stand's own heading
+  }
   nodeXY(k: string): number[] { const g = this.graph, i = +k.slice(1); return k[0] === 'p' ? [g.parks[i][0], g.parks[i][1]] : [g.pts[i][0], g.pts[i][1]]; }
   nearestNode(x: number, y: number): string {
     const g = this.graph; let best: string = null, bd = 1e18;
@@ -446,7 +477,7 @@ class AirportView {
           const need = path.length > 1 ? PUSH + (rH ? rH.total : 0) + 40 + LINE : 0, wait = Math.max(0, (tx[1] - tx[0]) - need);
           const sIn = el - tx[0] - wait, holdHdg = sp.hold.length > 1 ? Math.atan2(holdPt[0] - sp.hold[sp.hold.length - 2][0], holdPt[1] - sp.hold[sp.hold.length - 2][1]) * 180 / Math.PI : rwyHdg;
           const runwayHold = fe.hold && fe.hold.kind === 'runway';
-          if (path.length > 1 && sIn < 0) { const k = this.nodeXY(stand), pk = g.parks[+stand.slice(1)]; pos = [k[0], k[1], pk ? pk[2] : 0]; phase = 'At the gate, boarding'; kt = 0; }
+          if (path.length > 1 && sIn < 0) { const k = this.nodeXY(stand), pk = g.parks[+stand.slice(1)]; pos = [k[0], k[1], pk ? this.standHdg(+stand.slice(1), t.id) : 0]; phase = 'At the gate, boarding'; kt = 0; }
           else if (path.length > 1 && sIn < PUSH) {
             const r = this.taxiTimed(path, 0, 0), q = this.timedAt(r, 0), back = Math.min(1, sIn / PUSH) * 35;
             const sp = this.along(path, Math.min(0.999, back / Math.max(1, r.p.length * 10)));
@@ -494,7 +525,9 @@ class AirportView {
             const path = this.arrivalPath(land.end, f.reg, big);
             const r = this.taxiTimed(path, 15, 0), q = this.timedAt(r, sIn - land.t);
             // then it stays at its stand (it becomes one of the parked aircraft when the flight is closed)
-            if (q) { pos = q.pos; kt = q.kt; phase = sIn - land.t >= r.total ? 'At the gate' : 'Taxi in'; }
+            if (q) { pos = q.pos; kt = q.kt; phase = sIn - land.t >= r.total ? 'At the gate' : 'Taxi in';
+              // at the gate: nose wheel on the stop mark, main wheels on the lead-in line
+              if (phase === 'At the gate') { const pi = g.parks.findIndex(pk => Math.hypot(pk[0] - pos[0], pk[1] - pos[1]) < 1.5); if (pi >= 0) pos = [pos[0], pos[1], this.standHdg(pi, t.id)]; } }
           }
         }
       }
@@ -508,7 +541,7 @@ class AirportView {
       if (a.location !== icao || a.status === 'flying' || State.live.some(f => f.reg === a.reg)) continue;
       const j0 = this.runwayJoins()[0], t = acType(a.typeId), st = this.standFor(a.reg, t.seats >= 60, j0 ? j0.k : undefined) || this.standFor(a.reg, t.seats >= 60); if (!st) continue;
       const k = this.nodeXY(st), park = g.parks[+st.slice(1)];
-      out.push({ reg: a.reg, stype: park ? park[4] : 0, id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? park[2] : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), nose: noseWheelAhead(t.id), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
+      out.push({ reg: a.reg, stype: park ? park[4] : 0, id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? this.standHdg(+st.slice(1), a.typeId) : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), nose: noseWheelAhead(t.id), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
     }
     this.planes = out;
     // stands are freed when their aircraft has left (taken off) or isn't here any more
