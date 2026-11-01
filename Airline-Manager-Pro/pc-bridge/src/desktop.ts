@@ -48,6 +48,8 @@ export class Desktop {
     if (ip !== '127.0.0.1' && ip !== '::1') return false;
     const url = (req.url || '/').split('?')[0];
     if (url === '/api/desktop') return this.api(req, res), true;
+    // a newer copy of the PC app starting up asks this one to make way: close the window, then quit
+    if (url === '/api/quit' && req.method === 'POST') { json(res, { ok: true }); this.closeWindow(); setTimeout(() => process.exit(0), 1500); return true; }
     if (url === '/api/backup') return this.backup(req, res), true;
     if (url === '/api/update') {
       if (req.method === 'POST') return readBody(req, b => { let v = ''; try { v = String(JSON.parse(b).version || ''); } catch (e) { /* none */ }
