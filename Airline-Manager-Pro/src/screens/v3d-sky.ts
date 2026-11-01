@@ -152,8 +152,8 @@ function v3dGroundMat(map: any, wetTex: any): any {
   m.userData.u = own; m.userData.ground = true;
   m.onBeforeCompile = (sh: any) => {
     Object.assign(sh.uniforms, U, own);
-    sh.vertexShader = 'varying vec3 vWpos; varying vec2 vUv2;\n' + sh.vertexShader.replace('#include <fog_vertex>', 'vWpos = (modelMatrix * vec4(position, 1.0)).xyz; vUv2 = uv;\n#include <fog_vertex>');
-    sh.fragmentShader = `varying vec3 vWpos; varying vec2 vUv2;
+    sh.vertexShader = 'attribute float aFlat; varying float vFlat; varying vec3 vWpos; varying vec2 vUv2;\n' + sh.vertexShader.replace('#include <fog_vertex>', 'vWpos = (modelMatrix * vec4(position, 1.0)).xyz; vUv2 = uv; vFlat = aFlat;\n#include <fog_vertex>');
+    sh.fragmentShader = `varying float vFlat; varying vec3 vWpos; varying vec2 vUv2;
 uniform sampler2D uWet; uniform sampler2D uCity; uniform float uCityOn;
 uniform vec3 uSunCol; uniform float uSunVis; uniform float uMoonVis; uniform float uAmb; uniform float uNight; uniform float uTime;
 uniform float uWind; uniform float uWindDir; uniform float uWater; uniform float uMirror; uniform float uMirrorPass; uniform sampler2D uMirrorTex; uniform mat4 uMirrorMat;
@@ -163,7 +163,8 @@ ${SKY_GLSL}
 ${SPOT_GLSL}
 ` + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
 {
-  float wet = texture2D(uWet, vUv2).r;
+  // water only where the ground is water: flat, at the water's own level (never on a slope or on land)
+  float wet = texture2D(uWet, vUv2).r * smoothstep(0.85, 1.0, vFlat);
   if (uMirrorPass > 0.5 && wet > 0.5) discard;
   vec3 cityL = vec3(0.0);
   if (uCityOn > 0.5 && uNight > 0.01) { vec3 cc = texture2D(uCity, vUv2).rgb; float lum = max(dot(cc, vec3(0.35, 0.45, 0.2)) - 0.09, 0.0) / 0.91; cityL = vec3(1.0, 0.7, 0.36) * pow(lum, 1.5) * 1.5 * uNight * (1.0 - smoothstep(0.3, 0.6, wet)); }
@@ -735,10 +736,10 @@ function v3dMastMeshes(masts: number[][], gy: (x: number, z: number) => number):
   const poolMat = new T.ShaderMaterial({
     uniforms: { uOn: U.uLightsOn }, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
     vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);\n#include <logdepthbuf_vertex>\n}',
-    fragmentShader: '#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform float uOn; varying vec2 vUv; void main() {\n#include <logdepthbuf_fragment>\nfloat r = length(vUv - 0.5) * 2.0; float k = (1.0 - smoothstep(0.0, 1.0, r)); k *= k; gl_FragColor = vec4(vec3(1.0, 0.78, 0.5) * k * 0.28 * uOn, 1.0); }',
+    fragmentShader: '#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform float uOn; varying vec2 vUv; void main() {\n#include <logdepthbuf_fragment>\nfloat r = length(vUv - 0.5) * 2.0; float k = (1.0 - smoothstep(0.0, 1.0, r)); k = k * (0.55 + 0.45 * k); gl_FragColor = vec4(vec3(1.0, 0.78, 0.5) * k * 0.22 * uOn, 1.0); }',
     polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8,
   });
-  const pool = new T.InstancedMesh(new T.PlaneGeometry(90, 90).rotateX(-Math.PI / 2), poolMat, n);
+  const pool = new T.InstancedMesh(new T.PlaneGeometry(270, 270).rotateX(-Math.PI / 2), poolMat, n);   // the floodlit area: about 135 m around each mast
   masts.forEach((m, i) => {
     const y = gy(m[0], m[1]), r = cloudHash(Math.round(m[0]), Math.round(m[1]), 7) * Math.PI;
     M.makeRotationY(r).setPosition(m[0], y, m[1]); pole.setMatrixAt(i, M); head.setMatrixAt(i, M);

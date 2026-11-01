@@ -58,6 +58,7 @@
   try { startBiz(); } catch (e) { /* ignore */ }
   });
   Link.init();
+  try { procPrefetchStart(); } catch (e) { /* procedures are fetched as needed */ }
   Updater.init();
   Backup.init();
   Licence.init().then(() => { try { CloudSync.init(); } catch (e) { /* sync stays off */ } });

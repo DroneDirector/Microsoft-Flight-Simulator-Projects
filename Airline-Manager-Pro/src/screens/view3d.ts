@@ -284,6 +284,53 @@ function v3dGround(lon: number, lat: number): number { return V3dTerrain.ground(
 
 /* ---------- the airport ---------- */
 
+/** Facades and roofs for the airport buildings, drawn by the app (generic, no real building's design). The wall
+ *  pictures are 24 m wide and one building tall; at night the windows glow. */
+function v3dBuildingTextures(): any {
+  const VA: any = V3d; if (VA.bTex) return VA.bTex;
+  const T = THREE, U = v3dSkyUniforms();
+  const mk = (w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d')); const t = new T.CanvasTexture(cv); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = V3d.r ? V3d.r.capabilities.getMaxAnisotropy() : 4; return t; };
+  const noise = (g: CanvasRenderingContext2D, w: number, h: number, a: number) => { for (let i = 0; i < w * h / 6; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,255,255'},${Math.random() * a})`; g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1); } };
+  // a terminal: a tall glass curtain wall in panels between steel mullions, a solid band at the top, glazed
+  // doors at the ground
+  const term = (night: boolean) => mk(512, 256, g => {
+    g.fillStyle = night ? '#05080C' : '#C9CED4'; g.fillRect(0, 0, 512, 256);
+    for (let x = 0; x < 512; x += 32) for (let y = 34; y < 222; y += 47) {
+      if (night) { const lit = Math.random() < 0.93; g.fillStyle = lit ? `rgba(255,226,170,${0.62 + Math.random() * 0.12})` : '#06090D'; g.fillRect(x + 2, y + 2, 28, 43); continue; }
+      const gr = g.createLinearGradient(x, y, x + 32, y + 47); gr.addColorStop(0, '#5C7891'); gr.addColorStop(0.55, '#7F9CB6'); gr.addColorStop(1, '#4A6278');
+      g.fillStyle = gr; g.fillRect(x + 2, y + 2, 28, 43); g.fillStyle = 'rgba(255,255,255,0.14)'; g.fillRect(x + 4, y + 4, 8, 39);
+    }
+    if (!night) { g.fillStyle = '#AEB5BD'; g.fillRect(0, 0, 512, 32); g.fillStyle = '#8E969F'; g.fillRect(0, 28, 512, 4); g.fillStyle = '#7D858E'; g.fillRect(0, 222, 512, 34); for (let x = 40; x < 512; x += 128) { g.fillStyle = '#3E5468'; g.fillRect(x, 226, 46, 30); } noise(g, 512, 256, 0.05); }
+  });
+  // smaller buildings: rows of windows in a light rendered wall
+  const office = (night: boolean) => mk(512, 256, g => {
+    g.fillStyle = night ? '#000000' : '#D8D6D0'; g.fillRect(0, 0, 512, 256);
+    if (!night) noise(g, 512, 256, 0.06);
+    for (let row = 0; row < 3; row++) for (let x = 12; x < 512; x += 42) {
+      const y = 30 + row * 74;
+      if (night) { if (Math.random() < 0.55) { g.fillStyle = `rgba(255,${206 + Math.random() * 40},${140 + Math.random() * 70},0.9)`; g.fillRect(x, y, 28, 40); } continue; }
+      g.fillStyle = '#4C6176'; g.fillRect(x, y, 28, 40); g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(x + 2, y + 2, 6, 36); g.fillStyle = '#9C9A94'; g.fillRect(x - 2, y + 40, 32, 3);
+    }
+  });
+  const roofTex = mk(256, 256, g => {
+    g.fillStyle = '#9EA2A6'; g.fillRect(0, 0, 256, 256); noise(g, 256, 256, 0.12);
+    for (let i = 0; i < 6; i++) { const x = Math.random() * 220, y = Math.random() * 220; g.fillStyle = '#7C8187'; g.fillRect(x, y, 24 + Math.random() * 20, 16 + Math.random() * 14); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x + 3, y + 16, 24, 4); }
+  });
+  const wallMat = (day: any, night: any, emis: number) => {
+    const m = new T.MeshLambertMaterial({ map: day, emissive: new T.Color(0xFFFFFF), emissiveMap: night, emissiveIntensity: emis });
+    m.onBeforeCompile = (sh: any) => { sh.uniforms.uLightsOn = U.uLightsOn; sh.fragmentShader = 'uniform float uLightsOn;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance *= uLightsOn;'); };
+    return m;
+  };
+  // the wall pictures repeat every 24 m along a wall and once over its height; the roof every 40 m
+  const t1 = term(false), t1n = term(true), o1 = office(false), o1n = office(true);
+  // (the walls' heights run from 0 at the ground upwards: the picture the right way up, its bottom at the ground)
+  for (const t of [t1, t1n]) { t.repeat.set(1 / 24, -1 / 16); t.offset.set(0, 1 / 16); }
+  for (const t of [o1, o1n]) { t.repeat.set(1 / 24, -1 / 12); t.offset.set(0, 1 / 12); }
+  roofTex.repeat.set(1 / 40, 1 / 40);
+  VA.bTex = { terminal: wallMat(t1, t1n, 1.0), office: wallMat(o1, o1n, 0.9), roof: new T.MeshLambertMaterial({ map: roofTex }) };
+  return VA.bTex;
+}
+
 function v3dBuildAirport(L: AirportLayout) {
   const T = THREE, g = new T.Group(), e = L.alt || 0;
   (V3d as any).lastL = L;
@@ -291,13 +338,17 @@ function v3dBuildAirport(L: AirportLayout) {
   // the ground's height where it is known (the terrain may still be loading: then the airport's elevation)
   const gy = (x: number, z: number) => { if (!V3dTerrain.rings.length) return e; const ll = v3dLonLat(x, z); return V3dTerrain.ground(ll[0], ll[1]) - v3dCurve(x, z); };
   // terminals and other buildings
-  const mBuild = new T.MeshLambertMaterial({ color: 0x8C96A3 });
+  // generic airport buildings: glass and steel terminal fronts (large buildings) or office windows (smaller
+  // ones), a light roof with plant on it; the windows lit at night
+  const bTex = v3dBuildingTextures();
   for (const a of L.areas || []) {
     if (a.k === 'apron' || a.pts.length < 3) continue;
     const sh = new T.Shape(a.pts.map(p => { const q = loc(p[0], p[1]); return new T.Vector2(q[0], -q[1]); }));
     const c = loc(a.pts[0][0], a.pts[0][1]);
-    const geo = new T.ExtrudeGeometry(sh, { depth: 14, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, gy(c[0], c[1]) - 0.5, 0);
-    const bm = new T.Mesh(geo, mBuild); bm.renderOrder = 9; g.add(bm);
+    let area = 0; for (let i = 0, n = a.pts.length; i < n; i++) { const p = a.pts[i], q = a.pts[(i + 1) % n]; area += p[0] * q[1] - q[0] * p[1]; } area = Math.abs(area) / 2;
+    const big = area > 6000, hgt = big ? 16 : area > 1500 ? 12 : 9;
+    const geo = new T.ExtrudeGeometry(sh, { depth: hgt, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, gy(c[0], c[1]) - 0.5, 0);
+    const bm = new T.Mesh(geo, [bTex.roof, big ? bTex.terminal : bTex.office]); bm.renderOrder = 9; g.add(bm);
   }
   // the airport's ground paint, drawn from its own layout into one picture and laid over the terrain like a sheet
   try { const lt = v3dAirportLights(L, loc, gy); if (lt) g.add(lt); } catch (e) { /* no lights */ }
@@ -482,7 +533,21 @@ function v3dLoop(now: number) {
     // never below the ground (or the runway), wheels on it when rolling
     // the drawn surface (the runway and taxiways sit half a metre above it), so wheels are on what you see
     const ground = V3dTerrain.rings.length ? v3dGround(w.lon, w.lat) + 0.5 : (V3d.icao ? V3d.elev : 0);
-    const y = w.onGround ? ground : Math.max(ground + 2, w.altM);
+    let y = w.onGround ? ground : Math.max(ground + 2, w.altM);
+    // flights the app flies itself keep clear of high ground: never lower than about 1,000 ft over the terrain
+    // under them and just ahead, except close to the airports, where they are on the runway's own path
+    // (your flight in the simulator is shown exactly where the simulator has it)
+    if (!w.onGround && !(g as any).real && V3dTerrain.rings.length) {
+      const PT: any = P; let lift = 0;
+      try {
+        const h = w.hdg, here = [w.lon, w.lat], T0 = Math.max(v3dGround(w.lon, w.lat), ...[0.8, 1.6, 2.4].map(nm => { const a = geoDest(here, h, nm); return v3dGround(a[0], a[1]); }));
+        const ap = [g.from, g.to].map(k => { const a = apt(k); return a && a.pos ? gcDistanceNm(here, a.pos) : 99; }), dA = Math.min(ap[0], ap[1]);
+        const clear = 300 * clamp((dA - 1.5) / 4, 0, 1) + 60;
+        lift = Math.max(0, T0 + clear - y);
+      } catch (e) { /* no terrain here */ }
+      PT.lift = (PT.lift || 0) + (lift - (PT.lift || 0)) * Math.min(1, (typeof dt === 'number' ? dt : 0.05) * 1.2);
+      y += PT.lift;
+    }
     P.tgt.set(q[0], y - v3dCurve(q[0], q[1]), q[1]);
     if (!P.pos) P.pos = P.tgt.clone();
     // a hired pilot's flight is worked out every frame, so it is placed exactly; your own flight's position

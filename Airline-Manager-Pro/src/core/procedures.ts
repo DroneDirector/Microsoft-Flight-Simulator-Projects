@@ -136,6 +136,29 @@ const SimProcedures = {
   },
 };
 
+/** While linked to Flight Simulator: the published departures, arrivals and approaches (real-world navigation
+ *  data, as the simulator has it) for the airports your airline flies to, where its aircraft are, and the
+ *  Faroe Islands, Iceland, Greenland and Scandinavia, fetched one airport every few seconds and kept on this
+ *  device, so flights there follow the real procedures (also later, when not linked). */
+const ProcPrefetch = { queue: [] as string[], started: false, timer: 0 as any };
+function procPrefetchStart() {
+  if (ProcPrefetch.started) return; ProcPrefetch.started = true;
+  ProcPrefetch.timer = setInterval(() => {
+    if (Link.status !== 'connected') return;
+    if (!ProcPrefetch.queue.length) {
+      const want: { [k: string]: number } = {};
+      const add = (k: string, pr: number) => { if (k && /^[A-Z0-9]{4}$/.test(k)) want[k] = Math.max(want[k] || 0, pr); };
+      try { for (const r of State.routes || []) for (const l of (r as any).legs || []) add(l, 3); } catch (e) { /* none */ }
+      try { for (const f of State.live || []) { add(f.from, 3); add(f.to, 3); } for (const a of State.fleet || []) add((a as any).location, 2); } catch (e) { /* none */ }
+      try { for (const a of World.list || []) if (/^(EK|EN|ES|EF|BI|BG)/.test(a.icao) && (a as any).size >= 1) add(a.icao, /^(EKVG|EKKA|EKCH|ENGM|ENBR|ESSA|EFHK|BIKF|BGSF)$/.test(a.icao) ? 3 : 1); } catch (e) { /* not loaded */ }
+      const have = (k: string) => { try { return !!localStorage.getItem('amp-proc:' + k) || SimProcedures.data[k] !== undefined; } catch (e) { return false; } };
+      ProcPrefetch.queue = Object.keys(want).filter(k => !have(k)).sort((a, b) => want[b] - want[a]).slice(0, 400);
+      if (!ProcPrefetch.queue.length) return;
+    }
+    const k = ProcPrefetch.queue.shift(); if (k) SimProcedures.ask(k);
+  }, 4000);
+}
+
 const APP_TYPES: { [t: number]: string } = { 1: 'GPS', 2: 'VOR', 3: 'NDB', 4: 'ILS', 5: 'LOC', 6: 'SDF', 7: 'LDA', 8: 'VOR/DME', 9: 'NDB/DME', 10: 'RNAV', 11: 'LOC BC' };
 const hasFix = (l: SimLeg) => !!l && (Math.abs(l.lat) > 1e-6 || Math.abs(l.lon) > 1e-6);
 
