@@ -306,6 +306,16 @@ function cylBetween(a: number[], b: number[], r: number, mat: any, seg?: number)
 
 const _acMats: { [k: string]: any } = {};
 function acMat(key: string, make: () => any) { return _acMats[key] || (_acMats[key] = make()); }
+/** Wings that flex: the tips move up and down with the bending (more towards the tip), set per aircraft just
+ *  before it is drawn (userData.flex on the model, in metres at the tip; userData.semi, the half span). */
+function wingFlex(m: any): any {
+  m.userData.flex = { value: 0 }; m.userData.semi = { value: 15 };
+  m.onBeforeCompile = (sh: any) => {
+    sh.uniforms.uFlex = m.userData.flex; sh.uniforms.uSemi = m.userData.semi;
+    sh.vertexShader = 'uniform float uFlex; uniform float uSemi;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  { float sf = clamp(abs(position.y) / max(1.0, uSemi), 0.0, 1.2); transformed.z += uFlex * sf * sf; }');
+  };
+  return m;
+}
 
 /** Build the model of a type in a livery. userData.set({ flaps: 0..1, gear: 0..1, prop: angle }) moves its parts. */
 function buildAircraftModel(typeId: string, lv: Livery): any {
@@ -317,7 +327,7 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   // the painted fuselage, tail and engines are glossy (they reflect the sky and the sun); the wings stay satin
   const mBody = std({ map: tex, side: T.DoubleSide, roughness: 0.24, metalness: 0.12 });
   const mFin = std({ map: finTex, side: T.DoubleSide, roughness: 0.26, metalness: 0.12 });
-  const mWing = acMat('wing', () => std({ color: 0xAFB9C5, roughness: 0.5, metalness: 0.25, side: T.DoubleSide, envMapIntensity: 0.35 }));
+  const mWing = acMat('wing', () => wingFlex(std({ color: 0xAFB9C5, roughness: 0.5, metalness: 0.25, side: T.DoubleSide, envMapIntensity: 0.35 })));
   const mWingTop = acMat('wing2', () => std({ color: 0xB7C0CB, roughness: 0.55, metalness: 0.2, side: T.DoubleSide, envMapIntensity: 0.35 }));
   const engCol = lv.engines === 'c1' ? lv.c1 : lv.engines === 'c2' ? lv.c2 : lv.engines === 'body' ? lv.body : '#C9D1DA';
   const mEng = std({ color: new T.Color(engCol), roughness: 0.22, metalness: lv.engines === 'metal' ? 0.6 : 0.18 });
@@ -327,9 +337,17 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   const mTyre = acMat('tyre', () => std({ color: 0x16191D, roughness: 0.9, metalness: 0 }));
   const mBlade = acMat('blade', () => std({ color: 0x23282F, roughness: 0.6, metalness: 0.2 }));
   const mDisc = acMat('disc', () => new T.MeshBasicMaterial({ color: 0xC8D2DC, transparent: true, opacity: 0.16, depthWrite: false, side: T.DoubleSide }));
-  const add = (geo: any, mat: any, parent?: any) => { const m = new T.Mesh(geo, mat); (parent || root).add(m); return m; };
+  const flexSemi = s.span / 2;
+  const add = (geo: any, mat: any, parent?: any) => {
+    const m = new T.Mesh(geo, mat); (parent || root).add(m);
+    if (mat === mWing) m.onBeforeRender = () => {   // this aircraft's wing bending, from its model
+      let o: any = m, f = 0; while (o) { if (typeof o.userData.flex === 'number') { f = o.userData.flex; break; } o = o.parent; }
+      mWing.userData.flex.value = f; mWing.userData.semi.value = flexSemi; mWing.uniformsNeedUpdate = true;
+    };
+    return m;
+  };
 
-  add(buildFuselage(s), mBody);
+  add(buildFuselage(s), mBody).userData.fus = true;   // hidden from the cabin window views (you sit inside it)
 
   /* wings, both sides */
   const W = s.wing, semi = s.span / 2, rootY = s.w / 2 * 0.9;

@@ -1,12 +1,18 @@
 package __PACKAGE__;
 
+import android.content.SharedPreferences;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.PowerManager;
 import android.view.View;
+import android.view.WindowManager;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -30,6 +36,9 @@ import java.util.List;
  *   and the back gesture itself is handled inside the app (it never quits by accident).
  * - When Android shuts down the app's web view in the background to free memory, the app is
  *   brought back instead of closing; everything is saved, so it opens where it was.
+ * - Full screen can be switched off in the app's settings; the choice is kept on the phone.
+ * - Game Booster (off unless switched on, kept on the phone): the screen stays on, and on phones that
+ *   offer it the processor is held at a steady, sustained speed instead of slowing down when warm.
  */
 public class MainActivity extends BridgeActivity {
 
@@ -49,6 +58,37 @@ public class MainActivity extends BridgeActivity {
         });
         enterImmersive();
         protectEdges();
+        applyBoost();
+        // after a swipe from the edge the system bars show over the app for a moment: hide them again
+        // soon after (the notification shade can still be pulled down while they show)
+        ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (v, insets) -> {
+            if (fullScreen() && insets.isVisible(WindowInsetsCompat.Type.systemBars())) {
+                hideLater.removeCallbacksAndMessages(null);
+                hideLater.postDelayed(() -> { if (hasWindowFocus()) enterImmersive(); }, 2500);
+            }
+            return ViewCompat.onApplyWindowInsets(v, insets);
+        });
+    }
+
+    private final Handler hideLater = new Handler(Looper.getMainLooper());
+    SharedPreferences prefs() { return getSharedPreferences("amp_display", MODE_PRIVATE); }
+    boolean fullScreen() { return prefs().getBoolean("fullscreen", true); }
+    boolean boost() { return prefs().getBoolean("boost", false); }
+
+    /** Called by the app's settings (AppTools). */
+    void setFullScreen(boolean on) { prefs().edit().putBoolean("fullscreen", on).apply(); runOnUiThread(this::enterImmersive); }
+    void setBoost(boolean on) { prefs().edit().putBoolean("boost", on).apply(); runOnUiThread(this::applyBoost); }
+
+    /** Game Booster: keep the screen on and, where the phone supports it, hold the processor at a steady speed. */
+    void applyBoost() {
+        boolean on = boost();
+        if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+                if (pm != null && pm.isSustainedPerformanceModeSupported()) getWindow().setSustainedPerformanceMode(on);
+            }
+        } catch (Exception ignored) { }
     }
 
     @Override
@@ -61,11 +101,17 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         enterImmersive();
+        applyBoost();
     }
 
     private void enterImmersive() {
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         WindowInsetsControllerCompat c = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        if (!fullScreen()) {
+            WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+            c.show(WindowInsetsCompat.Type.systemBars());
+            return;
+        }
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         c.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         c.hide(WindowInsetsCompat.Type.systemBars());
     }

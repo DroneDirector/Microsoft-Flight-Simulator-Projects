@@ -30,6 +30,10 @@ grep -q 'UpdatedReceiver' "$MAN" || sed -i 's|</application>|    <receiver andro
 RES=android/app/src/main/res
 mkdir -p "$RES/layout" "$RES/xml" "$RES/drawable"
 cp scripts/android/res/layout/amp_widget.xml "$RES/layout/"; cp scripts/android/res/xml/amp_widget_info.xml "$RES/xml/"; cp scripts/android/res/drawable/amp_widget_bg.xml "$RES/drawable/"
+# a game: Android's game mode (Android 12+) and the phone's own game booster recognise it and remember its mode
+cp scripts/android/res/xml/game_mode_config.xml "$RES/xml/"
+grep -q 'appCategory' "$MAN" || sed -i 's/<application/<application android:appCategory="game" android:isGame="true"/' "$MAN"
+grep -q 'android.game_mode_config' "$MAN" || sed -i 's|</application>|    <meta-data android:name="android.game_mode_config" android:resource="@xml/game_mode_config" />\n    </application>|' "$MAN"
 grep -q 'amp_widget_desc' "$RES/values/strings.xml" || sed -i 's|</resources>|    <string name="amp_widget_desc">Balance, next flight and aircraft in the air</string>\n</resources>|' "$RES/values/strings.xml"
 grep -q 'StatusWidget' "$MAN" || sed -i 's|</application>|    <receiver android:name=".StatusWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/amp_widget_info" /></receiver>\n    </application>|' "$MAN"
 for P in ACCESS_WIFI_STATE ACCESS_NETWORK_STATE CHANGE_WIFI_MULTICAST_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION; do

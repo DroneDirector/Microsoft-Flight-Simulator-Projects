@@ -157,6 +157,8 @@ function v3dGroundMat(map: any, wetTex: any): any {
 uniform sampler2D uWet; uniform sampler2D uCity; uniform float uCityOn;
 uniform vec3 uSunCol; uniform float uSunVis; uniform float uMoonVis; uniform float uAmb; uniform float uNight; uniform float uTime;
 uniform float uWind; uniform float uWindDir; uniform float uWater; uniform float uMirror; uniform float uMirrorPass; uniform sampler2D uMirrorTex; uniform mat4 uMirrorMat;
+float wh(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float wvn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(wh(i), wh(i + vec2(1.0, 0.0)), f.x), mix(wh(i + vec2(0.0, 1.0)), wh(i + vec2(1.0, 1.0)), f.x), f.y); }
 ${SKY_GLSL}
 ${SPOT_GLSL}
 ` + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
@@ -169,25 +171,38 @@ ${SPOT_GLSL}
     vec3 V = normalize(cameraPosition - vWpos); float dist = length(cameraPosition - vWpos); vec2 P = vWpos.xz; float w = uWind;
     vec2 g = vec2(0.0);
     float foot = dist * 0.0012 / max(V.y, 0.03);   // the size of a pixel on the water there (long at a low angle)
-    // many waves of different lengths and directions (so no pattern shows), each faded out where it
-    // would be smaller than a few pixels on screen
-    for (int i = 0; i < 9; i++) {
-      float fi = float(i), r1 = fract(sin(fi * 12.9898) * 43758.5453), r2 = fract(sin(fi * 78.233) * 12345.678);
-      float lam = 150.0 * pow(0.62, fi) * mix(0.6, 1.3, w) * (0.85 + 0.3 * r1);
-      float ang = uWindDir + (r2 - 0.5) * 2.2;
+    // the sea's surface: many waves of different lengths, heights and directions, on a slowly wandering grid
+    // (so no straight lines or repeating pattern show), plus irregular small ripples; waves too small to
+    // see from here are faded out and turn into a rougher, softer sheen instead of a striped one
+    vec2 Pw = P + vec2(sin(P.y * 0.0091 + uTime * 0.05) + sin(P.y * 0.0037 - P.x * 0.002), sin(P.x * 0.0083 - uTime * 0.04) + sin(P.x * 0.0029 + P.y * 0.0031)) * 22.0;
+    float tot = 0.0, seen = 0.0;
+    for (int i = 0; i < 14; i++) {
+      float fi = float(i), r1 = fract(sin(fi * 12.9898 + 1.3) * 43758.5453), r2 = fract(sin(fi * 78.233 + 4.1) * 12345.678), r3 = fract(sin(fi * 39.425 + 7.7) * 24634.634);
+      float lam = 170.0 * pow(0.71, fi) * mix(0.6, 1.3, w) * (0.7 + 0.6 * r1);
+      float ang = uWindDir + (r2 - 0.5) * (1.6 + fi * 0.18);
       vec2 dir = vec2(cos(ang), sin(ang)); float k = 6.2831853 / lam;
-      float ph = dot(dir, P) * k - uTime * sqrt(9.81 * k) + r1 * 6.2831853;
-      float amp = mix(0.03, 0.13, w) * smoothstep(foot * 5.0, foot * 18.0, lam);
-      g += dir * cos(ph) * amp;
+      float ph = dot(dir, Pw) * k - uTime * sqrt(9.81 * k) + r3 * 6.2831853;
+      float a0 = mix(0.025, 0.11, w) * (0.55 + 0.9 * r3), vis = smoothstep(foot * 4.0, foot * 16.0, lam);
+      g += dir * cos(ph) * a0 * vis; tot += a0; seen += a0 * vis;
     }
+    // small irregular ripples (noise), drifting with the wind
+    vec2 wd = vec2(cos(uWindDir), sin(uWindDir)) * uTime * (0.6 + 1.5 * w);
+    for (int j = 0; j < 2; j++) {
+      float sc = j == 0 ? 6.5 : 2.2, vis = smoothstep(foot * 3.0, foot * 12.0, sc);
+      vec2 q = (P - wd * (j == 0 ? 1.0 : 1.7)) / sc, e = vec2(0.37, 0.0);
+      g += vec2(wvn(q + e.xy) - wvn(q - e.xy), wvn(q + e.yx) - wvn(q - e.yx)) * mix(0.18, 0.5, w) * vis * (j == 0 ? 1.0 : 0.6);
+      tot += 0.08; seen += 0.08 * vis;
+    }
+    float rough = 1.0 - seen / max(tot, 1e-4);   // how much of the surface's detail is too small to see from here
     vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
     float F = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
     vec3 R = reflect(-V, N); R.y = abs(R.y) + 0.002; R = normalize(R);
-    vec3 refl = pow(skyCol(R), vec3(2.2));
-    if (uMirror > 0.5) { vec4 mp = uMirrorMat * vec4(vWpos, 1.0); vec2 st = mp.xy / mp.w * 0.5 + 0.5 + N.xz * 0.05; if (mp.w > 0.0 && st.x > 0.0 && st.x < 1.0 && st.y > 0.0 && st.y < 1.0) refl = texture2D(uMirrorTex, st).rgb; }
+    // far away, the unseen ripples blur the reflection: the sky a little higher up and softer
+    vec3 refl = pow(skyCol(normalize(R + vec3(0.0, rough * 0.12 * (0.4 + w), 0.0))), vec3(2.2));
+    if (uMirror > 0.5) { vec4 mp = uMirrorMat * vec4(vWpos, 1.0); vec2 st = mp.xy / mp.w * 0.5 + 0.5 + N.xz * 0.05; if (mp.w > 0.0 && st.x > 0.0 && st.x < 1.0 && st.y > 0.0 && st.y < 1.0) refl = mix(texture2D(uMirrorTex, st).rgb, refl, rough * 0.35); }
     vec3 body = vec3(0.006, 0.03, 0.045) * uAmb;
     vec3 wc = mix(body, refl, F);
-    float shn = mix(2200.0, 260.0, w);
+    float shn = mix(2200.0, 260.0, w) * (1.0 - 0.75 * rough);
     wc += uSunCol * pow(max(dot(R, uSun), 0.0), shn) * mix(40.0, 7.0, w) * uSunVis;
     wc += vec3(0.55, 0.6, 0.7) * pow(max(dot(R, uMoon), 0.0), shn * 0.6) * mix(3.0, 1.0, w) * uMoonVis;
     float shore = smoothstep(0.28, 0.45, wet) * (1.0 - smoothstep(0.45, 0.7, wet));
@@ -831,17 +846,20 @@ function v3dPlaneLightsSet(model: any, ph: string, agl: number, onGround: boolea
   const landing = toRoll || (!onGround && low) || (onRwyLanding && (gs == null || gs > 30)) ? 1 : 0;
   const gearDown = onGround || /final|landing|approach|lift-?off|take-?off/.test(ph) || agl < 2000;
   const nose = push ? 0 : taxi || lineUp || toRoll || onRwyLanding || (!onGround && gearDown && low && !/climb/.test(ph)) ? 1 : 0;
+  // the light sits on the nose gear: only lit when that gear is fully down (never while it is retracting or stowed)
+  const gearNow = model && model.userData ? model.userData.gearNow : null;
+  const noseOn = gearNow == null || gearNow > 0.97 ? nose : 0;
   const logo = onGround || low ? 1 : 0;
   L.material.uniforms.uFlags.value.set(nav, strobe, beacon, landing);
-  L.material.uniforms.uFlags2.value.set(nose, logo, 0, 0);
+  L.material.uniforms.uFlags2.value.set(noseOn, logo, 0, 0);
   // the light they throw on the ground, and their beams in mist
   const src = body.userData.lightSrc, U = v3dSkyUniforms();
-  if (src && (landing || nose) && U.uLightsOn.value > 0.02) {
+  if (src && (landing || noseOn) && U.uLightsOn.value > 0.02) {
     body.updateMatrixWorld();
     const T = THREE, at = (p: any) => p.clone().applyMatrix4(body.matrixWorld), dirOf = (d: number[]) => new T.Vector3(d[0], d[1], d[2]).transformDirection(body.matrixWorld);
     const a = at(src.land[0]), b = at(src.land[1]);
     if (landing) V3dSky.spots.push({ pos: a.add(b).multiplyScalar(0.5), dir: dirOf(src.landDir), k: 1, range: 420 });
-    if (nose) V3dSky.spots.push({ pos: at(src.nose), dir: dirOf(src.taxiDir), k: landing ? 0.45 : 0.8, range: 110 });
+    if (noseOn) V3dSky.spots.push({ pos: at(src.nose), dir: dirOf(src.taxiDir), k: landing ? 0.45 : 0.8, range: 110 });
   }
   const beams = body.userData.beams;
   if (beams) { const k = landing * U.uMist.value * U.uLightsOn.value; body.userData.beamMat.uniforms.uK.value = k; for (const m of beams) m.visible = k > 0.01; }
@@ -1074,8 +1092,9 @@ void main() {
   float e = asin(clamp(d.y, -1.0, 1.0)), az = atan(d.x, -d.z), R = 6371.0;
   float la1 = uLL.y, lo1 = uLL.x;
   vec3 col = vec3(0.0);
+  float jit = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);   // a different start for every pixel: no bands
   for (int i = 0; i < 12; i++) {
-    float H = 95.0 + float(i) * 18.0;
+    float H = 95.0 + (float(i) + jit) * 18.0;
     // where the line of sight is at this height (over the curved Earth), and the forecast there
     float g = acos(clamp((R + uH) / (R + H) * cos(e), -1.0, 1.0)) - e;
     float la2 = asin(sin(la1) * cos(g) + cos(la1) * sin(g) * cos(az));
@@ -1084,7 +1103,9 @@ void main() {
     if (p < 0.02) continue;
     // curtains: bright vertical rays in slowly moving folds along the oval
     float fold = sin(lo2 * 45.0 + sin(la2 * 25.0 + uTime * 0.04) * 3.0 + uTime * 0.03);
-    float rays = pow(vn(vec3(lo2 * 260.0 + fold * 2.0, la2 * 40.0, uTime * 0.12)), 2.5) * 1.6 + 0.15 * (0.5 + 0.5 * fold);
+    float rays = pow(vn(vec3(lo2 * 260.0 + fold * 2.0, la2 * 40.0, uTime * 0.12)), 3.5) * 2.0 + 0.05 * (0.5 + 0.5 * fold);
+    float band = smoothstep(0.25, 0.9, 0.5 + 0.5 * sin(la2 * 220.0 + fold * 1.5 + uTime * 0.02));   // separate curtains, not one glow
+    rays *= 0.35 + 0.65 * band;
     float hf = (H - 95.0) / 200.0;
     vec3 c = mix(vec3(0.12, 1.0, 0.38), vec3(0.85, 0.12, 0.32), smoothstep(0.4, 0.85, hf));   // green low down (oxygen, 558 nm), red high up (630 nm)
     float prof = exp(-hf * 3.2) + 0.3 * smoothstep(0.35, 0.7, hf) * (1.0 - hf);
@@ -1101,7 +1122,7 @@ void main() {
   u.uLL.value.set(ll[0] * D2R, ll[1] * D2R); u.uH.value = Math.max(0, (cam.position.y + v3dCurve(cam.position.x, cam.position.z)) / 1000);
   u.uTime.value = now / 1000;
   // only on dark nights, dimmed by the moon and hidden by overcast
-  u.uK.value = night * (1 - 0.5 * (U.uMoonK ? U.uMoonK.value : 0)) * (1 - 0.92 * (A.wx ? A.wx.cloud : 0)) * 1.4;
+  u.uK.value = night * (1 - 0.5 * (U.uMoonK ? U.uMoonK.value : 0)) * (1 - 0.92 * (A.wx ? A.wx.cloud : 0)) * 1.05;
   M.visible = u.uK.value > 0.01;
   M.position.copy(cam.position); M.scale.setScalar(cam.far * 0.88);
 }

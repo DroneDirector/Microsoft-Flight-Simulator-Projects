@@ -315,6 +315,7 @@ class WorldMap {
   }
 
   tapAt(x: number, y: number) {
+    try { if (crashMapTap(this, x, y)) return; } catch (e) { /* not a crash mark */ }
     let best: string = null, bd = 28;
     for (const f of liveOf()) {
       const p = this.px.apply(this, this.inScene[f.id] || flightPos(f));
@@ -325,7 +326,22 @@ class WorldMap {
     {
       let ap: string = null, ad = 18;
       for (const k of this.shownAps) { const a = apt(k); if (!a) continue; const p = this.px(a.pos[0], a.pos[1]), d = Math.hypot(p[0] - x, p[1] - y); if (d < ad) { ad = d; ap = k; } }
+      // a weather mark (any airport with a report on the map)
+      if (!ap && WxLayer.on() && (State.settings as any).wxMetar !== false) {
+        for (const k in LiveWx.cache) { const w: any = LiveWx.cache[k]; if (!w.raw) continue; const a = apt(k); if (!a) continue; const p = this.px(a.pos[0], a.pos[1]); const d = Math.hypot(p[0] - x, p[1] - y); if (d < Math.min(ad, 14)) { ad = d; ap = k; } }
+      }
+      // any other airport, when zoomed in far enough to tell them apart
+      if (!ap && this.degPx() > 2.5) {
+        const ll = this.ll(x, y), ll2 = this.ll(x + 16, y);
+        if (ll && ll2) { const nm = gcDistanceNm(ll, ll2), k = World.nearest(ll[0], ll[1], nm); if (k) { const a = apt(k), p = a ? this.px(a.pos[0], a.pos[1]) : null; if (p) { ad = Math.hypot(p[0] - x, p[1] - y); ap = k; } } }
+      }
       if (ap && (!best || ad + 3 < bd) && typeof focusAirport === 'function') { this.selected = null; this.closeBubble(); Sound.tick(); focusAirport(ap, true); return; }
+    }
+    // another airline's aircraft: a short card (who, where from and to, how high and fast), nothing more
+    if (Traffic.on()) {
+      let tb: any = null, td = Math.min(bd, 20); const now = Date.now();
+      for (const f of Traffic.live()) { const pp = flightPathPos(f, now); if (!pp) continue; const p = this.px(pp.pos[0], pp.pos[1]); if (!p) continue; const d = Math.hypot(p[0] - x, p[1] - y); if (d < td) { td = d; tb = f; } }
+      if (tb) { this.selected = null; this.closeBubble(); Sound.tick(); trafficCard(tb); return; }
     }
     this.selected = best;
     if (best) this.openBubble(best); else this.closeBubble();
@@ -400,6 +416,8 @@ class WorldMap {
     if (!this.alive) return;
     this.raf = requestAnimationFrame(this.loop);
     if (!this.el.isConnected) { this.destroy(); return; }
+    // Game Booster: while the 3D view covers the map, the map doesn't draw at all
+    if (typeof V3d !== 'undefined' && V3d.open && gameBoost()) return;
     if (_saverWas && !this.anim) { const T: any = this; if (T._svT && now - T._svT < 100) return; T._svT = now; }
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.1) : 0; this.last = now;
     if (this.anim && !this.ml) {
@@ -450,6 +468,7 @@ class WorldMap {
     }
     try { nightMapDraw(c, this); } catch (e) { /* never stop the map */ }
     try { WxLayer.draw(c, this, degPx); } catch (e) { /* never stop the map */ }
+    try { crashMapDraw(c, this); } catch (e) { /* never stop the map */ }
     try { if (typeof Network !== 'undefined') Network.drawOnMap(c, this, degPx); } catch (e) { /* never stop the map */ }
     try { this.drawTraffic(c, degPx); } catch (e) { /* never stop the map */ }
     for (const f of liveOf()) {

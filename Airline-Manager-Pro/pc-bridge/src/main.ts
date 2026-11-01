@@ -162,6 +162,7 @@ export async function main(replay?: { file: string; speed: number }) {
   let status = 'Starting…', phones = 0;
   const server = new LinkServer(dir, VERSION);
   const desktop = new Desktop(dir);
+  try { desktop.applyBoost(); } catch (e) { /* normal priority */ }
   server.web = (req, res) => desktop.handle(req, res);
   const redraw = () => banner(server, status, phones, lines);
   const log = (s: string) => { writeLog(s); lines.push(new Date().toTimeString().slice(0, 8) + '  ' + s); if (lines.length > 200) lines.shift(); redraw(); };

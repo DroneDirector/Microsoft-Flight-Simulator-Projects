@@ -13,7 +13,11 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => `<div class="set-card"><span class="brand-lg">${brandMark()}</span><span><b>${esc(APP.name)}</b><small>Version ${esc(APP.version)}</small></span><button class="btn ghost sm" data-act="whats-new">${icon('star')}What's new</button></div>` },
     { type: 'choice', key: 'units', label: 'Units', options: [['imperial', 'Feet, knots, nm'], ['metric', 'Metres, km/h, km']] },
     { type: 'toggle', key: 'clock24', label: '24-hour clock' },
+    { type: 'html', html: () => typeof DESKTOP !== 'undefined' && DESKTOP ? '' : `<label class="tg-row"><span><b>Full screen</b><small>The phone's status bar and navigation buttons stay hidden. A swipe from the edge shows them for a moment (and the notification panel can still be pulled down); they hide again by themselves. Remembered by the phone.</small></span><button class="tg ${fullScreenOn() ? 'on' : ''}" role="switch" aria-checked="${fullScreenOn()}" data-act="fullscreen-toggle"><i></i></button></label>` },
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
+  ] },
+  { id: 'booster', title: 'Game Booster', icon: 'power', items: [
+    { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
   ] },
   { id: 'licence', title: 'Registration', icon: 'key', items: [
     { type: 'html', html: () => licenceHtml() },

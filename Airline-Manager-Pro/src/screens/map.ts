@@ -159,7 +159,7 @@ function focusAirport(icao: string, stay?: boolean) {
     <div class="apt-rwy" id="apt-rwy"></div>
     <small class="muted">${onRoutes.length ? 'On your routes: ' + onRoutes.join(', ') : 'Not on any of your routes yet'}</small>
     <div class="apt-wx" id="apt-wx">${aptWxHtml(icao)}</div>
-    <div class="btn-row">${AIRPORT_VIEW ? `<button class="btn primary sm apt-view-btn" data-act="apt-view" data-icao="${esc(icao)}">${icon('land')}Airport view</button>` : ''}<button class="btn ghost sm" data-act="apt-3d" data-icao="${esc(icao)}"><b>3D</b>View in 3D</button></div>
+    <div class="btn-row">${AIRPORT_VIEW ? `<button class="btn primary sm apt-view-btn" data-act="apt-view" data-icao="${esc(icao)}">${icon('land')}Airport view</button>` : ''}<button class="btn ghost sm" data-act="apt-zoom" data-icao="${esc(icao)}">${icon('search')}Zoom in</button><button class="btn ghost sm" data-act="apt-3d" data-icao="${esc(icao)}"><b>3D</b>View in 3D</button></div>
   </div></div>`;
   if (LiveWx.on() && !LiveWx.cache[icao]) LiveWx.fetch([icao]).then(() => { const w = $('#apt-wx'); if (w) w.innerHTML = aptWxHtml(icao); });
   World.loadRunways().then(rw => {
@@ -168,6 +168,10 @@ function focusAirport(icao: string, stay?: boolean) {
     el.innerHTML = list.length ? list.map(r => `<span class="rwy-chip"><b>${esc(r[0])}/${esc(r[1])}</b>${r[2] ? ` ${num(Math.round(r[2] * 0.3048))} m` : ''}</span>`).join('') : '';
   });
 }
+ACTIONS['apt-zoom'] = el => {
+  const a: any = apt(el.getAttribute('data-icao')), m = _curMap(); if (!a || !m) return;
+  Sound.tick(); const d = 0.035; m.fit([[a.pos[0] - d / Math.max(0.2, Math.cos(a.pos[1] * D2R)), a.pos[1] - d], [a.pos[0] + d / Math.max(0.2, Math.cos(a.pos[1] * D2R)), a.pos[1] + d]], 20, true); m.baseDirty = true;
+};
 ACTIONS['map-find'] = el => { closeAll(); Sound.tick(); focusAirport(el.getAttribute('data-icao')); };
 ACTIONS['map-unmark'] = () => { const m = _curMap(); if (m) { m.mark = null; m.baseDirty = true; } const box = $(State.screen === 'map' ? '#map-detail' : '#ops-sel'); if (box) box.innerHTML = ''; };
 
@@ -223,3 +227,20 @@ function aptWxHtml(icao: string): string {
   const m = LiveWx.on() ? LiveWx.cache[icao] : null, at = Network.which() !== 'off' ? Network.atcAt(icao) : [];
   return `${m && m.raw ? `<code class="metar">${esc(m.raw)}</code>` : ''}<small class="muted">${esc(SIZE_NAMES[aptSize(icao)])} · fuel $${fuelPrice(icao).toFixed(2)}/kg${m && m.cat ? ' · ' + esc(m.cat) : ''}</small>${at.length ? `<div class="wx-atc">${at.map(x => `<span class="chip">${esc(x.callsign)} ${esc(x.freq)}</span>`).join('')}</div>` : ''}`;
 }
+
+/** Another airline's aircraft, tapped on the map: the basics only (they are not yours). */
+function trafficCard(f: any) {
+  const box = $(State.screen === 'map' ? '#map-detail' : '#ops-sel'); if (!box || !f || !f.tfc) return;
+  const now = Date.now(), t: any = acType(f.typeId) || {};
+  let q: any = null; try { q = profileAt(flightProfile(f.typeId, f.from, f.to, f.depAt), flightEl(f, now).el); } catch (e) { /* no profile */ }
+  const eta = f.depAt + (f.durMs || 0), A = apt(f.from), B = apt(f.to);
+  const row = (k: string, v: string) => `<div><small>${k}</small><b>${v}</b></div>`;
+  box.innerHTML = `<div class="sel-pop"><div class="card apt-card tfc-card">
+    <div class="card-h"><b><i class="tfc-dot" style="background:${esc(f.tfc.color)}"></i>${esc(tfcLabel(f.tfc))} <small>${esc(f.callsign)}</small></b><button class="icon-btn" data-act="map-unmark" aria-label="Close">${icon('close')}</button></div>
+    <div class="apt-name">${esc(f.from)} → ${esc(f.to)}</div><small class="muted">${esc([A ? A.city || A.name : '', B ? B.city || B.name : ''].filter(Boolean).join(' to '))}</small>
+    <div class="kv-row">${row('Aircraft', esc(t.name || f.typeId))}${row('Registration', esc(f.tfc.reg || '—'))}${row('Phase', esc(q ? q.ph : f.phase || '—'))}
+      ${row('Altitude', q && q.alt > 0 ? num(Math.round(q.alt / 100) * 100) + ' ft' : 'On the ground')}${row('Speed', q && q.gs ? Math.round(q.gs) + ' kt' : '—')}${row('Arrives', eta > now ? new Date(eta).toTimeString().slice(0, 5) : 'Landed')}</div>
+    <div class="btn-row"><button class="btn ghost sm" data-act="tfc-3d" data-id="${esc(f.id)}"><b>3D</b>Follow in 3D</button></div>
+  </div></div>`;
+}
+ACTIONS['tfc-3d'] = el => { const id = el.getAttribute('data-id'), m = _curMap(); if (!id || !m) return; ACTIONS['map-unmark'](el, null); v3dOpen(id, m); };
