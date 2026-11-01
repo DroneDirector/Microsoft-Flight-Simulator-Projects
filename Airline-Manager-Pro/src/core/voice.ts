@@ -61,6 +61,11 @@ function moodPhonemes(ps: string, sp: Speaker): string {
   return out;
 }
 
+/** The voice pack's files and sizes (its pack.json), for when the list can't be fetched. */
+const VOICE_PACK_LIST = { version: 1, files: { 'LICENSE-Kokoro-Apache-2.0.txt': 11357, 'LICENSE-kokoro-onnx-MIT.txt': 1080, 'LICENSE-misaki-Apache-2.0.txt': 11357, 'NOTICE.txt': 676,
+  'kokoro-v1.0-q8.onnx': 92361271, 'lexicon-gb.json.gz': 2893766, 'lexicon-us.json.gz': 2705901, 'voice-af_bella.bin': 522240, 'voice-af_heart.bin': 522240, 'voice-am_fenrir.bin': 522240,
+  'voice-am_michael.bin': 522240, 'voice-am_puck.bin': 522240, 'voice-bf_emma.bin': 522240, 'voice-bf_isabella.bin': 522240, 'voice-bm_daniel.bin': 522240, 'voice-bm_george.bin': 522240, 'voice-bm_lewis.bin': 522240 },
+  voices: ['bm_george', 'bm_lewis', 'bm_daniel', 'bf_emma', 'bf_isabella', 'af_heart', 'af_bella', 'am_michael', 'am_fenrir', 'am_puck'] };
 const VOICE_PACK_BASE = 'https://github.com/DroneDirector/Microsoft-Flight-Simulator-Projects/releases/download/amp-voice-pack-1/';
 const VOICE_MODEL = 'kokoro-v1.0-q8.onnx';
 // the model's sound numbers (its vocabulary), from the model's config
@@ -128,7 +133,11 @@ const VoicePack = {
     if (this.manifest) return this.manifest;
     let txt = '';
     if (this.native()) txt = await (await fetch(this.url('pack.json'))).text();
-    else if (DESKTOP) { const r = await Net.request(VOICE_PACK_BASE + 'pack.json'); if (r.status >= 400) throw new Error('The voice pack isn\'t available right now (' + r.status + ')'); txt = r.text; }
+    else if (DESKTOP) {
+      // the PC app fetches the list itself (newer PC apps); otherwise the list this version was made with
+      try { const r = await fetch('/api/voicepack?manifest=1&base=' + encodeURIComponent(VOICE_PACK_BASE)); const j = r.ok ? await r.json() : null; txt = j && j.text ? j.text : ''; } catch (e) { txt = ''; }
+      if (!txt) txt = JSON.stringify(VOICE_PACK_LIST);
+    }
     else txt = await (await fetch(this.url('pack.json'))).text();
     this.manifest = JSON.parse(txt);
     return this.manifest;

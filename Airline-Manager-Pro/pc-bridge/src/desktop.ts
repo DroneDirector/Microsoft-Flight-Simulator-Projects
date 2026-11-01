@@ -109,6 +109,14 @@ export class Desktop {
     const dir = this.voiceDir();
     const files = () => { const o: any = {}; for (const f of fs.readdirSync(dir)) if (!/\.part$/.test(f)) o[f] = fs.statSync(path.join(dir, f)).size; return o; };
     if (req.method === 'DELETE') { this.vp.cancel = true; for (const f of fs.readdirSync(dir)) try { fs.unlinkSync(path.join(dir, f)); } catch (e) { /* in use */ } return json(res, { ok: true }); }
+    // the pack's list of files, fetched here (the app window can't reach the download server itself)
+    const qs = new URL(req.url || '/', 'http://x').searchParams;
+    if (qs.get('manifest')) {
+      const base = String(qs.get('base') || ''), tmp = path.join(os.tmpdir(), 'amp-voice-pack.json');
+      if (!/^https:\/\/github\.com\/DroneDirector\//.test(base)) { res.writeHead(403); res.end('Address not allowed'); return; }
+      getFile(base + 'pack.json', tmp, () => { /* small */ }, () => false).then(() => { let text = ''; try { text = fs.readFileSync(tmp, 'utf8'); JSON.parse(text); } catch (e) { text = ''; } json(res, { text }); }, (e: any) => json(res, { text: '', error: String(e && e.message || e) }));
+      return;
+    }
     if (req.method === 'POST') return readBody(req, b => {
       let o: any; try { o = JSON.parse(b); } catch (e) { res.writeHead(400); res.end(); return; }
       const base = String(o.base || ''), list: [string, number][] = (o.files || []).filter((x: any) => Array.isArray(x) && typeof x[0] === 'string' && !/[\\/]|\.\./.test(x[0]));
@@ -148,7 +156,10 @@ export class Desktop {
   /** Close the app window this PC app opened (before an update restarts everything). */
   closeWindow() {
     if (!this.windowPid) return;
-    try { execFile('taskkill', ['/PID', String(this.windowPid), '/T', '/F'], { windowsHide: true }, () => { /* closed */ }); } catch (e) { /* gone */ }
+    // gently first (the window saves and closes as when you close it yourself), then for sure
+    const pid = String(this.windowPid);
+    try { execFile('taskkill', ['/PID', pid, '/T'], { windowsHide: true }, () => { /* asked */ }); } catch (e) { /* gone */ }
+    setTimeout(() => { try { execFile('taskkill', ['/PID', pid, '/T', '/F'], { windowsHide: true }, () => { /* closed */ }); } catch (e) { /* gone */ } }, 4000);
   }
 
   /** Open the app window (Microsoft Edge in app mode, falling back to Chrome or the default browser). */

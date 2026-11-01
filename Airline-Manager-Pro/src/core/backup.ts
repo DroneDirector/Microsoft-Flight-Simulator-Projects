@@ -83,16 +83,33 @@ const Backup = {
     });
   },
 
-  /** Ask before replacing the airline on this phone with a backup. */
+  /** Ask before replacing the airline on this device with a backup: the backup and what is here now, side by
+   *  side (when each was saved, by which version, the airlines, balance, fleet and flights), with a clear
+   *  warning when the backup is older than what it would replace. */
   confirmRestore(text: string, from: string) {
     const d = this.parse(text); if (!d) { toast('No Airline Manager Pro backup was found there', 'warn'); return; }
-    const st = d.state || {}, cos = (st.companies || []).map((c: any) => c.name).join(', ');
-    const when = d.savedAt ? dateStr(new Date(d.savedAt)) : 'unknown time';
+    const here = DESKTOP ? 'this PC' : 'this phone';
+    let cur: any = null; try { cur = JSON.parse(localStorage.getItem(Mode.key()) || 'null'); } catch (e) { /* nothing */ }
+    if (cur && !cur.state) cur = null;
+    if (!cur && !Store.wasEmpty) { const o: any = {}; for (const k of SAVED_KEYS) o[k] = (State as any)[k]; cur = { savedAt: Date.now(), app: APP.version, state: o }; }
+    const card = (title: string, x: any, cls: string, verb: string) => {
+      if (!x) return `<div class="rs-card ${cls}"><small class="rs-k">${esc(title)}</small><b>Nothing saved on ${here}</b><small>A fresh start: nothing will be lost.</small></div>`;
+      const st = x.state || {}, cos = (st.companies || []).map((c: any) => c.name).join(', '), sm = typeof syncSummary === 'function' ? syncSummary(st) : null;
+      return `<div class="rs-card ${cls}"><small class="rs-k">${esc(title)}</small><b>${esc(cos || 'Your airline')}</b>
+        <span><small>Saved</small>${esc(x.savedAt ? dateStr(new Date(x.savedAt)) : 'unknown time')}</span>
+        <span><small>Version</small>${esc(x.app || '?')}</span>
+        ${sm ? `<span><small>Balance</small>${esc(sm.balance)}</span><span><small>Aircraft</small>${sm.fleet}</span><span><small>Flights in the log</small>${sm.flights}</span>` : ''}
+        <em>${esc(verb)}</em></div>`;
+    };
+    const older = cur && cur.savedAt && d.savedAt && d.savedAt < cur.savedAt - 60000;
+    const warn = !cur ? '' : older
+      ? `<p class="v3d-note warn">${icon('alert')}The backup is older than what is on ${here} now (saved ${esc(dateStr(new Date(cur.savedAt)))}). Restoring it replaces the newer airline here, and everything since the backup is lost.</p>`
+      : `<p class="v3d-note">${icon('info')}Restoring replaces the airline on ${here}: settings, looks, staff, fleet, money, flight logs and the link to your PC.</p>`;
     (window as any).__restoreText = text;
     openLayer('modal', `<div class="modal-head"><div><h2>Restore this backup?</h2><small>${esc(from)}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-      <div class="set-card"><span class="pc-ic">${icon('download')}</span><span><b>${esc(cos || 'Your airline')}</b><small>Saved ${esc(when)} by version ${esc(d.app || '?')}</small></span></div>
-      <p class="lede">Everything on this phone is replaced with the backup: settings, looks, staff, fleet, money, flight logs and the link to your PC.</p>
-      <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="backup-restore-go">${icon('check')}Restore</button></div>`, { cls: 'sm' });
+      <div class="rs-cards">${card('The backup', d, 'from', 'Will be restored')}${card('Now on ' + here, cur, 'to', 'Will be replaced')}</div>
+      ${warn}
+      <div class="modal-actions"><button class="btn ghost" data-act="close-layer">${cur ? 'Keep what is here' : 'Cancel'}</button><button class="btn primary ${older ? 'danger' : ''}" data-act="backup-restore-go">${icon('check')}${older ? 'Restore the older backup' : 'Restore'}</button></div>`, { cls: 'wide' });
   },
 
   /** First start with nothing saved (a new phone, a reinstall, cleared data): offer to bring the airline back. */

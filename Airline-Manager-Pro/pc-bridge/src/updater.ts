@@ -51,7 +51,7 @@ export const PcUpdate = {
       setTimeout(() => {
         try { closeWindow(); } catch (e) { /* the window may be closed already */ }
         const ch = spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsHide: true }); ch.unref();
-        setTimeout(() => process.exit(0), 600);
+        setTimeout(() => process.exit(0), 5000);   // after the window has closed and saved
       }, 1500);
     }).catch(e => this.fail(String(e && e.message || e)));
     return '';
