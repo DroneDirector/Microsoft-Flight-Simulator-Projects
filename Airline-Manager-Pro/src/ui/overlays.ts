@@ -260,7 +260,7 @@ function mechanicPopup(issueId: string) {
 
 /** In a dialogue that just opened, the person starts talking (when voices are on). */
 function autoSpeak(wrap: HTMLElement) {
-  if (!State.settings.mechanicVoice || State.settings.muteAll) return;
+  if (!State.settings.mechanicVoice || State.settings.muteAll || (State.settings as any).autoVoice !== true) return;
   // everyone in the dialogue speaks in turn, like a conversation
   const turn = (i: number) => {
     if (!wrap || !wrap.isConnected) return;

@@ -495,9 +495,23 @@ function v3dLoop(now: number) {
     const wantBank = w.smooth && w.turn != null ? clamp(w.turn * 8, -25, 25) : clamp(dh * 1.6, -25, 25);
     P.bank += (wantBank * (w.onGround ? 0 : 1) - P.bank) * Math.min(1, dt * 1.2);
     const vs = w.vs != null ? w.vs : (g as any).vs || 0, gs = Math.max(60, g.gs || 140);
-    P.pitch += (clamp(Math.atan2(vs / 196.85, gs * 0.5144) / D2R + (w.onGround ? 0 : 2.5), -6, 15) - P.pitch) * Math.min(1, dt * 1.5);
-    // flaps and gear by phase (the type's own speeds in flight-configs when available)
     const ph = w.phase.toLowerCase();
+    // touchdown: the flare raises the nose over the last few metres, the main wheels touch first, the nose
+    // stays up for a moment and is then lowered onto the runway
+    const PS: any = P, agl = w.altM - ground;
+    if (!w.onGround && agl > 3) PS.air = true;
+    let touched = false;
+    if (w.onGround && PS.air && (g.gs || 140) > 50 && s.gear && !s.gear.fixed) { PS.air = false; PS.tdAt = now; touched = true; }
+    const landing = /final|landing|touchdown|flare/.test(ph) && !/take-?off|lift-?off|climb/.test(ph);
+    // in the air: the flight path plus the wing's angle of attack (about 5° slow with flaps out, 2.5° at cruise),
+    // so an airliner on a 3° approach flies about 2° nose up, as real ones do
+    const slow = landing || /approach|take-?off|lift-?off|initial/.test(ph) || gs < 190;
+    let pitchT = clamp(Math.atan2(vs / 196.85, gs * 0.5144) / D2R + (w.onGround ? 0 : slow ? 5 : 2.5), -6, 15);
+    const flareDeg = s.gear && s.gear.fixed ? 4 : 5.5;
+    if (!w.onGround && landing && agl < 25) pitchT = Math.max(pitchT, 2.5 + (flareDeg - 2.5) * clamp((25 - agl) / 20, 0, 1));
+    if (w.onGround && PS.tdAt && now - PS.tdAt < 6000) pitchT = Math.max(pitchT, flareDeg * clamp(1 - (now - PS.tdAt - 1200) / 3500, 0, 1));
+    P.pitch += (pitchT - P.pitch) * Math.min(1, dt * (w.onGround && PS.tdAt && now - PS.tdAt < 6000 ? 2.5 : 1.5));
+    // flaps and gear by phase (the type's own speeds in flight-configs when available)
     try { v3dPlaneLightsSet(P.model, ph, (w.altM - ground) / 0.3048, w.onGround, w.altM / 0.3048, g.gs); } catch (e) { /* no lights */ }
     const cfg = flightConfig(P.type, ph, (g as any).ias || g.gs || 0, (w.altM - ground) / 0.3048, w.onGround);
     // your own flight: the flaps and gear as they are in the simulator
@@ -516,17 +530,22 @@ function v3dLoop(now: number) {
     const bodyO = P.model.userData.body; if (bodyO) bodyO.position.x = -s.L / 2 + noseWheelAhead(P.type) * PG.gw;
     // place it: nose (−x of the model) along the heading, at the right height
     P.model.position.copy(P.pos);
+    // nose up near the ground: the model turns about its nose wheel, so lift it until the main wheels are on the surface
+    { const xm = (bodyO ? bodyO.position.x : -s.L / 2) + (s.gear ? s.gear.main : s.L * 0.55);
+      if (P.pitch > 0 && xm > 0) P.model.position.y += PG.gw * xm * Math.sin(P.pitch * D2R); }
     P.model.rotation.set(0, 0, 0);
     P.model.rotateY(-(P.hdg + 90) * D2R);
     P.model.rotateZ(-P.pitch * D2R);   // nose up
     P.model.rotateX(-P.bank * D2R);   // a turn to the right lowers the right wing
     // touchdown: tyre smoke from the main wheels (left behind on the runway as the aircraft rolls on)
-    const PS: any = P, agl = w.altM - ground;
-    if (!w.onGround && agl > 3) PS.air = true;
-    if (w.onGround && PS.air && (g.gs || 140) > 50 && s.gear && !s.gear.fixed) { PS.air = false; PS.smokeUntil = now + 350; PS.smokeK = g.you && (State as any).lastTouchdown ? clamp(Math.abs((State as any).lastTouchdown.fpm || 150) / 200, 0.6, 2) : 1; }
-    if (PS.smokeUntil > now && (PS.smokeTick = !PS.smokeTick)) {
+    if (touched) { PS.smokeUntil = now + 900; PS.smokeAt = 0; PS.smokeK = g.you && (State as any).lastTouchdown ? clamp(Math.abs((State as any).lastTouchdown.fpm || 150) / 200, 0.7, 2) : 1; }
+    if (PS.smokeUntil > now && now - (PS.smokeAt || 0) > 40) {
+      // the same amount of smoke however fast the screen is drawn: a puff for every 40 ms that has passed
+      const nP = PS.smokeAt ? Math.min(6, Math.floor((now - PS.smokeAt) / 40)) : 3;
+      PS.smokeAt = now;
       const h = P.hdg * D2R, fx = Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = Math.sin(h), bx = bodyO ? bodyO.position.x : -s.L / 2, back = bx + s.gear.main;
-      for (const side of [-1, 1]) v3dSmokePuff(P.pos.x - fx * back + rx * side * s.gear.track / 2, P.pos.y + 0.4, P.pos.z - fz * back + rz * side * s.gear.track / 2, PS.smokeK || 1);
+      const fresh = 1 - (PS.smokeUntil - now) / 900;   // thickest at the moment of touchdown
+      for (let n = 0; n < nP; n++) for (const side of [-1, 1]) v3dSmokePuff(P.pos.x - fx * (back + n * 2) + rx * side * s.gear.track / 2, P.pos.y + 0.6, P.pos.z - fz * (back + n * 2) + rz * side * s.gear.track / 2, (PS.smokeK || 1) * (1.15 - fresh * 0.5));
     }
     void s;
   }
@@ -877,7 +896,7 @@ function v3dCrashCheck() {
   try { ErrorLog.add('3d', 'The app was closed by the system during the 3D view', `Satellite ${m.sat ? 'on, detail ' + names[m.q] : 'off'}; graphics limit ${m.cap}px; device memory ${m.mem || '?'} GB`, `The 3D view was open (version ${m.ver}) when Android closed the app, most likely because the graphics ran out of memory.`); } catch (e) { /* ignore */ }
   let lowered = '';
   if (m.sat && (S.v3dSatQ == null ? 1 : S.v3dSatQ) > 0) { S.v3dSatQ = Math.max(0, (S.v3dSatQ == null ? 1 : S.v3dSatQ) - 1); lowered = names[S.v3dSatQ]; Store.soon(); }
-  State.notices.unshift({ id: uid(), kind: 'mechanic' as any, title: 'The 3D view closed the app', body: `Your device ran out of graphics memory in the 3D view.${lowered ? ` Satellite detail is now ${lowered}; you can raise it again in Settings → 3D view.` : ''} The details are in Settings → Updates and errors.`, time: 'Now', at: Date.now(), read: false } as any);
+  State.notices.unshift({ id: uid(), kind: 'mechanic' as any, title: 'The 3D view closed the app', body: `Your device ran out of graphics memory in the 3D view.${lowered ? ` Satellite detail is now ${lowered}; you can raise it again in Settings → Graphics.` : ''} The details are in Settings → Updates and errors.`, time: 'Now', at: Date.now(), read: false } as any);
 }
 
 /* ---------- tyre smoke at touchdown ---------- */
@@ -890,19 +909,23 @@ function v3dSmokePuff(x: number, y: number, z: number, k: number) {
     gr.addColorStop(0, 'rgba(235,235,235,1)'); gr.addColorStop(0.45, 'rgba(220,220,220,.55)'); gr.addColorStop(1, 'rgba(210,210,210,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
     _smokeTex = new T.CanvasTexture(c);
   }
-  if (_smoke.length > 160) return;
-  const sp = new T.Sprite(new T.SpriteMaterial({ map: _smokeTex, transparent: true, depthWrite: false, opacity: 0.6 }));
+  if (_smoke.length > 220) return;
+  const sp = new T.Sprite(new T.SpriteMaterial({ map: _smokeTex, transparent: true, depthWrite: false, opacity: 0.8 }));
+  sp.material.userData.noDim = true;   // lit by hand in v3dSmokeStep
   sp.position.set(x + (Math.random() - 0.5) * 0.8, y, z + (Math.random() - 0.5) * 0.8); sp.scale.set(1.5, 1.5, 1.5); sp.renderOrder = 12;
   V3d.scene.add(sp);
-  _smoke.push({ sp, age: 0, life: 2.2 + Math.random() * 1.4, k, vx: (Math.random() - 0.5) * 1.2, vz: (Math.random() - 0.5) * 1.2 });
+  _smoke.push({ sp, age: 0, life: 3 + Math.random() * 2.5, k, vx: (Math.random() - 0.5) * 2, vz: (Math.random() - 0.5) * 2 });
 }
 function v3dSmokeStep(dt: number) {
   for (let i = _smoke.length - 1; i >= 0; i--) {
     const p = _smoke[i]; p.age += dt; const t = p.age / p.life;
     if (t >= 1 || !V3d.scene) { if (V3d.scene) V3d.scene.remove(p.sp); p.sp.material.dispose(); _smoke.splice(i, 1); continue; }
-    const sz = (1.2 + Math.sqrt(t) * 6.5) * p.k; p.sp.scale.set(sz, sz, sz);
-    p.sp.position.x += p.vx * dt; p.sp.position.z += p.vz * dt; p.sp.position.y += (0.6 + t * 0.8) * dt;
-    p.sp.material.opacity = 0.6 * Math.min(1, 0.6 + p.k * 0.3) * (1 - t) * (1 - t);
+    const sz = (2 + Math.sqrt(t) * 13) * p.k; p.sp.scale.set(sz, sz * 0.8, sz);
+    p.sp.position.x += p.vx * dt; p.sp.position.z += p.vz * dt; p.sp.position.y += (0.8 + t * 1.2) * dt;
+    p.sp.material.opacity = 0.8 * Math.min(1, 0.65 + p.k * 0.3) * (1 - t) * (1 - t * 0.6);
+    // the light of the moment: grey-white by day, dim at night (lit a little by the landing lights)
+    const tint = (V3dSky as any).tint || [1, 1, 1], amb = Math.max(0.18, (V3dSky as any).amb || 1);
+    p.sp.material.color.setRGB(tint[0] * amb, tint[1] * amb, tint[2] * amb);
   }
 }
 
@@ -949,6 +972,13 @@ function v3dGroundPaint(L: AirportLayout, loc: (x: number, y: number) => number[
       const contour = ar.pts.map(p => new T.Vector2(p[0], p[1])), faces = T.ShapeUtils.triangulateShape(contour, []);
       for (const f of faces) { const [a, b, c] = f.map((i: number) => v(ar.pts[i][0], ar.pts[i][1], 0.15)); tri('apron', a, c, b); }
     } catch (e) { /* an odd outline: left out */ }
+  }
+  // the parking areas: paved all over (stands, lead-ins, taxilanes), also where the map has no apron outline
+  for (const poly of layoutParkingFill(L)) {
+    try {
+      const faces = T.ShapeUtils.triangulateShape(poly.map(p => new T.Vector2(p[0], p[1])), []);
+      for (const f of faces) { const [a, b, c] = f.map((i: number) => v(poly[i][0], poly[i][1], 0.15)); tri('apron', a, c, b); }
+    } catch (e) { /* skip */ }
   }
   // taxiways: shoulder, then asphalt (with round joints)
   const joints: { [i: number]: number } = {};

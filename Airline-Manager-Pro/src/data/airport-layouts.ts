@@ -423,3 +423,39 @@ function layoutPrefetch() {
   LayoutDb.keys().then(have => { const list = Object.keys(set).filter(k => have[k] !== 'sim'); if (list.length) linkSend({ type: 'layout-prefetch', list }); });
 }
 setInterval(() => { try { layoutPrefetch(); } catch (e) { /* ignore */ } }, 120e3);
+
+/** The paved parking area around the stands, as polygons in the layout's metres: under every stand (the
+ *  aircraft's whole footprint and the gap to the next stand), along the lead-in lines and stand connectors,
+ *  and along the taxilanes that run between the stands. Where the map has no apron outline (or an
+ *  incomplete one) this fills it, so no grass shows between parked aircraft. Plain taxiways away from
+ *  the stands are not touched: they stay strips. */
+function layoutParkingFill(L: AirportLayout): number[][][] {
+  const out: number[][][] = [], parks = L.parks || [], P = L.points || [];
+  if (!parks.length) return out;
+  const rect = (A: number[], B: number[], w: number) => {
+    const dx = B[0] - A[0], dy = B[1] - A[1], len = Math.hypot(dx, dy); if (len < 0.5) return;
+    const nx = -dy / len * w / 2, ny = dx / len * w / 2;
+    out.push([[A[0] + nx, A[1] + ny], [A[0] - nx, A[1] - ny], [B[0] - nx, B[1] - ny], [B[0] + nx, B[1] + ny]]);
+  };
+  const disc = (C: number[], r: number) => { const q: number[][] = []; for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; q.push([C[0] + Math.cos(a) * r, C[1] + Math.sin(a) * r]); } out.push(q); };
+  const nearStand = (x: number, y: number) => { let best = 1e9, r = 0; for (const k of parks) { const d = Math.hypot(x - k[0], y - k[1]); if (d < best) { best = d; r = k[3] || 15; } } return { d: best, r }; };
+  // the stands: from just past the stop bar back over the whole aircraft, a little wider than its wings
+  for (const k of parks) {
+    const r = Math.max(8, k[3] || 15), h = (k[2] || 0) * Math.PI / 180, ux = Math.sin(h), uy = Math.cos(h);
+    rect([k[0] + ux * r * 0.4, k[1] + uy * r * 0.4], [k[0] - ux * r * 2.4, k[1] - uy * r * 2.4], 2 * r + 14);
+  }
+  // lead-in lines and stand connectors: wide enough for the aircraft that follow them
+  for (const p of L.paths || []) {
+    const A = P[p[2]];
+    if (p[0] === 9) { const B = P[p[3]]; if (!A || !B) continue; const n = nearStand((A[0] + B[0]) / 2, (A[1] + B[1]) / 2); if (n.d < n.r * 4 + 40) rect(A, B, 2 * n.r + 10); }
+    else if (p[0] === 3) { const k = parks[p[3]]; if (!A || !k) continue; const r = Math.max(8, k[3] || 15); rect(A, k, 2 * r + 10); disc(A, r + 5); }
+  }
+  // taxilanes: taxi paths running among the stands get pavement out to the stands on both sides
+  for (const p of L.paths || []) {
+    if (!(p[0] === 1 || p[0] === 4)) continue;
+    const A = P[p[2]], B = P[p[3]]; if (!A || !B) continue;
+    const na = nearStand(A[0], A[1]), nb = nearStand(B[0], B[1]), r = Math.max(na.r, nb.r);
+    if (na.d < r * 2.6 + 25 && nb.d < r * 2.6 + 25) { rect(A, B, Math.min(40, Math.max(10, p[1] || 18)) + 2 * r + 20); disc(A, r + 15); disc(B, r + 15); }
+  }
+  return out;
+}

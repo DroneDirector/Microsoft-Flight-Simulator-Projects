@@ -127,6 +127,10 @@ const INCIDENTS: { [role: string]: string[][] } = {
 };
 const MISCONDUCT_P: { [k: string]: number } = { never: 0, rare: 0.02, normal: 0.07, often: 0.2 };
 
+/** How often conduct reports happen overall (Settings → Staff → Conduct): 0 never … 3 normal (a third fewer than
+ * before) … 4 often; it scales the chances set for each kind of staff. */
+const CONDUCT_LEVEL_K = [0, 0.3, 0.5, 0.67, 1.2];
+function conductLevel(): number { const v = (State.settings as any).conductLevel; return v == null ? 3 : clamp(Math.round(+v), 0, 4); }
 function maybeIncident() {
   const S: any = State;
   if (!conductOn()) return;   // switched off in Settings: nothing new happens, nothing is removed
@@ -135,7 +139,7 @@ function maybeIncident() {
   const roles: string[] = ['fa', 'mech', 'ground', 'fo', 'pilot'];
   const me = myPilot();
   for (const r of roles) {
-    const p = MISCONDUCT_P[S.settings.misconduct[r === 'pilot' ? 'fo' : r]] || 0;
+    const p = (MISCONDUCT_P[S.settings.misconduct[r === 'pilot' ? 'fo' : r]] || 0) * CONDUCT_LEVEL_K[conductLevel()];
     if (Math.random() >= p) continue;
     const pool = (r === 'fo' ? State.pilots.filter((x: any) => x.coPilotFor === cid)
       : r === 'pilot' ? State.pilots.filter((x: any) => x.companyId === cid && !x.coPilotFor && x !== me && x.id !== 'you' && x.status !== 'off')

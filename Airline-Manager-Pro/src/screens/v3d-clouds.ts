@@ -1,4 +1,4 @@
-/* Clouds from the real-world airport reports: soft volumetric puffs in the 3D view, see-through layers on the map. */
+/* Clouds from the real-world airport reports: clouds built in three dimensions in the 3D view, see-through layers on the map. */
 
 const CLOUD_COV: { [k: string]: number } = { FEW: 0.19, SCT: 0.44, BKN: 0.75, OVC: 1 };
 
@@ -53,59 +53,54 @@ function cloudKind(l: { cover: string; base: number; type?: string }): string {
 
 /* ---------- the 3D view ---------- */
 
-const V3dClouds: any = { mesh: null, tex: null, key: '', at: 0, cx: 0, cz: 0, list: [] as number[][], sortAt: 0, sx: 1e9, sz: 1e9, fetchAt: 0, fetchKey: '' };
+/* Each cloud is built in three dimensions: a heap of round puffs placed in the world (cumulus, towers, anvils)
+ * or stacked flat sheets (overcast, high cloud). A puff is drawn as a soft sphere: its surface, its light and
+ * its ragged edge are worked out in world space, so a cloud keeps its shape and its sunny side from every
+ * angle while you circle around it. Clouds that come or go (a new report, a layer that moved) fade in and out. */
 
-function v3dCloudTexture(): any {
-  const T = THREE, cv = document.createElement('canvas'); cv.width = cv.height = 256;
-  const g = cv.getContext('2d');
-  for (let t = 0; t < 4; t++) {
-    const ox = (t % 2) * 128, oy = Math.floor(t / 2) * 128;
-    g.save(); g.beginPath(); g.rect(ox + 1, oy + 1, 126, 126); g.clip();
-    // a heap of soft blobs: wide, domed at the top, flatter at the bottom, brighter where the sun reaches
-    for (let i = 0; i < 26; i++) {
-      const u = cloudHash(t, i, 3) * 2 - 1, v = cloudHash(t, i, 4);
-      const x = ox + 64 + u * 34, top = 1 - u * u, y = oy + 84 - v * 40 * top, s = (10 + cloudHash(t, i, 5) * 18) * (0.6 + 0.6 * top);
-      if (y + s * 0.5 > oy + 108) continue;
-      const lit = Math.round(175 + 80 * clamp((oy + 100 - y) / 70, 0, 1));
-      const gr = g.createRadialGradient(x, y, 0, x, y, s);
-      gr.addColorStop(0, `rgba(${lit},${lit},${lit},0.6)`); gr.addColorStop(0.55, `rgba(${lit},${lit},${lit},0.32)`); gr.addColorStop(1, `rgba(${lit},${lit},${lit},0)`);
-      g.fillStyle = gr; g.beginPath(); g.arc(x, y, s, 0, Math.PI * 2); g.fill();
-    }
-    g.restore();
-  }
-  const tex = new T.CanvasTexture(cv); tex.generateMipmaps = true; tex.minFilter = T.LinearMipmapLinearFilter;
-  return tex;
-}
+interface CloudPuff { x: number; y: number; z: number; m: number; s: number; h: number; a: number; sd: number; dx: number; dy: number; dz: number; id: string; born?: number; dies?: number }
+const CLOUD_FADE_S = 25;   // seconds for a cloud to form or dissolve
+const V3dClouds: any = { mesh: null, key: '', at: 0, cx: 0, cz: 0, list: [] as CloudPuff[], sortAt: 0, sx: 1e9, sz: 1e9, fetchAt: 0, fetchKey: '', built: false };
+function cloudClock(): number { return performance.now() / 1000; }
 
 function v3dCloudMesh(max: number): any {
   const T = THREE, geo = new T.InstancedBufferGeometry();
   geo.setAttribute('position', new T.Float32BufferAttribute([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], 3));
   geo.setAttribute('uv', new T.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
   geo.setIndex([0, 1, 2, 0, 2, 3]);
-  geo.setAttribute('iOff', new T.InstancedBufferAttribute(new Float32Array(max * 4), 4).setUsage(T.DynamicDrawUsage));
-  geo.setAttribute('iData', new T.InstancedBufferAttribute(new Float32Array(max * 4), 4).setUsage(T.DynamicDrawUsage));
+  for (const [n, k] of [['iOff', 4], ['iData', 4], ['iDir', 4], ['iFade', 2]] as [string, number][])
+    geo.setAttribute(n, new T.InstancedBufferAttribute(new Float32Array(max * k), k).setUsage(T.DynamicDrawUsage));
   geo.instanceCount = 0;
-  if (!V3dClouds.tex) V3dClouds.tex = v3dCloudTexture();
   const mat = new T.ShaderMaterial({
-    uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, { uTex: { value: null }, uFar: { value: 1e5 }, uLight: { value: new T.Color(0.97, 0.98, 1) }, uDark: { value: new T.Color(0.5, 0.55, 0.63) } }]),
+    uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, {
+      uFar: { value: 1e5 }, uTime: { value: 0 }, uFadeT: { value: CLOUD_FADE_S }, uDetail: { value: 1 },
+      uLight: { value: new T.Color(0.97, 0.98, 1) }, uDark: { value: new T.Color(0.5, 0.55, 0.63) },
+      uSun: { value: new T.Vector3(0, 1, 0) }, uSunK: { value: 1 },
+    }]),
     vertexShader: `
       #include <common>
       #include <fog_pars_vertex>
       #include <logdepthbuf_pars_vertex>
-      attribute vec4 iOff; attribute vec4 iData;
-      uniform float uFar;
-      varying vec2 vUv; varying float vShade; varying float vAlpha;
+      attribute vec4 iOff; attribute vec4 iData; attribute vec4 iDir; attribute vec2 iFade;
+      uniform float uTime; uniform float uFadeT;
+      varying vec2 vUv; varying vec3 vCen; varying vec4 vData; varying vec3 vDir; varying float vMode; varying float vFade;
       void main() {
-        vec4 mvPosition = modelViewMatrix * vec4(iOff.xyz, 1.0);
-        mvPosition.x += position.x * iData.x;
-        mvPosition.y += position.y * iData.x * iOff.w;
-        float t = iData.y;
-        vUv = (uv + vec2(mod(t, 2.0), floor(t / 2.0))) * 0.5;
-        float d = length(mvPosition.xyz);
-        mvPosition.xyz *= max(0.05, (d - iData.x * 0.5) / d);
-        vAlpha = iData.w * (1.0 - smoothstep(uFar * 0.75, uFar, d)) * smoothstep(iData.x * 0.25, iData.x * 1.1, d);
-        vShade = iData.z + position.y * 0.35;
+        float s = iData.x;
+        vec4 mvPosition;
+        if (iOff.w > 0.5 && iOff.w < 1.5) {
+          // a round puff: a disc facing the camera, shaded in the fragment shader as the sphere it stands for
+          mvPosition = modelViewMatrix * vec4(iOff.xyz, 1.0);
+          mvPosition.xy += position.xy * s;
+          float d = length(mvPosition.xyz);
+          mvPosition.xyz *= max(0.05, (d - s * 0.5) / d);
+        } else {
+          // a sheet: lies flat in the world
+          mvPosition = modelViewMatrix * vec4(iOff.xyz + vec3(position.x * s, 0.0, position.y * s), 1.0);
+        }
+        vUv = uv; vCen = (modelMatrix * vec4(iOff.xyz, 1.0)).xyz; vData = iData; vDir = iDir.xyz; vMode = iOff.w;
+        vFade = smoothstep(iFade.x, iFade.x + uFadeT, uTime) * (1.0 - smoothstep(iFade.y, iFade.y + uFadeT, uTime));
         gl_Position = projectionMatrix * mvPosition;
+        if (vFade < 0.001) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
         #include <logdepthbuf_vertex>
         #include <fog_vertex>
       }`,
@@ -113,20 +108,59 @@ function v3dCloudMesh(max: number): any {
       #include <common>
       #include <fog_pars_fragment>
       #include <logdepthbuf_pars_fragment>
-      uniform sampler2D uTex; uniform vec3 uLight; uniform vec3 uDark;
-      varying vec2 vUv; varying float vShade; varying float vAlpha;
+      uniform vec3 uLight; uniform vec3 uDark; uniform vec3 uSun; uniform float uSunK; uniform float uFar; uniform float uDetail;
+      varying vec2 vUv; varying vec3 vCen; varying vec4 vData; varying vec3 vDir; varying float vMode; varying float vFade;
+      float h31(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+      float vn(vec3 x) {
+        vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(h31(i), h31(i + vec3(1.0, 0.0, 0.0)), f.x), mix(h31(i + vec3(0.0, 1.0, 0.0)), h31(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+                   mix(mix(h31(i + vec3(0.0, 0.0, 1.0)), h31(i + vec3(1.0, 0.0, 1.0)), f.x), mix(h31(i + vec3(0.0, 1.0, 1.0)), h31(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
+      }
       void main() {
         #include <logdepthbuf_fragment>
-        vec4 t = texture2D(uTex, vUv);
-        float a = t.a * vAlpha;
-        if (a < 0.008) discard;
-        vec3 col = mix(uDark, uLight, clamp(vShade, 0.0, 1.0)) * (0.82 + 0.18 * t.r);
+        vec2 q = vUv * 2.0 - 1.0; float r2 = dot(q, q);
+        if (r2 >= 1.0) discard;
+        float s = vData.x, hgt = vData.y, a0 = vData.z, sd = vData.w;
+        vec3 R = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+        vec3 U = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+        vec3 B = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+        vec3 col; float a;
+        if (vMode > 0.5 && vMode < 1.5) {
+          // the point of the sphere under this pixel, in the world
+          vec3 n = normalize(R * q.x + U * q.y + B * sqrt(1.0 - r2));
+          vec3 p = vCen + n * s * 0.5;
+          float nz = vn(p / (s * 0.3) + sd * 17.0) * (1.0 - 0.38 * uDetail) + vn(p / (s * 0.11) + sd * 5.0) * 0.38 * uDetail;
+          float den = (1.0 - r2) * 1.3 - (nz - 0.3) * 0.95;
+          a = smoothstep(0.0, 0.5, den) * a0;
+          // light: the side towards the sun is bright, the bottom and the inside of the heap are grey
+          vec3 N = normalize(n + vDir * 0.9);
+          float dif = clamp(dot(N, uSun) * 0.55 + 0.45, 0.0, 1.0);
+          float lit = clamp(0.16 + 0.3 * hgt + uSunK * dif * (0.45 + 0.55 * hgt) * 0.78 + (nz - 0.5) * 0.14, 0.0, 1.0);
+          col = mix(uDark, uLight, lit);
+          // the bright rim when the sun is behind the cloud
+          col += uLight * pow(max(dot(-B, uSun), 0.0), 10.0) * uSunK * (1.0 - smoothstep(0.0, 0.6, den)) * 0.9;
+          float dc = distance(vCen, cameraPosition);
+          a *= smoothstep(s * 0.3, s * 1.1, dc) * (1.0 - smoothstep(uFar * 0.75, uFar, dc));
+        } else {
+          vec3 p = vCen + vec3(q.x, 0.0, q.y) * s * 0.5;
+          float nz = vMode > 1.5
+            ? vn(vec3(p.x / 2500.0, p.y / 400.0, p.z / 9000.0) + sd * 13.0) * 0.6 + vn(vec3(p.x / 700.0, 0.0, p.z / 2600.0) + sd) * 0.4
+            : vn(p / 1800.0 + sd * 11.0) * 0.6 + vn(p / 600.0 + sd * 3.0) * 0.4;
+          float den = pow(1.0 - r2, 0.6) * 1.2 - (nz - 0.35) * 1.1;
+          a = smoothstep(0.0, 0.5, den) * a0;
+          float below = step(cameraPosition.y, vCen.y);
+          float lit = mix(0.55 + 0.4 * uSunK, 0.18 + 0.25 * hgt, below) + (nz - 0.5) * 0.15;
+          col = mix(uDark, uLight, clamp(lit, 0.0, 1.0));
+          float dc = distance(p, cameraPosition);
+          a *= smoothstep(30.0, 260.0, abs(cameraPosition.y - vCen.y)) * (1.0 - smoothstep(uFar * 0.75, uFar, dc));
+        }
+        a *= vFade;
+        if (a < 0.006) discard;
         gl_FragColor = vec4(col, a);
         #include <fog_fragment>
       }`,
-    transparent: true, depthWrite: false, fog: true,
+    transparent: true, depthWrite: false, fog: true, side: T.DoubleSide,
   });
-  mat.uniforms.uTex.value = V3dClouds.tex;
   const mesh = new T.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 5; mesh.userData.max = max;
   return mesh;
 }
@@ -145,56 +179,91 @@ function v3dCloudFetch(lon: number, lat: number, km: number) {
   }).catch(() => { V3dClouds.pending = false; /* offline: no clouds */ });
 }
 
-/** The puffs within reach of the camera: [x, y, z, flat, size, picture, shade, alpha]. */
-function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): number[][] {
-  const R = km * 1000, ll0 = v3dLonLat(cx, cz), list = cloudStations(ll0[0], ll0[1], km + 160), out: number[][] = [];
+/** The puffs and sheets within reach of the camera. Every one has a name made from where and what it is, so
+ * the same cloud is recognised when the clouds are built again and only real changes fade in or out. */
+function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): CloudPuff[] {
+  const R = km * 1000, ll0 = v3dLonLat(cx, cz), list = cloudStations(ll0[0], ll0[1], km + 160), out: CloudPuff[] = [];
   if (!list.length) return out;
-  const budget = [900, 2000, 3600, 5400][detail - 1];
+  const per = [5, 8, 12, 18][detail - 1], budget = [2000, 4500, 7500, 11000][detail - 1];
   // the size of one cloud cell: smaller cells mean more, better-shaped clouds; the area must fit the budget
-  let cell = [3200, 2400, 1800, 1300][detail - 1];
-  cell = Math.max(cell, Math.sqrt(Math.PI * R * R / (budget / 2.2)));
+  let cell = [3200, 2600, 2000, 1600][detail - 1];
+  cell = Math.max(cell, Math.sqrt(Math.PI * R * R / (budget / (per * 0.45))));
+  cell = Math.round(cell / 100) * 100;
   const cells: number[][] = [];
   const x0 = Math.floor((cx - R) / cell), x1 = Math.ceil((cx + R) / cell), z0 = Math.floor((cz - R) / cell), z1 = Math.ceil((cz + R) / cell);
   for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) {
-    const x = i * cell, z = j * cell, d = Math.hypot(x - cx, z - cz); if (d <= R) cells.push([x, z, d]);
+    const x = i * cell, z = j * cell, d = Math.hypot(x - cx, z - cz); if (d <= R) cells.push([x, z, d, i, j]);
   }
   cells.sort((a, b) => a[2] - b[2]);   // nearest first, so the budget is spent close by
+  const add = (p: CloudPuff) => { const L = Math.hypot(p.dx, p.dy, p.dz) || 1; p.dx /= L; p.dy /= L; p.dz /= L; out.push(p); };
   for (const c of cells) {
     if (out.length >= budget) break;
     const ll = v3dLonLat(c[0], c[1]), st = cloudNearest(list, ll[0], ll[1], 150); if (!st) continue;
     const xk = ll[0] * 111.32 * Math.cos(ll[1] * D2R), yk = ll[1] * 110.54, curve = v3dCurve(c[0], c[1]);
+    const lod = clamp(1.35 - c[2] / R * 1.1, 0.3, 1);
     st.layers.forEach((l, li) => {
       const cov = CLOUD_COV[l.cover] || 0, kind = cloudKind(l); if (!cov) return;
       const n = cloudNoise(xk, yk, kind === 'st' ? 14 : kind === 'ci' ? 22 : kind === 'cb' ? 18 : 6, 11 + li * 17);
       if (n > cov) return;
       const dens = cov >= 1 ? 1 : clamp((cov - n) / Math.max(0.12, cov) * 1.6, 0.25, 1);
-      const base = st.elev + l.base * 0.3048 - curve, rnd = (k: number) => cloudHash(Math.round(c[0]), Math.round(c[1]), li * 31 + k);
+      const base = st.elev + l.base * 0.3048 - curve, rnd = (k: number) => cloudHash(c[3], c[4], li * 131 + k);
+      const tag = `${c[3]},${c[4]},${li},${kind},${Math.round(l.base / 100)},${Math.round(dens * 4)},${cell}`;
+      const sd = rnd(999) * 10;
       if (kind === 'cb' || kind === 'tcu') {
-        // a tower: puffs stacked up to about 9 km (thunderstorm) or 4 km (towering cumulus), widening at the top
-        const top = base + (kind === 'cb' ? 9000 - l.base * 0.3048 * 0.5 : 3500), steps = Math.max(4, Math.round((top - base) / (cell * 0.45)));
-        for (let s = 0; s < steps; s++) {
-          const f = s / steps, wid = cell * (0.9 + (kind === 'cb' && f > 0.8 ? 1.2 : 0.3 * f));
-          out.push([c[0] + (rnd(s) - 0.5) * cell * 0.4, base + f * (top - base), c[1] + (rnd(s + 40) - 0.5) * cell * 0.4, 0.85, wid, Math.floor(rnd(s + 80) * 4), kind === 'cb' ? 0.05 + f * 0.9 : 0.3 + f * 0.7, 0.85]);
+        // a tower of puffs up to about 9 km (thunderstorm) or 3.5 km (towering cumulus); a thunderstorm spreads into an anvil at the top
+        const top = base + (kind === 'cb' ? 9000 - l.base * 0.3048 * 0.5 : 3500), lv = clamp(Math.round((top - base) / (cell * 0.45)), 5, 14);
+        const np = detail >= 3 ? 4 : 3, cxx = c[0] + (rnd(1) - 0.5) * cell * 0.3, czz = c[1] + (rnd(2) - 0.5) * cell * 0.3;
+        for (let s = 0; s < lv; s++) {
+          const f = s / (lv - 1), anvil = kind === 'cb' && f > 0.82, spread = anvil ? cell * 1.5 : cell * (0.28 + 0.12 * f);
+          for (let k = 0; k < (anvil ? np + 3 : np); k++) {
+            const ang = rnd(s * 17 + k * 3 + 5) * Math.PI * 2, rr = Math.sqrt(rnd(s * 17 + k * 3 + 6)) * spread;
+            const dx = Math.cos(ang) * rr, dz = Math.sin(ang) * rr;
+            add({ x: cxx + dx, y: base + f * (top - base), z: czz + dz, m: 1, s: cell * (anvil ? 0.9 : 0.95 + 0.25 * f), h: kind === 'cb' ? 0.05 + f * 0.95 : 0.25 + f * 0.75, a: 0.9, sd,
+              dx, dy: (f - 0.4) * cell, dz, id: `${tag}|${s}|${k}` });
+          }
         }
+        if (kind === 'cb') add({ x: cxx, y: top + 150, z: czz, m: 0, s: cell * 4, h: 1, a: 0.75, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|anvil` });
         return;
       }
-      if (kind === 'ci') {   // thin, see-through high cloud
-        out.push([c[0] + (rnd(1) - 0.5) * cell, base + rnd(2) * 300, c[1] + (rnd(3) - 0.5) * cell, 0.3, cell * 2.1, Math.floor(rnd(4) * 4), 0.95, 0.28 * dens]);
+      if (kind === 'ci') {   // thin, see-through high cloud in streaks
+        add({ x: c[0] + (rnd(1) - 0.5) * cell, y: base + rnd(2) * 300, z: c[1] + (rnd(3) - 0.5) * cell, m: 2, s: cell * 2.2, h: 1, a: 0.32 * dens, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|ci` });
         return;
       }
-      if (kind === 'st') {   // a sheet: wide, flat, grey underneath
-        for (let s = 0; s < 2; s++) out.push([c[0] + (rnd(s) - 0.5) * cell * 0.6, base + 60 + s * 220, c[1] + (rnd(s + 9) - 0.5) * cell * 0.6, 0.5, cell * 1.6, Math.floor(rnd(s + 20) * 4), 0.25 + s * 0.45, 0.75]);
+      if (kind === 'st') {   // a layer: stacked flat sheets, grey underneath, with a lumpy top on the detailed settings
+        const th = l.cover === 'OVC' ? 420 : 300;
+        for (let s = 0; s < 3; s++) add({ x: c[0] + (rnd(s) - 0.5) * cell * 0.5, y: base + 40 + s * th / 2, z: c[1] + (rnd(s + 9) - 0.5) * cell * 0.5, m: 0, s: cell * 1.75, h: s / 2, a: 0.8, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|st${s}` });
+        if (detail >= 3 && lod > 0.6) for (let s = 0; s < 2; s++)
+          add({ x: c[0] + (rnd(s + 40) - 0.5) * cell * 0.8, y: base + th, z: c[1] + (rnd(s + 50) - 0.5) * cell * 0.8, m: 1, s: cell * 0.7, h: 0.9, a: 0.7, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|top${s}` });
         return;
       }
-      // heaps (cumulus): a few puffs, bigger and taller where the cell is denser
-      const k = 2 + Math.round(dens * (detail + 1)), th = 250 + dens * 900;
+      // a heap (cumulus): round puffs in a dome with a flat base, bigger and taller where the cell is denser
+      const W = cell * (0.5 + 0.45 * dens), Hh = Math.min(2500, 250 + dens * 1000);
+      const ccx = c[0] + (rnd(1) - 0.5) * cell * 0.35, ccz = c[1] + (rnd(2) - 0.5) * cell * 0.35, mid = base + Hh * 0.35;
+      const k = Math.max(3, Math.round(per * (0.55 + 0.45 * dens) * lod));
       for (let s = 0; s < k; s++) {
-        const f = rnd(s + 60);
-        out.push([c[0] + (rnd(s) - 0.5) * cell, base + 60 + f * th, c[1] + (rnd(s + 30) - 0.5) * cell, 0.7, cell * (0.8 + 0.6 * dens) * (1 - f * 0.3), Math.floor(rnd(s + 90) * 4), 0.2 + f * 0.8, 0.85]);
+        const ang = rnd(s * 5 + 100) * Math.PI * 2, rr = s === 0 ? 0 : Math.sqrt(rnd(s * 5 + 101));
+        const f = s === 0 ? 0.3 : Math.pow(rnd(s * 5 + 102), 1.3) * Math.sqrt(Math.max(0, 1 - rr * rr * 0.85));
+        const rad = W * 0.28 * (1.15 - 0.45 * f) * (0.75 + 0.5 * rnd(s * 5 + 103));
+        const x = ccx + Math.cos(ang) * rr * W * 0.5, z = ccz + Math.sin(ang) * rr * W * 0.5, y = base + rad * 0.45 + f * Hh;
+        add({ x, y, z, m: 1, s: rad * 2, h: clamp((y - base) / (Hh + rad * 0.5), 0, 1), a: 0.88, sd, dx: x - ccx, dy: (y - mid) * 1.4, dz: z - ccz, id: `${tag}|${s}` });
       }
     });
   }
   return out;
+}
+
+/** Puts the new set of clouds in place of the old one: clouds that stay keep going, new ones form, gone ones dissolve. */
+function v3dCloudMerge(fresh: CloudPuff[]) {
+  const t = cloudClock(), old = new Map<string, CloudPuff>(), first = !V3dClouds.built;
+  for (const p of V3dClouds.list as CloudPuff[]) old.set(p.id, p);
+  const out: CloudPuff[] = [];
+  for (const p of fresh) {
+    const o = old.get(p.id);
+    if (o && o.dies == null) { out.push(o); old.delete(p.id); continue; }
+    p.born = first ? -1e4 : t; out.push(p);
+  }
+  old.forEach(o => { if (o.dies == null) o.dies = t; if (t - o.dies < CLOUD_FADE_S) out.push(o); });
+  V3dClouds.list = out; V3dClouds.built = true;
 }
 
 /** Each frame: rebuild the clouds when the camera has moved far, the reports changed or the settings changed; keep them sorted far to near. */
@@ -205,29 +274,40 @@ function v3dCloudsStep(now: number) {
   const ll = v3dLonLat(cam.x, cam.z);
   v3dCloudFetch(ll[0], ll[1], km);
   const key = V3d.origin.join(',') + '|' + km + '|' + detail;
-  if (!V3dClouds.mesh || V3dClouds.mesh.parent !== V3d.scene) { V3dClouds.mesh = v3dCloudMesh(5600); V3d.scene.add(V3dClouds.mesh); V3dClouds.key = ''; }
-  V3dClouds.mesh.visible = true;
+  if (!V3dClouds.mesh || V3dClouds.mesh.parent !== V3d.scene) { V3dClouds.mesh = v3dCloudMesh(12000); V3d.scene.add(V3dClouds.mesh); V3dClouds.key = ''; V3dClouds.list = []; V3dClouds.built = false; }
+  const M: any = V3dClouds.mesh, t = cloudClock();
+  M.visible = true; M.material.uniforms.uTime.value = t;
   if (key !== V3dClouds.key || Math.hypot(cam.x - V3dClouds.cx, cam.z - V3dClouds.cz) > Math.max(3000, km * 120) || now - V3dClouds.at > 5 * 60e3) {
+    // a different place or different settings: start over without fading; otherwise the changes fade
+    const restart = !!V3dClouds.key && V3dClouds.key !== key;
+    if (restart) { V3dClouds.list = []; V3dClouds.built = false; }
     V3dClouds.key = key; V3dClouds.at = now; V3dClouds.cx = cam.x; V3dClouds.cz = cam.z;
-    V3dClouds.list = v3dCloudBuild(cam.x, cam.z, km, detail);
+    v3dCloudMerge(v3dCloudBuild(cam.x, cam.z, km, detail));
     V3dClouds.sx = 1e9;   // sort and upload now
-    const M: any = V3dClouds.mesh; M.material.uniforms.uFar.value = km * 1000;
+    M.material.uniforms.uFar.value = km * 1000; M.material.uniforms.uDetail.value = detail >= 2 ? 1 : 0;
   }
   // far to near, so the see-through puffs blend properly
-  if (now - V3dClouds.sortAt > 400 && Math.hypot(cam.x - V3dClouds.sx, cam.y - (V3dClouds.sy || 0), cam.z - V3dClouds.sz) > 120) {
+  if ((now - V3dClouds.sortAt > 400 && Math.hypot(cam.x - V3dClouds.sx, cam.y - (V3dClouds.sy || 0), cam.z - V3dClouds.sz) > 120) || now - V3dClouds.sortAt > 5000) {
     V3dClouds.sortAt = now; V3dClouds.sx = cam.x; V3dClouds.sy = cam.y; V3dClouds.sz = cam.z;
-    const L: number[][] = V3dClouds.list, d = (p: number[]) => (p[0] - cam.x) * (p[0] - cam.x) + (p[1] - cam.y) * (p[1] - cam.y) + (p[2] - cam.z) * (p[2] - cam.z);
-    L.sort((a, b) => d(b) - d(a));
-    const g = V3dClouds.mesh.geometry, o = g.attributes.iOff.array as Float32Array, a = g.attributes.iData.array as Float32Array, n = Math.min(L.length, V3dClouds.mesh.userData.max);
+    let L: CloudPuff[] = V3dClouds.list;
+    L = V3dClouds.list = L.filter(p => p.dies == null || t - p.dies < CLOUD_FADE_S);
+    const d = (p: CloudPuff) => (p.x - cam.x) * (p.x - cam.x) + (p.y - cam.y) * (p.y - cam.y) + (p.z - cam.z) * (p.z - cam.z);
+    for (const p of L) (p as any)._d = d(p);
+    L.sort((a: any, b: any) => b._d - a._d);
+    const g = M.geometry, o = g.attributes.iOff.array as Float32Array, a = g.attributes.iData.array as Float32Array,
+      r = g.attributes.iDir.array as Float32Array, f = g.attributes.iFade.array as Float32Array, n = Math.min(L.length, M.userData.max);
     for (let i = 0; i < n; i++) {
       const p = L[i];
-      o[i * 4] = p[0]; o[i * 4 + 1] = p[1]; o[i * 4 + 2] = p[2]; o[i * 4 + 3] = p[3];
-      a[i * 4] = p[4]; a[i * 4 + 1] = p[5]; a[i * 4 + 2] = p[6]; a[i * 4 + 3] = p[7];
+      o[i * 4] = p.x; o[i * 4 + 1] = p.y; o[i * 4 + 2] = p.z; o[i * 4 + 3] = p.m;
+      a[i * 4] = p.s; a[i * 4 + 1] = p.h; a[i * 4 + 2] = p.a; a[i * 4 + 3] = p.sd;
+      r[i * 4] = p.dx; r[i * 4 + 1] = p.dy; r[i * 4 + 2] = p.dz; r[i * 4 + 3] = 0;
+      f[i * 2] = p.born == null ? -1e4 : p.born; f[i * 2 + 1] = p.dies == null ? 1e9 : p.dies;
     }
-    g.instanceCount = n; g.attributes.iOff.needsUpdate = true; g.attributes.iData.needsUpdate = true;
+    g.instanceCount = n;
+    for (const k of ['iOff', 'iData', 'iDir', 'iFade']) g.attributes[k].needsUpdate = true;
   }
 }
-function v3dCloudsClear() { V3dClouds.mesh = null; V3dClouds.key = ''; V3dClouds.list = []; V3dClouds.tex = null; }
+function v3dCloudsClear() { V3dClouds.mesh = null; V3dClouds.key = ''; V3dClouds.list = []; V3dClouds.built = false; }
 
 /* ---------- the map: see-through layers ---------- */
 
