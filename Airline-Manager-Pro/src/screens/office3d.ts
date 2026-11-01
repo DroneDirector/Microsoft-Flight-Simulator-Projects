@@ -288,7 +288,7 @@ OfficeRoom.open = function (inc?: any) {
   const R = OfficeRoom; if (R.on) R.close(true);
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   const p: any = inc ? staffById(inc.staffId) : null; if (inc && !p) { toast('This person no longer works for you', 'info'); return; }
-  R.on = true; R.inc = inc || null; R.p = p; R.mode = inc ? 'interview' : 'visit'; R.keys = {}; R.stick = [0, 0]; R.pct = 0; R.asked = []; R.answers = 0; R.decided = false; R.loadT0 = performance.now();
+  R.on = true; R.inc = inc || null; R.p = p; R.mode = inc ? 'interview' : 'visit'; R.keys = {}; R.stick = [0, 0]; R.pct = 0; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0; R.flush = false; R.doorT = 0; R.last = 0; R.view = ''; R.vis = null; R.loadT0 = performance.now();
   const q = typeof cabinQ === 'function' ? cabinQ() : 2, co = company();
   const root = document.createElement('div'); root.className = 'court3d office3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
@@ -337,7 +337,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   const next = () => {
     ctProgress(70, R.inc ? `${R.p.name} is at the door…` : 'Opening the blinds…', R);
     if (R.inc) {
-      const go = () => { try { ofVisitor(); } catch (e) { /* no one comes in */ } ofReady(); };
+      const go = () => { try { ofVisitor(); } catch (e) { R.vis = null; try { ErrorLog.add('office', 'Your office: the visitor couldn\'t be shown', (e && (e as any).message) || String(e), 'You can still talk to them.'); } catch (x) { /* no log */ } } ofReady(); };
       if (Human.ready) setTimeout(go, 30); else Human.load().then(() => setTimeout(go, 30), () => ofReady());
     } else ofReady();
   };
@@ -410,13 +410,29 @@ function ofKnock() {
 }
 /** In they come: the door swings open, they walk to the chair, turn, and sit down facing you. */
 function ofEnter() {
-  const R = OfficeRoom, V = R.vis; if (!V) return;
+  const R = OfficeRoom, V = R.vis; if (!V) { ofInterviewStart(); return; }
   V.pivot.visible = true; V.state = 'walking'; R.doorT = 1;
   V.path = [[-2.2, -2.45], [-1.2, -1.55], [-0.35, -0.82], [0, -0.86]]; V.after = 'sit';
   setTimeout(() => { R.doorT = 0; }, 3800);
+  // if anything holds them up on the way, they're in the chair after a few seconds anyway
+  setTimeout(() => { if (R.on && R.vis === V && !R.started) ofSeatNow(); }, 9000);
+}
+/** Straight into the chair, facing you, and the conversation begins. */
+function ofSeatNow() {
+  const R = OfficeRoom, V = R.vis;
+  if (V) { V.path = []; V.pivot.visible = true; V.x = 0; V.z = -0.86; V.yaw = 0; V.v = 0; V.state = 'sitting'; V.wantSit = 1; V.sitK = 1; }
+  R.doorT = 0;
+  if (!R.started) { R.started = true; ofInterviewStart(); }
+}
+/** Something went wrong with the person in the room: note it (Settings → Updates and errors), seat them, carry on. */
+function ofRescue(e: any) {
+  const R = OfficeRoom; if (R.rescued) return; R.rescued = true;
+  try { ErrorLog.add('office', 'Your office: the visitor couldn\'t be shown moving', (e && e.message) || String(e), 'The conversation carries on. Tell us if this keeps happening.'); } catch (x) { /* no log */ }
+  try { ofSeatNow(); } catch (x) { /* carry on */ }
 }
 function ofExit() {
   const R = OfficeRoom, V = R.vis; if (!V) return;
+  if (!V.m) { setTimeout(() => ofVisitUi(true), 1500); return; }   // no figure was shown
   V.wantSit = 0; V.state = 'standing';
   setTimeout(() => { if (!R.on || !R.vis) return; R.doorT = 1; V.state = 'walking'; V.path = [[-0.35, -0.82], [-1.2, -1.55], [-2.3, -2.5], [-3.6, -2.6]]; V.after = 'gone'; }, 1300);
 }
@@ -427,6 +443,7 @@ function ofFrame() {
   // the door
   if (R.A.doorLeaf) { const want = R.doorT ? -1.25 : 0; R.A.doorLeaf.rotation.y += (want - R.A.doorLeaf.rotation.y) * Math.min(1, dt * 2.5); }
   const V = R.vis;
+  try {
   if (V && V.pivot.visible) {
     const top = V.m.top || 1.7, t = now + 3;
     if (V.state === 'walking' && V.path.length) {
@@ -466,6 +483,7 @@ function ofFrame() {
     V.g = V.g ? cabinLerpG(V.g, gT, Math.min(1, dt * 6)) : gT;
     V.m.pose({ t, yaw: 0, gaze: [0, 0.05], blink: (t % 4.1) < 0.12 ? 1 : 0, g: V.g });
   }
+  } catch (e) { ofRescue(e); }
   // you: in your chair (look around), or walking about
   if (R.seat) {
     R.cam.position.set(0, 1.2, 1.02);
@@ -619,6 +637,7 @@ function ofSay(who: string, text: string, title?: string, tell?: string) {
 }
 function ofInterviewStart() {
   const R = OfficeRoom, p = R.p;
+  if (!R.vis) R.vis = { attitude: ofAttitude(p), state: 'sitting', pivot: { visible: false }, path: [] };
   ofSay(p.name, R.vis.attitude === 'dismissive' ? 'You wanted to see me.' : R.vis.attitude === 'honest' ? 'Thank you for seeing me. I think I know what this is about.' : 'You wanted to see me?', `${ROLE_NAMES[personRole(p)]}, ${p.base}`);
   ofQuestions();
 }
