@@ -5,7 +5,7 @@
  * and ambulances around it with their lights flashing. It shows in the 3D view, and on the map as a marker
  * you can tap to go there. */
 
-interface CrashSite { id: string; apt: string; typeId: string; color: string; color2: string; cid: string; reg: string; at: number; dead: boolean; pos?: number[]; hdg?: number }
+interface CrashSite { id: string; apt: string; typeId: string; color: string; color2: string; cid: string; reg: string; at: number; dead: boolean; pos?: number[]; hdg?: number; level?: 'destroyed' | 'damaged'; parts?: string[] }
 const CRASH_KEEP_MS = 3 * 86400e3, CRASH_FIRE_MS = 6 * 3600e3, CRASH_SMOKE_MS = 30 * 3600e3;
 
 function crashSites(): CrashSite[] {
@@ -13,10 +13,10 @@ function crashSites(): CrashSite[] {
   return S.crashSites;
 }
 /** Remember a crash where it happened (the airport it was arriving at; your own simulator position when you were there). */
-function crashSiteAdd(o: { key: string; c: Company; typeId: string; reg: string; to: string; dead?: boolean }) {
+function crashSiteAdd(o: { key: string; c: Company; typeId: string; reg: string; to: string; dead?: boolean; level?: 'destroyed' | 'damaged'; parts?: string[] }) {
   if (!o || !o.to || !apt(o.to)) return;
   const list = crashSites(); if (list.some(c => c.id === o.key)) return;
-  const site: CrashSite = { id: o.key, apt: o.to, typeId: o.typeId || 'a320neo', color: (o.c && o.c.color) || '#2C8CFF', color2: (o.c && (o.c as any).color2) || '#FFFFFF', cid: (o.c && o.c.id) || '', reg: o.reg || '', at: Date.now(), dead: !!o.dead };
+  const site: CrashSite = { id: o.key, apt: o.to, typeId: o.typeId || 'a320neo', color: (o.c && o.c.color) || '#2C8CFF', color2: (o.c && (o.c as any).color2) || '#FFFFFF', cid: (o.c && o.c.id) || '', reg: o.reg || '', at: Date.now(), dead: !!o.dead, level: o.level || 'destroyed', parts: o.parts || [] };
   try {
     const L: any = typeof Link !== 'undefined' ? (Link as any).sim : null;
     if (L && L.lat && L.t && Date.now() - L.t < 15 * 60e3 && gcDistanceNm([L.lon, L.lat], apt(o.to).pos) < 8) { site.pos = [L.lon, L.lat]; site.hdg = L.hdg || 0; }
@@ -120,8 +120,11 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   const at = (along: number, side: number) => [P.x + fx * along + rx * side, P.z + fz * along + rz * side];
   // the aircraft, broken in three, scorched
   const lv = liveryFor(site.color, site.color2, site.cid);
-  const cuts = [[0, 0.34], [0.34, 0.7], [0.7, 1.01]];
-  const lay = [   // where each piece came to rest: [along, side, sink, yaw, pitch, roll]
+  // damaged but in one piece (structural damage): the aircraft whole, down on a collapsed gear leg where one
+  // broke, with the parts that came off lying near it; destroyed: broken in three, burnt
+  const dmg = site.level === 'damaged', parts = site.parts || [], has = (k: string) => parts.some(p => p.indexOf(k) >= 0);
+  const cuts = dmg ? [[0, 1.01]] : [[0, 0.34], [0.34, 0.7], [0.7, 1.01]];
+  const lay = dmg ? [[0, 0, has('main gear') ? 1.0 : has('nose gear') ? 0.5 : 0, (rnd(6) - 0.5) * 10, has('nose gear') ? -3.5 : has('tail') ? 2 : 0, has('main gear') ? 5 + rnd(7) * 3 : 0]] : [   // where each piece came to rest: [along, side, sink, yaw, pitch, roll]
     [len * 0.55 + 18 + rnd(1) * 25, (rnd(2) - 0.5) * 18, 1.2, (rnd(3) - 0.5) * 50, -7 - rnd(4) * 8, 25 + rnd(5) * 40],
     [0, 0, 1.6, (rnd(6) - 0.5) * 16, 2, (rnd(7) - 0.5) * 18],
     [-len * 0.45 - 14 - rnd(8) * 30, (rnd(9) - 0.5) * 30, 0.8, 60 + rnd(10) * 70, 4, -30 - rnd(11) * 40],
@@ -134,7 +137,7 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
     m.traverse((o: any) => {
       if (!o.material) return;
       const one = (mt: any) => { const c = mt.clone(); c.clippingPlanes = planes; c.clipShadows = true; c.side = T.DoubleSide;
-        const k = 0.16 + rnd(i * 13 + (o.id % 7)) * 0.24; if (c.color) c.color.multiplyScalar(k); if ('roughness' in c) c.roughness = 0.95; if ('metalness' in c) c.metalness = 0.05; if (c.envMapIntensity != null) c.envMapIntensity = 0.1; return c; };
+        const k = dmg ? 0.82 + rnd(i * 13 + (o.id % 7)) * 0.15 : 0.16 + rnd(i * 13 + (o.id % 7)) * 0.24; if (c.color) c.color.multiplyScalar(k); if ('roughness' in c) c.roughness = 0.95; if ('metalness' in c) c.metalness = 0.05; if (c.envMapIntensity != null) c.envMapIntensity = 0.1; return c; };
       o.material = Array.isArray(o.material) ? o.material.map(one) : one(o.material);
     });
     const piv = new T.Group(); m.position.x = -(cut[0] + cut[1]) / 2 * len; piv.add(m);
@@ -159,6 +162,7 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   scar.material.userData.noDim = true;
   const sc = at(-len * 0.6 - 60, 0); scar.position.set(sc[0], gy(sc[0], sc[1]) + 0.6, sc[1]); scar.scale.set(s.span * 0.9, 1, len * 2.6 + 140); scar.rotation.y = -h; scar.renderOrder = 7;
   const burn = new T.Mesh(new T.CircleGeometry(1, 28).rotateX(-Math.PI / 2), scar.material); burn.position.set(P.x, y0 + 0.65, P.z); burn.scale.set(s.span * 1.3, 1, len * 1.2); burn.renderOrder = 7;
+  if (dmg) { scar.scale.set(s.span * 0.4, 1, len * 1.2 + 40); burn.scale.set(s.span * 0.35, 1, len * 0.4); }
   if (!sea) grp.add(scar, burn);
   else {
     // the slick: dark, ragged, with an oily rainbow sheen, spreading out from the wreck
@@ -175,7 +179,7 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
     oil.material.userData.noDim = true; oil.position.set(P.x - fx * len * 0.4, y0 + 0.15, P.z - fz * len * 0.4); oil.scale.set(len * 3.2, 1, len * 4.2); oil.rotation.y = -h; oil.renderOrder = 7; grp.add(oil);
   }
   // debris: hundreds of pieces strewn back along the path, thickest near the wreck
-  const nD = 260, deb = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0x3A3C40 }), nD), M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), Sv = new T.Vector3();
+  const nD = dmg ? 45 : 260, deb = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0x3A3C40 }), nD), M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), Sv = new T.Vector3();
   for (let i = 0; i < nD; i++) {
     const t = Math.pow(Math.random(), 1.8), p = at(-t * (len * 3 + 220) + (Math.random() - 0.3) * len * 0.6, (Math.random() - 0.5) * (s.span * 0.5 + t * 50));
     const sz = (0.25 + Math.pow(Math.random(), 3) * 2.6);
@@ -186,7 +190,16 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   grp.add(deb);
   // fire and smoke from the wreck (wing roots, engines, the nose)
   const src: number[][] = [];
-  for (const [al, sd, sz] of [[0, 0, 9], [len * 0.05, -s.span * 0.22, 8], [len * 0.05, s.span * 0.22, 8], [lay[0][0], lay[0][1], 6], [-len * 0.2, s.span * 0.35, 5], [lay[2][0] * 0.5, 4, 4]]) {
+  // the parts that broke off (damaged aircraft): an engine, a wing tip, the gear, lying where they fell
+  if (dmg) {
+    const metal = new T.MeshLambertMaterial({ color: 0xBFC4CA }), dark = new T.MeshLambertMaterial({ color: 0x3A3D42 });
+    if (has('engine')) { const q = at(-len * 0.25 - rnd(20) * 20, s.span * 0.42 + rnd(21) * 10), e = new T.Mesh(new T.CylinderGeometry(s.w * 0.28, s.w * 0.24, s.w * 0.9, 18), metal); e.rotation.set(Math.PI / 2, rnd(22) * 3, 0.3); e.position.set(q[0], gy(q[0], q[1]) + s.w * 0.24, q[1]); grp.add(e); }
+    if (has('wing')) { const q = at(-len * 0.4 - rnd(23) * 30, -s.span * 0.5 - 6), w = new T.Mesh(new T.BoxGeometry(s.span * 0.12, 0.35, len * 0.06), new T.MeshLambertMaterial({ color: site.color })); w.rotation.set(0.2, rnd(24) * 3, 0.15); w.position.set(q[0], gy(q[0], q[1]) + 0.3, q[1]); grp.add(w); }
+    if (has('gear')) { const q = at(-len * 0.15 - rnd(25) * 25, (rnd(26) - 0.5) * 12); for (let k = 0; k < 2; k++) { const wh = new T.Mesh(new T.CylinderGeometry(0.6, 0.6, 0.45, 16), dark); wh.rotation.set(Math.PI / 2, 0, rnd(27 + k)); wh.position.set(q[0] + k * 1.6, gy(q[0], q[1]) + 0.25, q[1] + k); grp.add(wh); } }
+  }
+  const fireAt: number[][] = dmg ? (has('fire') ? [[len * 0.05, -s.span * 0.22, 3]] : []) : [[0, 0, 9], [len * 0.05, -s.span * 0.22, 8], [len * 0.05, s.span * 0.22, 8], [lay[0][0], lay[0][1], 6], [-len * 0.2, s.span * 0.35, 5], [lay[2][0] * 0.5, 4, 4]];
+  if (dmg && !fireAt.length) fireAt.push([len * 0.05, s.span * 0.2, 1.2]);   // a little smoke where it was hurt
+  for (const [al, sd, sz] of fireAt) {
     const q = at(al, sd); src.push([q[0], gy(q[0], q[1]) + 0.5, q[1], sz * Math.max(0.6, len / 40)]);
   }
   if (sea) {
@@ -194,7 +207,7 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
     for (const q of src) q[1] = y0 + 0.3;
     for (let i = 0; i < 12; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * len * 1.3, q = at(-len * 0.4 + Math.cos(a) * d, Math.sin(a) * d * 0.7); src.push([q[0], y0 + 0.2, q[1], (3 + Math.random() * 5) * Math.max(0.6, len / 40)]); }
   }
-  const fire = crashFx('fire', src, sea ? 150 : 90), smoke = crashFx('smoke', src.slice(0, sea ? 5 : 3).map(q => [q[0], q[1] + 4, q[2], q[3] * (sea ? 1.8 : 1.4)]), sea ? 100 : 70);
+  const fire = crashFx('fire', src, dmg ? (has('fire') ? 30 : 0) : sea ? 150 : 90), smoke = crashFx('smoke', src.slice(0, sea ? 5 : 3).map(q => [q[0], q[1] + 4, q[2], q[3] * (sea ? 1.8 : 1.4)]), sea ? 100 : 70);
   if (sea) { fire.material.uniforms.uK.value = 1; for (let i = 0; i < 150; i++) { const b = fire.geometry.attributes.iP; b.setZ(i, b.getZ(i) * 0.55); } fire.geometry.attributes.iP.needsUpdate = true; }
   grp.add(fire, smoke);
   // the fire's glow on the ground at night

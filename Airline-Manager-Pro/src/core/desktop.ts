@@ -16,6 +16,10 @@ const Desk = {
       const z = clamp(Math.min(innerHeight / 560, innerWidth / 980), 0.8, 6) * k;   // narrow screens (4:3, 5:4) by their width, wide ones by their height
       (window as any).__uiZoom = z;
       (document.documentElement.style as any).zoom = String(z);
+      // the page is scaled by z, so a screen-sized length is the window divided by z (otherwise windows sized to the
+      // screen end up z times too big and run off it)
+      document.documentElement.style.setProperty('--vh', (innerHeight / z / 100) + 'px');
+      document.documentElement.style.setProperty('--vw', (innerWidth / z / 100) + 'px');
     };
     fit(); window.addEventListener('resize', fit); (window as any).__deskFit = fit;
     fetch('/api/desktop').then(r => r.json()).then(p => { this.prefs = p; }).catch(() => { /* PC app older */ });
