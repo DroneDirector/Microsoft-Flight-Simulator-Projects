@@ -414,8 +414,14 @@ function ofEnter() {
   V.pivot.visible = true; V.state = 'walking'; R.doorT = 1;
   V.path = [[-2.2, -2.45], [-1.2, -1.55], [-0.35, -0.82], [0, -0.86]]; V.after = 'sit';
   setTimeout(() => { R.doorT = 0; }, 3800);
-  // if anything holds them up on the way, they're in the chair after a few seconds anyway
-  setTimeout(() => { if (R.on && R.vis === V && !R.started) ofSeatNow(); }, 9000);
+  // they walk in, turn and sit down as animated; only if they get stuck (no progress for 4 seconds) are they
+  // put straight into the chair
+  let mark = '', since = performance.now();
+  const watch = setInterval(() => {
+    if (!R.on || R.vis !== V || R.started) { clearInterval(watch); return; }
+    const now = `${V.state}|${V.x.toFixed(2)}|${V.z.toFixed(2)}|${V.yaw.toFixed(2)}|${V.sitK.toFixed(2)}`;
+    if (now !== mark) { mark = now; since = performance.now(); } else if (performance.now() - since > 4000) { clearInterval(watch); ofSeatNow(); }
+  }, 500);
 }
 /** Straight into the chair, facing you, and the conversation begins. */
 function ofSeatNow() {
