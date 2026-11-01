@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.53 (2026-11-01)
+
+- office3d: interview state reset on every open (started, rescued, talk, door); visitor seated by a 9 s fallback; per-frame visitor errors caught, logged and the visitor seated; the interview runs without a figure
+
 ## 0.9.52 (2026-11-01)
 
 - pc-bridge: on EADDRINUSE ask /info; same or newer version opens its window and exits; older is asked to quit (/api/quit) or ended by PID from netstat; retry the port
