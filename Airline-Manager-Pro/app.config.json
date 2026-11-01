@@ -3,8 +3,8 @@
   "appName": "Airline Manager Pro",
   "shortName": "Airline Manager",
   "appId": "com.dronedirector.airlinemanagerpro",
-  "version": "0.9.45",
-  "versionCode": 79,
+  "version": "0.9.46",
+  "versionCode": 80,
   "updates": {
     "repo": "DroneDirector/Microsoft-Flight-Simulator-Projects",
     "tagPrefix": "airline-manager-pro-v"
@@ -18,7 +18,7 @@
   },
   "online": {
     "_comment": "The online register for registration keys and co-op (Supabase). Only the project URL and the public anon key go here, never the secret service_role key.",
-    "supabaseUrl": "",
-    "supabaseKey": ""
+    "supabaseUrl": "https://tdtjrkafdwxlpljiwxqe.supabase.co",
+    "supabaseKey": "sb_publishable_OprK1Q6M0yOEGK9uUgQP8w_f4LCWaSV"
   }
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.46 (2026-11-01)
+
+- core/cloudsync: online sync (encrypted parts, versions, engine lease, realtime nudges, offline choice), Settings > Sync, supabase/sync.sql and setup-all.sql; publishable key headers (supaHeaders)
+- v3d-cabincrew: aircraft cabin crew (planeCabinCrew, faCrew), captain, jump seats per episode, trolley service in cruise, gesture blending, legs in the figure shader, conversations (cabinExchange), speech marks and tap card
+- v3d-cabin: night dimming and reading lights, bins at 1.8 m, windows at 1.1 m, rows fitted to the manifest, passengers in front of the seat backs; manifest premium letters and economy spread
+- airport-view: standHdg (main gear on the lead-in line)
+- PC: display mode wording, deskAA, deskRes with render scale, fit by width on narrow screens
+
 ## 0.9.45 (2026-11-01)
 
 - v3d-cabin: swept bin profile with smooth normals (cabinSweep), PSU with reading lights and vents, light lines, bezels, curtain, charcoal seats with Catmull-Rom outline (cabinSmooth), winged headrests, headrest covers in company colour (cabinCoverTex), closed window-seat room, eye abeam the measured wing tip

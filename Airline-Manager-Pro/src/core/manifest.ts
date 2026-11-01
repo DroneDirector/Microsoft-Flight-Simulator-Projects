@@ -51,13 +51,27 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
   const letters = 'ABCDEFGHJK'.slice(0, abreast).split('');
   const natFrom = (NAT_FOR_HUB as any)[f.from], natTo = (NAT_FOR_HUB as any)[f.to];
   const out: PaxSeat[] = [];
-  let row = 1, col = 0, lastCls = '';
+  let row = 1, col = 0, lastCls = '', ySlots: string[] = null, yi = 0;
   for (let i = 0; i < n; i++) {
     const cls: 'F' | 'J' | 'Y' = i < nF ? 'F' : i < nF + nJ ? 'J' : 'Y';
     if (cls !== lastCls && lastCls) { row += (col ? 1 : 0) + (cls === 'Y' ? 2 : 1); col = 0; }
     lastCls = cls;
-    const per = cls === 'Y' ? abreast : Math.max(2, abreast - 2);
-    const seat = row + letters[Math.min(col, letters.length - 1)];
+    // premium rows have fewer, wider seats: no middle seats (A C D F on a six-abreast aircraft), as in the cabin
+    const rowLetters = cls === 'Y' ? letters : abreast === 6 ? ['A', 'C', 'D', 'F'] : abreast >= 9 ? letters.filter((l, i) => i !== 1 && i !== abreast - 2) : letters.slice(0, Math.max(2, abreast - 2));
+    const per = rowLetters.length;
+    let seat = row + rowLetters[Math.min(col, rowLetters.length - 1)];
+    if (cls === 'Y') {
+      // economy passengers spread over the whole economy cabin as booked (window seats first, middle seats
+      // last), not packed into the front rows
+      if (!ySlots) {
+        const nY = n - nF - nJ, capY = Math.max(nY, (t.seats || nY) - nF - nJ), rowsY = Math.ceil(capY / abreast), rnd = seeded(f.id + '|seats');
+        const middles = abreast === 6 ? [1, 4] : abreast >= 9 ? [1, 4, 7] : [];
+        const all: { r: number; c: number; w: number }[] = [];
+        for (let rr = 0; rr < rowsY; rr++) for (let c = 0; c < abreast; c++) all.push({ r: row + rr, c, w: (c === 0 || c === abreast - 1 ? 0 : middles.indexOf(c) >= 0 ? 0.6 : 0.25) + rnd() * 0.8 });
+        ySlots = all.sort((a, b) => a.w - b.w).slice(0, nY).sort((a, b) => a.r - b.r || a.c - b.c).map(x => x.r + letters[x.c]);
+      }
+      seat = ySlots[yi++] || seat;
+    }
     col++; if (col >= per) { col = 0; row++; }
     const seed = f.id + ':' + i, r = seeded(seed + 'n'), roll = r();
     const nat = roll < 0.6 && natFrom ? natFrom[Math.floor(r() * natFrom.length)] : roll < 0.85 && natTo ? natTo[Math.floor(r() * natTo.length)] : undefined;

@@ -93,8 +93,11 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   V3d.root = root; V3d.cv = root.querySelector('.v3d-cv');
   const phone = Math.min(innerWidth, innerHeight) < 600;
   const rg = v3dRange(map && (map as any).cy != null ? undefined : undefined);
-  const r = new T.WebGLRenderer({ canvas: V3d.cv, antialias: !phone, powerPreference: v3dKm() > 300 || gameBoost() ? 'high-performance' : 'low-power', logarithmicDepthBuffer: v3dKm() > 60 });
-  r.setPixelRatio(Math.min(window.devicePixelRatio || 1, phone ? 1 : 1.5));
+  // edge smoothing: on the PC it is chosen in Settings → Display (off, multisampling, or multisampling with the
+  // picture drawn larger and scaled down for the smoothest edges); on phones and tablets the app decides
+  const aa = DESKTOP ? deskAA() : phone ? 0 : 1, dpr = (window.devicePixelRatio || 1) * deskRenderScale();   // the PC's chosen resolution
+  const r = new T.WebGLRenderer({ canvas: V3d.cv, antialias: aa > 0, powerPreference: v3dKm() > 300 || gameBoost() || aa >= 3 ? 'high-performance' : 'low-power', logarithmicDepthBuffer: v3dKm() > 60 });
+  r.setPixelRatio(aa >= 2 ? Math.min(Math.max(dpr, 0.35) * (aa === 4 ? 2 : aa === 3 ? 1.5 : 1.25), 4) : DESKTOP && deskRes()[0] ? clamp(dpr, 0.35, 3) : Math.min(dpr, phone ? 1 : 1.5));
   r.outputColorSpace = T.SRGBColorSpace;
   V3d.r = r;
   const sc = new T.Scene(); V3d.scene = sc;
@@ -200,6 +203,7 @@ function v3dBind() {
 function v3dDist(): number { const p = V3d.planes[V3d.target]; const span = p ? shapeOf(p.type).span : 35; return V3d.dist || (V3d.mode === 'tower' ? 0 : span * 1.9 + 25); }
 
 function v3dTap(x: number, y: number) {
+  if (V3d.mode === 'cabin') { try { if (cabinTap(x, y)) return; } catch (e) { /* the aircraft below */ } }
   const T = THREE, ray = new T.Raycaster(), v = new T.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
   ray.setFromCamera(v, V3d.cam);
   const objs: any[] = []; for (const id in V3d.planes) objs.push(V3d.planes[id].model);

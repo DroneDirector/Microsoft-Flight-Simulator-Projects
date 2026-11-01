@@ -83,7 +83,7 @@ const Licence = {
   /** Ask the online register (null when it isn't set up or can't be reached). */
   rpc(fn: string, args: any): Promise<string> {
     const o = this.online(); if (!o) return Promise.resolve(null);
-    return fetch(o.supabaseUrl.replace(/\/$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: o.supabaseKey, Authorization: 'Bearer ' + o.supabaseKey }, body: JSON.stringify(args) })
+    return fetch(o.supabaseUrl.replace(/\/$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: supaHeaders(o.supabaseKey), body: JSON.stringify(args) })
       .then(r => r.ok ? r.json() : null).then(v => typeof v === 'string' ? v : null).catch(() => null);
   },
 
@@ -125,3 +125,11 @@ const Licence = {
     });
   },
 };
+
+/** Headers for the online register: the newer publishable keys (sb_publishable_…) go in the apikey header
+ *  only (they are not tokens); the older anon keys are sent both ways, as Supabase expects. */
+function supaHeaders(key: string): any {
+  const h: any = { 'Content-Type': 'application/json', apikey: key };
+  if (!/^sb_/.test(key)) h.Authorization = 'Bearer ' + key;
+  return h;
+}

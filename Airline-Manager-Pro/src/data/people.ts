@@ -201,6 +201,25 @@ function ageOf(dob: string): number {
 /* ---------- Real-world crew requirements ---------- */
 // Flight attendants: aircraft with 20+ passenger seats need 1 per 50 seats (rounded up).
 function faNeeded(t: AircraftType): number { return t.seats >= 20 ? Math.ceil(t.seats / 50) : 0; }
+/** The flight attendants who fly on an aircraft: your own hired cabin crew, each aircraft its own team (as many
+ *  as its seats need), kept from flight to flight so the same faces are on the same aircraft. People who leave,
+ *  are dismissed, suspended, ill, on strike or off duty are replaced from the rest of the cabin crew, first
+ *  those based where the aircraft is, and only shared with another aircraft when there aren't enough. */
+function planeCabinCrew(reg: string): Staff[] {
+  const S: any = State, a = plane(reg); if (!a) return [];
+  const t = acType(a.typeId); if (!t) return [];
+  S.faCrew = S.faCrew || {};
+  const ok = (x: any) => x && !x.suspended && !x.left && !x.onStrike && x.status !== 'off' && !(x.sickUntil && x.sickUntil > Date.now());
+  const all: Staff[] = staffOf(a.companyId, 'fa'), byId = (id: string) => all.filter(x => x.id === id)[0];
+  const need = Math.max(1, faNeeded(t));
+  const taken: { [id: string]: boolean } = {};
+  for (const r of Object.keys(S.faCrew)) if (r !== reg && plane(r)) for (const id of S.faCrew[r]) taken[id] = true;
+  const mine: string[] = (S.faCrew[reg] || []).filter((id: string) => ok(byId(id)));
+  const free = all.filter(x => ok(x) && mine.indexOf(x.id) < 0).sort((x, y) => (taken[x.id] ? 1 : 0) - (taken[y.id] ? 1 : 0) || (x.base === a.location ? 0 : 1) - (y.base === a.location ? 0 : 1) || (x.id < y.id ? -1 : 1));
+  while (mine.length < need && free.length) mine.push(free.shift().id);
+  if (JSON.stringify(mine) !== JSON.stringify(S.faCrew[reg] || [])) { S.faCrew[reg] = mine; try { Store.soon(); } catch (e) { /* saved later */ } }
+  return mine.map(byId).filter(Boolean);
+}
 // Line-maintenance staffing per aircraft, by class (airline staffing ratios; no single law sets these).
 const MECH_RATIO: { [cls: string]: number } = { ga: 1 / 3, bush: 1 / 3, turboprop: 2, regional: 2, airliner: 3, widebody: 5 };
 // Pilots on a leg: two-pilot aircraft need 2; long legs need augmented crews.
