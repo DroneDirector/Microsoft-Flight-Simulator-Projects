@@ -10,6 +10,15 @@
 function humanGesture(mood: any, t: number): any {
   const S = Math.sin, base = (L: number[], R: number[]) => ({ L, R, lean: 0, bob: 0, roll: 0, nod: 0, shake: 0, tilt: 0, flush: 0, calm: 1 });
   const ease = 0.06 + 0.02 * S(t * 0.7);   // at rest: arms hanging, the slightest swing
+  // cabin crew at work: walking (legs and arms swinging), pushing the trolley, handing something to a seat
+  // (v: −1 left, 1 right), and sitting on a jump seat
+  if (mood && mood.kind === 'walk') { const w = S(t * 2 * Math.PI * 0.9), g = base([0.02 + 0.28 * w, 0.07, 0, 0.25 + 0.1 * Math.max(0, w)], [0.02 - 0.28 * w, 0.07, 0, 0.25 + 0.1 * Math.max(0, -w)]);
+    g.legs = [-0.32 * w, 0.45 * Math.max(0, w), 0.32 * w, 0.45 * Math.max(0, -w)]; g.bob = 0.012 * Math.abs(S(t * 2 * Math.PI * 0.9)); g.roll = 0.015 * w; return g; }
+  if (mood && mood.kind === 'push') { const w = S(t * 2 * Math.PI * 0.7), g = base([0.95, 0.12, 0.15, 0.9], [0.95, 0.12, 0.15, 0.9]);
+    g.legs = mood.v ? [-0.22 * w, 0.35 * Math.max(0, w), 0.22 * w, 0.35 * Math.max(0, -w)] : [0, 0, 0, 0]; g.lean = 0.08; g.bob = mood.v ? 0.008 * Math.abs(w) : 0; return g; }
+  if (mood && mood.kind === 'serve') { const sd = mood.v || 1, k = 0.5 + 0.5 * S(t * 1.3), reach = [1.15 + 0.15 * k, 0.55, -0.1, 0.35], rest = [0.55, 0.1, 0.4, 1.3];
+    const g = base(sd > 0 ? rest : reach, sd > 0 ? reach : rest); g.legs = [0, 0, 0, 0]; g.lean = 0.12; g.tilt = 0.12 * sd; g.shake = 0.35 * sd; return g; }
+  if (mood && mood.kind === 'sit') { const g = base([0.55, 0.12, 0.35, 1.25], [0.55, 0.12, 0.35, 1.25]); g.legs = [-1.5, 1.5, -1.5, 1.5]; g.calm = 0.5; return g; }
   if (!mood || !mood.kind) return base([0.04 + 0.02 * S(t * 0.6), 0.08, 0, 0.12 + ease], [0.04 + 0.02 * S(t * 0.6 + 1), 0.08, 0, 0.12 + ease]);
   const v = mood.v || 0, f = (hz: number, ph?: number) => S(t * hz * Math.PI * 2 + (ph || 0));
   if (mood.kind === 'beg') {
@@ -173,11 +182,14 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       uShL: { value: v3(I.J['upperarm01.L']) }, uShR: { value: v3(I.J['upperarm01.R']) },
       uElL: { value: v3(I.J['upperarm01.L']).lerp(v3(I.J['wrist.L']), 0.56 / 0.97) }, uElR: { value: v3(I.J['upperarm01.R']).lerp(v3(I.J['wrist.R']), 0.56 / 0.97) },
       uArmL: { value: new THREE.Matrix3() }, uArmR: { value: new THREE.Matrix3() }, uElbL: { value: new THREE.Matrix3() }, uElbR: { value: new THREE.Matrix3() }, uFlush: { value: 0 },
+      // legs: hip and knee turns (walking, sitting)
+      uHipL: { value: v3(I.J['upperleg01.L']) }, uHipR: { value: v3(I.J['upperleg01.L']).multiply(new THREE.Vector3(-1, 1, 1)) },
+      uLegL: { value: new THREE.Matrix3() }, uLegR: { value: new THREE.Matrix3() }, uKneeL: { value: new THREE.Matrix3() }, uKneeR: { value: new THREE.Matrix3() },
     };
     m.userData.U = U;
     m.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, U);
-      const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR; uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR; uniform float uFlush;
+      const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR,uHipL,uHipR; uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR,uLegL,uLegR,uKneeL,uKneeR; uniform float uFlush;
         uniform float uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink;
         varying vec3 vRest; varying vec3 vF; varying vec3 vON; varying vec4 vA; varying vec4 vB; varying float vBeard;
         float hairlineAt(float az){ float a = abs(az);
@@ -191,7 +203,9 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
           objectNormal = normalize(mix(objectNormal, uHeadRot * objectNormal, smoothstep(0.15, 0.85, fa.w)));
           if (fa.y > 0.5) { bool lf = rest.x > 0.0; float ke = smoothstep(uElbowS - 0.03, uElbowS + 0.03, fa.x), ks = smoothstep(0.0, 0.06, fa.x);
-            objectNormal = normalize(mix(objectNormal, (lf ? uElbL : uElbR) * objectNormal, ke)); objectNormal = normalize(mix(objectNormal, (lf ? uArmL : uArmR) * objectNormal, ks)); }`)
+            objectNormal = normalize(mix(objectNormal, (lf ? uElbL : uElbR) * objectNormal, ke)); objectNormal = normalize(mix(objectNormal, (lf ? uArmL : uArmR) * objectNormal, ks)); }
+          if (fa.z > 0.02 && fa.y < 0.5) { bool ll = rest.x > 0.0; float kw = smoothstep(uKneeY + 0.03, uKneeY - 0.03, rest.y);
+            objectNormal = normalize(mix(objectNormal, (ll ? uKneeL : uKneeR) * objectNormal, kw)); objectNormal = normalize(mix(objectNormal, (ll ? uLegL : uLegR) * objectNormal, fa.z)); }`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           vRest = rest; vF = fpos; vA = fa; vB = fb; vON = objectNormal; vBeard = beardW;
           float hm = hairMask(fb, fa.w);
@@ -209,7 +223,12 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
           if (fa.y > 0.5) { bool lf = rest.x > 0.0; vec3 sp = lf ? uShL : uShR, ep = lf ? uElL : uElR;
             float ke = smoothstep(uElbowS - 0.03, uElbowS + 0.03, fa.x), ks = smoothstep(0.0, 0.06, fa.x);
             transformed = mix(transformed, ep + (lf ? uElbL : uElbR) * (transformed - ep), ke);
-            transformed = mix(transformed, sp + (lf ? uArmL : uArmR) * (transformed - sp), ks); }`);
+            transformed = mix(transformed, sp + (lf ? uArmL : uArmR) * (transformed - sp), ks); }
+          // legs: the lower leg turns at the knee, then the whole leg at the hip
+          if (fa.z > 0.02 && fa.y < 0.5) { bool ll = rest.x > 0.0; vec3 hp = ll ? uHipL : uHipR, kp = vec3(hp.x, uKneeY, hp.z);
+            float kw = smoothstep(uKneeY + 0.03, uKneeY - 0.03, rest.y);
+            transformed = mix(transformed, kp + (ll ? uKneeL : uKneeR) * (transformed - kp), kw);
+            transformed = mix(transformed, hp + (ll ? uLegL : uLegR) * (transformed - hp), fa.z); }`);
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + decl + GLSL_NOISE)
         .replace('#include <color_fragment>', `#include <color_fragment>
           vec3 R = vRest; float onArm = step(0.5, vA.y), headW = vA.w;
@@ -1192,10 +1211,12 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         root.rotation.y = p.yaw; root.rotation.z = Math.sin(t * 2 * Math.PI / 6.2) * 0.008; root.rotation.x = 0; root.position.y = 0;
         root.scale.y = 1 + Math.sin(t * 2 * Math.PI / 4.2) * 0.0015;
         // body language: the arms (a little life even at rest), the lean, the head
-        const g = humanGesture(p.mood, t);
+        const g = p.g || humanGesture(p.mood, t);   // a gesture worked out by the caller (blended between moves), or from the mood
         const arm = (a, sd) => { const m = new THREE.Matrix4().makeRotationY(sd * -a[2]).multiply(new THREE.Matrix4().makeRotationZ(sd * a[1])).multiply(new THREE.Matrix4().makeRotationX(-a[0])); return new THREE.Matrix3().setFromMatrix4(m); };
         const elb = (b) => new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(-b));
         U.uArmL.value.copy(arm(g.L, 1)); U.uArmR.value.copy(arm(g.R, -1)); U.uElbL.value.copy(elb(g.L[3])); U.uElbR.value.copy(elb(g.R[3])); U.uFlush.value = g.flush;
+        const lg = g.legs || [0, 0, 0, 0], rx = (a) => new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(a));
+        U.uLegL.value.copy(rx(lg[0])); U.uKneeL.value.copy(rx(lg[1])); U.uLegR.value.copy(rx(lg[2])); U.uKneeR.value.copy(rx(lg[3]));
         root.rotation.x = g.lean; root.position.y = g.bob; root.rotation.z += g.roll;
         eul.set(Math.sin(t * 0.31 + 1) * 0.035 - 0.01 + g.nod, Math.sin(t * 0.43) * 0.13 * g.calm + Math.sin(t * 0.17) * 0.06 * g.calm + p.gaze[0] * 0.25 + g.shake, Math.sin(t * 0.23 + 2) * 0.02 + g.tilt);
         headPivot.quaternion.setFromEuler(eul); rot.copy(headPivot.quaternion);

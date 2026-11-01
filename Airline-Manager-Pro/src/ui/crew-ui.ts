@@ -35,6 +35,7 @@ function openStaff(id: string) {
           <div><small>Nationality</small><b>${natLabel(p.nat)}</b></div>
           <div><small>Age</small><b>${ageOf(p.dob)}</b></div>
           <div><small>Base</small><b>${esc(p.base)}</b></div>
+          ${role === 'fa' ? (() => { const regs = (State.fleet || []).filter((a: any) => a.companyId === p.companyId && planeCabinCrew(a.reg).some((x: any) => x.id === p.id)).map((a: any) => a.reg); return `<div><small>Flies on</small><b>${regs.length ? esc(regs.join(', ')) : 'Not on an aircraft yet'}</b></div>`; })() : ''}
           <div><small>Salary</small><b>${money(p.salary)}/wk</b></div>
           <div><small>Rating</small><b>${(p.rating || 4).toFixed(1)} ★</b></div>
           ${p.you ? '' : (l => `<div class="kv-lvl"><small>Level ${l.level} of ${LEVEL_MAX}</small><b>${esc(levelTitle(p))}</b><span class="lvl-bar"><i style="width:${(l.p * 100).toFixed(0)}%"></i></span><small>${num(p.xp || 0)} XP${l.to > l.from ? ` · ${num(l.to - (p.xp || 0))} to level ${l.level + 1}` : ' · highest level'}</small></div>`)(levelOf(p.xp))}

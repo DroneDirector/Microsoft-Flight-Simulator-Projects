@@ -155,7 +155,7 @@ function v3dCabinCam(P: any, mode: string) {
   if (V3d.cam.fov !== 62 || V3d.cam.near > 0.03) { V3d.cam.fov = 62; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
   // the cabin's light: daylight from the window, warm cabin lights at night
   const night = (V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0, amb = (V3dSky as any).amb || 1;
-  CabinLight.self.value = 0.55 + 0.2 * night + 0.0 * amb; CabinLight.warm.value.setRGB(1, 0.97 - 0.06 * night, 0.92 - 0.14 * night);
+  CabinLight.self.value = 0.55 * (1 - night * 0.82) + 0.0 * amb; CabinLight.warm.value.setRGB(1, 0.97 - 0.2 * night, 0.92 - 0.05 * night);
 
 }
 /** Leaving a window view: the aircraft as it was, the camera's near limit back. */
@@ -278,7 +278,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
       M0.compose(V(x0 + 1.2 + i * 0.79 + j * 0.08, side * (wallY - bd * 0.62 - j * 0.07), zb - 0.02), new T.Quaternion(), new T.Vector3(1, 1, 1)); rl.setMatrixAt(i * 2 + j, M0);
       M0.compose(V(x0 + 1.32 + i * 0.79 + j * 0.06, side * (wallY - bd * 0.3), zb - 0.02), new T.Quaternion(), new T.Vector3(1, 1, 1)); vent.setMatrixAt(i * 2 + j, M0);
     }
-    g.add(rl, vent);
+    g.add(rl, vent); (g.userData.rls = g.userData.rls || []).push(rl);
     // the bin door's edge (a darker latch strip with a handle on each door) and the joints between doors
     // the joints between doors, following the door's curve
     const doorPts = prof.filter(p => p[0] > bd * 0.34 && p[1] > 0.002).map((p, i, arr) => { const a2 = arr[Math.max(0, i - 1)], b2 = arr[Math.min(arr.length - 1, i + 1)], tx = b2[0] - a2[0], ty = b2[1] - a2[1], tl = Math.hypot(tx, ty) || 1; return [p[0] - ty / tl * 0.003, p[1] + tx / tl * 0.003]; });
@@ -289,7 +289,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     for (let i = 0; i < handles.count; i++) { M0.compose(V(x0 + 1.5 + i * 1.5, side * (wallY - bd - 0.008), zb + bh * 0.2), new T.Quaternion(), new T.Vector3(1, 1, 1)); handles.setMatrixAt(i, M0); }
     g.add(handles);
     // light: a bright line where the bin meets the ceiling, and one along the wall above the windows
-    const glow = new T.MeshBasicMaterial({ color: 0xFFFFFF }); glow.userData.noDim = true;
+    const glow = new T.MeshBasicMaterial({ color: 0xFFFFFF }); glow.userData.noDim = true; (g.userData.glows = g.userData.glows || []).push(glow);
     const up = new T.Mesh(new T.BoxGeometry(len, 0.02, 0.05), glow); up.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.35), zb + bh + 0.06)); g.add(up);
     const wl = new T.Mesh(new T.BoxGeometry(len, 0.018, 0.03), glow); wl.position.copy(V(x0 + len / 2, side * (wallY - 0.02), zb - 0.04)); g.add(wl);
     if (side === -1) V3dCabin.mood = up;
@@ -390,10 +390,13 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   g.add(tray, latch, pocket); if (scr) g.add(scr);
   g.add(cush, back, head);
   // the passengers
-  if (cabinPeopleOn() && list.length) g.add(cabinPeople(list, seatAt, zf, V));
+  if (cabinPeopleOn() && list.length) { const pg = cabinPeople(list, seatAt, zf, V); g.add(pg); g.userData.people = pg; }
   g.userData.pax = { list: list.length, seated: list.filter(p => seatAt[p.seat]).length };
   g.traverse((m: any) => { m.frustumCulled = false; m.renderOrder = 40; });
   g.userData.eye = [x1 - 0.3, aisleY, zf + 1.7]; g.userData.look = [x0 + 2, aisleY, zf + 0.7];
+  // for the cabin crew: the aisle, the floor, the galleys and the rows with passengers in them
+  { const paxRows: number[] = []; for (const p of list) { const r = parseInt(p.seat, 10); if (seatAt[p.seat] && paxRows.indexOf(r) < 0) paxRows.push(r); } paxRows.sort((a, b) => a - b);
+    g.userData.crewAt = { aisleY, zf, x0, x1, rowX, paxRows, mood: st.mood }; }
   return g;
 }
 
@@ -418,22 +421,26 @@ function cabinPeople(list: PaxSeat[], seatAt: any, zf: number, V: (x: number, y:
   const torso = mk(_people.torso, n), headM = mk(_people.head, n), hairM = mk(_people.hair, n), longM = mk(_people.long, n), arms = mk(_people.arm, n * 2), neck = mk(_people.neck, n), thighs = mk(_people.thigh, n * 2);
   const pets = ok.filter(p => p.pet && !p.pet.left && p.pet.where === 'cabin'), petB = mk(_people.petBody, pets.length), petH = mk(_people.petHead, pets.length), ears = mk(_people.ear, pets.length * 2);
   const M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), one = new T.Vector3(1, 1, 1), C = new T.Color();
-  const put = (m: any, pos: any, rot: number[], sc: any, col: any) => { E.set(rot[0], rot[1], rot[2]); Q.setFromEuler(E); M.compose(pos, Q, sc); m.setMatrixAt(m.count, M); m.setColorAt(m.count, col); m.count++; };
+  const put = (m: any, pos: any, rot: number[], sc: any, col: any) => { E.set(rot[0], rot[1], rot[2]); Q.setFromEuler(E); M.compose(pos, Q, sc); m.setMatrixAt(m.count, M); m.setColorAt(m.count, col); m.count++; return m.count - 1; };
+  // who is where: for tapping a passenger, and for turning their head when the crew talks to them
+  const who: any[] = []; g.userData.who = who; g.userData.meshes = { torso, head: headM, hair: hairM };
   for (const p of ok) {
     const at = seatAt[p.seat], L = p.look || {}, kid = p.age < 12 ? 0.72 : p.age < 16 ? 0.88 : 1, fem = p.sex === 'f' ? 0.93 : 1, sc = kid * fem;
     const skin = new T.Color(SKIN_TONES[L.skin == null ? 2 : L.skin] || '#D9A07A'), hairC = new T.Color(HAIR_COLORS[L.hairColor == null ? 1 : L.hairColor] || '#3A2A1E');
     const cloth = new T.Color(UNIFORM_COLORS[L.uniform || 0] || '#2F5D8C').lerp(new T.Color(cloudHash(p.key.length * 7, p.age, 3) < 0.5 ? 0xD8D2C4 : 0x5E6A78), 0.25 + cloudHash(p.key.length, p.age, 9) * 0.4);
     const seatZ = zf + 0.5, lean = -0.17;   // leaning back into the seat
-    const bx = at.x + 0.12, y = at.y;
+    const bx = at.x - 0.045 * (at.prem ? 1.25 : 1), y = at.y;   // the back and head just in front of the seat back and headrest, never through them
     put(torso, V(bx, y, seatZ), [0, 0, lean], new T.Vector3(sc * (p.sex === 'f' ? 0.92 : 1), sc, sc), cloth);
     const shoulderZ = seatZ + 0.56 * sc, headX = bx + Math.sin(-lean) * 0.6 * sc;
     put(neck, V(headX, y, shoulderZ + 0.05 * sc), [0, 0, lean], new T.Vector3(sc, sc, sc), skin);
     const hp = V(headX - 0.01, y, shoulderZ + 0.16 * sc);
-    put(headM, hp, [0, 0, lean * 0.5], new T.Vector3(sc, sc, sc), skin);
+    const hi = put(headM, hp, [0, 0, lean * 0.5], new T.Vector3(sc, sc, sc), skin); let ri = -1;
+    who.push({ p, hi, head: hp.clone(), sc, lean, seatY: at.y });
     if (L.hair !== 'bald' && L.hair !== 'buzz') {
-      put(hairM, V(headX + 0.012, y, shoulderZ + 0.175 * sc), [0, 0, lean * 0.5 - 0.25], new T.Vector3(sc * (L.hair === 'afro' ? 1.25 : 1), sc * (L.hair === 'afro' ? 1.2 : 1), sc * (L.hair === 'afro' ? 1.25 : 1)), hairC);
+      ri = put(hairM, V(headX + 0.012, y, shoulderZ + 0.175 * sc), [0, 0, lean * 0.5 - 0.25], new T.Vector3(sc * (L.hair === 'afro' ? 1.25 : 1), sc * (L.hair === 'afro' ? 1.2 : 1), sc * (L.hair === 'afro' ? 1.25 : 1)), hairC);
       if (/long|wavy|braids|ponytail|curly/.test(L.hair || '') && p.sex === 'f') put(longM, V(headX + 0.05, y, shoulderZ + 0.04 * sc), [0, 0, lean], new T.Vector3(sc, sc, sc), hairC);
-    } else if (L.hair === 'buzz') put(hairM, V(headX + 0.012, y, shoulderZ + 0.17 * sc), [0, 0, lean * 0.5 - 0.25], new T.Vector3(sc * 0.97, sc * 0.97, sc * 0.97), C.copy(hairC).lerp(skin, 0.4));
+    } else if (L.hair === 'buzz') ri = put(hairM, V(headX + 0.012, y, shoulderZ + 0.17 * sc), [0, 0, lean * 0.5 - 0.25], new T.Vector3(sc * 0.97, sc * 0.97, sc * 0.97), C.copy(hairC).lerp(skin, 0.4));
+    who[who.length - 1].ri = ri;
     for (const sd of [-1, 1]) {
       put(arms, V(bx - 0.06, y + sd * 0.2 * sc, seatZ + 0.3 * sc), [sd * 0.08, 0, -0.5], new T.Vector3(sc, sc, sc), cloth);
       put(thighs, V(at.x - 0.12, y + sd * 0.09 * sc, seatZ + 0.03), [0, 0, Math.PI / 2], new T.Vector3(sc, sc, sc), C.set(0x2E3540));
@@ -472,10 +479,22 @@ function v3dCabinFwdCam(P: any) {
   if (V3d.cam.fov !== 70 || V3d.cam.near > 0.03) { V3d.cam.fov = 70; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
   // light: the cabin's own lights (warmer at night, a touch brighter by day with the windows' light)
   const night = (V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0, amb = (V3dSky as any).amb || 1;
-  CabinLight.self.value = 0.7 + 0.08 * night; CabinLight.warm.value.setRGB(1, 0.99 - 0.07 * night, 0.98 - 0.16 * night);
+  // at night the cabin is dimmed, as airlines do: a low glow of mood lighting along the ceiling and above the
+  // windows, and here and there a passenger's reading light
+  const dim = night * 0.86;
+  CabinLight.self.value = 0.7 * (1 - dim) + 0.07 * dim;
+  const md = new T.Color(G.userData.crewAt ? G.userData.crewAt.mood : 0xBFD8FF);
+  CabinLight.warm.value.setRGB(1 - dim * (1 - md.r * 0.75), 0.99 - dim * (1 - md.g * 0.7), 0.98 - dim * (1 - md.b * 0.95));
+  for (const gm of G.userData.glows || []) gm.color.setRGB(1, 1, 1).lerp(md.clone().multiplyScalar(0.55), dim);
+  if (Math.abs((G.userData.nightWas == null ? -1 : G.userData.nightWas) - dim) > 0.05) {
+    G.userData.nightWas = dim;
+    for (const rl of G.userData.rls || []) { const first = !rl.instanceColor; for (let i = 0; i < rl.count; i++) { const on = cloudHash(i, rl.count, 77) < 0.14 || dim < 0.3; rl.setColorAt(i, new T.Color(on ? 0xFFF1D6 : 0x3A3E46)); } if (rl.instanceColor) rl.instanceColor.needsUpdate = true; if (first) rl.material.needsUpdate = true; }
+  }
+  try { cabinCrewStep(P, G, night); } catch (e) { /* the crew stays where it is */ }
   if (G.userData.wins) { const k = Math.max(0.08, Math.min(1, amb)); G.userData.wins.material.color.setRGB(k * (1 - 0.6 * night), k * (1 - 0.5 * night), k); }
 }
 function v3dCabinFwdLeave(P: any) {
+  try { cabinCrewFree(); } catch (e) { /* none */ }
   cabinFree(V3dCabinF.grp); V3dCabinF.grp = null; V3dCabinF.key = ''; cabinSharp(false);
   const body = P && P.model && P.model.userData.body;
   if (body) for (const c of body.children) if ((c.userData as any).hiddenForCabin) { c.visible = true; (c.userData as any).hiddenForCabin = false; }
