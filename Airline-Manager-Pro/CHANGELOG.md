@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.55 (2026-11-01)
+
+- view3d: the previous airport's clean-up skips multi-material meshes (the facade materials are shared), so the rebuild with the full layout completes; each building built in its own try
+
 ## 0.9.54 (2026-11-01)
 
 - office3d: the seat-now fallback fires only when the visitor makes no progress for 4 s (instead of after 9 s)
