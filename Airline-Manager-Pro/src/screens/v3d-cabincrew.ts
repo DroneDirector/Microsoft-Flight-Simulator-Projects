@@ -43,7 +43,7 @@ function cabinCrewEnsure(P: any, G: any): boolean {
   const co = company(), accent = co.color || '#2C8CFF', style = av3Style(), q = cabinQ() >= 2 ? 1 : 0.6;
   C.light = new T.HemisphereLight(0xFFFFFF, 0x6E747C, 1.0); g.add(C.light);
   // the seats: front left and right (facing the cabin), back left and right (facing forward)
-  const fx = at.x0 + 0.45, bx = at.x1 - 0.12;
+  const fx = at.x0 + 0.45, bx = at.x1 - 0.4;   // the back seats' backrests stay inside the rear wall
   C.seats = [[fx, -0.34, 1], [fx, 0.34, 1], [bx, -0.34, -1], [bx, 0.34, -1]];
   const seatMat = cabinMat(0x3A3E46, { map: cabinLeatherTex() });
   for (const s of C.seats) {

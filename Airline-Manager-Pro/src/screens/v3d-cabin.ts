@@ -251,6 +251,10 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   if (!V3dCabinF.curtTex) V3dCabinF.curtTex = cabinCanvas(128, 32, (gg, img, d) => { for (let y = 0; y < 32; y++) for (let x2 = 0; x2 < 128; x2++) { const v = 200 + 34 * Math.sin(x2 / 128 * Math.PI * 2 * 9) + 6 * (cloudHash(x2, y, 91) - 0.5), i = (y * 128 + x2) * 4; d[i] = v * 0.98; d[i + 1] = v * 0.94; d[i + 2] = v * 0.86; d[i + 3] = 255; } gg.putImageData(img, 0, 0); });
   const door = new T.Mesh(new T.PlaneGeometry(1.0, 1.95), cabinMat(0xFFFFFF, { map: V3dCabinF.curtTex })); door.position.copy(V(x0 + 0.05, 0, zf + 0.98)); door.rotation.y = Math.PI / 2; g.add(door);   // the galley curtain
   const exitSign = new T.Mesh(new T.BoxGeometry(0.02, 0.1, 0.32), new T.MeshBasicMaterial({ color: 0x18E070 })); exitSign.material.userData.noDim = true; exitSign.position.copy(V(x0 + 0.05, 0, zf + 2.05)); g.add(exitSign);
+  // the back of the cabin is closed the same way: a wall with the rear galley's curtain and an exit sign
+  const aftWall = new T.Mesh(new T.CircleGeometry(ri, cabinQv([24, 40, 64, 96])), mat(0xE2E4E6, 0.8)); aftWall.position.copy(V(x1 - 0.01, 0, zc)); aftWall.rotation.y = -Math.PI / 2; g.add(aftWall);
+  const door2 = new T.Mesh(new T.PlaneGeometry(1.0, 1.95), cabinMat(0xFFFFFF, { map: V3dCabinF.curtTex })); door2.position.copy(V(x1 - 0.05, 0, zf + 0.98)); door2.rotation.y = -Math.PI / 2; g.add(door2);
+  const exit2 = new T.Mesh(new T.BoxGeometry(0.02, 0.1, 0.32), new T.MeshBasicMaterial({ color: 0x18E070 })); exit2.material.userData.noDim = true; exit2.position.copy(V(x1 - 0.05, 0, zf + 2.05)); g.add(exit2);
   // the overhead bins on both sides, with their light strip
   const M0 = new T.Matrix4(), lam2 = (c: number) => cabinMat(c);
   const binH = st.bin === 'small' ? 0.3 : 0.42, binD = st.bin === 'small' ? 0.42 : 0.6, mBin = cabinMat(0xF6F7F8, { map: cabinSatinTex() });
