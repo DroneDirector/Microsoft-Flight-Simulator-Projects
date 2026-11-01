@@ -455,7 +455,7 @@ function v3dLoop(now: number) {
     if (!P) {
       const a = plane(g.reg), c: any = a ? company(a.companyId) : (g as any).tfc ? { color: (g as any).tfc.color, color2: (g as any).tfc.color2, id: (g as any).tfc.airline } : company();
       // the model is built from its nose; a pivot in its middle places and turns it
-      const body = buildAircraftModel(typeId, liveryFor(c.color, c.color2, c.id)), model = new T.Group();
+      const tc: any = (g as any).tfc, body = buildAircraftModel(typeId, tc && tc.dcode ? realLivery(tc.dcode, tc.color) : liveryFor(c.color, c.color2, c.id)), model = new T.Group();
       body.position.x = -shapeOf(typeId).L / 2; model.add(body); model.userData.body = body;
       body.traverse((o: any) => { o.renderOrder = 10; });   // after the airport's ground paint
       try { v3dPlaneLightsAdd(body, typeId); } catch (e) { /* no lights */ }
