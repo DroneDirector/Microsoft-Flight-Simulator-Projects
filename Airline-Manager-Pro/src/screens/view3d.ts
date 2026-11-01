@@ -115,6 +115,7 @@ function v3dClose() {
   V3d.open = false; cancelAnimationFrame(V3d.raf); document.body.classList.remove('v3d-on');
   try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ }
   v3dCrashGuard(false);
+  try { V3dCabin.grp = V3dCabinF.grp = null; V3dCabin.key = V3dCabinF.key = ''; (V3d as any).cabinFor = (V3d as any).cabinFwdFor = null; } catch (e) { /* none */ }
   removeEventListener('resize', v3dSize);
   try {
     V3d.scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); } });
