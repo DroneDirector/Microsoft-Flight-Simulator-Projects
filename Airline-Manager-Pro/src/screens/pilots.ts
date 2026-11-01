@@ -28,7 +28,7 @@ SCREENS.pilots = {
     const co: any = State.pilots.filter((p: any) => p.coPilotFor === c.id)[0];
     const myA = plane(State.myReg[c.id]);
     const cands = (State as any).staffCandidates.filter((x: any) => (_hireRole === 'all' || x.role === _hireRole) && (_hireRole !== 'ground' || _hireJob === 'all' || x.job === _hireJob));
-    const tabs = [['pilots', 'Pilots', crew.length + (co ? 1 : 0)], ['cabin', 'Cabin crew', fa.length], ['mech', 'Mechanics', mech.length], ['ground', 'Ground staff', ground.length], ['hire', 'Hire staff', (State as any).staffCandidates.length + State.candidates.length]];
+    const tabs = [['pilots', 'Pilots', crew.length + (co ? 1 : 0)], ['cabin', 'Cabin crew', fa.length], ['mech', 'Mechanics', mech.length], ['ground', 'Ground staff', ground.length], ['hire', 'Hire staff', (State as any).staffCandidates.length + State.candidates.length]].concat([['court', 'Court', ((State as any).cases || []).filter((x: any) => x.status === 'open' || x.appealing).length]] as any);
     let body = '';
     if (_pilotTab === 'pilots') body = `
       ${co ? `<div class="co-card">
@@ -56,6 +56,7 @@ SCREENS.pilots = {
     else if (_pilotTab === 'ground') body = `
       <p class="fine-print">${icon('info')}The people on the ramp: baggage handlers, push-back, fuel, catering and de-icing drivers, apron buses, stairs and ramp agents. They load every flight within the loadsheet's limits.</p>
       ${GROUND_JOBS.map(j => { const ps = ground.filter((p: any) => p.job === j[0]); return ps.length ? `<h4 class="grp-h">${esc(j[1])} · ${ps.length}</h4><div class="staff-grid">${ps.map((p, i) => staffCard(p, i)).join('')}</div>` : ''; }).join('') || emptyState('No ground staff yet', 'Hire baggage handlers, drivers and ramp agents under Hire staff.', 'Hire staff', 'pilot-hire')}`;
+    else if (_pilotTab === 'court') body = courtTabHtml();
     else body = `
       <div class="filter-row">${(coopOn() ? [['all', 'Everyone']] : [['all', 'Everyone'], ['captain', 'Captains'], ['fo', 'First officers']]).concat([['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['ground', 'Ground staff']]).map(r => `<button class="fchip ${_hireRole === r[0] ? 'on' : ''}" data-act="hire-role" data-r="${r[0]}">${r[1]}</button>`).join('')}</div>
       ${_hireRole === 'ground' ? `<div class="filter-row sub">${[['all', 'All jobs']].concat(GROUND_JOBS as any).map((r: any) => `<button class="fchip ${_hireJob === r[0] ? 'on' : ''}" data-act="hire-job" data-j="${r[0]}">${esc(r[1])}</button>`).join('')}</div>` : ''}
@@ -179,3 +180,14 @@ ACTIONS['tr-train'] = el => {
   if (State.live.some(f => f.pilotId === p.id)) { toast(`${p.name} is flying. The course starts after landing: try again then.`, 'warn'); return; }
   if (Ratings.train(p, id, retake)) { if (retake) delete p.failedType; Store.save(); Sound.payOut(); closeAll(); refresh(); toast(`${p.name} is on the ${acType(id).model} ${retake ? 'check ride' : 'course'}`, 'ok'); }
 };
+
+/* ---------- Crew → Court: the courtroom and every case ---------- */
+function courtTabHtml(): string {
+  const cases: any[] = ((State as any).cases || []).filter((c: any) => c.companyId === State.companyId).slice().sort((a: any, b: any) => ((b.status === 'open' || b.appealing) ? 1 : 0) - ((a.status === 'open' || a.appealing) ? 1 : 0) || b.opened - a.opened);
+  const live = cases.filter(c => c.hear && hearingWaiting(c) && !c.hear.standIn)[0], verdict = cases.filter(c => c.hear && c.hear.verdictReady && !c.hear.verdictSeen)[0];
+  const hub = apt(company().hub);
+  const status = live ? `Court is in session now: ${hearingWaiting(live).title.toLowerCase()}` : verdict ? 'The verdict is in: hear it read out in court' : 'No hearing today: the courtroom is empty. Walk in and look around.';
+  const role = (c: any) => c.role === 'airline' ? 'The airline' : c.role === 'pax' ? 'Passenger' : ROLE_NAMES[c.role === 'pilot' ? 'captain' : c.role] || 'Crew';
+  return `<div class="court-hero">${icon('shield')}<div><b>The District Court in ${esc(hub ? hub.city : 'town')}</b><small>${esc(status)}</small></div><button class="btn primary" data-act="court-enter">${live || verdict ? 'Go to court' : 'Enter the courtroom'}</button></div>
+    <div class="case-list">${cases.map(c => `<button class="case-row" data-act="court-open" data-id="${esc(c.id)}"><div><b>${esc(c.name)}: ${esc(c.offence)}</b><small>${esc(role(c))} · opened ${esc(atText(c.opened))}${c.sentence ? ' · ' + esc(c.sentence) : ''}</small></div>${statusChip(c.status === 'open' || c.appealing ? 'open' : c.status === 'guilty' ? 'guilty' : 'acquitted')}</button>`).join('') || emptyState('No court cases', 'Criminal cases against your staff, passengers or the airline show up here.')}</div>`;
+}

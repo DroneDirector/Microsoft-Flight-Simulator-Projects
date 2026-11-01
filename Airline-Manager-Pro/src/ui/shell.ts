@@ -240,6 +240,7 @@ function statusChip(s: string): string {
     ok: ['Normal', 'green'], hard: ['Hard landing', 'amber'], crash: ['Crash', 'red'], incident: ['Incident', 'amber'],
     open: ['Open', 'amber'], scheduled: ['Scheduled', 'cyan'], fixed: ['Fixed', 'green'],
     minor: ['Minor', 'dim'], major: ['Major', 'amber'], grounding: ['Grounding', 'red'], voided: ['Disregarded', 'dim'],
+    guilty: ['Guilty', 'red'], acquitted: ['Not guilty', 'green'],
   };
   const m = map[s] || [s, 'dim'];
   return `<span class="chip chip-${m[1]}">${esc(m[0])}</span>`;

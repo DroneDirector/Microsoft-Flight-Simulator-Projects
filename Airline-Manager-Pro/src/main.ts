@@ -58,6 +58,7 @@
   try { startBiz(); } catch (e) { /* ignore */ }
   });
   Link.init();
+  setTimeout(() => { try { alertsStart(); } catch (e) { /* no alerts */ } }, 2500);
   try { procPrefetchStart(); } catch (e) { /* procedures are fetched as needed */ }
   Updater.init();
   Backup.init();
