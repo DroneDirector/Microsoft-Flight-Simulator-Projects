@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.56 (2026-11-01)
+
+- v3d-cabinpax: boarding and deboarding (poses for standing, walking, sitting down and rising; aisle and galley queues; aisle-first and window-first orders; door fades; real-world rates); passenger figures get lower legs and a per-person fade (alpha hash)
+- cabin: placards under the bins after the real design; seat-back panel; dark headrests with the airline's colour; blue mood strips and wash; ceiling light lines; shades (none over the wing); aft wall with curtain and exit sign; seat view drag no longer inverted
+- turnaround: real-world deboarding and boarding times from the number of passengers
+- lights: taxi light as strong as the landing lights; taxi and landing lights off when standing still and at the gate
+- pc-bridge: windows found by the app's browser profile and closed gently, then for sure; the update ends other copies before starting the new one; stray windows closed at start
+
 ## 0.9.55 (2026-11-01)
 
 - view3d: the previous airport's clean-up skips multi-material meshes (the facade materials are shared), so the rebuild with the full layout completes; each building built in its own try
