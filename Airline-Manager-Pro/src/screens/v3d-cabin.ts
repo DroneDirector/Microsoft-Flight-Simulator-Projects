@@ -44,7 +44,7 @@ function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
   const rr = (w: number, h: number, rad: number) => { const p = new T.Path(); p.moveTo(-w / 2 + rad, -h / 2); p.lineTo(w / 2 - rad, -h / 2); p.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + rad); p.lineTo(w / 2, h / 2 - rad); p.quadraticCurveTo(w / 2, h / 2, w / 2 - rad, h / 2); p.lineTo(-w / 2 + rad, h / 2); p.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - rad); p.lineTo(-w / 2, -h / 2 + rad); p.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + rad, -h / 2); return p; };
   const shapeWith = (outer: any, hole: any) => { const sh = new T.Shape(outer.getPoints(12)); sh.holes.push(new T.Path(hole.getPoints(12))); return sh; };
   const mat = (c: number, rough: number, em?: number) => { const m = cabinMat(c, { side: T.DoubleSide }); if (em) { m.emissive = new T.Color(0xFFE2B8); m.emissiveIntensity = em; } void rough; return m; };
-  const mWall = mat(st.wall, 0.85), mBezel = mat(0xF3F1EC, 0.5), mReveal = mat(new T.Color(st.wall).multiplyScalar(0.94).getHex(), 0.9), mShade = mat(0xEDEAE3, 0.7), mBin = mat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), 0.6), mSeat = mat(st.seat, 0.95), mTrim = mat(st.trim, 0.45), mDark = mat(0x3A3D42, 0.8);
+  const mWall = cabinMat(st.wall, { side: T.DoubleSide, map: (() => { const t = cabinSatinTex().clone(); t.needsUpdate = true; t.repeat.set(3, 3); return t; })() }), mBezel = mat(0xF3F1EC, 0.5), mReveal = mat(new T.Color(st.wall).multiplyScalar(0.94).getHex(), 0.9), mShade = mat(0xEDEAE3, 0.7), mBin = cabinMat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), { side: T.DoubleSide, map: cabinSatinTex() }), mSeat = cabinMat(st.seat, { side: T.DoubleSide, map: cabinFabricTex() }), mTrim = mat(st.trim, 0.45), mDark = mat(0x3A3D42, 0.8);
   // the wall: a large panel with the window cut out, its frame going back through the wall's thickness
   const wall = new T.Mesh(new T.ExtrudeGeometry(shapeWith(rr(4.2, 2.6, 0.08), rr(ww + 0.12, wh + 0.15, r + 0.06)), { depth: 0.02, bevelEnabled: false }), mWall);
   wall.position.z = 0.02; g.add(wall);
@@ -82,7 +82,7 @@ function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
   const dado = new T.Mesh(new T.BoxGeometry(4.2, 0.5, 0.06), mWall); dado.position.set(0, -wh / 2 - 0.62, 0.06); dado.rotation.x = 0.15; g.add(dado);
   const arm = new T.Mesh(new T.BoxGeometry(0.62, 0.08, 0.1), mDark); arm.position.set(0.05, -wh / 2 - 0.3, 0.17); g.add(arm);
   const seatBack = new T.Mesh(new T.BoxGeometry(0.12, 0.95, 0.5), mSeat); void mShade; seatBack.position.set(-0.62, -wh / 2 - 0.12, 0.42); g.add(seatBack);
-  const head = new T.Mesh(new T.BoxGeometry(0.14, 0.24, 0.42), mat(st.head, 0.95)); head.position.set(-0.62, -wh / 2 + 0.38, 0.42); g.add(head);
+  const head = new T.Mesh(new T.BoxGeometry(0.14, 0.24, 0.42), cabinMat(st.head, { map: cabinLeatherTex() })); head.position.set(-0.62, -wh / 2 + 0.38, 0.42); g.add(head);
   // the next window along, on both sides (part of the row)
   for (const dx of [-1, 1]) {
     const pitch = Math.max(0.5, s.win.pitch || 0.53), bz = new T.Mesh(bezel.geometry, mBezel); bz.position.set(dx * pitch * 1.95, 0, 0.015); g.add(bz);
@@ -183,15 +183,16 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   const V = (x: number, y: number, z: number) => _av(x, y, z);
   const mat = (c: number, rough: number) => cabinMat(c); void 0;
   // the shell: side walls and ceiling (seen from inside), the floor with its aisle carpet, the front wall
-  const shell = new T.Mesh(new T.CylinderGeometry(ri, ri, len, 40, 1, true), mat(st.wall, 0.85)); shell.material.side = T.BackSide;
+  const shell = new T.Mesh(new T.CylinderGeometry(ri, ri, len, 64, 1, true), cabinMat(0xFFFFFF, { map: cabinShellTex(st.wall, len) })); shell.material.side = T.BackSide;
   shell.rotation.z = Math.PI / 2; shell.position.copy(V(x0 + len / 2, 0, zc)); g.add(shell);
-  const floor = new T.Mesh(new T.PlaneGeometry(len, ri * 1.9).rotateX(-Math.PI / 2), mat(0x3B4250, 0.95)); floor.position.copy(V(x0 + len / 2, 0, zf)); g.add(floor);
+  const carpet = cabinCarpetTex().clone(); carpet.needsUpdate = true; carpet.repeat.set(len / 0.6, ri * 1.9 / 0.6);
+  const floor = new T.Mesh(new T.PlaneGeometry(len, ri * 1.9).rotateX(-Math.PI / 2), cabinMat(0xFFFFFF, { map: carpet })); floor.position.copy(V(x0 + len / 2, 0, zf)); g.add(floor);
   const front = new T.Mesh(new T.CircleGeometry(ri, 40), mat(new T.Color(st.wall).multiplyScalar(0.97).getHex(), 0.8)); front.position.copy(V(x0 + 0.01, 0, zc)); front.rotation.y = Math.PI / 2; g.add(front);
   const door = new T.Mesh(new T.PlaneGeometry(0.8, 1.9), mat(st.trim, 0.6)); door.position.copy(V(x0 + 0.03, 0, zf + 0.95)); door.rotation.y = Math.PI / 2; g.add(door);
   const exitSign = new T.Mesh(new T.BoxGeometry(0.02, 0.1, 0.32), new T.MeshBasicMaterial({ color: 0x18E070 })); exitSign.material.userData.noDim = true; exitSign.position.copy(V(x0 + 0.05, 0, zf + 2.05)); g.add(exitSign);
   // the overhead bins on both sides, with their light strip
   const M0 = new T.Matrix4(), lam2 = (c: number) => cabinMat(c);
-  const binH = st.bin === 'small' ? 0.3 : 0.42, binD = st.bin === 'small' ? 0.42 : 0.6, mBin = mat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), 0.6);
+  const binH = st.bin === 'small' ? 0.3 : 0.42, binD = st.bin === 'small' ? 0.42 : 0.6, mBin = cabinMat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), { map: cabinSatinTex() });
   if (st.bin !== 'none') for (const side of [-1, 1]) {
     const sh = new T.Shape(); sh.moveTo(0, 0); sh.lineTo(binD, 0); if (st.bin === 'square') sh.lineTo(binD, binH); else sh.quadraticCurveTo(binD + 0.05, binH * 0.6, binD * 0.75, binH); sh.lineTo(0, binH); sh.lineTo(0, 0);
     const geo = new T.ExtrudeGeometry(sh, { depth: len, bevelEnabled: false });
@@ -203,15 +204,19 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     const strip = new T.Mesh(new T.BoxGeometry(len, 0.015, 0.03), new T.MeshBasicMaterial({ color: st.mood })); strip.material.userData.noDim = true;
     strip.position.copy(V(x0 + len / 2, side * (wallY - binD - 0.02), zb + binH + 0.02)); g.add(strip);
     // the bins' doors: a seam every 1.5 m, and the latch strip along the lower edge
-    const seams = new T.InstancedMesh(new T.BoxGeometry(0.012, binH * 0.92, 0.012), lam2(st.trim), Math.ceil(len / 1.5));
+    const seams = new T.InstancedMesh(new T.BoxGeometry(0.02, binH * 0.95, 0.02), lam2(0x6A7078), Math.ceil(len / 1.5));
     for (let i = 0; i < seams.count; i++) { M0.compose(V(x0 + 0.75 + i * 1.5, side * (wallY - binD - 0.01), zb + binH * 0.5), new T.Quaternion(), new T.Vector3(1, 1, 1)); seams.setMatrixAt(i, M0); }
     g.add(seams);
     const latch = new T.Mesh(new T.BoxGeometry(len, 0.03, 0.03), lam2(st.trim)); latch.position.copy(V(x0 + len / 2, side * (wallY - binD + 0.01), zb + 0.04)); g.add(latch);
+    // a handle recess in the middle of each door
+    const handles = new T.InstancedMesh(new T.BoxGeometry(0.22, 0.035, 0.03), lam2(0x50565E), Math.ceil(len / 1.5));
+    for (let i = 0; i < handles.count; i++) { M0.compose(V(x0 + 1.5 + i * 1.5, side * (wallY - binD - 0.012), zb + binH * 0.22), new T.Quaternion(), new T.Vector3(1, 1, 1)); handles.setMatrixAt(i, M0); }
+    g.add(handles);
   }
   // the windows along both walls
   const pitch = Math.max(0.45, s.win.pitch || 0.53), nW = Math.floor((s.win.to - s.win.from) / pitch), zW = zf + 0.95;
   if (!V3dCabinF.winTex) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 96; const x = cv.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 64, 96); x.fillStyle = '#fff'; x.beginPath(); (x as any).roundRect ? (x as any).roundRect(4, 4, 56, 88, 24) : x.rect(4, 4, 56, 88); x.fill(); V3dCabinF.winTex = new T.CanvasTexture(cv); }
-  const winGeo = new T.PlaneGeometry(st.ww * 1.25, st.wh * 1.2), winMat = new T.MeshBasicMaterial({ color: 0xBFD6EE, alphaMap: V3dCabinF.winTex, transparent: true, fog: false }); winMat.userData.noDim = true;
+  const winGeo = new T.PlaneGeometry(st.ww * 1.25, st.wh * 1.2), winMat = new T.MeshBasicMaterial({ color: 0xFFFFFF, map: cabinSkyTex(), alphaMap: V3dCabinF.winTex, transparent: true, fog: false }); winMat.userData.noDim = true;
   const wins = new T.InstancedMesh(winGeo, winMat, nW * 2), M = new T.Matrix4(), Q = new T.Quaternion(), S = new T.Vector3(1, 1, 1);
   let wi = 0;
   for (let i = 0; i < nW; i++) for (const side of [-1, 1]) {
@@ -245,9 +250,9 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     V3dCabinF.headGeo = hg;
   }
   const lam = (c: number) => cabinMat(c);
-  const cush = new T.InstancedMesh(V3dCabinF.seatGeo, lam(0xFFFFFF), nSeats);
+  const cush = new T.InstancedMesh(V3dCabinF.seatGeo, cabinMat(0xFFFFFF, { map: cabinFabricTex() }), nSeats);
   const back = new T.InstancedMesh(new T.BoxGeometry(0.42, 0.05, 0.05), lam(0x2A2D33), nSeats * 2);   // armrests, along the seat
-  const head = new T.InstancedMesh(V3dCabinF.headGeo, lam(0xFFFFFF), nSeats);
+  const head = new T.InstancedMesh(V3dCabinF.headGeo, cabinMat(0xFFFFFF, { map: cabinLeatherTex() }), nSeats);
   let k = 0; const seatAt: { [k: string]: any } = {};
   for (let r = 1; r <= rows; r++) {
     const c = rowsCls[r], prem = c !== 'Y', n = prem ? Math.max(2, abreast - 2) : abreast;
@@ -264,6 +269,24 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     }
   }
   cush.count = head.count = k; back.count = k * 2;
+  // the back of every seat: the tray table and its latch, the pocket, and on long-haul cabins the screen
+  const longHaul = abreast >= 7 || /a350|b777|b787|b747/.test(s.cockpit);
+  const tray = new T.InstancedMesh(new T.BoxGeometry(0.014, 0.3, 0.36), cabinMat(0x9EA3AA, { map: cabinSatinTex() }), k);
+  const latch = new T.InstancedMesh(new T.BoxGeometry(0.02, 0.025, 0.05), cabinMat(0x3A3D42), k);
+  const pocket = new T.InstancedMesh(new T.BoxGeometry(0.02, 0.2, 0.38), cabinMat(0x2A2E35, { map: cabinFabricTex() }), k);
+  const scr = longHaul ? new T.InstancedMesh(new T.BoxGeometry(0.012, 0.15, 0.24), new T.MeshBasicMaterial({ color: 0x1D4E7A, fog: false }), k) : null;
+  if (scr) scr.material.userData.noDim = true;
+  let t2 = 0; const one = new T.Vector3(1, 1, 1), q0 = new T.Quaternion().setFromEuler(new T.Euler(0, 0, -0.07));
+  for (const key in seatAt) {
+    const a = seatAt[key], bx = a.x + (a.prem ? 0.5 : 0.405);
+    M.compose(V(bx, a.y, zf + (scr ? 0.72 : 0.82)), q0, one); tray.setMatrixAt(t2, M);
+    M.compose(V(bx + 0.006, a.y, zf + (scr ? 0.86 : 0.96)), q0, one); latch.setMatrixAt(t2, M);
+    M.compose(V(bx - 0.03, a.y, zf + 0.5), q0, one); pocket.setMatrixAt(t2, M);
+    if (scr) { M.compose(V(bx + 0.012, a.y, zf + 0.98), q0, one); scr.setMatrixAt(t2, M); }
+    t2++;
+  }
+  tray.count = latch.count = pocket.count = t2; if (scr) scr.count = t2;
+  g.add(tray, latch, pocket); if (scr) g.add(scr);
   g.add(cush, back, head);
   // the passengers
   if (cabinPeopleOn() && list.length) g.add(cabinPeople(list, seatAt, zf, V));
@@ -347,11 +370,116 @@ function v3dCabinFwdCam(P: any) {
   // light: the cabin's own lights (warmer at night, a touch brighter by day with the windows' light)
   const night = (V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0, amb = (V3dSky as any).amb || 1;
   CabinLight.self.value = 0.62 + 0.18 * night; CabinLight.warm.value.setRGB(1, 0.97 - 0.06 * night, 0.92 - 0.14 * night);
-  if (G.userData.wins) { const sky = night > 0.5 ? new T.Color(0x0B1220) : new T.Color(0xBFD6EE).multiplyScalar(Math.max(0.3, Math.min(1, amb))); G.userData.wins.material.color.copy(sky); }
+  if (G.userData.wins) { const k = Math.max(0.08, Math.min(1, amb)); G.userData.wins.material.color.setRGB(k * (1 - 0.6 * night), k * (1 - 0.5 * night), k); }
 }
 function v3dCabinFwdLeave(P: any) {
   if (V3dCabinF.grp) V3dCabinF.grp.visible = false;
   const body = P && P.model && P.model.userData.body;
   if (body) for (const c of body.children) if ((c.userData as any).hiddenForCabin) { c.visible = true; (c.userData as any).hiddenForCabin = false; }
   if ((V3d as any).nearWas) { V3d.cam.near = (V3d as any).nearWas; (V3d as any).nearWas = 0; V3d.cam.updateProjectionMatrix(); }
+}
+
+/* ---------- cabin materials ----------
+ * Real-looking surfaces, drawn by the app itself (no photos, no makers' or airlines' designs): woven seat
+ * fabric with seams and piping, leather headrest covers, airline carpet, sidewall laminate with panel joints
+ * and shading from the window belt down to the dark lower wall, a perforated ceiling with cove lighting,
+ * satin bin doors, and the sky in the windows. Made once and shared by every cabin. */
+const CabinTex: any = {};
+function cabinCanvas(w: number, h: number, draw: (g: CanvasRenderingContext2D, img: ImageData, d: Uint8ClampedArray) => void, repeat?: number[]): any {
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const g = cv.getContext('2d'), img = g.createImageData(w, h);
+  draw(g, img, img.data);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8; if (repeat) tex.repeat.set(repeat[0], repeat[1]);
+  return tex;
+}
+/** Smooth noise for the textures (cheap value noise, tiling). */
+function cabinNoise(x: number, y: number, p: number, seed: number): number {
+  const h = (i: number, j: number) => cloudHash(((i % p) + p) % p, ((j % p) + p) % p, seed);
+  const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const a = h(ix, iy), b = h(ix + 1, iy), c = h(ix, iy + 1), e = h(ix + 1, iy + 1);
+  return a + (b - a) * ux + (c - a) * uy + (a - b - c + e) * ux * uy;
+}
+/** Woven seat fabric: a fine twill with flecks of colour, slightly worn in the middle of the tile. White, so
+ *  the seat's own colour tints it (each class its own colour). */
+function cabinFabricTex(): any {
+  return CabinTex.fabric || (CabinTex.fabric = cabinCanvas(256, 256, (g, img, d) => {
+    for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+      const tw = ((x + y) % 4 < 2 ? 1 : 0.86) * ((x - y + 512) % 6 < 3 ? 1 : 0.95);   // twill: diagonal ribs
+      const fl = cloudHash(x, y, 77) > 0.985 ? 1.18 : cloudHash(x, y, 78) < 0.015 ? 0.78 : 1;   // flecks
+      const hz = 0.9 + 0.1 * cabinNoise(x / 32, y / 32, 8, 5) + 0.04 * cabinNoise(x / 6, y / 6, 43, 6);   // heather
+      const v = Math.min(255, 228 * tw * fl * hz), i = (y * 256 + x) * 4;
+      d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }, [3, 3]));
+}
+/** Leather for the headrest covers and armrests: fine pebbled grain. */
+function cabinLeatherTex(): any {
+  return CabinTex.leather || (CabinTex.leather = cabinCanvas(256, 256, (g, img, d) => {
+    for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+      const n = cabinNoise(x / 3.2, y / 3.2, 80, 9), n2 = cabinNoise(x / 14, y / 14, 18, 10);
+      const v = Math.min(255, 205 + 40 * Math.pow(n, 1.5) + 14 * n2), i = (y * 256 + x) * 4;
+      d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }, [4, 4]));
+}
+/** Airline carpet: a dense loop pile in blue-grey with a small woven pattern and darker wear down the aisle. */
+function cabinCarpetTex(): any {
+  return CabinTex.carpet || (CabinTex.carpet = cabinCanvas(256, 256, (g, img, d) => {
+    for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
+      const pile = 0.82 + 0.18 * cloudHash(x, y, 31) * cabinNoise(x / 2, y / 2, 128, 32);
+      const pat = ((Math.floor(x / 16) + Math.floor(y / 16)) % 2 ? 1 : 0.93) * (Math.abs(((x % 32) - 16)) + Math.abs(((y % 32) - 16)) < 3 ? 1.25 : 1);
+      const k = pile * pat, i = (y * 256 + x) * 4;
+      d[i] = 52 * k; d[i + 1] = 60 * k; d[i + 2] = 78 * k; d[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }, [6, 2]));
+}
+/** The cabin's walls and ceiling, all around the fuselage (u around it, v along it): the perforated ceiling
+ *  with its cove light, the bins' shadow, the laminate sidewall with panel joints, the darker lower wall. */
+function cabinShellTex(wall: number, len: number): any {
+  const key = 'shell' + wall; if (CabinTex[key]) { CabinTex[key].repeat.set(1, len / 2.2); return CabinTex[key]; }
+  const base = new THREE.Color(wall);
+  return (CabinTex[key] = cabinCanvas(1024, 256, (g, img, d) => {
+    for (let y = 0; y < 256; y++) for (let x = 0; x < 1024; x++) {
+      const th = x / 1024 * Math.PI * 2, h = (Math.sin(th) + 1) / 2;   // 0 at the floor, 1 at the top of the ceiling
+      let k = 1, tint = [1, 1, 1];
+      if (h > 0.84) {   // ceiling: off-white, a field of tiny perforations, brighter towards the middle
+        k = 1.02 + 0.05 * (h - 0.84) / 0.16; if ((x % 6 === 0) && (y % 6 === 0)) k *= 0.88;
+      } else if (h > 0.78) {   // the cove: light washing up from behind the bins
+        k = 1.12 - (0.84 - h) * 2; tint = [1.02, 1.01, 0.98];
+      } else if (h > 0.70) {   // under the bins: in their shadow
+        k = 0.8;
+      } else if (h > 0.4) {   // sidewall laminate: fine speckle, a soft vertical gradient, panel joints every 1.1 m
+        k = 0.95 + 0.04 * (h - 0.4) / 0.3 + 0.025 * (cloudHash(x, y, 51) - 0.5) + 0.015 * cabinNoise(x / 9, y / 9, 114, 52);
+        if (y % 128 < 2) k *= 0.82; else if (y % 128 < 4) k *= 1.04;   // the joint and its lit edge
+      } else if (h > 0.22) {   // the lower wall (dado): darker, a slight texture
+        k = 0.62 + 0.02 * (cloudHash(x, y, 53) - 0.5); tint = [0.96, 0.96, 0.98];
+        if (Math.abs(h - 0.4) < 0.006) k = 0.5;   // the trim line between them
+      } else k = 0.4;
+      const i = (y * 1024 + x) * 4;
+      d[i] = Math.min(255, base.r * 255 * k * tint[0]); d[i + 1] = Math.min(255, base.g * 255 * k * tint[1]); d[i + 2] = Math.min(255, base.b * 255 * k * tint[2]); d[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }, [1, len / 2.2]));
+}
+/** Satin plastic for bins and trim: smooth, with the faintest mottling. */
+function cabinSatinTex(): any {
+  return CabinTex.satin || (CabinTex.satin = cabinCanvas(128, 128, (g, img, d) => {
+    for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+      const v = 238 + 10 * cabinNoise(x / 10, y / 10, 13, 61) + 4 * (cloudHash(x, y, 62) - 0.5), i = (y * 128 + x) * 4;
+      d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }, [2, 2]));
+}
+/** The sky as seen through a cabin window: a gradient with soft clouds (by day), a dark blue night. */
+function cabinSkyTex(): any {
+  return CabinTex.sky || (CabinTex.sky = cabinCanvas(64, 96, (g) => {
+    const gr = g.createLinearGradient(0, 0, 0, 96); gr.addColorStop(0, '#6E9FD6'); gr.addColorStop(0.55, '#B9D3EE'); gr.addColorStop(0.62, '#E8EEF4'); gr.addColorStop(1, '#8D9AA8');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 96);
+    for (let i = 0; i < 9; i++) { const x = Math.random() * 64, y = 48 + Math.random() * 18, r = 6 + Math.random() * 10, c = g.createRadialGradient(x, y, 0, x, y, r); c.addColorStop(0, 'rgba(255,255,255,.75)'); c.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = c; g.fillRect(0, 0, 64, 96); }
+  }));
 }
