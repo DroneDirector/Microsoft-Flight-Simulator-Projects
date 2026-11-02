@@ -66,6 +66,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-info"></div>
     <div class="v3d-line"></div>
     <div class="v3d-status"></div>
+    <button class="v3d-uitog" data-act="v3d-ui" aria-label="Hide or show the controls" title="Hide or show the controls (H)">${icon('focus')}<span>Hide controls</span></button>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
     <div class="v3d-free-ui">
       <div class="fc-stick" data-fc="stick"><i></i><small>Move</small></div>
@@ -141,8 +142,22 @@ ACTIONS['v3d-close'] = () => {
     { pct: 85, step: free ? 'Loading the Overview…' : 'Loading the map…', run: () => { if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } else { try { refresh(); } catch (e) { /* ignore */ } } } },
   ]);
 };
+/** Walking and the free camera: the controls can be hidden for a clean view (the button, H, or R3 on a controller). */
+function v3dUi(show?: boolean) {
+  const r = V3d.root; if (!r) return;
+  const on = show == null ? r.classList.contains('ui-off') : show;
+  r.classList.toggle('ui-off', !on);
+  const b = r.querySelector('.v3d-uitog span'); if (b) b.textContent = on ? 'Hide controls' : 'Show controls';
+}
+ACTIONS['v3d-ui'] = () => { Sound.tick(); v3dUi(); };
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (!V3d.open || !/^(walk|free)$/.test(V3d.mode) || e.key.toLowerCase() !== 'h' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target as HTMLElement; if (t && t.closest && t.closest('input, textarea, [contenteditable]')) return;
+  e.preventDefault(); v3dUi();
+});
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
+  if (V3d.root) { V3d.root.setAttribute('data-m', V3d.mode); if (!/^(walk|free)$/.test(V3d.mode)) v3dUi(true); }
   if (/^(tower|fwd|cabin|winL|winR)$/.test(V3d.mode)) { V3d.yaw = 0; V3d.pitch = 0; }   // these start looking the natural way
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
@@ -537,6 +552,7 @@ function v3dLoop(now: number) {
   if (document.hidden || now - V3d.last < 1000 / (gameBoost() ? 60 : V3D_FPS) - 2) return;
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
   V3d.frames = (V3d.frames || 0) + 1;   // counted for the Game Booster's frame-rate chart
+  if (V3d.root && V3d.root.getAttribute('data-m') !== V3d.mode) { V3d.root.setAttribute('data-m', V3d.mode); if (!/^(walk|free)$/.test(V3d.mode)) v3dUi(true); }
   const T = THREE, VK: any = V3d;
   let f: any = v3dAptOnly() || v3dTargetFlight();
   // the flight has ended: the aircraft stays where it parked and every camera, drag and the controller still work

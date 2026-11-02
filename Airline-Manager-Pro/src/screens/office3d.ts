@@ -392,6 +392,7 @@ function ofOpen2(root: HTMLElement, q: number) {
     if (!R.on) return; const k = e.key.toLowerCase();
     if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); ofPlannerClose(); } return; }   // the planner has the keys (typing)
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; ofLeave(); return; }   // the first Esc only gives the mouse back
+    if (k === 'h' && !R.seat) { e.preventDefault(); R.root.classList.toggle('ui-off'); return; }   // walking: hide or show the controls
     if (/^(w|a|s|d|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
   };
   R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; };
@@ -689,7 +690,7 @@ function ofVisitUi(afterInterview?: boolean) {
   const nRep = ofOpenReports().length;
   sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['planner', 'Flight planner'], ['schedule', 'Schedule'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
   pad.hidden = R.seat;
-  if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · the mouse looks around, all the way round · click what glows · Esc for the menu' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
+  if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · the mouse looks around, all the way round · click what glows · H hides the controls · Esc for the menu' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
   else hint.hidden = true;
   ofFit();
 }

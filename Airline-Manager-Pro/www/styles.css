@@ -3121,3 +3121,14 @@ body.of-over .toast, body.of-over .toasts { z-index: 990; }
 .walk-dot { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 0 0 1.5px rgba(0,0,0,.35), 0 0 10px rgba(111,227,245,.8); pointer-events: none; z-index: 6; opacity: 0; transition: opacity .3s; }
 body.aim-locked .walk-dot { opacity: 1; }
 body.aim-locked .office3d .of-aim { font-size: 22px; }
+
+/* walking and the free camera: the controls can be hidden (the button, H, or R3) */
+.v3d .v3d-uitog { display: none; position: absolute; right: 16px; bottom: 92px; z-index: 8; align-items: center; gap: 7px; padding: 8px 13px; border-radius: 99px; border: 1px solid rgba(255,255,255,.18); background: rgba(10,22,38,.62); color: #EAF2FA; font: 600 12.5px Inter, sans-serif; backdrop-filter: blur(8px); cursor: pointer; transition: opacity .3s, background .2s; }
+.v3d .v3d-uitog svg { width: 16px; height: 16px; }
+.v3d[data-m="walk"] .v3d-uitog, .v3d[data-m="free"] .v3d-uitog { display: inline-flex; }
+.v3d.ui-off > *:not(canvas):not(.v3d-uitog):not(.walk-dot):not(.walk-pad):not(.v3d-free-ui) { opacity: 0 !important; pointer-events: none !important; transition: opacity .35s; }
+.v3d.ui-off .v3d-free-ui > *:not(.fc-stick):not(.fc-ud) { opacity: 0 !important; pointer-events: none !important; }
+.v3d.v3d-pc.ui-off .walk-pad, .v3d.v3d-pc.ui-off .v3d-free-ui { opacity: 0 !important; pointer-events: none !important; }
+.v3d.ui-off .v3d-uitog { opacity: .35; } .v3d.ui-off .v3d-uitog:hover { opacity: 1; }
+
+.court3d.ui-off .ct-top, .court3d.ui-off .ct-leave, .court3d.ui-off .ct-spots, .court3d.ui-off .ct-hint, .court3d.ui-off .ct-box { opacity: 0 !important; pointer-events: none !important; transition: opacity .35s; }

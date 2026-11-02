@@ -142,6 +142,7 @@ function padLoop() {
       if (hit(4) || hit(5)) { const b = document.createElement('b'); b.setAttribute('data-d', hit(4) ? '-1' : '1'); try { ACTIONS['v3d-next'](b, null); } catch (e) { /* none */ } }
       if (hit(2)) { const ms = Array.from(V3d.root.querySelectorAll('.v3d-modes [data-m]')) as HTMLElement[], i = ms.findIndex(m => m.getAttribute('data-m') === V3d.mode); if (ms.length) { try { ACTIONS['v3d-mode'](ms[(i + 1) % ms.length], null); } catch (e) { /* none */ } } }
       if (hit(3)) { padCursor(!Pad.shown); }   // the 3D view's own buttons, with the cursor
+      if (hit(11) && /^(walk|free)$/.test(V3d.mode)) { try { v3dUi(); } catch (e) { /* none */ } }   // R3: hide or show the controls
     } else if (of || ct) {
       const R: any = op ? OpsRoom : of ? OfficeRoom : CourtRoom;
       if (R.stick) R.stick = [lx, -ly];
