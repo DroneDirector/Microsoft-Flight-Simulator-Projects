@@ -24,10 +24,14 @@ export function writeLog(line: string) {
   try { fs.appendFileSync(logPath, `${new Date().toISOString().replace('T', ' ').slice(0, 19)}  ${line}\n`); } catch (e) { /* disk full or read-only */ }
 }
 
+/** A program with a window of its own (no console) shows a stopping error its own way. */
+export const FatalHook: { show: ((title: string, detail: string, log: string) => void) | null } = { show: null };
+
 /** Shows the error, saves it to the log and keeps the window open until Enter is pressed. */
 export function fatal(title: string, err?: any): never {
   const detail = err ? (err.stack || err.message || String(err)) : '';
   writeLog(`ERROR ${title}${detail ? '\n' + detail : ''}`);
+  if (FatalHook.show) { try { FatalHook.show(title, detail, logPath); } catch (e) { process.exit(1); } return undefined as never; }
   const out = [
     '',
     '  AIRLINE MANAGER PRO  ·  PC app ' + VERSION,

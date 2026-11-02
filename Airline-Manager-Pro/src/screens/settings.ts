@@ -108,7 +108,8 @@ const SETTINGS: SetSection[] = [
       return `<div class="set-card link ${on ? 'ok' : ''}"><span class="pc-ic">${icon('pc')}</span><span><b>${on ? 'Connected to your PC' : pc ? 'Not connected' : 'No PC linked'}</b><small>${sub}</small></span><button class="btn ${pc ? 'ghost' : 'primary'} sm" data-act="link-panel">${pc ? 'Details' : 'Link a PC'}</button></div>`
         + (pc ? `<div class="btn-row"><button class="btn ghost sm" data-act="link-forget">${icon('close')}Unpair ${esc(pc.name)}</button></div>` : '');
     } },
-    { type: 'html', html: () => `<p class="fine-print">${icon('info')}The app links to the ${esc(APP.shortName)} PC app over your local network: put the phone and the PC with Flight Simulator on the same Wi-Fi, or connect the PC to your phone's hotspot to use mobile data.</p>` },
+    { type: 'html', html: () => DESKTOP ? pcPhoneLinkHtml() : '' },
+    { type: 'html', html: () => DESKTOP ? '' : `<p class="fine-print">${icon('info')}The app links to the ${esc(APP.shortName)} PC app over your local network: put the phone and the PC with Flight Simulator on the same Wi-Fi, or connect the PC to your phone's hotspot to use mobile data.</p>` },
     { type: 'toggle', key: 'gsx', label: 'I use GSX Pro', hint: 'Boarded passengers and the ground services you actually use in GSX (boarding, deboarding, catering, fuelling, pushback, de-icing) are taken from GSX and charged at real-world ground handling rates in Finance. Off, or without GSX: the app’s own passenger numbers and a standard handling and catering charge per flight.' },
   ] },
   { id: 'cloud', title: 'Sync', icon: 'share', items: [{ type: 'html', html: () => syncSettingsHtml() }] },
@@ -360,6 +361,18 @@ ACTIONS.settings = el => {
   closeAll(); Sound.tick();
   openLayer('modal', settingsHtml(), { cls: 'full settings-pop' });
 };
+/** On the PC: the code and address your phone links with (the PC app's own window shows them here). */
+let _pcLink: { code?: string; name?: string; addresses?: string[]; phones?: number; at: number } = { at: 0 };
+function pcPhoneLinkHtml(): string {
+  if (Date.now() - _pcLink.at > 4000) {
+    _pcLink.at = Date.now();
+    fetch('/api/link-info').then(r => r.json()).then(j => { const was = JSON.stringify([_pcLink.code, _pcLink.phones, _pcLink.addresses]); Object.assign(_pcLink, j, { at: Date.now() }); if (was !== JSON.stringify([j.code, j.phones, j.addresses]) && $('#set-body')) rerenderSettingsBody(); }).catch(() => { /* older PC app */ });
+  }
+  const c = String(_pcLink.code || ''), ips = (_pcLink.addresses || []).join(', '), n = _pcLink.phones || 0;
+  if (!c) return '';
+  return `<div class="set-card link ${n ? 'ok' : ''}"><span class="pc-ic">${icon('wifi')}</span><span><b>${n ? `${n} phone${n > 1 ? 's' : ''} linked` : 'Link your phone too'}</b><small>In the app on your phone: the link button at the top, pick ${esc(_pcLink.name || 'this PC')}${ips ? ` (${esc(ips)})` : ''} and enter this code. Phone and PC on the same Wi-Fi, or this PC on your phone's hotspot.</small></span><b class="pc-code">${esc(c.slice(0, 3))} ${esc(c.slice(3))}</b></div>`;
+}
+
 function rerenderSettingsBody(anim?: boolean) {
   const b = $('#set-body'); if (!b) return;
   if (anim) b.innerHTML = settingsBody(); else patchHtml(b, settingsBody());   // updates in place don't flash

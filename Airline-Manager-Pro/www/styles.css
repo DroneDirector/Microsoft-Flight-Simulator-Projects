@@ -994,6 +994,7 @@ input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: 0; bord
 .set-card b { display: block; font-size: 14px; }
 .set-card.col { flex-direction: column; align-items: stretch; gap: 8px; }
 .set-card.link.ok .pc-ic { color: var(--green); }
+.set-card .pc-code { font: 700 22px/1 ui-monospace, 'Cascadia Mono', monospace; letter-spacing: 3px; color: var(--cyan); white-space: nowrap; display: inline; }
 .pc-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--panel-3); color: var(--cyan); }
 .brand-lg { width: 46px; height: 46px; color: var(--cyan); }
 .brand-lg svg { width: 100%; height: 100%; }

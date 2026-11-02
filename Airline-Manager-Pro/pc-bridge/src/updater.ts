@@ -35,7 +35,7 @@ export const PcUpdate = {
       const src = path.join(out, 'Airline Manager Pro PC');
       if (!fs.existsSync(path.join(src, 'AirlineManagerPro-PC.exe'))) throw new Error('The download didn\'t contain the PC app.');
       const dst = path.dirname(process.execPath), exe = path.join(dst, path.basename(process.execPath));
-      const args = process.argv.slice(2).map(a => '"' + a.replace(/"/g, '') + '"').join(' ');
+      const args = process.argv.slice(process.versions.electron ? 1 : 2).map(a => '"' + a.replace(/"/g, '') + '"').join(' ');
       // wait for this PC app to close, copy the new version over it, start it again, tidy up
       const prof = String(profile || '').replace(/'/g, "''"), exeName = path.basename(process.execPath);
       const cmd = [

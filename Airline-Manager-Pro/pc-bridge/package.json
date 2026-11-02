@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "electron": "44.9.0",
     "esbuild": "^0.24.0",
     "postject": "^1.0.0-alpha.6",
     "rcedit": "^4.0.0",
