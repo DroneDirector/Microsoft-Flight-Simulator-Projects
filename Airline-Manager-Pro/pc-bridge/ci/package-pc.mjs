@@ -1,7 +1,11 @@
 // Packages the PC app for Windows: one .exe (Node single executable) plus node-simconnect
 // as its own unmodified library folder next to it (LGPL-3.0: replaceable by the user).
+// Then the Setup program: the whole app folder packed inside one more single executable with its own window
+// (src/setup), the app's compass-star icon on both .exe files and on the shortcuts Setup makes.
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, existsSync, cpSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, existsSync, cpSync, readdirSync, statSync } from 'node:fs';
+import { deflateRawSync } from 'node:zlib';
+import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,9 +21,23 @@ mkdirSync(pkg, { recursive: true });
 run('npx esbuild dist/cli.js --bundle --platform=node --format=cjs --target=node22 --external:node-simconnect --outfile=build/amp-pc.js');
 writeFileSync(join(out, 'sea.json'), JSON.stringify({ main: 'build/amp-pc.js', output: 'build/sea.blob', disableExperimentalSEAWarning: true }));
 run('node --experimental-sea-config build/sea.json');
-const exe = join(pkg, 'AirlineManagerPro-PC.exe');
+const exe = join(pkg, 'AirlineManagerPro-PC.exe'), ico = join(here, 'ci', 'app.ico'), publisher = app.publisher || 'DroneDirector';
 copyFileSync(process.execPath, exe);
+// the app's icon and name on the program (before the app is put into it)
+function brand(file, description) {
+  const bin = [join(here, 'node_modules', 'rcedit', 'bin', 'rcedit-x64.exe'), join(here, 'node_modules', 'rcedit', 'bin', 'rcedit.exe')].filter(existsSync)[0];
+  if (!bin || process.platform !== 'win32') { console.log('rcedit not found: the program keeps the standard icon'); return; }
+  const v4 = app.version + '.0';
+  try {
+    execFileSync(bin, [file, '--set-icon', ico, '--set-file-version', v4, '--set-product-version', v4,
+      '--set-version-string', 'ProductName', app.appName, '--set-version-string', 'FileDescription', description, '--set-version-string', 'CompanyName', publisher,
+      '--set-version-string', 'LegalCopyright', '\u00a9 ' + new Date().getFullYear() + ' ' + publisher, '--set-version-string', 'OriginalFilename', file.split(/[\\/]/).pop(),
+      '--set-version-string', 'InternalName', app.appName], { stdio: 'inherit' });
+  } catch (e) { console.log('Couldn\'t set the icon:', e.message); }
+}
+brand(exe, app.appName);
 run(`npx postject "${exe}" NODE_SEA_BLOB build/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2`);
+copyFileSync(ico, join(pkg, 'app.ico'));
 
 // the app itself (the same build as the phone's), shown in its own window on this PC
 const web = join(here, '..', 'www');
@@ -38,6 +56,10 @@ writeFileSync(join(pkg, 'README.txt'), [
   `Airline Manager Pro PC app ${app.version}`, '',
   'The full Airline Manager Pro app for Windows, connected straight to Microsoft Flight Simulator 2024 (and 2020),',
   'and the link to the Android app over your Wi-Fi. Use either or both.', '',
+  'Installing',
+  `  The easy way: run AirlineManagerPro-PC-Setup-${app.version}.exe. It installs into a folder of its own wherever you choose,`,
+  '  puts a shortcut on your desktop (replacing any older one) and in the Start menu, and adds the app to Settings > Apps,',
+  '  where it can be removed again. This zip works too, without installing: unzip it anywhere.', '',
   'The app on this PC',
   '  Double-click AirlineManagerPro-PC.exe: the app opens in its own window and connects to Flight Simulator.',
   '  Window, borderless or full screen, the size of everything, the graphics card and the sound output are in',
@@ -77,3 +99,26 @@ writeFileSync(join(pkg, 'Play back a flight.cmd'), ['@echo off', 'cd /d "%~dp0"'
   'if "%~1"=="" (echo Drag a recording from Documents\\Airline Manager Pro\\Recordings onto this file. & pause & exit /b)',
   'AirlineManagerPro-PC.exe --replay "%~1" 1', ''].join('\r\n'));
 console.log('Packaged', pkg);
+
+// ---------- the Setup program ----------
+// every file of the app folder, deflated one by one, after a header listing them (src/setup/core.ts reads it)
+const files = [], parts = [];
+let off = 0, total = 0;
+const walk = d => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p); else {
+  const raw = readFileSync(p), z = deflateRawSync(raw, { level: 9 }), rel = p.slice(pkg.length + 1);
+  files.push({ p: rel, size: raw.length, csize: z.length, off }); parts.push(z); off += z.length; total += raw.length; } } };
+walk(pkg);
+const head = Buffer.from(JSON.stringify({ version: app.version, publisher, total, files }), 'utf8'), len = Buffer.alloc(4); len.writeUInt32LE(head.length, 0);
+writeFileSync(join(out, 'payload.bin'), Buffer.concat([len, head, ...parts]));
+console.log(`Setup payload: ${files.length} files, ${(total / 1e6).toFixed(0)} MB unpacked, ${(off / 1e6).toFixed(0)} MB packed`);
+run('npx esbuild dist/setup-main.js --bundle --platform=node --format=cjs --target=node22 --outfile=build/setup.js');
+writeFileSync(join(out, 'setup-sea.json'), JSON.stringify({ main: 'build/setup.js', output: 'build/setup.blob', disableExperimentalSEAWarning: true, assets: { payload: 'build/payload.bin' } }));
+run('node --experimental-sea-config build/setup-sea.json');
+const setup = join(out, `AirlineManagerPro-PC-Setup-${app.version}.exe`);
+copyFileSync(process.execPath, setup);
+brand(setup, app.appName + ' Setup');
+run(`npx postject "${setup}" NODE_SEA_BLOB build/setup.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2`);
+// Setup is a windowed program: no black console window behind it (the PE header's subsystem: 2, Windows GUI)
+{ const b = readFileSync(setup), pe = b.readUInt32LE(0x3C); if (b.readUInt32LE(pe) !== 0x4550) throw new Error('Setup isn\'t a Windows program');
+  b.writeUInt16LE(2, pe + 24 + 68); writeFileSync(setup, b); }
+console.log('Setup', setup);

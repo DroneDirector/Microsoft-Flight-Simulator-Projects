@@ -95,6 +95,39 @@ jobs:
           Stop-Process -Id $p.Id -Force
           if ($r.app -ne "Airline Manager Pro") { exit 1 }
 
+      - name: Test Setup (install into a chosen folder, shortcut, Apps entry, then remove everything)
+        shell: pwsh
+        run: |
+          $v = (Get-Content ../app.config.json | ConvertFrom-Json).version
+          $setup = "build/AirlineManagerPro-PC-Setup-$v.exe"
+          if (-not (Test-Path $setup)) { Write-Output "No Setup program"; exit 1 }
+          $chosen = Join-Path $env:RUNNER_TEMP "Games"
+          New-Item -ItemType Directory -Force -Path $chosen | Out-Null
+          $desk = [Environment]::GetFolderPath('Desktop')
+          # an old shortcut with another name, pointing at the app, must be replaced
+          $ws = New-Object -ComObject WScript.Shell; $old = $ws.CreateShortcut((Join-Path $desk "AMP old.lnk")); $old.TargetPath = "C:\Old\AirlineManagerPro-PC.exe"; $old.Save()
+          $p = Start-Process -FilePath $setup -ArgumentList "--silent","--dir",$chosen -Wait -PassThru
+          Get-Content (Join-Path $env:TEMP "amp-setup.log") -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { Write-Output "Setup failed: $($p.ExitCode)"; exit 1 }
+          $dir = Join-Path $chosen "Airline Manager Pro"
+          foreach ($f in @("AirlineManagerPro-PC.exe", "app.ico", "install.json", "app\index.html", "lib\node_modules\node-simconnect\package.json")) { if (-not (Test-Path (Join-Path $dir $f))) { Write-Output "Missing after install: $f"; exit 1 } }
+          if (-not (Test-Path (Join-Path $desk "Airline Manager Pro.lnk"))) { Write-Output "No desktop shortcut"; exit 1 }
+          if (Test-Path (Join-Path $desk "AMP old.lnk")) { Write-Output "The old shortcut was not replaced"; exit 1 }
+          $lnk = $ws.CreateShortcut((Join-Path $desk "Airline Manager Pro.lnk")); Write-Output ("Shortcut: " + $lnk.TargetPath + " icon " + $lnk.IconLocation)
+          $key = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\AirlineManagerPro"
+          $r = Get-ItemProperty $key; Write-Output ("Apps entry: " + $r.DisplayName + " " + $r.DisplayVersion + " in " + $r.InstallLocation)
+          if ($r.DisplayVersion -ne $v) { exit 1 }
+          # installing again over it (an update) keeps working
+          $p = Start-Process -FilePath $setup -ArgumentList "--silent" -Wait -PassThru; if ($p.ExitCode -ne 0) { Write-Output "Second install failed"; exit 1 }
+          # remove it: every file, the shortcut, the entry and the folder itself
+          $p = Start-Process -FilePath (Join-Path $dir "AirlineManagerPro-PC.exe") -ArgumentList "--uninstall","--silent" -Wait -PassThru
+          Start-Sleep -Seconds 8
+          if (Test-Path $dir) { Write-Output "The folder is still there:"; Get-ChildItem -Recurse $dir | Select-Object -First 10 FullName; exit 1 }
+          if (Test-Path (Join-Path $desk "Airline Manager Pro.lnk")) { Write-Output "The shortcut is still there"; exit 1 }
+          if (Test-Path $key) { Write-Output "The Apps entry is still there"; exit 1 }
+          if (-not (Test-Path $chosen)) { Write-Output "The chosen folder itself was removed (it must stay)"; exit 1 }
+          Write-Output "Setup installs and removes cleanly"
+
       - name: Zip
         id: zip
         shell: pwsh
@@ -102,12 +135,16 @@ jobs:
           $v = (Get-Content ../app.config.json | ConvertFrom-Json).version
           $f = "AirlineManagerPro-PC-$v.zip"
           Compress-Archive -Path "build/Airline Manager Pro PC" -DestinationPath $f
+          Copy-Item "build/AirlineManagerPro-PC-Setup-$v.exe" .
           "file=$f" >> $env:GITHUB_OUTPUT
+          "setup=AirlineManagerPro-PC-Setup-$v.exe" >> $env:GITHUB_OUTPUT
 
       - uses: actions/upload-artifact@v4
         with:
           name: airline-manager-pro-pc
-          path: Airline-Manager-Pro/pc-bridge/${{ steps.zip.outputs.file }}
+          path: |
+            Airline-Manager-Pro/pc-bridge/${{ steps.zip.outputs.file }}
+            Airline-Manager-Pro/pc-bridge/${{ steps.zip.outputs.setup }}
 
   apk:
     name: Android app
@@ -163,6 +200,7 @@ jobs:
           path: ${{ steps.apk.outputs.file }}
 
       - name: Publish pre-release
+        if: github.ref == 'refs/heads/main'   # a test run from a work branch builds and tests, but never publishes
         uses: softprops/action-gh-release@v2
         with:
           tag_name: airline-manager-pro-v${{ steps.apk.outputs.version }}
@@ -172,3 +210,4 @@ jobs:
           files: |
             ${{ steps.apk.outputs.file }}
             pc/*.zip
+            pc/*.exe
