@@ -16,21 +16,27 @@ import * as https from 'https';
 import { saveFlightPlan } from './installed';
 import { LINK_PORT } from './protocol';
 import { PcUpdate } from './updater';
+import { PcBooster } from './booster';
 
 const TYPES: { [ext: string]: string } = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json',
   '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.mjs': 'text/javascript; charset=utf-8', '.onnx': 'application/octet-stream', '.gz': 'application/gzip', '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf', '.png': 'image/png', '.svg': 'image/svg+xml', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav',
 };
 
-export interface DesktopPrefs { open: boolean; mode: 'window' | 'borderless' | 'fullscreen'; gpu: 'auto' | 'high' | 'low'; width: number; height: number; boost: boolean }
-const DEFAULTS: DesktopPrefs = { open: true, mode: 'window', gpu: 'auto', width: 1600, height: 900, boost: false };
+export interface DesktopPrefs { open: boolean; mode: 'window' | 'borderless' | 'fullscreen'; gpu: 'auto' | 'high' | 'low'; width: number; height: number; boost: boolean; boostClose: string[] }
+const DEFAULTS: DesktopPrefs = { open: true, mode: 'window', gpu: 'auto', width: 1600, height: 900, boost: false, boostClose: [] as string[] };
 
 export class Desktop {
   prefs: DesktopPrefs;
   private file: string;
+  /** The browser program the app window runs in (never closed by the booster). */
+  windowExe = 'msedge';
+  booster: PcBooster;
   constructor(private dataDir: string) {
     this.file = path.join(dataDir, 'desktop.json');
     try { this.prefs = Object.assign({}, DEFAULTS, JSON.parse(fs.readFileSync(this.file, 'utf8'))); } catch (e) { this.prefs = Object.assign({}, DEFAULTS); }
+    if (!Array.isArray(this.prefs.boostClose)) this.prefs.boostClose = [];
+    this.booster = new PcBooster(() => this.prefs.boostClose || [], () => !!this.prefs.boost, () => this.windowExe);
   }
   save() { try { fs.writeFileSync(this.file, JSON.stringify(this.prefs, null, 2)); } catch (e) { /* read-only */ } }
 
@@ -51,6 +57,10 @@ export class Desktop {
     // a newer copy of the PC app starting up asks this one to make way: close the window, then quit
     if (url === '/api/quit' && req.method === 'POST') { json(res, { ok: true }); this.closeWindow(); setTimeout(() => process.exit(0), 1500); return true; }
     if (url === '/api/backup') return this.backup(req, res), true;
+    // Game Booster: readings for the charts, the programs you can pick to close, and the app saying it is open
+    if (url === '/api/boost') { this.booster.touch(); json(res, this.booster.status()); return true; }
+    if (url === '/api/boost/alive') { this.booster.alive(); json(res, { ok: true, watching: this.booster.watching() }); return true; }
+    if (url === '/api/boost/procs') { this.booster.touch(); this.booster.list().then(l => json(res, { procs: l })); return true; }
     if (url === '/api/update') {
       if (req.method === 'POST') return readBody(req, b => { let v = ''; try { v = String(JSON.parse(b).version || ''); } catch (e) { /* none */ }
         const err = PcUpdate.start(v, () => this.closeWindow(), this.windowProfile()); json(res, Object.assign(PcUpdate.status(), err ? { state: 'failed', error: err } : {})); }), true;
@@ -78,7 +88,7 @@ export class Desktop {
   }
 
   private api(req: http.IncomingMessage, res: http.ServerResponse) {
-    if (req.method === 'PUT') return readBody(req, b => { try { const p = JSON.parse(b); const was = this.prefs.boost; for (const k of Object.keys(DEFAULTS)) if (k in p) (this.prefs as any)[k] = p[k]; this.save(); if (was !== this.prefs.boost) this.applyBoost(); } catch (e) { /* ignore */ } json(res, this.prefs); });
+    if (req.method === 'PUT') return readBody(req, b => { try { const p = JSON.parse(b); const was = this.prefs.boost; for (const k of Object.keys(DEFAULTS)) if (k in p) (this.prefs as any)[k] = p[k]; this.save(); if (was !== this.prefs.boost) { this.applyBoost(); this.booster.boostChanged(); } } catch (e) { /* ignore */ } json(res, this.prefs); });
     json(res, Object.assign({ desktop: true, backupDir: this.backupDir() }, this.prefs));
   }
 
@@ -189,6 +199,7 @@ export class Desktop {
     const candidates = [path.join(pf, 'Microsoft', 'Edge', 'Application', 'msedge.exe'), path.join(pf2, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
       path.join(pf2, 'Google', 'Chrome', 'Application', 'chrome.exe'), path.join(pf, 'Google', 'Chrome', 'Application', 'chrome.exe'), path.join(la, 'Google', 'Chrome', 'Application', 'chrome.exe')];
     const exe = candidates.filter(c => c && fs.existsSync(c))[0];
+    if (exe) this.windowExe = path.basename(exe, '.exe').toLowerCase();
     try {
       if (exe) { const ch = spawn(exe, args, { detached: true, stdio: 'ignore' }); ch.unref(); this.windowPid = ch.pid || 0; this.applyBoost(); }
       else if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();

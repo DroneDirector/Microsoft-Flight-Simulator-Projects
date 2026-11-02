@@ -2688,6 +2688,49 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 @keyframes bcGlow { 50% { transform: scale(1.15); box-shadow: 0 0 36px rgba(140,240,255,1); } }
 @keyframes bcSurge { from { transform: scale(.6); opacity: 1; } to { transform: scale(2.6); opacity: 0; } }
 @keyframes bcShine { to { background-position: 300% 0; } }
+/* Game Booster: live readings */
+.boost-stats { margin: 0 0 16px; }
+.bs-title { display: flex; align-items: center; gap: 8px; margin: 2px 2px 10px; }
+.bs-title svg { width: 18px; height: 18px; color: var(--cyan); }
+.bs-title b { font-size: 15px; } .bs-title small { color: var(--ink-3); margin-left: auto; font-size: 12px; }
+.bs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.bs-card { position: relative; padding: 12px 14px 10px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); min-width: 0; }
+.bs-wide { margin-top: 10px; }
+.bs-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.bs-h b { font-size: 13.5px; color: var(--ink); }
+.bs-h small { flex-basis: 100%; color: var(--ink-2); font-size: 12px; line-height: 1.4; }
+.bs-v { margin-left: auto; font: 700 20px/1 Inter, sans-serif; font-style: normal; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bs-sub { display: block; color: var(--ink-3); font-size: 11.5px; margin: 3px 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 14px; }
+.bs-plot { position: relative; height: 74px; }
+.bs-plot svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.bs-line { fill: none; stroke: var(--cyan); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.bs-area { fill: rgba(63,208,232,.12); stroke: none; }
+.bs-plot .bs-gl { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+.bs-base { stroke: var(--line-2); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.bs-dot { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 0 2px var(--panel); }
+.bs-card.bs-none .bs-plot::after { content: "No reading yet"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-3); font-size: 12px; }
+.bs-tip { position: absolute; bottom: 86px; width: 90px; padding: 4px 6px; border-radius: 8px; background: var(--panel-3); border: 1px solid var(--line-2); color: var(--ink); font-size: 11.5px; text-align: center; pointer-events: none; font-variant-numeric: tabular-nums; z-index: 2; }
+.bs-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 8px; }
+.bs-nums span { display: flex; flex-direction: column; gap: 2px; }
+.bs-nums b { font: 700 22px/1.1 Inter, sans-serif; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bs-nums small { color: var(--ink-2); font-size: 11.5px; }
+.bs-bars { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; align-items: end; height: 54px; border-bottom: 1px solid var(--line-2); }
+.bs-bars i { display: block; background: var(--cyan); border-radius: 4px 4px 0 0; min-height: 0; }
+.bs-axis { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 11px; margin-top: 3px; }
+.bs-log { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; font-size: 12.5px; }
+.bs-log li { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.bs-log time { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.bs-log b { color: var(--ink); } .bs-log span { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-picker { margin-top: 10px; }
+.bs-pick-btns { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
+.bs-procs { display: grid; gap: 4px; max-height: 420px; overflow: auto; }
+.bs-proc { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; background: var(--panel-2); cursor: pointer; min-width: 0; }
+.bs-proc input { width: 18px; height: 18px; accent-color: var(--cyan); flex: 0 0 auto; }
+.bs-proc span { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.bs-proc span b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-proc span small { color: var(--ink-3); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-proc em { font-style: normal; font-size: 11px; font-weight: 700; color: var(--cyan); border: 1px solid rgba(63,208,232,.45); border-radius: 8px; padding: 1px 6px; }
+.bs-proc i { font-style: normal; color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
 @media (max-width: 560px) { .boost-hero { flex-direction: column; text-align: center; } .boost-btn, .boost-gauge { align-self: center; width: 100%; } }
 
 /* a staff member pleading to keep their job (dismissal dialog) */

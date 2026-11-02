@@ -494,6 +494,7 @@ function v3dLoop(now: number) {
   V3d.raf = requestAnimationFrame(v3dLoop);
   if (document.hidden || now - V3d.last < 1000 / (gameBoost() ? 60 : V3D_FPS) - 2) return;
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
+  V3d.frames = (V3d.frames || 0) + 1;   // counted for the Game Booster's frame-rate chart
   const T = THREE, f: any = v3dAptOnly() || v3dTargetFlight();
   if (!f) { const st = V3d.root.querySelector('.v3d-status'); if (st) st.textContent = 'This flight has ended'; V3d.r.render(V3d.scene, V3d.cam); return; }
   const w0 = v3dWhere(f);

@@ -17,7 +17,7 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
   ] },
   { id: 'booster', title: 'Game Booster', icon: 'power', items: [
-    { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
+    { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); boostDraw(); boostSample(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
   ] },
   { id: 'licence', title: 'Registration', icon: 'key', items: [
     { type: 'html', html: () => licenceHtml() },

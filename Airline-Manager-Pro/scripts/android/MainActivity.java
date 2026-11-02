@@ -39,6 +39,9 @@ import java.util.List;
  * - Full screen can be switched off in the app's settings; the choice is kept on the phone.
  * - Game Booster (off unless switched on, kept on the phone): the screen stays on, and on phones that
  *   offer it the processor is held at a steady, sustained speed instead of slowing down when warm.
+ *   Up to Android 13 it also closes other apps running in the background, and keeps doing so every
+ *   30 seconds while the app is open, so they don't stay running; Android 14 and later no longer let an
+ *   app close other apps.
  */
 public class MainActivity extends BridgeActivity {
 
@@ -79,10 +82,43 @@ public class MainActivity extends BridgeActivity {
     void setFullScreen(boolean on) { prefs().edit().putBoolean("fullscreen", on).apply(); runOnUiThread(this::enterImmersive); }
     void setBoost(boolean on) { prefs().edit().putBoolean("boost", on).apply(); runOnUiThread(this::applyBoost); }
 
+    /* What the booster closed since the app started (shown in the booster's charts). */
+    static int closeRounds = 0, closeAsked = 0; static long freedMb = 0, lastFreedMb = 0;
+    static boolean canCloseOthers() { return Build.VERSION.SDK_INT < 34; }
+    private final Handler closer = new Handler(Looper.getMainLooper());
+    private final Runnable closeRound = new Runnable() { public void run() { closeOthers(); closer.postDelayed(this, 30000); } };
+
+    /** Ask Android to end the other apps' background processes (Android 13 and older; never the app in front). */
+    void closeOthers() {
+        if (!boost() || !canCloseOthers()) return;
+        final android.content.Context ctx = getApplicationContext();
+        new Thread(() -> {
+            try {
+                android.app.ActivityManager am = (android.app.ActivityManager) ctx.getSystemService(ACTIVITY_SERVICE);
+                android.app.ActivityManager.MemoryInfo m0 = new android.app.ActivityManager.MemoryInfo(); am.getMemoryInfo(m0);
+                android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_MAIN); i.addCategory(android.content.Intent.CATEGORY_LAUNCHER);
+                java.util.HashSet<String> pk = new java.util.HashSet<>();
+                for (android.content.pm.ResolveInfo ri : ctx.getPackageManager().queryIntentActivities(i, 0)) pk.add(ri.activityInfo.packageName);
+                pk.remove(ctx.getPackageName());
+                int n = 0; for (String p : pk) { try { am.killBackgroundProcesses(p); n++; } catch (Exception ignored) { } }
+                Thread.sleep(1500);
+                android.app.ActivityManager.MemoryInfo m1 = new android.app.ActivityManager.MemoryInfo(); am.getMemoryInfo(m1);
+                long freed = Math.max(0, (m1.availMem - m0.availMem) / 1048576);
+                closeRounds++; closeAsked = n; lastFreedMb = freed; freedMb += freed;
+            } catch (Exception ignored) { }
+        }).start();
+    }
+
+    @Override
+    public void onPause() { super.onPause(); closer.removeCallbacksAndMessages(null); }
+
     /** Game Booster: keep the screen on and, where the phone supports it, hold the processor at a steady speed. */
     void applyBoost() {
         boolean on = boost();
         if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // while the app is open with the booster on, other apps are closed now and every 30 seconds
+        closer.removeCallbacksAndMessages(null);
+        if (on && canCloseOthers()) closer.post(closeRound);
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
