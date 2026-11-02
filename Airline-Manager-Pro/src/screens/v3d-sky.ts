@@ -624,19 +624,23 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
     for (let b = -w; b <= w + 0.1; b += (2 * w) / 8) { const p1 = at(-half, b), p2 = at(half, b); add(p1[0], p1[1], 0.8, GRN, 2.2); add(p2[0], p2[1], 0.8, RED, 2.2); }
     for (const dirn of [-1, 1]) {
       const out = [f[0] * dirn, 0, f[1] * dirn];   // from the threshold out towards the aircraft on approach
-      // approach lights before the threshold: on long runways the full system (900 m of white bars, a cross bar
-      // at 300 m, red side bars in the last 300 m, and flashing lights running towards the runway twice a
-      // second); on medium runways a shorter one (420 m with flashers)
-      if (r.len >= 1800) {
+      // approach lights before the threshold, at every airport: on long runways the full system (900 m of white
+      // bars, a cross bar at 300 m, red side bars in the last 300 m, and flashing lights running towards the
+      // runway twice a second); on medium runways (Vágar's 1,799 m among them) a shorter one (420 m with
+      // flashers); on short runways a simple one (a lit centre line of 210 m with a cross bar at 150 m)
+      if (r.len < 1200) {
+        for (let a = 30; a <= 210; a += 30) { const p = at(dirn * (half + a), 0); add(p[0], p[1], 1.2, W, 2.0); }
+        for (let b = -9; b <= 9; b += 1.5) { const p = at(dirn * (half + 150), b); add(p[0], p[1], 1.2, W, 1.9); }
+      } else {
         const full = r.len >= 2400, reach = full ? 900 : 420;
         for (let a = 30; a <= reach; a += 30) for (const b of [-2, -1, 0, 1, 2]) { const p = at(dirn * (half + a), b * 1.05); add(p[0], p[1], 1.5, W, 2.0); }
-        for (let b = -15; b <= 15; b += 1.5) { const p = at(dirn * (half + 300), b); add(p[0], p[1], 1.5, W, 2.0); }
+        for (let b = -15; b <= 15; b += 1.5) { const p = at(dirn * (half + (full ? 300 : 150)), b); add(p[0], p[1], 1.5, W, 2.0); }
         if (full) {
           for (let b = -7; b <= 7; b += 1) if (Math.abs(b) > 2) { const p = at(dirn * (half + 150), b); add(p[0], p[1], 1.5, W, 1.8); }
           for (let a = 30; a <= 270; a += 30) for (const sd of [-1, 1]) for (const bb of [0, 1, 2]) { const p = at(dirn * (half + a), sd * (11 + bb * 1.5)); add(p[0], p[1], 1.2, RED, 1.7); }
         }
         // the sequenced flashers ("the rabbit"), from the far end in to the cross bar
-        const f0 = full ? 330 : 210;
+        const f0 = full ? 330 : 180;
         for (let a = reach; a >= f0; a -= 30) { const p = at(dirn * (half + a), 0); add(p[0], p[1], 2.2, [1, 1, 1], 4.2, 7, out, (reach - a) / Math.max(30, reach - f0 + 30)); }
       }
       // glide path lights beside the touchdown zone, on the left: PAPI (four lights) on longer runways, VASI
@@ -645,7 +649,7 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
       if (r.len >= 1200) {
         const left = dirn, edge = (r.wid || 45) / 2;   // the left of an aircraft landing on this end
         const th = (a: number) => dirn < 0 ? -half + a : half - a;
-        if (r.len >= 1800) {
+        if (r.len >= 1500) {   // PAPI from 1,500 m (Vágar has one), VASI on shorter runways
           const angles = [2.5, 2.8333, 3.1667, 3.5];   // from the outermost light in towards the runway (the one nearest the runway is set highest)
           angles.forEach((ang, i) => { const p = at(th(300), left * (edge + 15 + (3 - i) * 9)); add(p[0], p[1], 1.0, RED, 3.4, 6, out, ang); });
         } else {
