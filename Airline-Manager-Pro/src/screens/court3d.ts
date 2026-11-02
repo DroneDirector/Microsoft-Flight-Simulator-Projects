@@ -537,24 +537,40 @@ function ctCast(c: any, st: any, judges: number, q: number) {
   }
   const cl = mk('clerk-' + c.id, 0.6); P('clerk', A.seats.clerk, ctLook('clerk-' + c.id, cl.sex as any, 'counsel'), 'exec', cl.name, 'Clerk of the court', cl.sex);
   const pr = mk('pros-' + c.id); P('prosecutor', A.seats.pros[0], ctLook('pros-' + c.id, pr.sex as any, 'counsel'), 'exec', pr.name, 'Prosecutor', pr.sex);
+  const staffCase = c.hear && c.hear.kind === 'staff';
+  if (staffCase) {
+    // a case you brought: you sit with the prosecution (and give evidence from the witness box on day one); the
+    // defendant, your employee, sits with their own counsel and takes the stand on day two
+    const yl = me && me.look ? Object.assign({}, me.look, { civil: true, top: 'jacket', uniform: 2, hat: 'none', neck: me.look.sex === 'f' ? 'open' : 'tie', bottom: 'trousers' }) : ctLook('you', 'm', 'counsel');
+    P('you', st.key === 'hear1' ? A.seats.witness : A.seats.pros[1], yl, 'exec', me ? me.name : 'You', `${co.name}, the injured party${st.key === 'hear1' ? ', witness' : ''}`, yl.sex || 'm');
+    const dp: any = staffById(c.staffId), dl = dp && dp.look ? Object.assign({}, dp.look, { civil: true, top: 'jacket', uniform: 0, hat: 'none', neck: 'open', bottom: 'trousers', shoes: 'oxford' }) : ctLook('def-' + c.id, 'm', 'public');
+    P('defendant', A.seats.def[1], dl, 'exec', c.name, 'The defendant', (dp && dp.sex) || dl.sex || 'm');
+    if (st.key === 'hear2') P('defendantW', A.seats.witness, dl, 'exec', c.name, 'The defendant, on the stand', (dp && dp.sex) || dl.sex || 'm', { hidden: true, pair: 'defendant' });
+    const lw = mk('dlaw-' + c.id); P('lawyer', A.seats.def[0], ctLook('dlaw-' + c.id, lw.sex as any, 'counsel'), 'exec', lw.name, 'Counsel for the defence', lw.sex);
+    if (st.key === 'hear2') {
+      const mate: any = dp ? staffOf(c.companyId, personRole(dp) as any).filter((x: any) => x.id !== dp.id)[0] : null;
+      if (mate) { const ml = mate.look ? Object.assign({}, mate.look, { civil: true, top: 'jacket', uniform: 0, neck: 'open', hat: 'none', bottom: 'trousers', shoes: 'oxford' }) : ctLook('mate-' + c.id, 'm', 'public'); P('witness', A.seats.witness, ml, 'exec', mate.name, `${ROLE_NAMES[personRole(mate)]}, a colleague, witness`, mate.sex || 'm', { hidden: true }); }
+    }
+  } else {
   const pa = mk('pros2-' + c.id); P('prosecutor2', A.seats.pros[1], ctLook('pros2-' + c.id, pa.sex as any, 'counsel'), 'exec', pa.name, 'Assistant prosecutor', pa.sex);
-  const yl = me && me.look ? Object.assign({}, me.look, { civil: true, top: 'jacket', uniform: 2, hat: 'none', neck: me.look.sex === 'f' ? 'open' : 'tie', bottom: 'trousers' }) : ctLook('you', 'm', 'counsel');
-  P('you', A.seats.def[1], yl, 'exec', me ? me.name : 'You', `Accountable manager, ${co.name}`, yl.sex || 'm');
-  const lw = mk('law-' + c.id); P('lawyer', A.seats.def[0], ctLook('law-' + c.id, lw.sex as any, 'counsel'), 'exec', lw.name, 'Your lawyer', lw.sex);
-  const fl = mk('fam-' + c.id); P('famlawyer', A.seats.fam, ctLook('fam-' + c.id, fl.sex as any, 'counsel'), 'exec', fl.name, 'Counsel for the families', fl.sex);
-  // the witnesses take the stand one at a time
-  if (st.key === 'hear2') {
-    const mechs: any[] = staffOf(c.companyId, 'mech'), chief: any = mechs.slice().sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))[0];
-    const wl = chief && chief.look ? Object.assign({}, chief.look, { civil: true, top: 'jacket', uniform: 0, neck: 'open', hat: 'none', bottom: 'trousers', shoes: 'oxford' }) : ctLook('chief-' + c.id, 'm', 'counsel');
-    P('witness', A.seats.witness, wl, 'exec', chief ? chief.name : makePerson('chief-' + c.id, 'mech', c.companyId, co.hub).name, 'Chief mechanic, witness', (chief && chief.sex) || 'm');
-    const sv = mk('surv-' + c.id); P('survivor', A.seats.witness, ctLook('surv-' + c.id, sv.sex as any, 'public'), 'exec', sv.name, 'Surviving passenger, witness', sv.sex, { hidden: true });
+    const yl = me && me.look ? Object.assign({}, me.look, { civil: true, top: 'jacket', uniform: 2, hat: 'none', neck: me.look.sex === 'f' ? 'open' : 'tie', bottom: 'trousers' }) : ctLook('you', 'm', 'counsel');
+    P('you', A.seats.def[1], yl, 'exec', me ? me.name : 'You', `Accountable manager, ${co.name}`, yl.sex || 'm');
+    const lw = mk('law-' + c.id); P('lawyer', A.seats.def[0], ctLook('law-' + c.id, lw.sex as any, 'counsel'), 'exec', lw.name, 'Your lawyer', lw.sex);
+    const fl = mk('fam-' + c.id); P('famlawyer', A.seats.fam, ctLook('fam-' + c.id, fl.sex as any, 'counsel'), 'exec', fl.name, 'Counsel for the families', fl.sex);
+    // the witnesses take the stand one at a time
+    if (st.key === 'hear2') {
+      const mechs: any[] = staffOf(c.companyId, 'mech'), chief: any = mechs.slice().sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))[0];
+      const wl = chief && chief.look ? Object.assign({}, chief.look, { civil: true, top: 'jacket', uniform: 0, neck: 'open', hat: 'none', bottom: 'trousers', shoes: 'oxford' }) : ctLook('chief-' + c.id, 'm', 'counsel');
+      P('witness', A.seats.witness, wl, 'exec', chief ? chief.name : makePerson('chief-' + c.id, 'mech', c.companyId, co.hub).name, 'Chief mechanic, witness', (chief && chief.sex) || 'm');
+      const sv = mk('surv-' + c.id); P('survivor', A.seats.witness, ctLook('surv-' + c.id, sv.sex as any, 'public'), 'exec', sv.name, 'Surviving passenger, witness', sv.sex, { hidden: true });
+    }
   }
   // police
   A.police.forEach((s: any, i: number) => { const p = mk('pol-' + c.id + i, 0.3); P('police' + i, s, ctLook('pol-' + c.id + i, p.sex as any, 'police'), 'police', p.name, 'Police', p.sex); });
   // the relatives in the front row, the press at the back, the public between
   const pub = A.seats.pub as any[], nPub = [8, 11, 15, 20][q] || 11;
   const front = pub.filter(s => s.row === 0 && s.side < 0).slice(1, 5), press = pub.filter(s => s.row === 6 && s.side > 0).slice(0, 2);
-  const rel = mk('rel-' + c.id + 0, 0.55); front.forEach((s, i) => { const r2 = i ? mk('rel-' + c.id + i, 0.55) : rel; P(i ? 'relative' + i : 'relative', s, ctLook('rel-' + c.id + i, r2.sex as any, 'mourn'), 'exec', r2.name, 'Relative of a victim', r2.sex); });
+  const rel = mk('rel-' + c.id + 0, 0.55); if (!staffCase || c.fatal) front.forEach((s, i) => { const r2 = i ? mk('rel-' + c.id + i, 0.55) : rel; P(i ? 'relative' + i : 'relative', s, ctLook('rel-' + c.id + i, r2.sex as any, 'mourn'), 'exec', r2.name, 'Relative of a victim', r2.sex); });
   press.forEach((s, i) => { const p = mk('press-' + c.id + i); P('press' + i, s, ctLook('press-' + c.id + i, p.sex as any, 'public'), 'exec', p.name, 'Press', p.sex); });
   const r = ctRng(seedOf(c.id + st.key)), free = pub.filter(s => front.indexOf(s) < 0 && press.indexOf(s) < 0 && !(s.row === 0 && s.side < 0)), used: any = {};
   for (let i = 0; i < nPub && free.length; i++) { let k = Math.floor(r() * free.length); let tries = 0; while ((used[k] || used[k - 1] || used[k + 1]) && tries++ < 20) k = Math.floor(r() * free.length); used[k] = 1; const p = mk('pub-' + c.id + st.key + i); P('pub' + i, free[k], ctLook('pub-' + c.id + st.key + i, p.sex as any, 'public'), 'exec', p.name, 'Public', p.sex, { crowd: true }); }
@@ -642,7 +658,9 @@ function ctBox(): any { const b = CourtRoom.root.querySelector('.ct-box') as HTM
 function ctSay(key: string, text: string, mood?: string) {
   const R = CourtRoom, p = R.people[key] || R.people[key === 'relative' ? 'relative' : key];
   R.speaker = key; R.talkUntil = (performance.now() - R.t0) / 1000 + Math.max(2.5, text.split(/\s+/).length * 0.36);
-  if (p && p.seat && key !== 'judge' && !/^judge|clerk|witness|survivor/.test(key)) p.wantSit = 0;   // counsel, you and relatives stand to speak
+  if (p && p.seat && key !== 'judge' && !/^judge|clerk|witness|survivor|defendantW/.test(key) && p.seat !== R.A.seats.witness) p.wantSit = 0;   // counsel, you and relatives stand to speak (the witness box sits)
+  // whoever speaks from the witness box is the one in it; the defendant leaves their table for it
+  if (p && p.seat === R.A.seats.witness && p.pivot) { for (const k in R.people) { const o = R.people[k]; if (o !== p && o.seat === R.A.seats.witness && o.pivot && k !== 'you') { o.pivot.visible = false; if (o.pair && R.people[o.pair]) R.people[o.pair].pivot.visible = true; } } p.pivot.visible = true; if (p.pair && R.people[p.pair]) R.people[p.pair].pivot.visible = false; }
   if (key === 'survivor' && R.people.survivor) { R.people.survivor.pivot.visible = true; if (R.people.witness) R.people.witness.pivot.visible = false; }
   ctShotOf(key);
   const b = ctBox(), name = p ? p.name : key, title = p ? p.title : '';
@@ -667,6 +685,7 @@ function ctNext() {
   if (ln.who === 'relative' || ln.who === 'survivor') R.mourn = true;
   if (ln.who === 'clerk' || /adjourned\.?$/.test(ln.text)) (R.root.querySelector('.ct-ex') as HTMLElement).hidden = true;
   if (ln.q) { ctAsk(ln); return; }
+  if (ln.ask) { ctAskOwn(ln); return; }
   ctSay(ln.who === 'judge' ? 'judge' : ln.who, ln.text, ln.mood);
   ctCtl(`<button class="btn primary" data-ct="next">Continue</button>`);
 }
@@ -675,14 +694,24 @@ function ctExhibit(ex: any) {
   const e = R.root.querySelector('.ct-ex') as HTMLElement; e.hidden = false;
   e.innerHTML = `<b>${esc(ex.title)}</b>${ex.rows.map((r: string[]) => `<div><small>${esc(r[0])}</small><span>${esc(r[1])}</span></div>`).join('')}${ex.note ? `<p>${esc(ex.note)}</p>` : ''}`;
 }
+/** Your turn to question the defendant: three ways to ask. */
+function ctAskOwn(ln: HearLine) {
+  const R = CourtRoom, b = ctBox(), me: any = myPilot();
+  ctShotOf(R.people.defendantW ? 'defendantW' : 'defendant');
+  (b.querySelector('.ct-who b') as HTMLElement).textContent = me ? me.name : 'You'; (b.querySelector('.ct-who small') as HTMLElement).textContent = 'Your question to the defendant';
+  (b.querySelector('.ct-text') as HTMLElement).textContent = 'Choose how to put it: an open question, the evidence, or pressing hard (the court may not allow it).';
+  (b.querySelector('.ct-say') as HTMLElement).innerHTML = '';
+  (b.querySelector('.ct-opts') as HTMLElement).innerHTML = ln.ask.opts.map((o, i) => `<button class="ct-opt" data-ct="own" data-i="${i}">${esc(o.t)}<small>${o.kind === 'facts' ? 'Open question' : o.kind === 'evidence' ? 'With the evidence' : 'Pressing hard'}</small></button>`).join('');
+  ctCtl('');
+}
 /** A question to you: the options, your lawyer's suggestion, an objection where your lawyer can make one. */
 function ctAsk(ln: HearLine) {
   const R = CourtRoom, c = R.c, q = ln.q as HearQ;
-  const who = ln.who === 'famlawyer' ? 'famlawyer' : ln.who === 'lawyer' ? 'judge' : q.asker === 'judge' ? 'judge' : 'prosecutor';
+  const staffCase = c.hear && c.hear.kind === 'staff', who = staffCase && R.people[ln.who] ? ln.who : ln.who === 'famlawyer' ? 'famlawyer' : ln.who === 'lawyer' ? 'judge' : q.asker === 'judge' ? 'judge' : 'prosecutor';
   ctSay(who, q.text);
   const sug = hearingSuggest(c, q);
   const b = ctBox();
-  (b.querySelector('.ct-opts') as HTMLElement).innerHTML = q.opts.map((o, i) => `<button class="ct-opt ${i === sug ? 'sug' : ''}" data-ct="ans" data-i="${i}">${esc(o.t)}${i === sug ? `<small>Your lawyer suggests this</small>` : ''}</button>`).join('');
+  (b.querySelector('.ct-opts') as HTMLElement).innerHTML = q.opts.map((o, i) => `<button class="ct-opt ${i === sug ? 'sug' : ''}" data-ct="ans" data-i="${i}">${esc(o.t)}${i === sug ? `<small>${staffCase ? 'The prosecutor suggests this' : 'Your lawyer suggests this'}</small>` : ''}</button>`).join('');
   ctCtl(!R.objected && hearingCanObject(c, q) ? `<button class="btn ghost" data-ct="object">Your lawyer objects</button>` : '');
 }
 function ctClick(b: HTMLElement) {
@@ -693,6 +722,14 @@ function ctClick(b: HTMLElement) {
   else if (k === 'pay') { (R.root.querySelector('.ct-modal') as HTMLElement).hidden = true; ctPayLeave(); }
   else if (k === 'exit') CourtRoom.close();
   else if (k === 'spot') ctSpot(b.getAttribute('data-k'));
+  else if (k === 'own') {
+    // your question to the defendant: you ask (standing at your table), they answer from the stand, the judge may comment
+    const ln = R.lines[R.i], o = ln.ask.opts[+(b.getAttribute('data-i') as string)]; Voice.stop();
+    const res = courtStaffAsk(c, o.kind); Store.save();
+    ctSay('you', o.t); ctRateChip(res.d);
+    R.react = { who: R.people.defendantW ? 'defendantW' : 'defendant', text: res.answer, then: res.note ? { who: 'judge', text: res.note } : null };
+    ctCtl(`<button class="btn primary" data-ct="react">Continue</button>`);
+  }
   else if (k === 'object') {
     const ln = R.lines[R.i]; R.objected = true; Voice.stop();
     ctSay('lawyer', 'Objection, your honour. The question is leading, and goes beyond what this witness can fairly be asked.');
@@ -713,11 +750,11 @@ function ctClick(b: HTMLElement) {
     const res = hearingScore(c, q, o.kind); R.answered.push(q.id); Store.save();
     // you stand and answer; then the reaction
     ctSay('you', o.t.replace(/\s*\([^)]*\)$/, '')); ctRateChip(res.d);
-    R.react = { who: ln.who === 'famlawyer' ? 'famlawyer' : q.asker === 'judge' || ln.who === 'lawyer' ? 'judge' : 'prosecutor', text: res.say };
+    R.react = { who: c.hear && c.hear.kind === 'staff' && R.people[ln.who] ? ln.who : ln.who === 'famlawyer' ? 'famlawyer' : q.asker === 'judge' || ln.who === 'lawyer' ? 'judge' : 'prosecutor', text: res.say };
     ctCtl(`<button class="btn primary" data-ct="react">Continue</button>`);
   } else if (k === 'react') {
     Voice.stop(); ctSitDown(); const r = R.react; R.react = null;
-    if (r && r.text) { ctSay(r.who, r.text); ctCtl(`<button class="btn primary" data-ct="next">Continue</button>`); } else ctNext();
+    if (r && r.text) { ctSay(r.who, r.text); if (r.then) { R.react = r.then; ctCtl(`<button class="btn primary" data-ct="react">Continue</button>`); } else ctCtl(`<button class="btn primary" data-ct="next">Continue</button>`); } else ctNext();
   }
 }
 function ctRateChip(d: number) {

@@ -178,6 +178,11 @@ function dismissMood(p: any): { kind: string; v: number } {
   if (!inc && !(p.warnings >= 2)) return undefined;
   return { kind: 'beg', v: Math.floor(Math.random() * 5) };
 }
+ACTIONS['inc-court'] = el => {
+  const inc = ((State as any).incidents || []).filter((x: any) => x.id === el.getAttribute('data-id'))[0]; if (!inc || !courtReportable(inc)) return;
+  const p = staffById(inc.staffId), c = courtBringCase(inc); closeAll();
+  if (c) toast(`${p.name} is reported to the police. You will be called to court as a witness.`, 'warn');
+};
 ACTIONS['open-incident'] = el => { const t = el.closest('.toast'); if (t) t.remove(); incidentPopup(el.getAttribute('data-id')); };
 function incidentPopup(id: string) {
   const inc = (State as any).incidents.filter((x: Incident) => x.id === id)[0]; if (!inc) return;
@@ -194,6 +199,7 @@ function incidentPopup(id: string) {
         <p class="speech">${esc(inc.text)}</p>
         ${conductDetailHtml(inc, p)}
         ${inc.status === 'open' ? `<button class="btn ghost of-invite" data-act="office-invite" data-id="${inc.id}">${icon('user')}Invite ${esc(p.name.replace(/^Capt\.\s*/, '').split(/\s+/)[0])} to my office</button>` : ''}
+        ${courtReportable(inc) ? `<button class="btn ghost of-invite" data-act="inc-court" data-id="${inc.id}">${icon('alert')}Report ${esc(p.name.replace(/^Capt\.\s*/, '').split(/\s+/)[0])} to the police</button>` : ''}
         <div class="inc-who"><b>${esc(p.name)}</b><small>${ROLE_NAMES[role]}, ${natLabel(p.nat)}, ${ageOf(p.dob)}, base ${esc(p.base)}</small><small class="${p.warnings ? 'amber' : ''}">${p.warnings ? `Already ${p.warnings} warning${p.warnings > 1 ? 's' : ''} on record: ${esc(warnSummary(p))}` : 'No earlier warnings'}</small><small>This report: <b class="sev-${inc.sev || 'moderate'}">${esc(inc.sev || 'moderate')}</b></small></div>
         ${warnHistory(p)}
         ${inc.status === 'open' ? `<div class="decide">

@@ -25,7 +25,7 @@ function courtBench(c: any): string { return c.sys === 'jury' ? 'the jury' : c.s
 const LAWYER_FEE: { [k: string]: number } = { none: 0, basic: 8000, good: 25000, top: 70000 };
 const LAWYER_NAME: { [k: string]: string } = { none: 'No lawyer (a public defender)', basic: 'A standard defence lawyer', good: 'A good defence firm', top: 'A top criminal defence firm' };
 function courtVictims(c: any): boolean { return !!c.fatal || /assault|theft|withheld help|accident/i.test(c.offence); }
-function courtOffence(c: any): any { return (OFFENCES[c.role] || OFFENCES.fa).filter((x: any) => x.title === c.offence)[0] || OFFENCES.fa[0]; }
+function courtOffence(c: any): any { if (c.offDef) return c.offDef; return (OFFENCES[c.role] || OFFENCES.fa).filter((x: any) => x.title === c.offence)[0] || OFFENCES.fa[0]; }
 
 /** Set a new case up: its court system, your default choices, the investigation report for accidents. */
 function courtSetup(c: any) {
