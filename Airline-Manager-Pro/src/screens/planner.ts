@@ -269,7 +269,7 @@ function plRouteHtml(P: FlightPlanR): string {
       <tbody><tr class="apt"><td></td><td><b>${esc(P.from)}</b><small>${esc((apt(P.from) || { name: '' } as any).name)}</small></td><td colspan="5"><small>Departure</small></td></tr>${rows}<tr class="apt"><td></td><td><b>${esc(P.to)}</b><small>${esc((apt(P.to) || { name: '' } as any).name)}</small></td><td colspan="5"><small>Arrival${PlannerUi.prev ? ' · ' + plHm(PlannerUi.prev.airS) : ''}</small></td></tr></tbody></table>
     <div class="pl-add"><input class="pl-addin" placeholder="Add: an airport (EKVG), a position (6200N00700W) or 62.0 -7.0" aria-label="Add a waypoint"><button class="btn sm" data-act="pl-addtxt">${icon('plus')}Add</button></div>
     <small class="muted">Levels: FL350 or 35000; a waypoint's level is flown from it on (step climbs and descents at the waypoint). Speeds: M.82 or 280 (indicated knots), empty for the aircraft's own. Drag a waypoint on the map to move it.</small>
-    <div class="pl-btns">${typeof svcOk === 'function' && svcOk('simbriefApi') && SimBrief.user() ? `<button class="btn sm" data-act="pl-simbrief">${icon('download')}From my SimBrief flight plan</button>` : ''}<button class="btn ghost sm" data-act="pl-reset">Start again: straight route</button><button class="btn ghost sm" data-act="pl-remove">Remove this plan</button></div>`;
+    <div class="pl-btns">${typeof svcOk === 'function' && svcOk('simbriefApi') && SimBrief.user() ? `<button class="btn sm" data-act="pl-simbrief">${icon('download')}From my SimBrief flight plan</button>` : ''}<button class="btn sm" data-act="pl-awy">${icon('routes')}Real airways (Flight Simulator)</button><button class="btn ghost sm" data-act="pl-reset">Start again: straight route</button><button class="btn ghost sm" data-act="pl-remove">Remove this plan</button></div>`;
 }
 function plWxHtml(P: FlightPlanR): string {
   const hz = plHazards(), path: FlightPath = PlannerUi.path, pr: FlightProfile = PlannerUi.prev;
@@ -334,4 +334,22 @@ ACTIONS['pl-simbrief'] = () => {
     planSave(P); plRecalc(); plFit(true); plPanelRedraw();
     toast(`SimBrief plan ${P.from} → ${P.to}: ${P.wps.length} waypoints. Flights on this route now fly it.`, 'ok');
   }, (e: any) => toast((e && e.message) || 'SimBrief could not be reached', 'warn'));
+};
+
+/** The plan along the real airways (from the simulator through the PC app): its fixes with the airway to each. */
+function plFillAirways(route: AwyFixA[]) {
+  const P = plCur(); if (!P || !route || !route.length) return;
+  const alt = PlannerUi.prev ? PlannerUi.prev.cruiseAlt : (P.wps[0] ? P.wps[0].alt : 35000);
+  P.wps = route.map(x => ({ id: uid(), name: x.id, lat: x.lat, lon: x.lon, alt, via: x.via && x.via !== 'DCT' ? x.via : '' }));
+  planSave(P); plRecalc(); plFit(true); plPanelRedraw();
+  toast(`${P.wps.length} waypoints along the airways`, 'ok');
+}
+ACTIONS['pl-awy'] = () => {
+  const P = plCur(); if (!P) return;
+  const cls = awyClass(PlannerUi.typeId || plType()), k = AirwayRoutes.key(P.from, P.to, cls);
+  const have = AirwayRoutes.data[k]; if (have) { plFillAirways(have.route); return; }
+  if (Link.status !== 'connected') { toast('Link the PC app with Flight Simulator running to get the real airways', 'warn'); return; }
+  PlannerUi.awyWait = k; delete AirwayRoutes.asked[k]; delete AirwayRoutes.data[k];
+  AirwayRoutes.ask(P.from, P.to, cls);
+  toast(`Asking Flight Simulator for the ${cls === 'H' ? 'high' : 'low'} airways ${P.from} → ${P.to}…`, 'info');
 };

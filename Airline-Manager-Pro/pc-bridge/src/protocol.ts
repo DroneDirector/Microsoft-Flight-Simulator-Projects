@@ -76,6 +76,7 @@ export type ToPhone =
   | { type: 'layout'; icao: string; layout?: any; error?: string }
   /** an airport's published SIDs, STARs and approaches from the simulator, or why there are none */
   | { type: 'procs'; icao: string; procs?: any; error?: string }
+  | { type: 'awy'; from: string; to: string; cls: 'H' | 'L'; route?: { id: string; lat: number; lon: number; via: string }[]; error?: string }
   /** every airport the simulator has, as [ident, latitude, longitude], in parts */
   | { type: 'all-airports'; list: [string, number, number][]; part: number; parts: number; total: number }
   /** a flight plan saved for the simulator, or why not */
@@ -91,6 +92,7 @@ export type ToPc =
   | { type: 'plan'; from?: string; to?: string; reg?: string }
   | { type: 'layout'; icao: string }
   | { type: 'procs'; icao: string }
+  | { type: 'awy'; from: string; to: string; cls: 'H' | 'L' }
   | { type: 'all-airports' }
   | { type: 'flightplan'; name: string; text: string }
   | { type: 'aircraft-list' };

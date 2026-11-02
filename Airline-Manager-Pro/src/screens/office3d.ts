@@ -327,6 +327,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); });
   R.key$ = (e: KeyboardEvent) => {
     if (!R.on) return; const k = e.key.toLowerCase();
+    if (R.overlay) { if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); ofPlannerClose(); } return; }   // the planner has the keys (typing)
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); ofLeave(); return; }
     if (/^(w|a|s|d|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
   };
@@ -350,7 +351,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   });
   if (Human.ready) setTimeout(photo, 30); else Human.load().then(() => setTimeout(photo, 30), () => next());
   R.loading = true;
-  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading) ofFrame(); };
+  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !R.overlay) ofFrame(); };   // the room rests while the planner is open
   R.raf = requestAnimationFrame(loop);
 }
 function ofReady() {
@@ -549,10 +550,24 @@ function ofVisitUi(afterInterview?: boolean) {
   if (!afterInterview) box.hidden = true;
   sp.hidden = false;
   const nRep = ofOpenReports().length;
-  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
+  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['planner', 'Flight planner'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
   pad.hidden = R.seat;
   if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · drag to look · click your chair to sit · click the door to leave' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
   else hint.hidden = true;
+}
+/** The Flight planner at your desk: the whole planner over the office (the room stays behind it); Back or Esc
+ *  returns to the office. */
+function ofPlannerOpen() {
+  const R = OfficeRoom; if (!R.on || R.overlay) return;
+  for (const sel of ['.of-spots', '.ct-box', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
+  const ov = document.createElement('div'); ov.className = 'of-planner';
+  ov.innerHTML = `<div class="of-pl-head"><b>${icon('routes')}Flight planner</b><button class="btn ghost sm" data-of="plclose">${icon('close')}Back to the office</button></div><div class="of-pl-body">${SCREENS.planner.render()}</div>`;
+  R.root.appendChild(ov); R.overlay = ov;
+  try { SCREENS.planner.mount(ov.querySelector('.of-pl-body') as HTMLElement); } catch (e) { /* the planner shows what it can */ }
+}
+function ofPlannerClose() {
+  const R = OfficeRoom; if (!R.overlay) return;
+  R.overlay.remove(); R.overlay = null; Sound.tick(); ofVisitUi();
 }
 /** The open conduct reports about people who still work for you, newest first. */
 function ofOpenReports(): any[] { return ((State as any).incidents || []).filter((x: any) => x.status === 'open' && staffById(x.staffId)); }
@@ -583,6 +598,7 @@ function ofInviteNow(id: string) {
 }
 function ofSpot(k: string) {
   if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
+  if (k === 'planner') { Sound.tick(); ofPlannerOpen(); return; }
   const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true;
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
   else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
@@ -731,6 +747,7 @@ function ofClick(b: HTMLElement) {
   else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else ofSpot(s); }
   else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
   else if (k === 'back') { Sound.tick(); ofVisitUi(); }
+  else if (k === 'plclose') ofPlannerClose();
   else if (k === 'tocourt') {
     // straight to the police, without talking to them first (the court will ask about that)
     const inc = ofOpenReports().filter((x: any) => x.id === b.getAttribute('data-id'))[0]; if (!inc || !courtReportable(inc)) return;

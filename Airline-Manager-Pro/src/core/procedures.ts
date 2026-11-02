@@ -136,6 +136,49 @@ const SimProcedures = {
   },
 };
 
+/* ---------- Real-world airways (from the simulator, through the PC app) ---------- */
+// Airliners and cargo jets fly the high airways, turboprops and light aircraft the low ones, between where
+// their departures end and their arrivals begin, as in real life. A route is asked for once per city pair and
+// kind and kept on this device; until it is known (or without the simulator) flights fly the great circle.
+interface AwyFixA { id: string; lat: number; lon: number; via: string }
+const AirwayRoutes = {
+  data: {} as { [k: string]: { at: number; route: AwyFixA[] } | false }, asked: {} as { [k: string]: number }, busy: 0,
+  key(from: string, to: string, cls: string) { return `${from}-${to}-${cls}`; },
+  get(from: string, to: string, cls: string): AwyFixA[] {
+    if (!from || !to || from === to || (State.settings as any).realAirways === false) return null;
+    const k = this.key(from, to, cls), d = this.data[k];
+    if (d) return d.route; if (d === false) return null;
+    try { const j = JSON.parse(localStorage.getItem('amp-awy:' + k) || 'null'); if (j && j.route) { this.data[k] = j; return j.route; } } catch (e) { /* none */ }
+    this.ask(from, to, cls);
+    return null;
+  },
+  sig(from: string, to: string, cls: string): string { const r = this.get(from, to, cls); return r ? '|awy' + cls + r.length : ''; },
+  ask(from: string, to: string, cls: string) {
+    const k = this.key(from, to, cls), now = Date.now();
+    if ((this.asked[k] && now - this.asked[k] < 30 * 60e3) || Link.status !== 'connected' || this.busy > 2) return;
+    const A = apt(from), B = apt(to); if (!A || !B || gcDistanceNm(A.pos, B.pos) < 100) { this.data[k] = false; return; }
+    this.asked[k] = now; this.busy++;
+    try { linkSend({ type: 'awy', from, to, cls } as any); } catch (e) { this.busy--; }
+  },
+  received(from: string, to: string, cls: string, route: AwyFixA[], error?: string) {
+    this.busy = Math.max(0, this.busy - 1);
+    const k = this.key(from, to, cls);
+    if (!route || error || route.length < 2) { this.data[k] = false; try { if (PlannerUi.awyWait === k) { PlannerUi.awyWait = ''; toast(error || 'No airway route found', 'warn'); } } catch (e) { /* not open */ } return; }
+    const v = { at: Date.now(), route: route.filter(x => x && isFinite(x.lat) && isFinite(x.lon)) };
+    this.data[k] = v;
+    try { localStorage.setItem('amp-awy:' + k, JSON.stringify(v)); } catch (e) { /* storage full */ }
+    // flights that start from now on fly it (a flight never changes its path in the air)
+    for (const pk of Object.keys(_paths)) if (pk.indexOf(from + '>' + to) === 0) delete _paths[pk];
+    try { for (const pk in _profiles) if (pk.indexOf('|' + from + '|' + to + '|') >= 0) delete _profiles[pk]; } catch (e) { /* none */ }
+    try { if (PlannerUi.awyWait === k) { PlannerUi.awyWait = ''; plFillAirways(v.route); } else plPanelRedraw(); } catch (e) { /* not open */ }
+  },
+};
+/** High airways for airliners and cargo jets, low ones for turboprops and light aircraft. */
+function awyClass(typeId: string): 'H' | 'L' {
+  const t = acType(typeId); if (!t) return 'H';
+  const P: any = perfFor(t); return P.jet && P.maxAlt >= 25000 ? 'H' : 'L';
+}
+
 /** While linked to Flight Simulator: the published departures, arrivals and approaches (real-world navigation
  *  data, as the simulator has it) for the airports your airline flies to, where its aircraft are, and the
  *  Faroe Islands, Iceland, Greenland and Scandinavia, fetched one airport every few seconds and kept on this
@@ -232,12 +275,15 @@ function simArrival(arr: RunwayEnd, from: number[]): { star: number[][]; app: nu
 
 const _paths: { [k: string]: FlightPath } = {};
 /** The whole path of a flight from runway to runway (cached). Null when the runways aren't known. */
-function flightPathFor(from: string, to: string, noSim?: boolean): FlightPath {
+function flightPathFor(from: string, to: string, noSim?: boolean, cls?: 'H' | 'L'): FlightPath {
   if (!from || !to || from === to || !World.runways) return null;
   const dep = activeRunway(from), arr = activeRunway(to);
   if (!dep || !arr) return null;
-  const PL = flightPlanFor(from, to);   // a flight plan from the planner: its waypoints instead of the great circle
-  const key = from + '>' + to + '|' + dep.name + '>' + arr.name + (noSim ? '|own' : '') + planSig(from, to);
+  const PL0 = flightPlanFor(from, to);   // a flight plan from the planner: its waypoints instead of the great circle
+  // otherwise the real airways (high or low) from the simulator, when known
+  const AW = !PL0 && cls && !noSim ? AirwayRoutes.get(from, to, cls) : null;
+  const PL: { wps: { id: string; lat: number; lon: number }[] } = PL0 || (AW ? { wps: AW.map((x, i) => ({ id: 'awy' + i, lat: x.lat, lon: x.lon })) } : null);
+  const key = from + '>' + to + '|' + dep.name + '>' + arr.name + (noSim ? '|own' : '') + planSig(from, to) + (AW ? '|awy' + cls + AW.length : '');
   if (_paths[key]) return _paths[key];
   // departure: the published one from the simulator, or straight ahead for 4 nm and a turn onto the route
   let sidPts: number[][], sidName: string;
@@ -316,7 +362,7 @@ function flightPathFor(from: string, to: string, noSim?: boolean): FlightPath {
   const wpD: { [id: string]: number } = {}; for (const id in wpRaw) wpD[id] = idx(map[sid.length + wpRaw[id]]);
   // still much longer than the trip itself: the app's own departure and arrival instead
   if ((sd || sa) && !noSim && len > gc * 1.35 + (PL ? 400 : 120)) { const own = flightPathFor(from, to, true); if (own) return (_paths[key] = own); }
-  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa), wpD } as any);
+  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa), wpD, awy: AW || null } as any);
 }
 
 /** The point `d` nm along a path, and the direction of travel there. */
@@ -333,7 +379,8 @@ function flightPathPos(f: any, now?: number): { pos: number[]; hdg: number; d: n
   if (!f || !f.depAt || f.real && f.you) return null;
   const pk = f.id + '|' + f.from + '>' + f.to + '|' + f.depAt + planSig(f.from, f.to);
   let fp = _flightPaths[pk];
-  if (!fp) { fp = flightPathFor(f.from, f.noDest ? null : f.to); if (!fp) return null; _flightPaths[pk] = fp; }
+  const cls = awyClass(f.typeId || (plane(f.reg) || {} as any).typeId);
+  if (!fp) { fp = flightPathFor(f.from, f.noDest ? null : f.to, false, cls); if (!fp) return null; _flightPaths[pk] = fp; }
   now = now || Date.now();
   const prof: FlightProfile = f.coop || f.tfc ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
   // the simulator's procedures much longer than the trip the times are worked out for: the app's own ones instead

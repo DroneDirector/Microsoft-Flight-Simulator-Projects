@@ -128,6 +128,7 @@ const Link = {
         else if (m.type === 'event') onSimEvent(m.e);
         else if (m.type === 'airports') onAirports(m.list);
         else if (m.type === 'layout') { try { AirportLayouts.received(m.icao, m.layout, m.error); } catch (e) { /* ignore */ } }
+        else if (m.type === 'awy') { try { AirwayRoutes.received(m.from, m.to, m.cls, m.route, m.error); } catch (e) { /* ignore */ } }
         else if (m.type === 'procs') { try { SimProcedures.received(m.icao, m.procs, m.error); } catch (e) { /* ignore */ } }
         else if (m.type === 'flightplan-saved') { try { plnSaved(m.path, m.error); } catch (e) { /* ignore */ } }
         else if (m.type === 'aircraft-list') { try { InstalledAircraft.received(m.list || [], m.error); } catch (e) { /* ignore */ } }

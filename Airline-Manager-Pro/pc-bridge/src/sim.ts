@@ -6,6 +6,7 @@ import { EventEmitter } from 'events';
 import { LB_TO_KG } from './geo';
 import type { SimSnapshot, Airport } from './protocol';
 import { LayoutReader, AirportLayout } from './airport-layout';
+import { AirwayReader, AwyFix } from './airways';
 import { ProcReader, AirportProcedures } from './procedures';
 
 export type RawSnapshot = Omit<SimSnapshot, 'phase' | 'from'>;
@@ -18,6 +19,7 @@ export interface SimSource extends EventEmitter {
   /** an airport's layout as the simulator has it (runways, taxiways, stands) */
   getLayout?(icao: string): Promise<AirportLayout>;
   getProcedures?(icao: string): Promise<AirportProcedures>;
+  getAirwayRoute?(from: string, to: string, high: boolean): Promise<AwyFix[]>;
   /** every airport the simulator has */
   allAirports?(): Promise<Airport[]>;
   // events: 'snapshot' (RawSnapshot), 'crash', 'airports' (Airport[]), 'status' (connected: boolean, text: string)
@@ -68,6 +70,9 @@ export class SimConnectSource extends EventEmitter implements SimSource {
   private stationNames: string[] = [];
   private layouts: LayoutReader = null;
   private procs: ProcReader = null;
+  private awys: AirwayReader = null;
+  /** Where the PC app keeps its data (set by main): the airway network read from the simulator is kept there. */
+  dataDir = '';
   private proto = 0;
   private all: Airport[] = null;
   private allParts: Airport[] = [];
@@ -98,6 +103,23 @@ export class SimConnectSource extends EventEmitter implements SimSource {
   getProcedures(icao: string): Promise<AirportProcedures> {
     if (!this.procs) return Promise.reject(new Error('Flight Simulator isn\'t running'));
     return this.procs.get(icao);
+  }
+
+  /** The airway route between two airports (high: airliners and cargo jets; low: turboprops and light aircraft):
+   *  from where its departures end to where its arrivals begin, along the simulator's own airways. */
+  async getAirwayRoute(from: string, to: string, high: boolean): Promise<AwyFix[]> {
+    if (!this.procs || !this.awys) throw new Error('Flight Simulator isn\'t running');
+    const [a, b] = await Promise.all([this.procs.get(from).catch((): any => null), this.procs.get(to).catch((): any => null)]);
+    const fix = (l: any) => l && l.fix && /^[A-Z0-9]{2,5}$/.test(l.fix) ? { id: l.fix, reg: l.reg || '', lat: l.lat, lon: l.lon } : null;
+    const uniq = (l: any[]) => l.filter((x, i) => x && l.findIndex(y => y && y.id === x.id) === i);
+    // where the departures end (each enroute transition, or the common part) and where the arrivals begin
+    const starts = uniq(((a && a.sids) || []).flatMap((p: any) => p.enroute.length ? p.enroute.map((t: any) => fix(t.legs[t.legs.length - 1])) : [fix(p.common[p.common.length - 1] || (p.runways[0] && p.runways[0].legs[p.runways[0].legs.length - 1]))]));
+    const goals = uniq(((b && b.stars) || []).flatMap((p: any) => p.enroute.length ? p.enroute.map((t: any) => fix(t.legs[0])) : [fix(p.common[0] || (p.runways[0] && p.runways[0].legs[0]))]));
+    if (!starts.length) throw new Error(`No departures in the simulator for ${from}`);
+    if (!goals.length) throw new Error(`No arrivals in the simulator for ${to}`);
+    const r = await this.awys.route(`${from}-${to}-${high ? 'H' : 'L'}`, starts, goals, high ? 2 : 1);
+    if (!r) throw new Error('No airway route found');
+    return r;
   }
 
   /** Every airport in the simulator (MSFS 2024): read once per session. */
@@ -181,6 +203,8 @@ export class SimConnectSource extends EventEmitter implements SimSource {
     this.layouts = new LayoutReader(h);
     this.layouts.on('note', (t: string) => this.emit('note', t));
     this.procs = new ProcReader(h);
+    this.awys = new AirwayReader(h, this.dataDir || require('os').tmpdir(), this.lib);
+    this.awys.on('note', (t: string) => this.emit('note', t));
     this.procs.on('note', (t: string) => this.emit('note', t));
     this.all = null;
     h.on('airportList', (r: any) => {
