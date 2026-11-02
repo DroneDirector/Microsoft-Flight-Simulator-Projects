@@ -2,6 +2,7 @@
 
 ## 0.9.68 (2026-11-02)
 
+- Android: laptop browser added to the activity's content frame (the web view's parent is a CoordinatorLayout), placed with the web view's offset
 - faces: a second, older humanTalk overrode the voice-led one and fed NaN to the jaw (heads partly missing, mouths still); removed, and pose ignores non-finite mouth values
 - office: the visitor answers your decision, waits for "you are dismissed", may reply, then leaves
 - court: stand-in per court day (refund when cancelled); the bar's gate opens and shuts with a spring swing, latch and hinge sound, blocks the way when shut

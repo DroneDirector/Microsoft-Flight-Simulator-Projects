@@ -29,9 +29,16 @@ public class LapBrowserPlugin extends Plugin {
     private View full;
     private WebChromeClient.CustomViewCallback fullDone;
 
+    /** The activity's own content frame (always a FrameLayout, whatever layout holds the app's web view). */
     private FrameLayout host() {
-        View v = getBridge().getWebView();
-        return (FrameLayout) v.getParent();
+        return (FrameLayout) getActivity().findViewById(android.R.id.content);
+    }
+
+    /** How far the app's web view sits from the content frame's corner, so the page lands on the laptop's screen. */
+    private int[] offset() {
+        int[] a = new int[2], b = new int[2];
+        try { getBridge().getWebView().getLocationInWindow(a); host().getLocationInWindow(b); } catch (Exception e) { return new int[]{0, 0}; }
+        return new int[]{a[0] - b[0], a[1] - b[1]};
     }
 
     private void place(PluginCall call) {
@@ -40,7 +47,8 @@ public class LapBrowserPlugin extends Plugin {
         int x = Math.round(call.getDouble("x", 0.0).floatValue() * k), y = Math.round(call.getDouble("y", 0.0).floatValue() * k);
         int w = Math.max(1, Math.round(call.getDouble("w", 300.0).floatValue() * k)), h = Math.max(1, Math.round(call.getDouble("h", 200.0).floatValue() * k));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, h);
-        lp.leftMargin = x; lp.topMargin = y;
+        int[] o = offset();
+        lp.leftMargin = x + o[0]; lp.topMargin = y + o[1];
         web.setLayoutParams(lp);
     }
 
