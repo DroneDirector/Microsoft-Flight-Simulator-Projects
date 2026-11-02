@@ -229,8 +229,10 @@ export async function uninstall(o: RemoveOpts, report: (p: Progress) => void): P
 export function removeFolderAfterExit(dir: string) {
   if (process.platform !== 'win32') { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* gone */ } return; }
   const bat = path.join(os.tmpdir(), 'amp-remove-' + process.pid + '.cmd');
-  fs.writeFileSync(bat, ['@echo off', ':wait', `tasklist /FI "PID eq ${process.pid}" 2>nul | find "${process.pid}" >nul && (timeout /t 1 /nobreak >nul & goto wait)`,
-    'cd /d "%TEMP%"', `rmdir /s /q "${dir}"`, `if exist "${dir}" (timeout /t 2 /nobreak >nul & rmdir /s /q "${dir}")`, '(goto) 2>nul & del "%~f0"', ''].join('\r\n'));
+  // (a pause with ping: "timeout" doesn't wait in a window-less command; Windows lets go of a program's own file
+  // a moment after it closes, so the folder is tried again for up to a minute)
+  fs.writeFileSync(bat, ['@echo off', ':wait', `tasklist /FI "PID eq ${process.pid}" 2>nul | find "${process.pid}" >nul && (ping -n 2 127.0.0.1 >nul & goto wait)`,
+    'cd /d "%TEMP%"', 'set /a n=0', ':again', `rmdir /s /q "${dir}" 2>nul`, `if exist "${dir}" (set /a n+=1 & ping -n 2 127.0.0.1 >nul & if %n% lss 60 goto again)`, '(goto) 2>nul & del "%~f0"', ''].join('\r\n'));
   const ch = spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsHide: true }); ch.unref();
 }
 
