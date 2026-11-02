@@ -143,6 +143,7 @@
     "src/graphics/aim.ts",
     "src/screens/court3d.ts",
     "src/screens/office3d.ts",
+    "src/screens/laptop.ts",
     "src/screens/ops3d.ts",
     "src/data/stars.ts",
     "src/screens/v3d-sky.ts",

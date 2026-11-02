@@ -92,13 +92,24 @@ function openWindow(url: string, prefs: DesktopPrefs): boolean {
     width: prefs.width || 1600, height: prefs.height || 900, minWidth: 960, minHeight: 600, center: true, show: false,
     title: 'Airline Manager Pro', icon: fs.existsSync(icon) ? icon : undefined, backgroundColor: '#06111F', autoHideMenuBar: true,
     fullscreen: prefs.mode === 'borderless', kiosk: prefs.mode === 'fullscreen',
-    webPreferences: { backgroundThrottling: false, contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false },
+    webPreferences: { backgroundThrottling: false, contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false, webviewTag: true },
   });
   win.once('ready-to-show', () => win.show());
   const wc = win.webContents, origin = new URL(url).origin;
   // links to other sites open in the normal browser, never inside the app
   wc.setWindowOpenHandler((d: any) => { if (/^https?:/i.test(d.url)) shell.openExternal(d.url); return { action: 'deny' }; });
   wc.on('will-navigate', (ev: any, to: string) => { if (new URL(to).origin !== origin) { ev.preventDefault(); if (/^https?:/i.test(to)) shell.openExternal(to); } });
+  // the laptop's web browser (a <webview> in the office): web pages only, sandboxed, nothing of the app's own powers;
+  // signed-in sites stay signed in (its own saved partition)
+  wc.on('will-attach-webview', (_e: any, prefs: any, params: any) => {
+    delete prefs.preload; prefs.nodeIntegration = false; prefs.contextIsolation = true; prefs.sandbox = true; prefs.webSecurity = true;
+    if (!/^https?:/i.test(params.src || '')) params.src = 'about:blank';
+    params.partition = 'persist:laptop';
+  });
+  wc.on('did-attach-webview', (_e: any, guest: any) => {
+    guest.setWindowOpenHandler((d: any) => { if (/^https?:/i.test(d.url)) guest.loadURL(d.url); return { action: 'deny' }; });   // links that open a new window open in the same page
+    guest.on('will-navigate', (ev: any, to: string) => { if (!/^https?:/i.test(to)) ev.preventDefault(); });
+  });
   // F11 switches full screen, as in the Edge window
   wc.on('before-input-event', (ev: any, i: any) => { if (i.type === 'keyDown' && i.key === 'F11') { ev.preventDefault(); win.setFullScreen(!win.isFullScreen()); } });
   // the drawing part stopped (a graphics driver reset, out of memory): note it and load the app again

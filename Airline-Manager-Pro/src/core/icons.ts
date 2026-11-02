@@ -52,6 +52,13 @@ const ICON_PATHS: { [k: string]: string } = {
   jobs: '<rect x="3.5" y="7.5" width="17" height="12" rx="1.6"/><path d="M9 7.5V5.6c0-.9.7-1.6 1.6-1.6h2.8c.9 0 1.6.7 1.6 1.6v1.9M3.5 12.5h17M11 12.5v2h2v-2"/>',
   dispatch: '<rect x="5" y="4.5" width="14" height="16" rx="1.6"/><path d="M9.5 4.5V3.5h5v1M8.5 10h7M8.5 13.5h7M8.5 17h4"/>',
   pc: '<rect x="3" y="4.5" width="18" height="12" rx="1.5"/><path d="M8.5 20.5h7M12 16.5v4"/>',
+  mail: '<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3.5 7l8.5 6.2L20.5 7"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2"/>',
+  bank: '<path d="M3 9.5L12 4l9 5.5"/><path d="M4.5 10v8M9 10v8M15 10v8M19.5 10v8M3 20h18"/>',
+  camera: '<path d="M4 8h3.2L9 5.5h6L16.8 8H20a1 1 0 0 1 1 1v9.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.6"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/>',
+  back: '<path d="M14.5 5.5L8 12l6.5 6.5"/>',
+  reload: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/>',
 };
 
 function icon(name: string, cls?: string): string {

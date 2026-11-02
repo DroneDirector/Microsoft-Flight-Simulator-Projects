@@ -164,6 +164,7 @@ function courtAdvance() {
   if (conduct) try { courtReleases(); whistleAdvance(); } catch (e) { /* ignore */ }
   try { hearingReminders(); hearingWatchDaily(); courtLeakCheck(); } catch (e) { /* ignore */ }
   try { investigationsAdvance(); } catch (e) { /* ignore */ }
+  try { mailTick(); } catch (e) { /* ignore */ }
   const now = Date.now(); let changed = false;
   for (const c of S.cases as CourtCase[]) {
     if (c.status !== 'open' && !(c as any).appealing) continue;

@@ -169,7 +169,8 @@ function ofBuild(scene: any, q: number) {
   bx(1.06, 0.5, 0.03, mat.walnutM, 0, 0.45, -0.12);   // modesty panel, set back
   // things on the desk
   const lt = new T.Group(); lt.position.set(0.72, 0.775, 0.02); lt.rotation.y = -0.6; root.add(lt);
-  ofLaptop3d(T, lt, slab, bx, ctTex(ofLaptop(co)));
+  A.lapScr = ofLaptop3d(T, lt, slab, bx, ctTex(ofLaptop(co)));
+  { const lh = new T.Mesh(new T.BoxGeometry(0.38, 0.27, 0.3), new T.MeshBasicMaterial({ visible: false })); lh.position.set(0, 0.12, -0.02); lh.userData.act = 'laptop'; lt.add(lh); A.hits.push(lh); }
   // the banker's lamp: brass stand, green glass shade, a warm light
   add(new T.CylinderGeometry(0.07, 0.08, 0.02, 24), mat.brass, -0.72, 0.785, -0.18); add(new T.CylinderGeometry(0.008, 0.008, 0.3, 8), mat.brass, -0.72, 0.94, -0.18);
   const shade = add(new T.CylinderGeometry(0.06, 0.06, 0.32, 28, 1, true, 0, Math.PI), mat.greenGlass, -0.72, 1.1, -0.17); shade.rotation.set(0, 0, Math.PI / 2);   // a half tube, open below
@@ -301,6 +302,8 @@ function ofLaptop3d(T: any, lt: any, slab: any, bx: any, screenTex: any) {
   const scrW = W - 0.022, scrH = LH - 0.026;
   const sm = new T.Mesh(new T.PlaneGeometry(scrW, scrH), new T.MeshBasicMaterial({ map: screenTex, toneMapped: false })); sm.position.set(0, LH / 2 - 0.004, 0.0004); lid.add(sm);
   const cam = new T.Mesh(new T.CircleGeometry(0.0022, 12), new T.MeshStandardMaterial({ color: 0x1D2733, roughness: 0.1 })); cam.position.set(0, LH - 0.006, 0.0005); lid.add(cam);
+  sm.userData.size = [scrW, scrH];
+  return sm;
 }
 
 /** A photo of you with your family on the desk: taken once, with the figures, and kept. */
@@ -385,12 +388,14 @@ function ofOpen2(root: HTMLElement, q: number) {
     drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; cv.setPointerCapture(e.pointerId); });
   R.mm$ = (e: MouseEvent) => { if (R.on && !R.seat && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
   document.addEventListener('mousemove', R.mm$);
-  cv.addEventListener('pointermove', e => { if (!drag) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); });
+  cv.addEventListener('pointermove', e => {
+    if (!drag && R.seat && !R.overlay && !R.loading) { const o = ofAimedObj(e), on = !!(o && o.userData.act === 'laptop'); R.lapHover = on; cv.style.cursor = on ? 'pointer' : ''; if (on && R.glow) R.glow.showObj(o); }
+    if (!drag) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); });
   cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else ofClickAt(); return; } justLocked = false; if (drag && moved < 6) ofClickAt(e); drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); });
   R.key$ = (e: KeyboardEvent) => {
     if (!R.on) return; const k = e.key.toLowerCase();
-    if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); ofPlannerClose(); } return; }   // the planner has the keys (typing)
+    if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay.classList.contains('lap-screen')) ofLaptopClose(); else ofPlannerClose(); } return; }   // the planner has the keys (typing)
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; ofLeave(); return; }   // the first Esc only gives the mouse back
     if (k === 'h' && !R.seat) { e.preventDefault(); R.root.classList.toggle('ui-off'); return; }   // walking: hide or show the controls
     if (/^(w|a|s|d|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
@@ -415,7 +420,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   });
   if (Human.ready) setTimeout(photo, 30); else Human.load().then(() => setTimeout(photo, 30), () => next());
   R.loading = true;
-  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !R.overlay) ofFrame(); };   // the room rests while the planner is open
+  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && (!R.overlay || R.lapZ)) ofFrame(); };   // the room rests while the planner is open
   R.raf = requestAnimationFrame(loop);
 }
 function ofReady() {
@@ -433,7 +438,8 @@ function ofReady() {
 }
 OfficeRoom.close = function (quiet?: boolean) {
   const R = OfficeRoom; if (!R.on) return; R.on = false;
-  R.overlay = null; document.body.classList.remove('of-over');
+  if (R.overlay && R.overlay.classList.contains('lap-screen')) { try { lapUnmount(); } catch (e) { /* closed */ } }
+  R.overlay = null; R.lapZ = null; document.body.classList.remove('of-over');
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   document.removeEventListener('mousemove', R.mm$); aimUnlock(); R.glow = null;
   try { Voice.stop(); } catch (e) { /* ignore */ }
@@ -629,13 +635,23 @@ function ofFrame() {
   }
   } catch (e) { ofRescue(e); }
   // you: in your chair (look around), or walking about
-  if (R.seat) {
+  const lk = ofLapK();
+  if (R.seat && lk > 0 && R.A.lapScr) {
+    // leaning in to the laptop (and back), eased at both ends
+    const e = lk * lk * (3 - 2 * lk), S = R.A.lapScr, c = new T.Vector3(), n = new T.Vector3(0, 0, 1);
+    S.getWorldPosition(c); n.applyQuaternion(S.getWorldQuaternion(new T.Quaternion()));
+    const to = c.clone().add(n.multiplyScalar(0.42)), from = new T.Vector3(0, 1.2, 1.02);
+    R.cam.position.copy(from.lerp(to, e));
+    const yaw = Math.PI + R.look.yaw, p = R.look.pitch, ahead = R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)));
+    R.cam.lookAt(ahead.lerp(c, e));
+    if (S.material) S.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, lk * 1.4)));   // the screen lights up as it opens
+  } else if (R.seat) {
     R.cam.position.set(0, 1.2, 1.02);
     const yaw = Math.PI + R.look.yaw;   // facing −z
     const k = R.keys || {}; if (k.arrowleft) R.look.yaw = clamp(R.look.yaw + dt * 1.4, -2.6, 2.6); if (k.arrowright) R.look.yaw = clamp(R.look.yaw - dt * 1.4, -2.6, 2.6); if (k.arrowup) R.look.pitch = clamp(R.look.pitch + dt, -1.25, 0.9); if (k.arrowdown) R.look.pitch = clamp(R.look.pitch - dt, -1.25, 0.9);
     const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
   } else ofWalk(dt);
-  if (R.glow) { if (R.seat) R.glow.hide(); R.glow.step(dt); }
+  if (R.glow) { if ((R.seat && !R.lapHover) || R.overlay || R.lapZ) R.glow.hide(); R.glow.step(dt); }
   R.ren.render(R.scene, R.cam);
 }
 function ofBlocked(x: number, z: number): boolean {
@@ -668,8 +684,10 @@ function ofAimedObj(e?: PointerEvent): any {
   return h && h.distance < 2.6 ? h.object : null;
 }
 function ofClickAt(e?: PointerEvent) {
-  const R = OfficeRoom; if (R.seat || R.loading) return;
-  const a = ofAimed(e) || ofAimed();
+  const R = OfficeRoom; if (R.loading || R.overlay) return;
+  const a = ofAimed(e) || (R.seat ? '' : ofAimed());
+  if (a === 'laptop') { ofLaptopOpen(); return; }
+  if (R.seat) return;
   if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); R.doorT = 1; setTimeout(() => ofExitToMain(), 650); }
 }
 function ofSit() { aimUnlock(); const R = OfficeRoom; R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = true; ofVisitUi(); Sound.tick(); }
@@ -691,7 +709,7 @@ function ofVisitUi(afterInterview?: boolean) {
   if (!afterInterview) { box.hidden = true; ofTopState(); }
   sp.hidden = false;
   const nRep = ofOpenReports().length;
-  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['planner', 'Flight planner'], ['schedule', 'Schedule'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
+  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['laptop', 'My laptop'], ['planner', 'Flight planner'], ['schedule', 'Schedule'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
   pad.hidden = R.seat;
   if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · the mouse looks around, all the way round · click what glows · H hides the controls · Esc for the menu' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
   else hint.hidden = true;
@@ -710,6 +728,59 @@ function ofScreenOpen(key: string) {
   try { if (SCREENS[key].mount) SCREENS[key].mount(ov.querySelector('.of-pl-body .screen') as HTMLElement); } catch (e) { /* the screen shows what it can */ }
 }
 function ofPlannerOpen() { ofScreenOpen('planner'); }
+
+/* ---------- the laptop: lean in, and its screen grows out of it (as the Operations monitor) ---------- */
+const OF_LAP_MS = 750;
+function ofLapK(): number {
+  const R = OfficeRoom, Z = R.lapZ; if (!Z) return R.overlay && R.overlay.classList.contains('lap-screen') ? 1 : 0;
+  const k = Math.min(1, (performance.now() - Z.t0) / OF_LAP_MS);
+  if (k >= 1) { R.lapZ = null; if (Z.done) Z.done(); return Z.dir > 0 ? 1 : 0; }
+  return Z.dir > 0 ? k : 1 - k;
+}
+/** The laptop's screen on your screen, from the chair. */
+function ofLapRect(): { x: number; y: number; w: number; h: number } {
+  const R = OfficeRoom, T = THREE, cam = R.cam, S = R.A.lapScr, rr = R.root.getBoundingClientRect();
+  const keep = cam.position.clone(), q = cam.quaternion.clone();
+  cam.position.set(0, 1.2, 1.02); const yaw = Math.PI + R.look.yaw, p = R.look.pitch;
+  cam.lookAt(cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)))); cam.updateMatrixWorld();
+  const [w, h] = S.userData.size || [0.32, 0.2]; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const [x, y] of [[-w / 2, -h / 2], [w / 2, -h / 2], [-w / 2, h / 2], [w / 2, h / 2]]) {
+    const v = S.localToWorld(new T.Vector3(x, y, 0)).project(cam), sx = (v.x + 1) / 2 * rr.width, sy = (1 - v.y) / 2 * rr.height;
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+  }
+  cam.position.copy(keep); cam.quaternion.copy(q); cam.updateMatrixWorld();
+  return { x: x0, y: y0, w: Math.max(40, x1 - x0), h: Math.max(30, y1 - y0) };
+}
+function ofLaptopOpen() {
+  const R = OfficeRoom; if (!R.on || R.overlay || R.lapZ || !R.A || !R.A.lapScr) return;
+  Sound.tick(); aimUnlock();
+  if (!R.seat) { R.seat = true; R.view = 'sit'; }
+  R.look = { yaw: R.look.yaw, pitch: R.look.pitch };
+  for (const sel of ['.of-spots', '.ct-box', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
+  const ov = document.createElement('div'); ov.className = 'of-planner lap-screen';
+  R.root.appendChild(ov); R.overlay = ov; document.body.classList.add('of-over');
+  try { lapMount(ov); } catch (e) { ov.innerHTML = '<p class="muted">The laptop could not start.</p>'; }
+  let reduced = false; try { reduced = !!(State.settings as any).reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* motion */ }
+  if (reduced) return;
+  const m = ofLapRect(), W = R.root.clientWidth, H = R.root.clientHeight;
+  ov.classList.add('lap-zoom'); ov.style.transformOrigin = '0 0';
+  ov.style.transform = `translate(${m.x}px, ${m.y}px) scale(${m.w / W}, ${m.h / H})`; ov.style.opacity = '0';
+  const fx = document.createElement('div'); fx.className = 'lap-zoom-fx'; fx.style.left = m.x + 'px'; fx.style.top = m.y + 'px'; fx.style.width = m.w + 'px'; fx.style.height = m.h + 'px'; R.root.appendChild(fx);
+  R.lapZ = { t0: performance.now(), dir: 1, done: () => { ov.classList.remove('lap-zoom', 'lap-zoom-go'); ov.style.transform = ''; ov.style.opacity = ''; ov.style.transformOrigin = ''; } };
+  void ov.offsetWidth;
+  requestAnimationFrame(() => { ov.classList.add('lap-zoom-go'); ov.style.transform = 'translate(0px, 0px) scale(1, 1)'; ov.style.opacity = '1'; fx.classList.add('go'); setTimeout(() => fx.remove(), 900); });
+}
+function ofLaptopClose() {
+  const R = OfficeRoom, ov = R.overlay; if (!ov || !ov.classList.contains('lap-screen') || R.lapZ) return;
+  Sound.tick(); try { lapUnmount(); } catch (e) { /* closed */ }
+  const finish = () => { ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); ofVisitUi(); };
+  let reduced = false; try { reduced = !!(State.settings as any).reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* motion */ }
+  if (reduced) { finish(); return; }
+  const m = ofLapRect(), W = R.root.clientWidth, H = R.root.clientHeight;
+  ov.style.pointerEvents = 'none'; ov.style.transformOrigin = '0 0'; ov.classList.add('lap-zoom', 'lap-zoom-go', 'lap-zoom-back');
+  R.lapZ = { t0: performance.now(), dir: -1, done: finish };
+  requestAnimationFrame(() => { ov.style.transform = `translate(${m.x}px, ${m.y}px) scale(${m.w / W}, ${m.h / H})`; ov.style.opacity = '0'; });
+}
 /** After a change (a leg moved, a route added): the screen over the office shows it too. */
 function ofScreenRefresh() {
   const R = OfficeRoom; if (!R.on || !R.overlay) return;
@@ -749,6 +820,7 @@ function ofInviteNow(id: string) {
 }
 function ofSpot(k: string) {
   if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
+  if (k === 'laptop') { ofLaptopOpen(); return; }
   if (k === 'planner' || k === 'schedule') { Sound.tick(); ofScreenOpen(k); return; }
   const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true; ofTopState();
   if (k !== 'free') aimUnlock();

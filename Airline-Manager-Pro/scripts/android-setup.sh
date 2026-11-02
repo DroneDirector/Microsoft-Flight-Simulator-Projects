@@ -21,7 +21,7 @@ APPID=$(node -p "require('./app.config.json').appId")
 JDIR="android/app/src/main/java/$(echo "$APPID" | tr '.' '/')"
 mkdir -p "$JDIR"
 sed "s/__PACKAGE__/${APPID}/" scripts/android/MainActivity.java > "$JDIR/MainActivity.java"
-for J in LanLinkPlugin AppToolsPlugin VoicePlugin UpdatedReceiver StatusWidget; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
+for J in LanLinkPlugin AppToolsPlugin VoicePlugin LapBrowserPlugin UpdatedReceiver StatusWidget; do sed "s/__PACKAGE__/${APPID}/" "scripts/android/$J.java" > "$JDIR/$J.java"; done
 # permissions for the Wi-Fi link (network name needs location), notifications and installing updates
 # updates install without asking (Android 12+) only with UPDATE_PACKAGES_WITHOUT_USER_ACTION; after the
 # update the app opens again by itself (UpdatedReceiver)

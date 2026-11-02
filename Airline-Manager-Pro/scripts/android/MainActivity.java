@@ -50,6 +50,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(LanLinkPlugin.class);
         registerPlugin(AppToolsPlugin.class);
         registerPlugin(VoicePlugin.class);
+        registerPlugin(LapBrowserPlugin.class);
         keepCrashReports();
         super.onCreate(savedInstanceState);
         if (getBridge() != null) getBridge().addWebViewListener(new WebViewListener() {

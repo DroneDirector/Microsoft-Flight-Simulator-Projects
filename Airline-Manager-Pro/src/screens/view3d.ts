@@ -66,6 +66,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-info"></div>
     <div class="v3d-line"></div>
     <div class="v3d-status"></div>
+    <button class="v3d-shot" data-act="v3d-shot" aria-label="Take a screenshot" title="Take a screenshot (P)">${icon('camera')}</button>
     <button class="v3d-uitog" data-act="v3d-ui" aria-label="Hide or show the controls" title="Hide or show the controls (H)">${icon('focus')}<span>Hide controls</span></button>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
     <div class="v3d-free-ui">
@@ -154,6 +155,12 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (!V3d.open || !/^(walk|free)$/.test(V3d.mode) || e.key.toLowerCase() !== 'h' || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target as HTMLElement; if (t && t.closest && t.closest('input, textarea, [contenteditable]')) return;
   e.preventDefault(); v3dUi();
+});
+// P takes a screenshot (any camera)
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (!V3d.open || e.key.toLowerCase() !== 'p' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  const t = e.target as HTMLElement; if (t && t.closest && t.closest('input, textarea, [contenteditable]')) return;
+  e.preventDefault(); ACTIONS['v3d-shot'](null, null);
 });
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
@@ -1289,3 +1296,19 @@ function v3dClockStep(now: number) {
   if (el.textContent !== txt) el.innerHTML = `${icon('clock')}<b>${txt}</b>`;
   if (el.title !== title) { el.title = title; el.classList.toggle('sim', sim); }
 }
+
+/** A screenshot of the 3D view, kept with your screenshots (on your laptop and in your flight log). */
+ACTIONS['v3d-shot'] = () => {
+  if (!V3d.open || !V3d.r || !V3d.cv) return;
+  try {
+    V3d.r.render(V3d.scene, V3d.cam);   // drawn just now, so the picture is there to copy
+    const src = V3d.cv, W = src.width, H = src.height, big = document.createElement('canvas'), k = Math.min(1, 1920 / Math.max(W, H));
+    big.width = Math.round(W * k); big.height = Math.round(H * k); (big.getContext('2d') as CanvasRenderingContext2D).drawImage(src, 0, 0, big.width, big.height);
+    const th = document.createElement('canvas'), t = 320 / Math.max(big.width, big.height); th.width = Math.round(big.width * t); th.height = Math.round(big.height * t); (th.getContext('2d') as CanvasRenderingContext2D).drawImage(big, 0, 0, th.width, th.height);
+    const f: any = State.live.filter(x => x.id === V3d.target)[0], cap = `3D view${f ? ` · ${f.reg}, ${f.from} to ${f.to}` : V3d.icao ? ` · ${V3d.icao}` : ''}`;
+    const flash = document.createElement('div'); flash.className = 'v3d-flash'; V3d.root.appendChild(flash); setTimeout(() => flash.remove(), 600);
+    try { Sound.tick(); } catch (e) { /* quiet */ }
+    PhotoDb.put({ id: uid(), log: '3d', at: Date.now(), data: big.toDataURL('image/jpeg', 0.9), thumb: th.toDataURL('image/jpeg', 0.75), w: big.width, h: big.height, cap, mode: Mode.coop() ? 'coop' : 'solo' })
+      .then(() => toast('Screenshot saved: see it on your laptop, in the office', 'ok')).catch(() => toast('The screenshot could not be saved', 'warn'));
+  } catch (e) { toast('The screenshot could not be taken', 'warn'); }
+};
