@@ -43,6 +43,8 @@ copyFileSync(ico, join(pkg, 'app.ico'));
 
 // the app itself: its own browser engine (Electron's files, unchanged), renamed and with the app's icon
 const engine = join(here, 'node_modules', 'electron', 'dist');
+// npm may skip the package's own download step: run it (it fetches this exact Electron version's files and checks them)
+if (!existsSync(join(engine, 'version'))) run('node node_modules/electron/install.js');
 if (!existsSync(join(engine, 'electron.exe')) && process.platform === 'win32') throw new Error('Electron is missing (npm install)');
 cpSync(engine, pkg, { recursive: true });
 rmSync(join(pkg, 'resources', 'default_app.asar'), { force: true });
