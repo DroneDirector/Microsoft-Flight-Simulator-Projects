@@ -48,9 +48,29 @@ function v3dTargetFlight(): any {
   return null;
 }
 function v3dAptOnly(): any { const k = String(V3d.target || ''); if (k.indexOf('apt:') !== 0) return null; const icao = k.slice(4), A = apt(icao); return A ? { id: k, from: icao, to: icao, real: true, pos: A.pos, alt: 0, hdg: 0, phase: 'Parked', callsign: icao } : null; }
+/** Opened from a screen in one of your offices (the Operations monitor, your laptop): the room is put away first, so
+ *  the graphics card has only the 3D view to draw (two 3D scenes at once can make it give up: "WebGL context lost"),
+ *  and you are back in the room, at the same screen, when you close the 3D view. */
+function v3dRoomSuspend() {
+  const O: any = typeof OpsRoom !== 'undefined' ? OpsRoom : null, F: any = typeof OfficeRoom !== 'undefined' ? OfficeRoom : null;
+  if (O && O.on) { (V3d as any).backTo = { room: 'ops', tab: O.overlay ? (O.overlay.getAttribute('data-screen') || O.tab) : '' }; O.close(true); return; }
+  if (F && F.on && !F.inc) { const lap = F.overlay && F.overlay.classList.contains('lap-screen'); (V3d as any).backTo = { room: 'office', lap, app: lap ? Lap.app : '', screen: !lap && F.overlay ? F.overlay.getAttribute('data-screen') : '' }; F.close(true); return; }
+  (V3d as any).backTo = null;
+}
+/** Back into the room the 3D view was opened from, at the same screen. */
+function v3dRoomResume(): boolean {
+  const B = (V3d as any).backTo; (V3d as any).backTo = null; if (!B) return false;
+  const ready = (R: any, then: () => void) => { const t0 = Date.now(), iv = setInterval(() => { if (!R.on) { clearInterval(iv); return; } if (!R.loading && R.A && Date.now() - t0 > 2600) { clearInterval(iv); try { then(); } catch (e) { /* stays in the room */ } } else if (Date.now() - t0 > 40000) clearInterval(iv); }, 250); };
+  try {
+    if (B.room === 'ops') { OpsRoom.open(); if (B.tab) ready(OpsRoom, () => opsScreenOpen(B.tab)); return true; }
+    if (B.room === 'office') { OfficeRoom.open(); if (B.lap) ready(OfficeRoom, () => { ofLaptopOpen(); if (B.app) setTimeout(() => { Lap.app = B.app; lapRender(); }, 60); }); else if (B.screen) ready(OfficeRoom, () => ofScreenOpen(B.screen)); return true; }
+  } catch (e) { /* back to the app */ }
+  return false;
+}
 function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
+  try { v3dRoomSuspend(); } catch (e) { /* no room */ }
   V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null; V3d.shown = 0;   // the loading bar starts from nothing every time
   v3dCrashGuard(true);
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
@@ -140,7 +160,7 @@ ACTIONS['v3d-close'] = () => {
   exitSplash('v3d', '3D view', [
     { pct: 30, step: 'Landing the camera…', run: () => { (V3d as any).fcLeaving = true; v3dClose(); (V3d as any).fcLeaving = false; } },
     { pct: 55, step: 'Clearing the 3D world from memory…', run: () => { try { if (CabinOut.rt) CabinOut.rt.dispose(); CabinOut.rt = null; } catch (e) { /* none */ } exitFreeMemory(); } },
-    { pct: 85, step: free ? 'Loading the Overview…' : 'Loading the map…', run: () => { if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } else { try { refresh(); } catch (e) { /* ignore */ } } } },
+    { pct: 85, step: (V3d as any).backTo ? 'Back to your office…' : free ? 'Loading the Overview…' : 'Loading the map…', run: () => { if (v3dRoomResume()) return; if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } else { try { refresh(); } catch (e) { /* ignore */ } } } },
   ]);
 };
 /** Walking and the free camera: the controls can be hidden for a clean view (the button, H, or R3 on a controller). */
