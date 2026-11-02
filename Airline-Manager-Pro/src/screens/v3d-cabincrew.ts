@@ -40,7 +40,7 @@ function cabinCrewEnsure(P: any, G: any): boolean {
   if (!Human.ready) { C.loading = true; Human.load().then(() => { C.loading = false; }, () => { C.loading = false; }); return false; }
   cabinCrewFree();
   const T = THREE, g = new T.Group(); C.grp = g; C.key = key; G.add(g);
-  const co = company(), accent = co.color || '#2C8CFF', style = av3Style(), q = cabinQ() >= 2 ? 1 : 0.6;
+  const co = company(), accent = co.color || '#2C8CFF', style = av3Style(), q = cabinQ() === 3 ? 1 : cabinIsPc() ? [0.45, 0.6, 0.8][cabinQ()] : [0.35, 0.4, 0.5][cabinQ()];   // Ultra: the full figures
   C.light = new T.HemisphereLight(0xFFFFFF, 0x6E747C, 1.0); g.add(C.light);
   // the seats: front left and right (facing the cabin), back left and right (facing forward)
   const fx = at.x0 + 0.45, bx = at.x1 - 0.4;   // the back seats' backrests stay inside the rear wall

@@ -162,7 +162,7 @@ const CABIN_HD_Q = ['Light', 'Normal', 'High', 'Highest'];
  *  devices with little memory). */
 function cabinHdDetail(): number {
   const v = cabinOpt('cabHdQ'); if (v !== 'auto') return [0.35, 0.5, 0.7, 0.9][clamp(+v, 0, 3)];
-  const q = cabinQ(); return q === 3 ? 0.9 : cabinLowMem() ? 0.35 : cabinIsPc() ? [0.35, 0.5, 0.7][q] : 0.5;
+  const q = cabinQ(); return q === 3 ? 0.9 : cabinIsPc() ? [0.5, 0.7, 0.8][q] : 0.35;
 }
 function cabinHdStep(G: any, dt: number) {
   const pg = G.userData.people; if (!pg || !pg.userData.figs || !Human || !V3d.cam) return;
