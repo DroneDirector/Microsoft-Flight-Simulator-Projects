@@ -6,6 +6,7 @@ on:
     paths:
       - 'Airline-Manager-Pro/**'
       - '!Airline-Manager-Pro/tools/market/**'
+      - '!Airline-Manager-Pro/docs/**'
       - '.github/workflows/airline-manager-pro-android.yml'
   workflow_dispatch:
 
