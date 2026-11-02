@@ -135,6 +135,7 @@ function hearingAuto(c: any, st: any, how: 'standin' | 'absent' | 'off', skip?: 
   if (how === 'absent') { h.absent++; h.pAdj += h.kind === 'staff' ? -0.08 : 0.05; hearRate(c, -2, 'Did not come to court'); }   // without your evidence, a case you brought is weaker
   st.done = true; st.held = how;
   st.text = how === 'standin' ? `${si.name} attended for you. ${hearingDaySummary(c, st.key)}` : how === 'absent' ? `You did not come to court. The hearing went ahead without you, and the court noted your absence. ${hearingDaySummary(c, st.key)}` : hearingDaySummary(c, st.key);
+  if (how === 'standin') { h.lastStandIn = si; h.standIn = null; }   // one court day at a time: you decide again for the next
   hearingAfterDay(c, st);
   if (how === 'standin' && h.pending && h.pending.length) {
     State.notices.unshift({ id: uid(), kind: 'authority' as any, title: `${si.name} needs your decision`, body: `In the case against ${c.name}: ${h.pending.map((k: string) => k === 'settle' ? 'the families offer a settlement' : 'your lawyer asks how the airline pleads').join(', and ')}. These are your decisions to make.`, time: 'Now', at: Date.now(), read: false, ref: c.id } as any);
@@ -334,8 +335,8 @@ function hearingWatchDaily() {
   }
 }
 
-/** The price of a board member standing in for you: a large sum, more for a bigger airline. */
-function standInCost(c: any): number { return Math.round(clamp(400000 + fleetOf(c.companyId).length * 80000, 400000, 3000000) / 10000) * 10000; }
+/** The price of a board member standing in for you for one court day: a large sum, more for a bigger airline. */
+function standInCost(c: any): number { return Math.round(clamp(150000 + fleetOf(c.companyId).length * 30000, 150000, 1200000) / 10000) * 10000; }
 function standInPick(c: any): any {
   const p: any = makePerson('board-' + c.id, 'captain', c.companyId, company(c.companyId).hub);
   const r = seeded('board-skill-' + c.id)(); return { name: p.name, sex: p.sex, look: p.look, skill: Math.round((0.45 + r * 0.45) * 100) / 100 };
@@ -344,8 +345,8 @@ function standInHire(c: any) {
   if (c.hear.standIn) return;
   const cost = standInCost(c), s = standInPick(c);
   payTxn(c.companyId, `Board member stands in for you in court: ${s.name}`, -cost, 'fees', [[c.court, -cost]]);
-  c.hear.standIn = s;
-  State.notices.unshift({ id: uid(), kind: 'authority' as any, title: `${s.name} will stand in for you in court`, body: `${s.name}, from the board, attends the rest of the case for the airline (${s.skill > 0.75 ? 'experienced and calm in court' : s.skill > 0.6 ? 'capable' : 'not much experience in court'}). The big decisions still come to you.`, time: 'Now', at: Date.now(), read: false, ref: c.id } as any);
+  c.hear.standIn = Object.assign(s, { cost });
+  State.notices.unshift({ id: uid(), kind: 'authority' as any, title: `${s.name} will stand in for you in court`, body: `${s.name}, from the board, attends the next court day for the airline (${s.skill > 0.75 ? 'experienced and calm in court' : s.skill > 0.6 ? 'capable' : 'not much experience in court'}). The big decisions still come to you.`, time: 'Now', at: Date.now(), read: false, ref: c.id } as any);
   Store.save();
 }
 
@@ -356,8 +357,9 @@ function hearingCaseHtml(c: any): string {
   let x = '';
   if (wait && !h.standIn) x += `<div class="cc-row hear-now"><span><b>Court is in session</b><small>${esc(wait.title)}. ${wait.deadline ? `It goes ahead without you after ${esc(dateStr(new Date(wait.deadline)).slice(11))}.` : ''}</small></span><button class="btn primary sm" data-act="court-attend" data-id="${esc(c.id)}">Go to court</button></div>`;
   if (h.verdictReady && !h.verdictSeen) x += `<div class="cc-row hear-now"><span><b>The verdict</b><small>Hear it read out in court</small></span><button class="btn primary sm" data-act="court-attend" data-id="${esc(c.id)}" data-k="verdict">Go to court</button></div>`;
-  if ((c.status === 'open' || c.appealing) && !h.standIn) x += `<div class="cc-row"><span><b>Stand-in</b><small>A board member attends court for you from now on. The big decisions still come to you.</small></span><button class="btn ghost sm" data-act="court-standin" data-id="${esc(c.id)}">Send a board member, ${money(standInCost(c))}</button></div>`;
-  if (h.standIn) x += `<div class="cc-row"><span><b>Stand-in</b><small>${esc(h.standIn.name)} attends court for the airline</small></span></div>`;
+  const nextDay = c.stages.filter((s: any) => /^hear[0-9A]$/.test(s.key) && !s.done)[0];
+  if ((c.status === 'open' || c.appealing) && nextDay && !h.standIn) x += `<div class="cc-row"><span><b>Stand-in</b><small>A board member attends the next court day (${esc(nextDay.title.toLowerCase())}) for you. You decide again for each day. The big decisions still come to you.${h.lastStandIn ? ` Last time: ${esc(h.lastStandIn.name)}.` : ''}</small></span><button class="btn ghost sm" data-act="court-standin" data-id="${esc(c.id)}">Send a board member, ${money(standInCost(c))}</button></div>`;
+  if (h.standIn) x += `<div class="cc-row"><span><b>Stand-in</b><small>${esc(h.standIn.name)} attends the next court day${nextDay ? ` (${esc(nextDay.title.toLowerCase())})` : ''} for the airline. After that, you decide again.</small></span><button class="btn ghost sm" data-act="court-standin-off" data-id="${esc(c.id)}">I'll go myself</button></div>`;
   for (const k of h.pending || []) {
     if (k === 'settle' && !(c.ch && c.ch.settled) && c.status === 'open') x += `<div class="cc-row hear-now"><span><b>Your decision: the families' settlement</b><small>Your share after insurance: ${money(courtSettleCost(c))}</small></span><span class="btn-row"><button class="btn primary sm" data-act="hear-pend" data-id="${esc(c.id)}" data-k="settle" data-v="1">Accept</button><button class="btn ghost sm" data-act="hear-pend" data-id="${esc(c.id)}" data-k="settle" data-v="0">Decline</button></span></div>`;
     if (k === 'plea' && c.status === 'open') x += `<div class="cc-row hear-now"><span><b>Your decision: the plea</b><small>Guilty: a certain conviction, a lighter sentence</small></span><span class="btn-row"><button class="btn ghost sm" data-act="hear-pend" data-id="${esc(c.id)}" data-k="plea" data-v="1">Guilty</button><button class="btn primary sm" data-act="hear-pend" data-id="${esc(c.id)}" data-k="plea" data-v="0">Not guilty</button></span></div>`;
@@ -378,6 +380,13 @@ ACTIONS['court-standin'] = el => {
   const c = hearCase(el.getAttribute('data-id')); if (!c) return;
   standInHire(c); const w = hearingWaiting(c); if (w) hearingAuto(c, w, 'standin');
   Sound.tick(); courtPopup(c.id);
+};
+/** Changed your mind before the day: you go yourself, and the board member's fee is paid back. */
+ACTIONS['court-standin-off'] = el => {
+  const c = hearCase(el.getAttribute('data-id')); if (!c || !c.hear || !c.hear.standIn) return;
+  const s = c.hear.standIn, back = s.cost || 0; c.hear.standIn = null;
+  if (back) payTxn(c.companyId, `Stand-in cancelled, fee returned: ${s.name}`, back, 'fees', [[c.court, back]]);
+  Store.save(); Sound.tick(); courtPopup(c.id);
 };
 ACTIONS['hear-pend'] = el => {
   const c = hearCase(el.getAttribute('data-id')); if (!c) return;

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.68 (2026-11-02)
+
+- faces: a second, older humanTalk overrode the voice-led one and fed NaN to the jaw (heads partly missing, mouths still); removed, and pose ignores non-finite mouth values
+- office: the visitor answers your decision, waits for "you are dismissed", may reply, then leaves
+- court: stand-in per court day (refund when cancelled); the bar's gate opens and shuts with a spring swing, latch and hinge sound, blocks the way when shut
+- bank: per sub-account history, totals and filters; flip-text spans keep their line
+
 ## 0.9.67 (2026-11-02)
 
 - includes 0.9.66 (its build stopped on the phone browser plugin; fixed)

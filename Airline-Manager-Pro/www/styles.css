@@ -2383,7 +2383,8 @@ body.coop-mode .topbar{box-shadow:inset 0 -2px 0 rgba(255,180,60,.55)}
 .chip.coop{background:rgba(255,170,40,.16);color:#FFC861;margin-left:6px}
 
 /* live text: changed characters turn over like a split-flap board */
-.flap-w{white-space:pre}
+.flap-w{white-space:pre;display:inline!important;flex-direction:row!important;padding:0!important;margin:0!important;background:none!important;border:0!important;min-width:0!important}
+.flap-w .fl{flex-direction:row!important;padding:0!important;margin:0!important;background:none!important;border:0!important}   /* changing text never takes on the look of the spans around it */
 .flap-w .fl{display:inline-block;transform-origin:50% 55%;animation:flapIn .5s cubic-bezier(.25,1.5,.45,1) var(--d,0ms) both;backface-visibility:hidden}
 @keyframes flapIn{0%{transform:perspective(160px) rotateX(-92deg);opacity:0;color:#FFC861;text-shadow:0 0 10px rgba(255,200,97,.9)}
  45%{transform:perspective(160px) rotateX(18deg);opacity:1;color:#FFD98A;text-shadow:0 0 8px rgba(255,200,97,.6)}
@@ -3285,7 +3286,7 @@ body.aim-locked .office3d .of-aim { font-size: 22px; }
 .lk-sum { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; } .lk-sum > div { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid var(--line); } .lk-sum small { display: block; color: var(--ink-3); font-size: 11.5px; } .lk-sum b { font-size: 16px; }
 .lk-move { padding: 12px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid var(--line); margin-bottom: 12px; } .lk-mr { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; } .lk-mr select, .lk-mr input { flex: 1 1 140px; min-width: 0; } .lk-mr > span svg { width: 16px; height: 16px; color: var(--ink-3); }
 .lk-txh { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; }
-.lk-t { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--line); } .lk-t span { display: flex; flex-direction: column; min-width: 0; } .lk-t span b { font-size: 13px; font-weight: 500; } .lk-t small { color: var(--ink-3); font-size: 11.5px; }
+.lk-t { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px; border-bottom: 1px solid var(--line); } .lk-t > span { display: flex; flex-direction: column; min-width: 0; } .lk-t > span b { font-size: 13px; font-weight: 500; } .lk-t small { color: var(--ink-3); font-size: 11.5px; }
 .lk-big { display: block; font-size: 30px; margin: 4px 0 14px; } .lk-sub h3 { margin: 2px 0 0; } .lk-newf { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
 /* screenshots */
 .lp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }

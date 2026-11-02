@@ -135,6 +135,20 @@ const Sound = {
         thump(t, 110, 60, 0.07, 0.11); hit(t, 0.05, 0.3, 'highpass', 1800, 0.7, 4); hit(t + toe, 0.08, 0.12, 'bandpass', 3800, 0.9, 3);
     }
   },
+  /** The courtroom's wooden gate: the latch, a short creak of the hinges, and (shutting) a soft knock against the post. */
+  gate(open: boolean) {
+    const ctx = audio(); if (!ctx) return;
+    const t = ctx.currentTime + 0.01, out = ctx.createGain(); out.gain.value = 0.8; out.connect(ctx.destination);
+    tone(ctx, 2600, t, 0.03, 0.04, 'square', out); tone(ctx, 1700, t + 0.018, 0.04, 0.03, 'triangle', out);   // the latch
+    // the hinges: a rough, wavering tone that slides as the leaves swing
+    const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(open ? 420 : 520, t + 0.06); o.frequency.linearRampToValueAtTime(open ? 560 : 380, t + 0.5);
+    lfo.frequency.value = 23; lg.gain.value = 30; lfo.connect(lg); lg.connect(o.frequency);
+    f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 3;
+    g.gain.setValueAtTime(0.0001, t + 0.06); g.gain.exponentialRampToValueAtTime(0.025, t + 0.14); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.52);
+    o.connect(f); f.connect(g); g.connect(out); o.start(t + 0.06); o.stop(t + 0.6); lfo.start(t + 0.06); lfo.stop(t + 0.6);
+    if (!open) { tone(ctx, 140, t + 0.42, 0.12, 0.12, 'sine', out); tone(ctx, 900, t + 0.42, 0.05, 0.03, 'triangle', out); }   // shut against the post
+  },
   /** Call every frame while walking with the distance walked: a footstep each stride (0.65 m), on the floor underfoot. */
   steps(o: any, dist: number, surface: 'wood' | 'carpet' | 'tile' | 'metal' | 'concrete', v?: number) {
     const n = Math.floor(dist / 0.65);

@@ -56,8 +56,6 @@ function humanVoiceIs(who: string, name: string): boolean {
 function humanVoiceBusy(name: string): boolean { const V: any = typeof Voice !== 'undefined' ? Voice : null; return !!(V && V.speaking && name && humanVoiceIs(V.who, name)); }
 /** Is this person's voice being heard now (their mouth then follows it, not the text)? */
 function humanVoiceOn(name: string): boolean { const V: any = typeof Voice !== 'undefined' ? Voice : null; return !!(V && V.speaking && V.audibleAt && Date.now() >= V.audibleAt && humanVoiceIs(V.who, name)); }
-/** Only how far the mouth is open (see humanSpeech). */
-function humanTalk(text: string, startMs: number, nowMs?: number): number { return humanSpeech(text, startMs, nowMs).open; }
 function humanGesture(mood: any, t: number): any {
   const S = Math.sin, base = (L: number[], R: number[]) => ({ L, R, lean: 0, bob: 0, roll: 0, nod: 0, shake: 0, tilt: 0, flush: 0, calm: 1 });
   const ease = 0.06 + 0.02 * S(t * 0.7);   // at rest: arms hanging, the slightest swing
@@ -1331,8 +1329,8 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         if (p.noHead) { U.uHeadRot.value.multiplyScalar(0.001); headPivot.scale.setScalar(0.001); } else headPivot.scale.setScalar(1);
         U.uBlink.value = p.blink;
         // speaking: Low still, Medium the jaw, High the jaw and the lips with the dark of the mouth, Ultra also the teeth and the tongue
-        const sp = p.talk, SL = animLevel('animSpeak'), op = typeof sp === 'number' ? sp : sp ? sp.open : 0;
-        U.uJaw.value = SL ? op * (SL === 1 ? 0.8 : 1) : 0; U.uLipR.value = SL >= 2 && sp && typeof sp === 'object' ? sp.round : 0; U.uMouthIn.value = SL >= 3 ? 2 : SL === 2 ? 1 : 0;
+        const sp = p.talk, SL = animLevel('animSpeak'), op0 = typeof sp === 'number' ? sp : sp ? sp.open : 0, op = isFinite(op0) ? op0 : 0;   // never a broken number into the face
+        U.uJaw.value = SL ? op * (SL === 1 ? 0.8 : 1) : 0; U.uLipR.value = SL >= 2 && sp && typeof sp === 'object' && isFinite(sp.round) ? sp.round : 0; U.uMouthIn.value = SL >= 3 ? 2 : SL === 2 ? 1 : 0;
         for (const e of eyes) e.rotation.set(-p.gaze[1] * 0.25, p.gaze[0] * 0.3, 0);
       },
     };

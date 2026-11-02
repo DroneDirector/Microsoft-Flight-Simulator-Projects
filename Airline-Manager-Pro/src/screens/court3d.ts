@@ -352,7 +352,10 @@ function ctBuild(scene: any, judges: number, q: number) {
   const bl: number[][] = []; for (let x = X0 + 0.4; x < X1 - 0.3; x += 0.2) if (Math.abs(x) > 0.85) bl.push([x, 0.05, BAR]);
   inst(bal, mat.walnut, bl);
   for (const s of [-1, 1]) { slab(X1 - 0.85 - 0.2, 0.14, 0.07, 0.03, mat.walnut, s * (0.85 + (X1 - 0.85 - 0.2) / 2), 0.88, BAR); bx(X1 - 1.05, 0.05, 0.12, mat.walnut, s * (0.85 + (X1 - 1.05) / 2), 0.025, BAR); bx(0.12, 0.95, 0.12, mat.walnut, s * 0.85, 0.475, BAR); add(new T.SphereGeometry(0.07, 16, 12), mat.walnut, s * 0.85, 0.99, BAR); }
-  for (const s of [-1, 1]) { const g = new T.Group(); g.position.set(s * 0.79, 0, BAR); g.rotation.y = s * 0.0; root.add(g); bx(0.74, 0.06, 0.05, mat.walnut, -s * 0.37, 0.82, 0, 0, g); bx(0.74, 0.06, 0.05, mat.walnut, -s * 0.37, 0.12, 0, 0, g); for (let i = 1; i < 6; i++) bx(0.03, 0.7, 0.03, mat.walnut, -s * i * 0.12, 0.47, 0, 0, g); }
+  // the gate's two leaves, on hinges at the posts: click them to swing them open (and shut)
+  A.gate = []; A.hits = A.hits || [];
+  { const hit = new T.Mesh(new T.BoxGeometry(1.6, 0.95, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, 0.48, BAR); hit.userData.act = 'gate'; root.add(hit); A.hits.push(hit); }
+  for (const s of [-1, 1]) { const g = new T.Group(); g.position.set(s * 0.79, 0, BAR); g.rotation.y = s * 0.0; root.add(g); A.gate.push(g); g.userData.s = s; bx(0.74, 0.06, 0.05, mat.walnut, -s * 0.37, 0.82, 0, 0, g); bx(0.74, 0.06, 0.05, mat.walnut, -s * 0.37, 0.12, 0, 0, g); for (let i = 1; i < 6; i++) bx(0.03, 0.7, 0.03, mat.walnut, -s * i * 0.12, 0.47, 0, 0, g); }
   // the public benches: two blocks of pews behind the bar, the aisle in the middle
   A.seats.pub = [];
   for (let r = 0; r < 7; r++) {
@@ -467,7 +470,7 @@ function ctOpen2(c: any, st: any, root: HTMLElement, q: number, appeal: boolean,
     scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
   } catch (e) { /* no reflections */ }
   ctProgress(8, 'Building the hall…');
-  const A = ctBuild(scene, judges, q); R.A = A; ctProgress(empty ? 55 : 22, empty ? 'Lighting the hall…' : 'The court is coming in…');
+  const A = ctBuild(scene, judges, q); R.A = A; if (R.empty) { try { R.glow = new AimGlow(scene); } catch (e) { R.glow = null; } } ctProgress(empty ? 55 : 22, empty ? 'Lighting the hall…' : 'The court is coming in…');
   // dust in the light
   { const n = q >= 2 ? 500 : 200, g = new T.BufferGeometry(), p = new Float32Array(n * 3), r = ctRng(9);
     for (let i = 0; i < n; i++) { p[i * 3] = -7 + r() * 6; p[i * 3 + 1] = 0.5 + r() * 5.5; p[i * 3 + 2] = -8 + r() * 17; }
@@ -486,7 +489,10 @@ function ctOpen2(c: any, st: any, root: HTMLElement, q: number, appeal: boolean,
   R.mm$ = (e: MouseEvent) => { if (R.on && R.empty && aimLocked(cv)) aimTurn(R.look, e, -1.1, 1.1); };
   document.addEventListener('mousemove', R.mm$);
   cv.addEventListener('pointermove', e => { if (!drag) return; R.look.yaw = R.empty ? drag.yaw - (e.clientX - drag.x) * 0.004 : clamp(drag.yaw - (e.clientX - drag.x) * 0.004, -1.2, 1.2); R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, R.empty ? -1.1 : -0.5, R.empty ? 1.1 : 0.5); });
-  cv.addEventListener('pointerup', () => { drag = null; });
+  cv.addEventListener('pointerup', e => {
+    // walking about: a click (the dot in the middle with the mouse taken, or a tap) uses what glows, such as the gate
+    if (R.empty) { if (aimLocked(cv)) { if (R.lockedOnce) ctUse(); R.lockedOnce = true; } else if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) ctUse(e); }
+    drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-ct]') as HTMLElement; if (b) ctClick(b); });
   R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; }; window.addEventListener('keyup', R.ku$, true);
   R.key$ = (e: KeyboardEvent) => { if (!R.on) return; if (R.empty && e.key.toLowerCase() === 'h') { e.preventDefault(); R.root.classList.toggle('ui-off'); return; } if (R.empty && /^(w|a|s|d|arrow\w+|shift)$/.test(e.key.toLowerCase())) { R.keys[e.key.toLowerCase()] = true; e.preventDefault(); return; } if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; ctLeaveAsk(); } else if ((e.key === 'Enter' || e.key === ' ') && !root.querySelector('.ct-modal:not([hidden])')) { const n = root.querySelector('[data-ct="next"]') as HTMLElement; if (n) { e.preventDefault(); ctClick(n); } } };
@@ -501,7 +507,7 @@ function ctOpen2(c: any, st: any, root: HTMLElement, q: number, appeal: boolean,
 CourtRoom.open = function (c: any, st: any) {
   const R = CourtRoom; if (R.on) R.close(true);
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
-  const empty = !c; R.empty = empty; R.keys = {}; R.stick = [0, 0];
+  const empty = !c; R.empty = empty; R.keys = {}; R.stick = [0, 0]; R.gateT = 0; R.gateK = 0; R.gateV = 0; R.pushK = 0; R.lockedOnce = false; R.glow = null;
   R.on = true; R.c = c; R.st = st; R.key = st.key; R.lines = empty ? [] : hearingScript(c, st.key); R.i = -1; R.answered = []; R.finished = st.key === 'verdict' ? false : false; R.objected = false;
   const q = typeof cabinQ === 'function' ? cabinQ() : 2;
   const appeal = st.key === 'hearA', judges = appeal ? 5 : 3;
@@ -510,7 +516,7 @@ CourtRoom.open = function (c: any, st: any) {
   root.innerHTML = `<canvas></canvas>
     <div class="ct-top"><div><small>${esc(courtName)}</small><b>${esc(c ? co.name + ': ' + st.title : 'The courtroom, empty: no hearing today')}</b></div></div>
     <button class="ct-leave" data-ct="leave">${icon('close')}<span>Leave court</span><kbd>Esc</kbd></button>
-    <div class="ct-ex" hidden></div>
+    <div class="ct-ex" hidden></div>${empty ? '<div class="of-aim" hidden>·</div>' : ''}
     <div class="ct-rate" hidden></div>
     <div class="ct-box" hidden><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
     ${empty ? `<div class="ct-spots">${[['bench', 'The bench'], ['witness', 'Witness box'], ['def', 'Defence table'], ['pub', 'Public benches'], ['door', 'The doors']].map(x => `<button data-ct="spot" data-k="${x[0]}">${x[1]}</button>`).join('')}</div><div class="ct-hint">${DESKTOP ? 'W A S D to walk · click the view and the mouse looks all the way round · H hides the controls · Esc gives the mouse back, Esc again leaves' : 'Stick to walk · drag to look around'}</div><div class="walk-pad ct-pad"><i></i></div>` : ''}
@@ -651,7 +657,7 @@ function ctFrame() {
     p.g = p.g ? cabinLerpG(p.g, gT, Math.min(1, dt * 6)) : gT;
     p.m.pose({ t, yaw: 0, gaze: [p.gazeYaw * 0.4, 0], blink: (t % 4.3) < 0.12 ? 1 : 0, g: p.g, talk: humanTalk(vn, R.speaker === k ? R.sayText : '', R.sayAt) });
   }
-  if (R.empty) { ctWalk(dt); R.ren.render(R.scene, R.cam); return; }
+  if (R.empty) { ctWalk(dt); ctGateStep(dt); R.ren.render(R.scene, R.cam); return; }
   // the camera eases to the shot, and you can look around it
   const sh = R.shot, ease = Math.min(1, dt * 1.6);
   R.cam.position.lerp(sh.pos, ease); R.camAt.lerp(sh.at, ease);
@@ -843,6 +849,7 @@ function ctBlocked(x: number, z: number): boolean {
   if (x < -7.6 || x > 7.6 || z < -8.6 || z > 10.1) return true;
   const B: number[][] = [[-4.6, -9, 4.6, -5.2], [-1.25, -5.0, 1.25, -3.6], [4.1, -5.8, 5.9, -3.8], [-5.2, -1.75, -1.8, -0.0], [1.8, -1.75, 5.2, -0.0], [-7.2, -0.5, -5.4, 1.2], [-8, 1.45, -0.85, 1.75], [0.85, 1.45, 8, 1.75]];
   for (const r of B) if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true;
+  if (Math.abs(x) < 0.85 && Math.abs(z - 1.6) < 0.14 && (CourtRoom.gateK || 0) < 0.8) return true;   // the gate, unless it is open
   if (z > 2.55 && z < 2.55 + 7 * 1.02 && Math.abs(x) > 0.85 && Math.abs(x) < 7.45) {   // the pews (seat front to shelf); you can walk the rows between them
     const rz = (z - 2.55) / 1.02 - Math.floor((z - 2.55) / 1.02); if (rz < 0.7) return true;
   }
@@ -863,6 +870,41 @@ function ctEmptyStart() {
   setTimeout(() => { const h = R.root && R.root.querySelector('.ct-hint'); if (h) h.classList.add('fade'); }, 7000);
   void T;
 }
+/* ---------- the gate in the bar: push it open, walk through, push it shut ---------- */
+function ctAimedObj(e?: PointerEvent): any {
+  const R = CourtRoom, T = THREE; if (!R.A || !R.A.hits) return null;
+  const rc = new T.Raycaster();
+  if (e && !aimLocked()) { const r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect(); rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam); }
+  else rc.setFromCamera(new T.Vector2(0, 0), R.cam);
+  const h = rc.intersectObjects(R.A.hits, false)[0];
+  return h && h.distance < 2.4 ? h.object : null;
+}
+function ctUse(e?: PointerEvent) { const o = ctAimedObj(e); if (o && o.userData.act === 'gate') ctGateToggle(); }
+function ctGateToggle() {
+  const R = CourtRoom, F = R.free; if (!F) return;
+  const open = !R.gateT;
+  if (!open && Math.abs(F.x) < 0.95 && Math.abs(F.z - 1.6) < 0.55) { toast('Step out of the gateway first', 'info'); return; }
+  // it swings away from you as you push it: into the well from the public side, out towards the benches from inside
+  if (open) R.gateDir = F.z > 1.6 ? 1 : -1;
+  R.gateT = open ? 1 : 0; R.gateV = R.gateV || 0;
+  R.pushK = 1;   // a small lean forward as you push
+  try { Sound.gate(open); } catch (x) { /* quiet */ }
+}
+/** The leaves swing on a spring with a little bounce at the end; the view nudges with your push. */
+function ctGateStep(dt: number) {
+  const R = CourtRoom, A = R.A; if (!A || !A.gate) return;
+  const want = R.gateT || 0; let k = R.gateK || 0, v = R.gateV || 0;
+  v += ((want - k) * 38 - v * 7.5) * dt; k += v * dt; k = clamp(k, -0.06, 1.06);
+  R.gateK = k; R.gateV = v;
+  const ang = 1.5 * k * (R.gateDir || 1);
+  for (const g of A.gate) g.rotation.y = -g.userData.s * ang;
+  if (R.pushK > 0) { R.pushK = Math.max(0, R.pushK - dt * 2.2); const p = Math.sin(Math.PI * (1 - R.pushK)) * 0.06, yaw = R.look.yaw; R.cam.position.x += -Math.sin(yaw) * p; R.cam.position.z += -Math.cos(yaw) * p; R.cam.position.y -= p * 0.4; }
+  // what you can use glows, with a word at the dot
+  const o = ctAimedObj(), aim = R.root.querySelector('.of-aim') as HTMLElement;
+  if (R.glow) { if (o) R.glow.showObj(o); else R.glow.hide(); R.glow.step(dt); }
+  if (aim) { aim.hidden = false; aim.textContent = o ? (R.gateT ? 'Click to close the gate' : 'Click to open the gate') : '·'; aim.classList.toggle('on', !!o); }
+}
+
 /** Jump to a spot in the courtroom, looking the natural way from there. */
 function ctSpot(k: string) {
   const R = CourtRoom, F = R.free; if (!F) return;
