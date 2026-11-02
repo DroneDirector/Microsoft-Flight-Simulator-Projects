@@ -2947,6 +2947,9 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .of-aim.on { font-size: 13px; padding: 6px 12px; border-radius: 10px; background: rgba(18,12,7,.8); border: 1px solid rgba(214,168,92,.5); color: #F2D18A; }
 .of-dec { align-self: center; margin-right: auto; color: #C9B48E; font-size: 13px; }
 .ct-ctl .btn.danger { background: rgba(170,50,40,.85); color: #fff; }
+.of-x { position: sticky; top: 0; float: right; margin: -4px -6px 0 8px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 99px; background: rgba(255,255,255,.06); border: 1px solid rgba(214,168,92,.35); color: #F3ECE0; cursor: pointer; z-index: 1; }
+.of-x:hover { background: rgba(214,168,92,.25); }
+.of-x svg { width: 15px; height: 15px; }
 .ct-spots button.on { background: #D6A85C; color: #1A120A; border-color: #D6A85C; }
 .office3d .ct-box { max-height: 52%; overflow: auto; }
 .of-invite { margin: 2px 0 10px; }
@@ -3064,3 +3067,8 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .office3d .of-pl-head svg { width: 20px; height: 20px; }
 .office3d .of-pl-body { flex: 1; min-height: 0; overflow: auto; }
 .office3d .of-pl-body .planner { height: 100%; min-height: 0; }
+
+/* screens opened from the office: their windows, drawers and messages show above the room */
+body.of-over .layer { z-index: 975; }
+body.of-over .toast, body.of-over .toasts { z-index: 990; }
+.office3d .of-pl-body > .screen { padding: 0; }

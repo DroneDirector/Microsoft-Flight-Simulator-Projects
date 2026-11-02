@@ -107,7 +107,7 @@ function cabinSay(key: string, line: TalkLine, pos: () => any) {
   try { Voice.prepare(line.text, line.voice); } catch (e) { /* voices not ready */ }
 }
 /** A short exchange at a row: the attendant offers, a passenger answers (in their mood and the flight's story). */
-function cabinExchange(P: any, m: CrewMember, row: number, sideSign: number, rude: boolean) {
+function cabinExchange(P: any, m: CrewMember, row: number, sideSign: number, rude: boolean): any {
   const G = V3dCabinF.grp, pg = G && G.userData.people, f: any = State.live.filter(x => x.id === P.id)[0] || null;
   if (!pg || !f || !m || !m.holder) return;
   const list = (pg.userData.who as any[]).filter(w => parseInt(w.p.seat, 10) === row && Math.sign(w.seatY - G.userData.crewAt.aisleY) === sideSign);
@@ -144,6 +144,28 @@ function cabinExchange(P: any, m: CrewMember, row: number, sideSign: number, rud
     CabinCrew.talkHead = { w, until: Date.now() + 4000, sign: -sideSign };
   }, 2200);
   m.talkTo = { sign: sideSign, until: Date.now() + 4200, faMood };
+  // what they are handed: nothing if they said no (or were refused), a meal tray for food, a cup for a drink
+  const kind = drunk || /nothing for me|^no\b/i.test(reply) ? 'none' : /meal|chicken|pasta|sandwich|snack|crisps|biscuit|dinner/i.test(reply + ' ' + (/sandwich|snack/i.test(offer) && !/water|coffee|tea|juice|cola/i.test(reply) ? offer : '')) ? 'tray' : 'cup';
+  return { kind, w, sign: sideSign };
+}
+/** What is handed over: a cup (with coffee, tea, juice, water or cola, as asked) or a meal tray. */
+function cabinItem(kind: string, reply: string): any {
+  const T = THREE, g = new T.Group();
+  if (kind === 'tray') {
+    const tray = new T.Mesh(new T.BoxGeometry(0.3, 0.012, 0.22), cabinMat(0x3C4048)); g.add(tray);
+    const dish = new T.Mesh(new T.BoxGeometry(0.15, 0.035, 0.11), cabinMat(0xEDEBE6)); dish.position.set(-0.05, 0.024, 0); g.add(dish);
+    const foil = new T.Mesh(new T.BoxGeometry(0.14, 0.004, 0.1), cabinMat(0xC8CCD2, { map: cabinSatinTex() })); foil.position.set(-0.05, 0.043, 0); g.add(foil);
+    const bread = new T.Mesh(new T.SphereGeometry(0.025, 10, 8), cabinMat(0xC98E4A)); bread.scale.y = 0.7; bread.position.set(0.09, 0.022, -0.05); g.add(bread);
+    const cup = new T.Mesh(new T.CylinderGeometry(0.022, 0.018, 0.06, 12), cabinMat(0xF6F6F2)); cup.position.set(0.09, 0.036, 0.05); g.add(cup);
+    const nap = new T.Mesh(new T.BoxGeometry(0.05, 0.004, 0.12), cabinMat(0xF2EFE8)); nap.position.set(0.04, 0.009, 0); g.add(nap);
+  } else {
+    const col = /coffee/i.test(reply) ? 0x3B2414 : /tea/i.test(reply) ? 0x8A5A2B : /orange|apple|juice/i.test(reply) ? 0xF0A020 : /cola/i.test(reply) ? 0x2A140C : /wine/i.test(reply) ? 0x7A1020 : 0xCFE3F0;
+    const cup = new T.Mesh(new T.CylinderGeometry(0.03, 0.023, 0.09, 14, 1, true), cabinMat(0xF8F8F5, { side: T.DoubleSide })); cup.position.y = 0.045; g.add(cup);
+    const drink = new T.Mesh(new T.CircleGeometry(0.028, 14), cabinMat(col)); drink.rotation.x = -Math.PI / 2; drink.position.y = 0.075; g.add(drink);
+    const nap = new T.Mesh(new T.BoxGeometry(0.09, 0.003, 0.09), cabinMat(0xF2EFE8)); g.add(nap);
+  }
+  g.traverse((o: any) => { o.renderOrder = 41; o.castShadow = false; });
+  return g;
 }
 /** The drunk passenger you let on (your own flight): someone in the back half of the cabin. */
 function cabinDrunkKey(all: any[]): string { const back = all.filter((p: any) => parseInt(p.seat, 10) > 8), L = back.length ? back : all; const x = L[Math.floor(L.length * 0.37)]; return x ? x.key : ''; }
@@ -182,14 +204,38 @@ function cabinCrewStep(P: any, G: any, night: number) {
     if (r == null) S.state = 'back';
     else {
       const rx = at.rowX[r] + 0.1;
-      if (S.state === 'out') { const d = rx - S.x; S.x += Math.min(d, dt * Math.min(0.42, 0.25 + d)); if (rx - S.x < 0.01) { S.state = 'stop'; S.stopUntil = now + 6.5; S.talkedRow = false; } }
+      if (S.state === 'out') { const d = rx - S.x; S.x += Math.min(d, dt * Math.min(0.42, 0.25 + d)); if (rx - S.x < 0.01) { S.state = 'stop'; S.stopUntil = S.stopBase = now + 6.5; S.talkedRow = false; S.hands = []; } }
       else {
         if (!S.talkedRow) {
           S.talkedRow = true;
           const inc: any[] = (State as any).incidents || [], rudeOf = (m: CrewMember) => inc.some((i: any) => i.status === 'open' && /Rude to a passenger/.test(i.title) && i.staffId === (m.person && m.person.id));
-          if (fas[0]) cabinExchange(P, fa1, r, (S.row % 2) ? 1 : -1, rudeOf(fa1));
-          if (fas[1]) setTimeout(() => { if (V3dCabinF.grp) cabinExchange(P, fa2, r, (S.row % 2) ? -1 : 1, rudeOf(fa2)); }, 3200);
+          // each attendant asks their side; the answer comes, then what was asked for is handed over
+          const ask = (m: CrewMember, sign: number, delay: number) => {
+            const go = () => { if (!V3dCabinF.grp || S.state !== 'stop') return; const h = cabinExchange(P, m, r, sign, rudeOf(m)); if (h && h.kind !== 'none') S.hands.push({ m, h, at: performance.now() / 1000 + 3.0, t: -1 }); };
+            if (delay) { S.hands.push({ wait: true, at: now + delay / 1000 + 0.5 }); setTimeout(go, delay); } else go();
+          };
+          if (fas[0]) ask(fa1, (S.row % 2) ? 1 : -1, 0);
+          if (fas[1]) ask(fa2, (S.row % 2) ? -1 : 1, 3200);
         }
+        // the hand-over: from the attendant's hands to the passenger's tray table, in a second and a half
+        let busyTill = 0;
+        for (const H of S.hands || []) {
+          if (H.wait) { if (now < H.at) busyTill = Math.max(busyTill, now + 1); continue; }   // the second attendant is still to ask
+          if (now < H.at) { busyTill = Math.max(busyTill, H.at + 10.5); continue; }   // handed over soon, then 9 s
+          const m: CrewMember = H.m, w = H.h.w;
+          if (H.t < 0) {
+            H.t = 0; const line = ((CabinCrew.talk.log['pax:' + w.p.key] || []).slice(-1)[0] || { text: '' }).text;
+            H.item = cabinItem(H.h.kind, line); C.grp.add(H.item); (C.items = C.items || []).push(H.item); if (C.items.length > 60) { const o = C.items.shift(); if (o.parent) o.parent.remove(o); }
+            m.talkTo = { sign: H.h.sign, until: Date.now() + 1800, faMood: 'neutral' };
+          }
+          H.t = Math.min(1, H.t + dt / 1.5);
+          const from = m.holder.position.clone().add(new THREE.Vector3(-0.05, 1.02, -H.h.sign * 0.3));
+          const to = w.head.clone().add(new THREE.Vector3(-0.32, -0.45, 0));
+          const k = H.t * H.t * (3 - 2 * H.t), lift = Math.sin(Math.PI * k) * 0.08;
+          H.item.position.copy(from.lerp(to, k)).add(new THREE.Vector3(0, lift, 0));
+          busyTill = Math.max(busyTill, H.at + 1.5 + 9);   // then 9 seconds before the next row
+        }
+        S.stopUntil = Math.max(S.stopBase || 0, busyTill);
         if (now > S.stopUntil) { S.row++; S.state = 'out'; }
       }
     }
@@ -317,6 +363,7 @@ function cabinTalkOpen(key: string, m: CrewMember, pax?: any) {
 ACTIONS['cab-talk-close'] = () => { const c = V3d.root && V3d.root.querySelector('.cab-talk'); if (c) c.classList.remove('on'); };
 
 function cabinCrewFree() {
+  CabinCrew.items = [];
   const C = CabinCrew;
   if (C.grp) { if (C.grp.parent) C.grp.parent.remove(C.grp); for (const m of C.members) try { av3Dispose(m.m.root); } catch (e) { /* gone */ } try { C.grp.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); } catch (e) { /* gone */ } }
   C.grp = null; C.members = []; C.trolley = null; C.light = null; C.key = ''; C.talkHead = null; C.talk.live = [];

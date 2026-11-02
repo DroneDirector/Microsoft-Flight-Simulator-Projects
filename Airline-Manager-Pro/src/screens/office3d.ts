@@ -169,9 +169,7 @@ function ofBuild(scene: any, q: number) {
   bx(1.06, 0.5, 0.03, mat.walnutM, 0, 0.45, -0.12);   // modesty panel, set back
   // things on the desk
   const lt = new T.Group(); lt.position.set(0.72, 0.775, 0.02); lt.rotation.y = -0.6; root.add(lt);
-  bx(0.34, 0.015, 0.24, mat.chrome, 0, 0.008, 0, 0, lt); const scr = new T.Group(); scr.position.set(0, 0.015, -0.115); scr.rotation.x = -0.28; lt.add(scr);
-  bx(0.34, 0.23, 0.008, mat.chrome, 0, 0.115, 0, 0, scr);
-  const lsm = new T.Mesh(new T.PlaneGeometry(0.31, 0.2), new T.MeshBasicMaterial({ map: ctTex(ofLaptop(co)), toneMapped: false })); lsm.position.set(0, 0.115, 0.006); scr.add(lsm);
+  ofLaptop3d(T, lt, slab, bx, ctTex(ofLaptop(co)));
   // the banker's lamp: brass stand, green glass shade, a warm light
   add(new T.CylinderGeometry(0.07, 0.08, 0.02, 24), mat.brass, -0.72, 0.785, -0.18); add(new T.CylinderGeometry(0.008, 0.008, 0.3, 8), mat.brass, -0.72, 0.94, -0.18);
   const shade = add(new T.CylinderGeometry(0.06, 0.06, 0.32, 28, 1, true, 0, Math.PI), mat.greenGlass, -0.72, 1.1, -0.17); shade.rotation.set(0, 0, Math.PI / 2);   // a half tube, open below
@@ -180,7 +178,7 @@ function ofBuild(scene: any, q: number) {
   add(new T.CylinderGeometry(0.004, 0.004, 0.12, 6), mat.brass, -0.72, 1.04, -0.17);
   const lampL = new T.PointLight(0xFFD7A0, 1.6, 3, 1.6); lampL.position.set(-0.72, 1.05, -0.12); root.add(lampL);
   // the family photo, the phone, notes, coffee, pens
-  A.photoAt = new T.Group(); A.photoAt.position.set(-0.42, 0.775, 0.3); A.photoAt.rotation.y = 0.5;   // turned towards you root.add(A.photoAt);
+  A.photoAt = new T.Group(); A.photoAt.position.set(-0.42, 0.775, 0.3); A.photoAt.rotation.y = 0.5; root.add(A.photoAt);   // turned towards you
   bx(0.24, 0.015, 0.17, mat.white, 0.0, 0.783, 0.33, 0.1);   // a notepad
   add(new T.CylinderGeometry(0.006, 0.006, 0.15, 8), mat.black, 0.06, 0.79, 0.3).rotation.set(Math.PI / 2, 0, 0.6);
   add(new T.CylinderGeometry(0.04, 0.035, 0.09, 20), mat.white, 0.78, 0.82, 0.32); add(new T.TorusGeometry(0.025, 0.007, 8, 16), mat.white, 0.82, 0.82, 0.32).rotation.y = 0;
@@ -245,6 +243,66 @@ function ofBuild(scene: any, q: number) {
   return A;
 }
 
+/** The laptop on your desk: an aluminium body with rounded corners, a keyboard of real keys (function row,
+ *  letters, the wide keys at the ends, the space bar, the arrow keys), a glass trackpad, the hinge, and the lid
+ *  with a thin black bezel, the camera and the company's figures on the screen. 34 cm wide. */
+function ofLaptop3d(T: any, lt: any, slab: any, bx: any, screenTex: any) {
+  const alu = new T.MeshPhysicalMaterial({ color: 0x8D9299, metalness: 0.85, roughness: 0.32, clearcoat: 0.2 });
+  const keyM = new T.MeshStandardMaterial({ color: 0x1C1E22, roughness: 0.55 }), well = new T.MeshStandardMaterial({ color: 0x2A2D32, roughness: 0.8 });
+  const W = 0.34, D = 0.235, H = 0.014;
+  // the base and the keyboard well
+  slab(W, D, H, 0.012, alu, 0, H, 0, 0, lt);
+  const kw = 0.29, kd = 0.112, kz = -0.044;
+  bx(kw + 0.006, 0.0015, kd + 0.006, well, 0, H + 0.0002, kz, 0, lt);
+  // the keys: rows of 14 units, with the wide keys where a real keyboard has them
+  const u = kw / 14.6, g = u * 0.16, kh = 0.0024;
+  const rows: number[][] = [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.6],          // Esc, F1–F12, power
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.6],          // numbers, backspace
+    [1.6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],          // tab
+    [1.9, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.7],           // caps lock, enter
+    [2.4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2.2],              // shifts
+    [1, 1, 1, 1.25, 5.4, 1.25, 1, 1, 1, 1],                // fn, ctrl, alt, cmd, space, cmd, alt, arrows
+  ];
+  const rowH = [0.55, 1, 1, 1, 1, 1], tot = rowH.reduce((a, b) => a + b, 0) * u;
+  const keys: number[][] = []; let z = kz - tot / 2;
+  rows.forEach((r, ri) => {
+    const h = rowH[ri] * u, sum = r.reduce((a, b) => a + b, 0) * u; let x = -sum / 2;
+    r.forEach((wu, ki) => {
+      const w = wu * u;
+      // the arrow keys: up and down share one key's place, half height each
+      if (ri === 5 && ki >= 7 && ki <= 9 && ki === 8) { keys.push([x + w / 2, z + h * 0.25, w - g, h * 0.5 - g]); keys.push([x + w / 2, z + h * 0.75, w - g, h * 0.5 - g]); }
+      else if (ri === 5 && ki >= 7) keys.push([x + w / 2, z + h * 0.75, w - g, h * 0.5 - g]);
+      else keys.push([x + w / 2, z + h / 2, w - g, h - g]);
+      x += w;
+    });
+    z += h;
+  });
+  const kg = new T.BoxGeometry(1, kh, 1), km = new T.InstancedMesh(kg, keyM, keys.length), m4 = new T.Matrix4();
+  keys.forEach((k, i) => { m4.makeScale(k[2], 1, k[3]); m4.setPosition(k[0], H + kh / 2, k[1]); km.setMatrixAt(i, m4); });
+  km.castShadow = true; lt.add(km);
+  // the trackpad, and the small gap at the front edge where you lift the lid
+  const tp = new T.Mesh(new T.PlaneGeometry(0.12, 0.072), new T.MeshPhysicalMaterial({ color: 0x9CA1A8, metalness: 0.6, roughness: 0.18, clearcoat: 0.6 }));
+  tp.rotation.x = -Math.PI / 2; tp.position.set(0, H + 0.0004, 0.068); lt.add(tp);
+  bx(0.05, 0.003, 0.004, well, 0, H - 0.003, D / 2 - 0.001, 0, lt);
+  // the speaker grilles either side of the keyboard
+  for (const sx of [-1, 1]) bx(0.012, 0.0006, kd * 0.9, well, sx * (kw / 2 + 0.012), H + 0.0003, kz, 0, lt);
+  // the hinge and the lid, tilted back
+  const hinge = new T.Mesh(new T.CylinderGeometry(0.006, 0.006, W * 0.8, 16), alu); hinge.rotation.z = Math.PI / 2; hinge.position.set(0, H, -D / 2 + 0.004); lt.add(hinge);
+  const lid = new T.Group(); lid.position.set(0, H, -D / 2 + 0.004); lid.rotation.x = -0.3; lt.add(lid);
+  const LH = 0.225;
+  { const r = 0.012, sh = new T.Shape(), hw = W / 2, x0 = -hw, x1 = hw, y0 = 0, y1 = LH;
+    sh.moveTo(x0 + r, y0); sh.lineTo(x1 - r, y0); sh.quadraticCurveTo(x1, y0, x1, y0 + r); sh.lineTo(x1, y1 - r); sh.quadraticCurveTo(x1, y1, x1 - r, y1); sh.lineTo(x0 + r, y1); sh.quadraticCurveTo(x0, y1, x0, y1 - r); sh.lineTo(x0, y0 + r); sh.quadraticCurveTo(x0, y0, x0 + r, y0);
+    const lg = new T.ExtrudeGeometry(sh, { depth: 0.004, bevelEnabled: true, bevelThickness: 0.001, bevelSize: 0.001, bevelSegments: 2, curveSegments: 6 });
+    const back = new T.Mesh(lg, alu); back.position.z = -0.0055; back.castShadow = true; lid.add(back); }
+  // the front of the lid: black glass with the screen in it, the camera at the top
+  const bez = new T.Mesh(new T.PlaneGeometry(W - 0.006, LH - 0.004), new T.MeshPhysicalMaterial({ color: 0x0B0C0E, roughness: 0.08, clearcoat: 1 }));
+  bez.position.set(0, LH / 2, 0.0001); lid.add(bez);
+  const scrW = W - 0.022, scrH = LH - 0.026;
+  const sm = new T.Mesh(new T.PlaneGeometry(scrW, scrH), new T.MeshBasicMaterial({ map: screenTex, toneMapped: false })); sm.position.set(0, LH / 2 - 0.004, 0.0004); lid.add(sm);
+  const cam = new T.Mesh(new T.CircleGeometry(0.0022, 12), new T.MeshStandardMaterial({ color: 0x1D2733, roughness: 0.1 })); cam.position.set(0, LH - 0.006, 0.0005); lid.add(cam);
+}
+
 /** A photo of you with your family on the desk: taken once, with the figures, and kept. */
 function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   const T = THREE, R = OfficeRoom, me: any = myPilot();
@@ -294,7 +352,7 @@ OfficeRoom.open = function (inc?: any) {
   root.innerHTML = `<canvas></canvas>
     <div class="ct-top"><div><small>${esc(co.name)}</small><b>${inc ? `Your office: ${esc(p.name)}, ${esc(inc.title.toLowerCase())}` : 'Your office'}</b></div></div>
     <button class="ct-leave" data-of="leave">${icon('close')}<span>Leave the office</span><kbd>Esc</kbd></button>
-    <div class="ct-box" hidden><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><p class="of-tell"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
+    <div class="ct-box" hidden><button class="of-x" data-of="boxclose" aria-label="Close" title="Close">${icon('close')}</button><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><p class="of-tell"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
     <div class="ct-spots of-spots" hidden></div><div class="ct-hint" hidden></div><div class="walk-pad ct-pad" hidden><i></i></div><div class="of-aim" hidden>+</div>
     ${ctLoaderHtml('Your office', inc ? `${p.name} is on the way up…` : 'Unlocking the door…', OF_WINGS)}`;
   document.body.appendChild(root);
@@ -327,7 +385,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); });
   R.key$ = (e: KeyboardEvent) => {
     if (!R.on) return; const k = e.key.toLowerCase();
-    if (R.overlay) { if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); ofPlannerClose(); } return; }   // the planner has the keys (typing)
+    if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); ofPlannerClose(); } return; }   // the planner has the keys (typing)
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); ofLeave(); return; }
     if (/^(w|a|s|d|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
   };
@@ -369,6 +427,7 @@ function ofReady() {
 }
 OfficeRoom.close = function (quiet?: boolean) {
   const R = OfficeRoom; if (!R.on) return; R.on = false;
+  R.overlay = null; document.body.classList.remove('of-over');
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* none */ }
   try { Voice.stop(); } catch (e) { /* ignore */ }
@@ -409,20 +468,81 @@ function ofKnock() {
   } catch (e) { /* no sound */ }
   ofSay('', 'Come in.', 'A knock at the door');
 }
-/** In they come: the door swings open, they walk to the chair, turn, and sit down facing you. */
+/** In they come: the door swings open, a moment later they step in, walk round the furniture to the chair, turn
+ *  and sit down facing you. */
 function ofEnter() {
   const R = OfficeRoom, V = R.vis; if (!V) { ofInterviewStart(); return; }
-  V.pivot.visible = true; V.state = 'walking'; R.doorT = 1;
-  V.path = [[-2.2, -2.45], [-1.2, -1.55], [-0.35, -0.82], [0, -0.86]]; V.after = 'sit';
-  setTimeout(() => { R.doorT = 0; }, 3800);
-  // they walk in, turn and sit down as animated; only if they get stuck (no progress for 4 seconds) are they
-  // put straight into the chair
-  let mark = '', since = performance.now();
-  const watch = setInterval(() => {
-    if (!R.on || R.vis !== V || R.started) { clearInterval(watch); return; }
-    const now = `${V.state}|${V.x.toFixed(2)}|${V.z.toFixed(2)}|${V.yaw.toFixed(2)}|${V.sitK.toFixed(2)}`;
-    if (now !== mark) { mark = now; since = performance.now(); } else if (performance.now() - since > 4000) { clearInterval(watch); ofSeatNow(); }
-  }, 500);
+  R.doorT = 1; V.x = -3.8; V.z = -2.6; V.yaw = Math.PI / 2;   // waiting outside, in the corridor
+  setTimeout(() => {
+    if (!R.on || R.vis !== V || R.started) return;
+    V.pivot.visible = true; V.state = 'walking';
+    V.path = ofRoute(V.x, V.z, -0.6, -0.9).concat([[0, -0.86]]); V.after = 'sit';
+    // they walk in, turn and sit down as animated; only if they get stuck (no progress for 4 seconds) are they
+    // put straight into the chair
+    let mark = '', since = performance.now();
+    const watch = setInterval(() => {
+      if (!R.on || R.vis !== V || R.started) { clearInterval(watch); return; }
+      const now = `${V.state}|${V.x.toFixed(2)}|${V.z.toFixed(2)}|${V.yaw.toFixed(2)}|${V.sitK.toFixed(2)}`;
+      if (now !== mark) { mark = now; since = performance.now(); } else if (performance.now() - since > 4000) { clearInterval(watch); ofSeatNow(); }
+    }, 500);
+  }, 3000);
+}
+/* ---------- finding the way: round the door, the walls and the furniture ---------- */
+// what stands on the floor, as rectangles [x0, z0, x1, z1] (the room is 6.4 m by 6.4 m; the door is on the left wall
+// between z −3.1 and −2.1 and opens into the room, hinged at z −2.1)
+const OF_BLOCK: number[][] = [
+  [-1.08, -0.5, 1.08, 0.5],      // the desk
+  [-0.45, 0.55, 0.45, 1.45],     // your chair
+  [-0.34, -1.32, 0.34, -0.7],    // the visitor's chair
+  [-3.05, -3.4, -1.65, -3.0], [1.65, -3.4, 3.05, -3.0],   // the bookshelves
+  [-3.2, 0.1, -2.35, 2.3], [-2.05, 0.68, -1.45, 1.72],     // the sofa and the low table
+  [2.5, -3.2, 3.2, -2.7],        // the plant
+  [-1.25, 2.45, 1.25, 3.0],      // the credenza
+  [-3.2, -2.22, -2.12, -2.04],   // the door, open
+];
+const OF_GAP = 0.24;   // how far a person keeps from things (half their width, and a little)
+function ofFree(x: number, z: number): boolean {
+  if (z < -3.4 + OF_GAP || z > 3.0 - OF_GAP || x > 3.2 - OF_GAP - 0.1 || x < -4.0) return false;
+  if (x < -3.2 + OF_GAP && (z < -3.1 + OF_GAP || z > -2.1 - OF_GAP)) return false;   // the wall, but for the doorway
+  for (const b of OF_BLOCK) if (x > b[0] - OF_GAP && x < b[2] + OF_GAP && z > b[1] - OF_GAP && z < b[3] + OF_GAP) return false;
+  return true;
+}
+function ofClear(a: number[], b: number[]): boolean {
+  const d = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(d / 0.04));
+  for (let i = 1; i < n; i++) if (!ofFree(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n)) return false;
+  return true;
+}
+/** A walk from one place to another that keeps clear of everything: the shortest way on a 10 cm grid, then
+ *  straightened where nothing is in the way. */
+function ofRoute(x0: number, z0: number, x1: number, z1: number): number[][] {
+  const C = 0.1, GX0 = -4.0, GZ0 = -3.4, NX = 73, NZ = 65, idx = (i: number, j: number) => j * NX + i;
+  const cell = (x: number, z: number) => [Math.round((x - GX0) / C), Math.round((z - GZ0) / C)];
+  const pos = (i: number, j: number) => [GX0 + i * C, GZ0 + j * C];
+  const free = new Uint8Array(NX * NZ); for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const p = pos(i, j); free[idx(i, j)] = ofFree(p[0], p[1]) ? 1 : 0; }
+  const near = (x: number, z: number) => { const [ci, cj] = cell(x, z); let best = -1, bd = 1e9; for (let j = Math.max(0, cj - 6); j <= Math.min(NZ - 1, cj + 6); j++) for (let i = Math.max(0, ci - 6); i <= Math.min(NX - 1, ci + 6); i++) if (free[idx(i, j)]) { const d = (i - ci) ** 2 + (j - cj) ** 2; if (d < bd) { bd = d; best = idx(i, j); } } return best; };
+  const s = near(x0, z0), g = near(x1, z1); if (s < 0 || g < 0) return [[x1, z1]];
+  const cost = new Float32Array(NX * NZ).fill(1e9), from = new Int32Array(NX * NZ).fill(-1), done = new Uint8Array(NX * NZ);
+  const gi = g % NX, gj = (g / NX) | 0, hh = (k: number) => Math.hypot(k % NX - gi, ((k / NX) | 0) - gj);
+  const heap: number[][] = []; const push = (f: number, k: number) => { heap.push([f, k]); let c = heap.length - 1; while (c > 0) { const p = (c - 1) >> 1; if (heap[p][0] <= heap[c][0]) break; [heap[p], heap[c]] = [heap[c], heap[p]]; c = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let c = 0; for (;;) { const l = 2 * c + 1, r = l + 1; let m = c; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === c) break; [heap[m], heap[c]] = [heap[c], heap[m]]; c = m; } } return top; };
+  cost[s] = 0; push(hh(s), s);
+  while (heap.length) {
+    const k = pop()[1]; if (done[k]) continue; done[k] = 1; if (k === g) break;
+    const i = k % NX, j = (k / NX) | 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue; const ni = i + di, nj = j + dj; if (ni < 0 || nj < 0 || ni >= NX || nj >= NZ) continue;
+      const n = idx(ni, nj); if (!free[n] || done[n]) continue;
+      if (di && dj && (!free[idx(i + di, j)] || !free[idx(i, j + dj)])) continue;   // no cutting corners
+      const c = cost[k] + (di && dj ? 1.414 : 1); if (c < cost[n]) { cost[n] = c; from[n] = k; push(c + hh(n), n); }
+    }
+  }
+  if (from[g] < 0 && g !== s) return [[x1, z1]];
+  const cells: number[][] = []; for (let k = g; k >= 0; k = k === s ? -1 : from[k]) cells.unshift(pos(k % NX, (k / NX) | 0));
+  cells[0] = [x0, z0]; cells[cells.length - 1] = [x1, z1];
+  // straighten: from each point, on to the farthest one that can be seen
+  const out: number[][] = []; let a = 0;
+  while (a < cells.length - 1) { let b = cells.length - 1; while (b > a + 1 && !ofClear(cells[a], cells[b])) b--; out.push(cells[b]); a = b; }
+  return out;
 }
 /** Straight into the chair, facing you, and the conversation begins. */
 function ofSeatNow() {
@@ -441,18 +561,19 @@ function ofExit() {
   const R = OfficeRoom, V = R.vis; if (!V) return;
   if (!V.m) { setTimeout(() => ofVisitUi(true), 1500); return; }   // no figure was shown
   V.wantSit = 0; V.state = 'standing';
-  setTimeout(() => { if (!R.on || !R.vis) return; R.doorT = 1; V.state = 'walking'; V.path = [[-0.35, -0.82], [-1.2, -1.55], [-2.3, -2.5], [-3.6, -2.6]]; V.after = 'gone'; }, 1300);
+  setTimeout(() => { if (!R.on || !R.vis) return; R.doorT = 1; V.state = 'walking'; V.path = [[-0.6, -0.9] as number[]].concat(ofRoute(-0.6, -0.9, -3.8, -2.6)); V.after = 'gone'; }, 1300);
 }
 
 /* ---------- every frame ---------- */
 function ofFrame() {
   const R = OfficeRoom, T = THREE, now = (performance.now() - (R.t0 || 0)) / 1000, dt = Math.min(0.05, now - (R.last || now)); R.last = now;
   // the door
-  if (R.A.doorLeaf) { const want = R.doorT ? -1.25 : 0; R.A.doorLeaf.rotation.y += (want - R.A.doorLeaf.rotation.y) * Math.min(1, dt * 2.5); }
+  if (R.A.doorLeaf) { const want = R.doorT ? -1.5 : 0; R.A.doorLeaf.rotation.y += (want - R.A.doorLeaf.rotation.y) * Math.min(1, dt * 2.5); }
   const V = R.vis;
   try {
   if (V && V.pivot.visible) {
     const top = V.m.top || 1.7, t = now + 3;
+    if (V.state === 'walking' && V.after === 'sit' && R.doorT && V.x > -1.5) R.doorT = 0;   // the door shuts behind them
     if (V.state === 'walking' && V.path.length) {
       const [tx, tz] = V.path[0], dx = tx - V.x, dz = tz - V.z, d = Math.hypot(dx, dz);
       const vWant = Math.min(1.0, Math.sqrt(2 * 1.4 * (d + (V.path.length > 1 ? 1 : 0)))); V.v += Math.max(-1.4 * dt, Math.min(1.4 * dt, vWant - V.v));
@@ -550,24 +671,34 @@ function ofVisitUi(afterInterview?: boolean) {
   if (!afterInterview) box.hidden = true;
   sp.hidden = false;
   const nRep = ofOpenReports().length;
-  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['planner', 'Flight planner'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
+  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['planner', 'Flight planner'], ['schedule', 'Schedule'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
   pad.hidden = R.seat;
   if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · drag to look · click your chair to sit · click the door to leave' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
   else hint.hidden = true;
+  ofFit();
 }
-/** The Flight planner at your desk: the whole planner over the office (the room stays behind it); Back or Esc
- *  returns to the office. */
-function ofPlannerOpen() {
-  const R = OfficeRoom; if (!R.on || R.overlay) return;
+/** A screen at your desk (the Flight planner, the schedule): the whole screen over the office, working as it does
+ *  in the app (the room stays behind it); Back or Esc returns to the office. */
+const OF_SCREENS: { [k: string]: [string, string] } = { planner: ['Flight planner', 'routes'], schedule: ['Schedule', 'clock'] };
+function ofScreenOpen(key: string) {
+  const R = OfficeRoom; if (!R.on || R.overlay || !SCREENS[key]) return;
   for (const sel of ['.of-spots', '.ct-box', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
-  const ov = document.createElement('div'); ov.className = 'of-planner';
-  ov.innerHTML = `<div class="of-pl-head"><b>${icon('routes')}Flight planner</b><button class="btn ghost sm" data-of="plclose">${icon('close')}Back to the office</button></div><div class="of-pl-body">${SCREENS.planner.render()}</div>`;
-  R.root.appendChild(ov); R.overlay = ov;
-  try { SCREENS.planner.mount(ov.querySelector('.of-pl-body') as HTMLElement); } catch (e) { /* the planner shows what it can */ }
+  const [title, ic] = OF_SCREENS[key] || [SCREENS[key].title, SCREENS[key].icon];
+  const ov = document.createElement('div'); ov.className = 'of-planner of-scr-' + key; ov.setAttribute('data-screen', key);
+  ov.innerHTML = `<div class="of-pl-head"><b>${icon(ic)}${esc(title)}</b><button class="btn ghost sm" data-of="plclose">${icon('close')}Back to the office</button></div><div class="of-pl-body"><section class="screen screen-${key}">${SCREENS[key].render()}</section></div>`;
+  R.root.appendChild(ov); R.overlay = ov; document.body.classList.add('of-over');
+  try { if (SCREENS[key].mount) SCREENS[key].mount(ov.querySelector('.of-pl-body .screen') as HTMLElement); } catch (e) { /* the screen shows what it can */ }
+}
+function ofPlannerOpen() { ofScreenOpen('planner'); }
+/** After a change (a leg moved, a route added): the screen over the office shows it too. */
+function ofScreenRefresh() {
+  const R = OfficeRoom; if (!R.on || !R.overlay) return;
+  const key = R.overlay.getAttribute('data-screen'); if (!key || key === 'planner' || !SCREENS[key]) return;   // the planner redraws itself
+  const sec = R.overlay.querySelector('.of-pl-body .screen') as HTMLElement; if (sec) patchHtml(sec, SCREENS[key].render());
 }
 function ofPlannerClose() {
   const R = OfficeRoom; if (!R.overlay) return;
-  R.overlay.remove(); R.overlay = null; Sound.tick(); ofVisitUi();
+  R.overlay.remove(); R.overlay = null; document.body.classList.remove('of-over'); Sound.tick(); ofVisitUi();
 }
 /** The open conduct reports about people who still work for you, newest first. */
 function ofOpenReports(): any[] { return ((State as any).incidents || []).filter((x: any) => x.status === 'open' && staffById(x.staffId)); }
@@ -598,7 +729,7 @@ function ofInviteNow(id: string) {
 }
 function ofSpot(k: string) {
   if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
-  if (k === 'planner') { Sound.tick(); ofPlannerOpen(); return; }
+  if (k === 'planner' || k === 'schedule') { Sound.tick(); ofScreenOpen(k); return; }
   const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true;
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
   else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
@@ -686,6 +817,19 @@ function ofSay(who: string, text: string, title?: string, tell?: string) {
   (b.querySelector('.ct-who b') as HTMLElement).textContent = who === 'you' ? 'You' : who || ''; (b.querySelector('.ct-who small') as HTMLElement).textContent = title || '';
   (b.querySelector('.ct-text') as HTMLElement).textContent = text; (b.querySelector('.of-tell') as HTMLElement).textContent = tell || '';
   (b.querySelector('.ct-say') as HTMLElement).innerHTML = ''; (b.querySelector('.ct-opts') as HTMLElement).innerHTML = ''; (b.querySelector('.ct-ctl') as HTMLElement).innerHTML = '';
+  ofFit();
+}
+/** The dialogue sits above the row of places, never over it. */
+function ofFit() {
+  const R = OfficeRoom; if (!R.root) return;
+  const b = R.root.querySelector('.ct-box') as HTMLElement, sp = R.root.querySelector('.of-spots') as HTMLElement; if (!b) return;
+  b.style.bottom = sp && !sp.hidden && sp.offsetHeight ? (sp.offsetHeight + 30) + 'px' : '';
+}
+/** Close the dialogue (the X): during a talk only its words, the questions come back with the next answer. */
+function ofBoxClose() {
+  const R = OfficeRoom, b = R.root && R.root.querySelector('.ct-box') as HTMLElement; if (!b) return;
+  try { Voice.stop(); } catch (e) { /* no voice */ }
+  Sound.tick(); b.hidden = true;
 }
 function ofInterviewStart() {
   const R = OfficeRoom, p = R.p;
@@ -747,6 +891,7 @@ function ofClick(b: HTMLElement) {
   else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else ofSpot(s); }
   else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
   else if (k === 'back') { Sound.tick(); ofVisitUi(); }
+  else if (k === 'boxclose') ofBoxClose();
   else if (k === 'plclose') ofPlannerClose();
   else if (k === 'tocourt') {
     // straight to the police, without talking to them first (the court will ask about that)

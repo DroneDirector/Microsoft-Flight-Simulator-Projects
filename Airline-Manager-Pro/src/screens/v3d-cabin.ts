@@ -183,6 +183,51 @@ function v3dCabinLeave(P: any) {
 // (instanced), so even a full wide-body stays quick. Settings → Graphics → Passengers in the cabin.
 
 const V3dCabinF: any = { key: '', grp: null };
+
+/* ---------- the view out of the cabin windows ---------- */
+// The windows show the world outside as it is (the sky, the ground, the wing, the clouds, other aircraft): each
+// frame the outside is drawn small from the same eye, without the cabin, and every window shows its part of it.
+const CabinOut: any = { rt: null, mat: null, n: 0 };
+function cabinOutsideMat(): any {
+  const T = THREE; if (!T || !T.WebGLRenderTarget) return null;
+  if (CabinOut.mat) return CabinOut.mat;
+  CabinOut.mat = new T.ShaderMaterial({
+    uniforms: { tOut: { value: null }, tMask: { value: V3dCabinF.winTex }, uRes: { value: new T.Vector2(1, 1) } },
+    vertexShader: 'varying vec2 vUv;\nvoid main() { vUv = uv; vec4 p = vec4(position, 1.0);\n#ifdef USE_INSTANCING\n  p = instanceMatrix * p;\n#endif\n  gl_Position = projectionMatrix * modelViewMatrix * p; }',
+    fragmentShader: 'uniform sampler2D tOut; uniform sampler2D tMask; uniform vec2 uRes; varying vec2 vUv;\nvoid main() { vec4 c = texture2D(tOut, gl_FragCoord.xy / uRes); float a = texture2D(tMask, vUv).g; if (a < 0.02) discard;\n  gl_FragColor = vec4(c.rgb, a);\n  #include <tonemapping_fragment>\n  #include <colorspace_fragment>\n}',
+    transparent: true, depthWrite: false, toneMapped: true,
+  });
+  CabinOut.mat.userData.noDim = true;
+  return CabinOut.mat;
+}
+/** Before the cabin is drawn: the outside, from the same eye, small (it is only seen through the windows). */
+function cabinOutsidePass(P: any) {
+  const T = THREE, G = V3dCabinF.grp, ren = V3d.r; if (!G || !G.visible || !CabinOut.mat || !ren) return;
+  const body = P && P.model && P.model.userData.body; if (!body) return;
+  const pc = typeof cabinIsPc === 'function' && cabinIsPc(), q = cabinQ();
+  // phones draw it a little smaller and, on Low, every other frame
+  if (!pc && q === 0 && (CabinOut.n++ & 1) && CabinOut.rt) return;
+  const k = pc ? (q >= 2 ? 0.6 : 0.45) : (q >= 2 ? 0.4 : 0.3);
+  const sz = ren.getDrawingBufferSize(new T.Vector2()), w = Math.max(64, Math.round(sz.x * k)), h = Math.max(64, Math.round(sz.y * k));
+  if (!CabinOut.rt) CabinOut.rt = new T.WebGLRenderTarget(w, h, { depthBuffer: true });
+  else if (CabinOut.rt.width !== w || CabinOut.rt.height !== h) CabinOut.rt.setSize(w, h);
+  // the cabin away, the wings and engines back (not the fuselage: the eye is inside it), the clouds back
+  const shown: any[] = [];
+  G.visible = false;
+  for (const c of body.children) if ((c.userData as any).hiddenForCabin && c !== body.userData.cabin && !cabinIsFus(c)) { c.visible = true; shown.push(c); }
+  const cl = typeof V3dClouds !== 'undefined' && V3dClouds.mesh, clWas = cl ? cl.visible : false; if (cl) cl.visible = true;
+  const was = ren.getRenderTarget();
+  try { ren.setRenderTarget(CabinOut.rt); ren.clear(); ren.render(V3d.scene, V3d.cam); }
+  finally {
+    ren.setRenderTarget(was); G.visible = true; for (const c of shown) c.visible = false; if (cl) cl.visible = clWas;
+  }
+  CabinOut.mat.uniforms.tOut.value = CabinOut.rt.texture; CabinOut.mat.uniforms.uRes.value.set(sz.x, sz.y);
+}
+/** The fuselage (and anything else the eye would sit inside of). */
+function cabinIsFus(o: any): boolean {
+  let fus = false; o.traverse((x: any) => { if (x.userData && x.userData.fus) fus = true; });
+  return fus;
+}
 /** A cabin surface: lit by the cabin's own lights in its own colour (people, seats, walls keep their colours),
  *  with a little shading from the light outside on top. */
 const CabinLight: any = { self: { value: 0.8 }, warm: { value: new THREE.Color(1, 1, 1) },
@@ -429,7 +474,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   // the windows along both walls
   const pitch = Math.max(0.45, s.win.pitch || 0.53), nW = Math.floor((s.win.to - s.win.from) / pitch), zW = Math.min(zf + 1.12, zc + ri * 0.2);   // window middle about 1.1 m above the floor, as in real cabins
   if (!V3dCabinF.winTex) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 96; const x = cv.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 64, 96); x.fillStyle = '#fff'; x.beginPath(); (x as any).roundRect ? (x as any).roundRect(4, 4, 56, 88, 24) : x.rect(4, 4, 56, 88); x.fill(); V3dCabinF.winTex = new T.CanvasTexture(cv); }
-  const winGeo = new T.PlaneGeometry(st.ww * 1.25, st.wh * 1.2), winMat = new T.MeshBasicMaterial({ color: 0xFFFFFF, map: cabinSkyTex(), alphaMap: V3dCabinF.winTex, transparent: true, fog: false }); winMat.userData.noDim = true;
+  const winGeo = new T.PlaneGeometry(st.ww * 1.25, st.wh * 1.2), winMat = cabinOutsideMat() || new T.MeshBasicMaterial({ color: 0xFFFFFF, map: cabinSkyTex(), alphaMap: V3dCabinF.winTex, transparent: true, fog: false }); winMat.userData.noDim = true;
   const wins = new T.InstancedMesh(winGeo, winMat, nW * 2), M = new T.Matrix4(), Q = new T.Quaternion(), S = new T.Vector3(1, 1, 1);
   let wi = 0;
   for (let i = 0; i < nW; i++) for (const side of [-1, 1]) {
@@ -443,12 +488,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   const bez = new T.InstancedMesh(new T.PlaneGeometry(st.ww * 1.9, st.wh * 1.65), cabinMat(0xFFFFFF, { map: V3dCabinF.bezTex, transparent: true, alphaTest: 0.5 }), nW * 2);
   for (let i = 0; i < nW * 2; i++) { wins.getMatrixAt(i, M); const e = new T.Matrix4().makeTranslation(0, 0, 0.012); M.multiply(e); bez.setMatrixAt(i, M); }
   g.add(bez);
-  // window shades: some pulled down here and there, as passengers do; never over the wing, so it stays in view
-  { const Wg: any = (s as any).wing || {}, wx0 = (Wg.x || 0) - 0.9, wx1 = (Wg.x || 0) + (Wg.root || 3) * 0.95;
-    const shTex = cabinCanvas(32, 48, (gg) => { const gr = gg.createLinearGradient(0, 0, 0, 48); gr.addColorStop(0, '#E8EAED'); gr.addColorStop(1, '#CDD1D6'); gg.fillStyle = gr; gg.fillRect(0, 0, 32, 48); gg.fillStyle = '#B9BEC4'; gg.fillRect(8, 42, 16, 3); });
-    const shades = new T.InstancedMesh(new T.PlaneGeometry(st.ww * 1.22, st.wh * 1.18), cabinMat(0xFFFFFF, { map: shTex }), nW * 2); let ns = 0;
-    for (let i = 0; i < nW * 2; i++) { const wxp = s.win.from + Math.floor(i / 2) * pitch; if (wxp > wx0 && wxp < wx1) continue; if (cloudHash(i, nW, 41) > 0.3) continue; wins.getMatrixAt(i, M); M.multiply(new T.Matrix4().makeTranslation(0, 0, 0.006)); shades.setMatrixAt(ns++, M); }
-    shades.count = ns; if (ns) g.add(shades); }
+  // every window shade is up: the view out of each one
   // the seats, row by row, from the passenger list's layout (first class and business at the front, wider)
   const list: PaxSeat[] = f ? (() => { try { return manifestOf(f); } catch (e) { return []; } })() : [];
   const rowCls: { [r: number]: string } = {}; let maxRow = 0;
@@ -671,7 +711,7 @@ function v3dCabinFwdCam(P: any) {
   try { cabinCrewStep(P, G, night); } catch (e) { /* the crew stays where it is */ }
   try { const tn = performance.now() / 1000, CP: any = CabinPax; const dtp = Math.min(0.1, Math.max(0, tn - (CP.lastT || tn))); CP.lastT = tn; cabinPaxStep(P, G, dtp); } catch (e) { /* passengers stay where they are */ }
   try { const CH: any = CabinHD, tn2 = performance.now() / 1000, dth = Math.min(0.1, Math.max(0, tn2 - (CH.lastT || tn2))); CH.lastT = tn2; cabinHdStep(G, dth); } catch (e) { /* the simple figures stay */ }
-  if (G.userData.wins) { const k = Math.max(0.08, Math.min(1, amb)); G.userData.wins.material.color.setRGB(k * (1 - 0.6 * night), k * (1 - 0.5 * night), k); }
+  if (G.userData.wins && G.userData.wins.material.color) { const k = Math.max(0.08, Math.min(1, amb)); G.userData.wins.material.color.setRGB(k * (1 - 0.6 * night), k * (1 - 0.5 * night), k); }
 }
 function v3dCabinFwdLeave(P: any) {
   try { cabinCrewFree(); } catch (e) { /* none */ }
