@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.58 (2026-11-02)
+
+- cabin: seat level of detail (detailed parts in slots near the camera, light parts for all, dithered crossfade via aFade); seam/edge refinement scales with quality; arm and pad lighter below Ultra
+- cabin: supersampling automatic only on PC (and Ultra); frame guard lowers the pixel ratio while the frame rate is low; low-memory devices default to Medium
+- v3d-cabinpax: detailed passenger count and detail from settings (fewer on phones), built only while the camera is still, crossfaded with the simple figures
+- mood light shader skips lines that face away or are out of reach
+- settings: Graphics → Cabin part by part (detailed seats, sharpness, frame guard, mood lighting, passengers, detailed passengers and their detail)
+
 ## 0.9.57 (2026-11-02)
 
 - cabin: mood lights as analytic line lights in the cabin material (side wall wash, ceiling coves in pools, bin doors), day/night strength, white lines dimmed at night; up-facing depth shading

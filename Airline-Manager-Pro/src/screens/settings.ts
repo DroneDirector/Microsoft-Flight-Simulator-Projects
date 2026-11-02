@@ -57,6 +57,7 @@ const SETTINGS: SetSection[] = [
         <input type="range" class="v3d-cabq" min="0" max="3" step="1" value="${q}" aria-label="Cabin quality">
         <div class="v3d-scale"><span>Low</span><span>Medium</span><span>Very high</span><span>Ultra</span></div>${note}</div>`;
     } },
+    { type: 'html', html: () => cabinSettingsHtml() },
     { type: 'group', title: 'Sky and water' },
     { type: 'html', html: () => {
       const S: any = State.settings, wm = v3dWaterMode();
@@ -65,7 +66,6 @@ const SETTINGS: SetSection[] = [
         + (wm === 'mirror' ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: the 3D view is drawn twice for every picture.</p>` : '')
         + row('v3dDayNight', 'Day and night', 'The real sun for the place and time you look at: sunrise, sunset, twilight and night as they are there. Off: always daylight.')
         + row('v3dSky', 'Sun, moon and stars', 'The sun and the moon at their true size and place, the moon in its phase, and the real stars at night.')
-        + row('v3dCabinPax', 'Passengers in the cabin', 'In the Cabin view: the passengers in their own seats from the passenger list, each looking as they do there, with pets on their owners\' laps. Off: empty seats (quicker on slower devices).')
         + row('v3dFlare', 'Lens flare', 'Looking towards the sun, its light catches in the camera lens: a glare and a row of soft rings and spots across the picture.')
         + row('v3dPrecip', 'Rain and snow', 'From the real-world weather reports (or Flight Simulator\'s weather when linked): falling around you under a raining cloud, and in grey curtains below the clouds in the distance.')
         + row('v3dLightning', 'Lightning', 'Storm clouds flash from inside, with bolts to the ground now and then; at night the whole area lights up for an instant.')
@@ -569,3 +569,32 @@ document.addEventListener('change', e => {
   try { rerenderSettingsBody(); } catch (x) { /* ignore */ }
 });
 
+
+/** Graphics → Cabin: each part of the cabin on its own. "Automatic" follows the cabin quality (and says what that is now). */
+function cabinSettingsHtml(): string {
+  const S: any = State.settings, q = cabinQ();
+  const seg = (key: string, label: string, hint: string, opts: [string, string][], auto: string) => {
+    const cur = cabinOpt(key);
+    return `<div class="ch-row"><span><b>${label}</b><small>${hint}</small></span><div class="seg">${[['auto', `Automatic (${auto})`] as [string, string]].concat(opts).map(o => `<button class="${cur === o[0] ? 'on' : ''}" data-act="cab-opt" data-key="${key}" data-v="${o[0]}">${esc(o[1])}</button>`).join('')}</div></div>`;
+  };
+  const tg = (k: string, label: string, hint: string) => `<label class="tg-row"><span><b>${label}</b><small>${hint}</small></span><button class="tg ${S[k] !== false ? 'on' : ''}" role="switch" aria-checked="${S[k] !== false}" data-act="v3d-opt" data-key="${k}"><i></i></button></label>`;
+  const seatAuto = CABIN_SEAT_NEAR[[0, 1, 2, 4][q]], hdAuto = String(cabinHdAuto()), hdqAuto = q === 3 ? 'Highest' : cabinLowMem() ? 'Light' : DESKTOP ? ['Light', 'Normal', 'High'][q] : 'Normal';
+  const scAuto = q === 3 ? 'up to 300%' : q === 2 && DESKTOP ? 'up to 200%' : '100%';
+  return `<div class="set-card col cab-opts">
+    <div class="sc-h">${icon('sliders')}<span><b>The cabin, part by part</b><small>Each starts on Automatic, which follows the cabin quality above. Choose your own to make one part finer or lighter.${cabinLowMem() ? ' This device has 4 GB of memory or less, so Automatic keeps the cabin light.' : !DESKTOP ? ' On phones and tablets Automatic keeps fewer detailed passengers and the screen\'s own sharpness, as their graphics memory is small.' : ''}</small></span></div>
+    <div class="cab-h">Seats and drawing</div>
+    ${seg('cabSeatNear', 'Detailed seats', 'How far around you the seats are drawn with their padding, seams and stitching. Further away a lighter seat that looks the same from a distance; seats fade from one to the other as you move.', CABIN_SEAT_NEAR.map((n, i) => [String(i), n] as [string, string]), seatAuto)}
+    ${seg('cabScale', 'Sharpness', 'How finely the cabin is drawn against your screen. Above 100% edges are smoother, at the cost of speed.', [['0', '75%'], ['1', '100%'], ['2', '150%'], ['3', '200%'], ['4', '300%']], scAuto)}
+    ${seg('cabGuard', 'Keep the frame rate smooth', 'While the frame rate is low, the cabin is drawn a little less sharply until it is smooth again.', [['on', 'On'], ['off', 'Off']], q < 3 ? 'On' : 'Off')}
+    ${tg('cabMood', 'Mood lighting', 'The blue lights that light the side walls, the ceiling and the bins (softer by day, fuller at night). Off: quicker on slower devices.')}
+    <div class="cab-h">Passengers</div>
+    ${tg('v3dCabinPax', 'Passengers in the cabin', 'The passengers in their own seats from the passenger list, each looking as they do there, with pets on their owners\' laps. Off: empty seats (quicker on slower devices).')}
+    ${seg('cabHd', 'Detailed passengers', 'How many of the passengers nearest to you are drawn as detailed figures, with the faces from the passenger list. The others are simpler figures; they fade from one to the other as you move.', CABIN_HD_N.map((n, i) => [String(i), n ? String(n) : 'Off'] as [string, string]), hdAuto)}
+    ${seg('cabHdQ', 'Detail of each passenger', 'How finely each detailed passenger is made: faces, hair and clothes.', CABIN_HD_Q.map((n, i) => [String(i), n] as [string, string]), hdqAuto)}
+  </div>`;
+}
+ACTIONS['cab-opt'] = el => {
+  const S: any = State.settings, k = el.getAttribute('data-key'), v = el.getAttribute('data-v');
+  if (v === 'auto') delete S[k]; else S[k] = v;
+  Store.save(); Sound.tick(); rerenderSettingsBody();
+};
