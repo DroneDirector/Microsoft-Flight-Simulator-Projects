@@ -34,7 +34,8 @@ function prefsNow(): DesktopPrefs {
 function toTools(): boolean {
   if (!['--uninstall', '--check', '--replay', '--demo'].some(has)) return false;
   const tools = path.join(here, 'AirlineManagerPro-Tools.exe');
-  if (fs.existsSync(tools)) { try { spawn(tools, args, { cwd: here, detached: true, stdio: 'ignore' }).unref(); } catch (e) { /* not started */ } }
+  // started outside the app's folder, so removing the app can take the whole folder away
+  if (fs.existsSync(tools)) { try { spawn(tools, args, { cwd: require('os').tmpdir(), detached: true, stdio: 'ignore' }).unref(); } catch (e) { /* not started */ } }
   app.exit(0);
   return true;
 }
