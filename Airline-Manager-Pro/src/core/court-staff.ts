@@ -206,7 +206,6 @@ function courtStaffAftermath(c: any, guilty: boolean) {
   const h = c.hear, co: any = company(c.companyId);   // the job itself is settled by courtAftermath
   if (guilty && h.claim && h.damage && co) payTxn(co.id, `Damages from ${c.name}: ${c.offence}`, h.damage, 'other', [[c.court, h.damage]]);
   State.notices.unshift({ id: uid(), kind: 'authority' as any, title: `Verdict: ${c.name}`, body: guilty ? `Guilty of ${c.charge.charAt(0).toLowerCase() + c.charge.slice(1)}. ${c.sentence}.` : `Not guilty. ${c.name} returns to work.`, time: 'Now', at: Date.now(), read: false, ref: c.id } as any);
-  newsStaffCase(c, 'verdict');
   h.verdictReady = true;
   try { toast('The verdict is in', 'warn', { label: 'Hear it in court', act: 'court-verdict', data: c.id }); } catch (e) { /* not ready */ }
   // what you said that wasn't true may come out later, whatever the verdict
