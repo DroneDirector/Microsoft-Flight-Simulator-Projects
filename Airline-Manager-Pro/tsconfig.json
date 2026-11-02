@@ -37,6 +37,7 @@
     "src/core/link.ts",
     "src/core/feed.ts",
     "src/core/flightperf.ts",
+    "src/core/flightplan.ts",
     "src/core/economics.ts",
     "src/core/business.ts",
     "src/core/ai-sim.ts",
@@ -95,6 +96,7 @@
     "src/screens/schedule.ts",
     "src/screens/jobs.ts",
     "src/screens/dispatch.ts",
+    "src/screens/planner.ts",
     "src/screens/logbook.ts",
     "src/screens/maintenance.ts",
     "src/screens/finance.ts",
@@ -146,6 +148,7 @@
     "src/ui/conduct-detail.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
+    "src/ui/gamepad.ts",
     "src/main.ts"
   ]
 }

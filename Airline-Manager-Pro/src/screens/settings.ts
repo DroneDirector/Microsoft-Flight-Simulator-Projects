@@ -16,6 +16,7 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => typeof DESKTOP !== 'undefined' && DESKTOP ? '' : `<label class="tg-row"><span><b>Full screen</b><small>The phone's status bar and navigation buttons stay hidden. A swipe from the edge shows them for a moment (and the notification panel can still be pulled down); they hide again by themselves. Remembered by the phone.</small></span><button class="tg ${fullScreenOn() ? 'on' : ''}" role="switch" aria-checked="${fullScreenOn()}" data-act="fullscreen-toggle"><i></i></button></label>` },
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
   ] },
+  { id: 'pad', title: 'Controller', icon: 'play', items: [{ type: 'html', html: () => padSettingsHtml() }] },
   { id: 'booster', title: 'Game Booster', icon: 'power', items: [
     { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); boostDraw(); boostSample(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
   ] },
@@ -110,6 +111,7 @@ const SETTINGS: SetSection[] = [
   { id: 'cloud', title: 'Sync', icon: 'share', items: [{ type: 'html', html: () => syncSettingsHtml() }] },
   { id: 'online', title: 'Online services', icon: 'wifi', items: [
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}All optional. Your names, codes and the Discord address stay on this device and are only sent to the service they belong to.</p>` },
+    { type: 'html', html: () => setText('faaId', 'FAA NOTAM API: client ID', 'Your own free key from the FAA\'s API portal (api.faa.gov), for real-world NOTAMs in the Flight planner. Kept on this device only.', 'client_id') + setText('faaSecret', 'FAA NOTAM API: client secret', 'The secret that comes with the client ID.', 'client_secret') },
     { type: 'html', html: () => svcOk('simbriefApi') ? setText('sbUser', 'SimBrief username or pilot ID', 'Your latest SimBrief flight plan in Dispatch: route, fuel, weights, and a flight plan for the simulator.', 'username or 123456') : '' },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Real-world weather (METAR, TAF and SIGMETs from the Aviation Weather Center) is always used: the real wind picks the runway in use, and your hired pilots delay, hold, divert or cancel when the weather is beyond their aircraft's limits. Show it on the map with the weather button.</p>` },
     { type: 'html', html: () => netChoices().length > 1 ? `<div class="ch-row"><span><b>Online networks</b><small>Controllers online at your airports, your airline's flights online, and their traffic on the map. Updated every minute.</small></span><div class="seg">${netChoices().map(o => `<button class="${Network.which() === o[0] ? 'on' : ''}" data-act="set-choice" data-key="network" data-v="${o[0]}">${esc(o[1])}</button>`).join('')}</div></div>` : '' },

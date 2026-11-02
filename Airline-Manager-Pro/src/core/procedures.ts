@@ -10,7 +10,7 @@
 
 interface RunwayEnd { icao: string; name: string; other: string; thr: number[]; end: number[]; hdg: number; lenM: number; ils: boolean }
 interface ProcPart { kind: 'sid' | 'route' | 'star' | 'app'; name: string; from: number; to: number }   // distances along the path (nm)
-interface FlightPath { pts: number[][]; cum: number[]; len: number; parts: ProcPart[]; dep: RunwayEnd; arr: RunwayEnd }
+interface FlightPath { pts: number[][]; cum: number[]; len: number; parts: ProcPart[]; dep: RunwayEnd; arr: RunwayEnd; wpD?: { [id: string]: number } }
 
 const NM = 1852;
 
@@ -83,7 +83,7 @@ function flyByArcs(p: number[][], radiusNm: (i: number) => number): { pts: numbe
     let r = R; if (t > tMax) { t = tMax; r = t / Math.tan(th / 2); }
     const p0 = geoDest(b, (h1 + 180) % 360, t), side = turn > 0 ? 1 : -1;
     const ctr = geoDest(p0, (h1 + 90 * side + 360) % 360, r);
-    const steps = Math.max(2, Math.ceil(Math.abs(turn) / 6));
+    const steps = Math.max(3, Math.ceil(Math.abs(turn) / 2.5));   // a smooth curve: a point every 2.5° of turn
     const start = (h1 - 90 * side + 360) % 360;   // from the centre to the start of the arc
     map.push(out.length + Math.floor(steps / 2));
     for (let k = 0; k <= steps; k++) out.push(geoDest(ctr, (start + turn * k / steps + 360) % 360, r));
@@ -236,7 +236,8 @@ function flightPathFor(from: string, to: string, noSim?: boolean): FlightPath {
   if (!from || !to || from === to || !World.runways) return null;
   const dep = activeRunway(from), arr = activeRunway(to);
   if (!dep || !arr) return null;
-  const key = from + '>' + to + '|' + dep.name + '>' + arr.name + (noSim ? '|own' : '');
+  const PL = flightPlanFor(from, to);   // a flight plan from the planner: its waypoints instead of the great circle
+  const key = from + '>' + to + '|' + dep.name + '>' + arr.name + (noSim ? '|own' : '') + planSig(from, to);
   if (_paths[key]) return _paths[key];
   // departure: the published one from the simulator, or straight ahead for 4 nm and a turn onto the route
   let sidPts: number[][], sidName: string;
@@ -277,17 +278,29 @@ function flightPathFor(from: string, to: string, noSim?: boolean): FlightPath {
     starPts = sm.slice(0, -1); appPts = [IF, FAF, arr.thr];
     starName = `${arr.name} arrival`; appName = `${arr.ils ? 'ILS' : 'RNP'} ${arr.name}`;
   }
-  // the route between, along a great circle
-  const enroute: number[][] = [];
-  const a0 = sidEnd, b0 = starPts[0], legNm = gcDistanceNm(a0, b0), n = Math.max(2, Math.min(64, Math.round(legNm / 40)));
-  for (let i = 1; i < n; i++) enroute.push(gcInterpolate(a0, b0, i / n));
+  // the route between: along a great circle, or through the plan's waypoints (great circles between them)
+  const enroute: number[][] = [], wpRaw: { [id: string]: number } = {};
+  if (PL) {
+    const nodes: number[][] = [sidEnd], ids: string[] = [''];
+    for (const w of PL.wps) { const q = [w.lon, w.lat]; if (gcDistanceNm(q, sidEnd) < 12 || gcDistanceNm(q, starPts[0]) < 12) continue; nodes.push(q); ids.push(w.id); }
+    nodes.push(starPts[0]);
+    for (let j = 1; j < nodes.length; j++) {
+      const a = nodes[j - 1], b = nodes[j], m = Math.max(1, Math.min(32, Math.round(gcDistanceNm(a, b) / 40)));
+      for (let i = 1; i < m; i++) enroute.push(gcInterpolate(a, b, i / m));
+      if (j < nodes.length - 1) { enroute.push(b); wpRaw[ids[j]] = enroute.length - 1; }
+    }
+  } else {
+    const a0 = sidEnd, b0 = starPts[0], legNm = gcDistanceNm(a0, b0), n = Math.max(2, Math.min(64, Math.round(legNm / 40)));
+    for (let i = 1; i < n; i++) enroute.push(gcInterpolate(a0, b0, i / n));
+  }
   const sid = sd ? [dep.thr, dep.end].concat(sidPts) : smoothPath([dep.thr, dep.end].concat(sidPts), 1);
   const raw = sid.concat(enroute, starPts, appPts);
-  // turns are flown as round fly-by arcs, as a real aircraft turns: a rate-one-ish turn at the speed of
-  // each part (about 1.5 nm radius in the departure and arrival, up to 4 nm at cruise), never wider than
-  // the legs allow, so it still follows the route. The runway and the final stay straight.
+  // turns are flown as round fly-by arcs, as a real aircraft turns: the radius its speed gives at the bank
+  // airliners use (about 25°): about 1.5 nm in the departure and arrival, 3.5-4 nm joining and leaving the
+  // route, about 7 nm at cruise speed; never wider than the legs allow, so it still follows the route.
+  // The runway and the final stay straight.
   const iS = sid.length - 1, iR = iS + enroute.length + 1, iA = iR + starPts.length;
-  const radius = (i: number) => i <= 1 || i >= raw.length - 2 ? 0 : i <= iS ? 1.4 : i < iR ? 4 : i < iA ? 1.8 : 1.2;
+  const radius = (i: number) => i <= 1 || i >= raw.length - 2 ? 0 : i <= iS ? 1.4 : i < iR ? (i - iS <= 1 ? 3.5 : iR - i <= 1 ? 4 : 7) : i < iA ? 1.8 : 1.2;
   const sm = flyByArcs(raw, radius), pts = sm.pts, map = sm.map;
   const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + gcDistanceNm(pts[i - 1], pts[i]));
   const idx = (k: number) => cum[Math.min(cum.length - 1, k)];
@@ -299,9 +312,11 @@ function flightPathFor(from: string, to: string, noSim?: boolean): FlightPath {
     { kind: 'app', name: appName, from: idx(iApp), to: cum[cum.length - 1] },
   ];
   const len = cum[cum.length - 1], gc = gcDistanceNm(dep.thr, arr.thr);
+  // where each of the plan's waypoints is along the path (for its levels and speeds)
+  const wpD: { [id: string]: number } = {}; for (const id in wpRaw) wpD[id] = idx(map[sid.length + wpRaw[id]]);
   // still much longer than the trip itself: the app's own departure and arrival instead
-  if ((sd || sa) && !noSim && len > gc * 1.35 + 120) { const own = flightPathFor(from, to, true); if (own) return (_paths[key] = own); }
-  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa) } as any);
+  if ((sd || sa) && !noSim && len > gc * 1.35 + (PL ? 400 : 120)) { const own = flightPathFor(from, to, true); if (own) return (_paths[key] = own); }
+  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa), wpD } as any);
 }
 
 /** The point `d` nm along a path, and the direction of travel there. */
@@ -316,13 +331,13 @@ const _flightPaths: { [k: string]: FlightPath } = {};
 /** Where a hired or co-op pilot's flight is right now along its procedures (null: not on a known path). */
 function flightPathPos(f: any, now?: number): { pos: number[]; hdg: number; d: number; fp: FlightPath } {
   if (!f || !f.depAt || f.real && f.you) return null;
-  const pk = f.id + '|' + f.from + '>' + f.to + '|' + f.depAt;
+  const pk = f.id + '|' + f.from + '>' + f.to + '|' + f.depAt + planSig(f.from, f.to);
   let fp = _flightPaths[pk];
   if (!fp) { fp = flightPathFor(f.from, f.noDest ? null : f.to); if (!fp) return null; _flightPaths[pk] = fp; }
   now = now || Date.now();
   const prof: FlightProfile = f.coop || f.tfc ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
   // the simulator's procedures much longer than the trip the times are worked out for: the app's own ones instead
-  if ((fp as any).sim && prof.routeNm > 0 && fp.len > prof.routeNm * 1.4 + 40) { const own = flightPathFor(f.from, f.noDest ? null : f.to, true); if (own) fp = _flightPaths[pk] = own; }
+  if ((fp as any).sim && !flightPlanFor(f.from, f.to) && prof.routeNm > 0 && fp.len > prof.routeNm * 1.4 + 40) { const own = flightPathFor(f.from, f.noDest ? null : f.to, true); if (own) fp = _flightPaths[pk] = own; }
   const fe = flightEl(f, now), q = profileAt(prof, fe.el);
   // the profile's distance (along airways) mapped onto this path
   const d = prof.routeNm > 0 ? q.d / prof.routeNm * fp.len : 0;

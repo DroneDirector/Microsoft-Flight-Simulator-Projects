@@ -131,23 +131,32 @@ const _profiles: { [k: string]: FlightProfile } = {};
 /** The whole flight from off-blocks to on-blocks, sampled about every 20 seconds. */
 function flightProfile(typeId: string, from: string, to: string, when?: number): FlightProfile {
   const month = new Date(when || Date.now()).getMonth();
-  const key = typeId + '|' + from + '|' + to + '|' + month;
+  const key = typeId + '|' + from + '|' + to + '|' + month + planSig(from, to);
   if (_profiles[key]) return _profiles[key];
   const t = acType(typeId) || AIRCRAFT[0];
   // where the airports are: from the airport list, or from their runways; if neither is known yet (the world
   // list still loading), the profile is worked out but not kept, so it is made again with the real distance
   const at = (k: string): any => { const a = apt(k); if (a && a.pos) return a; try { const r: any = World.runways ? activeRunway(k) : null; return r && r.thr ? { pos: r.thr } : null; } catch (e) { return null; } };
-  const A = at(from), B = at(to), keep = !!(A && B);
+  const A = at(from), B = at(to); let keep = !!(A && B);
   // the type's own climb and descent speeds and flap schedule (flight-configs.ts), over the model defaults
   const CF: ConfigSpec = typeof FLIGHT_CONFIGS !== 'undefined' ? FLIGHT_CONFIGS[typeId] : null;
   const P = Object.assign({}, perfFor(t), CF ? { climbIas: CF.climbIas || undefined, descIas: CF.descIas || undefined } : {}) as PerfSpec;
   if (!P.climbIas) P.climbIas = perfFor(t).climbIas; if (!P.descIas) P.descIas = perfFor(t).descIas;
   if (CF && CF.climbMach) P.climbMach = CF.climbMach;
   const gc = A && B ? gcDistanceNm(A.pos, B.pos) : 200;
-  const routeNm = Math.max(3, gc * P.airway + (gc > 40 ? P.procNm : gc * 0.05));
+  // a flight plan from the planner: flown along its path, at its levels and speeds
+  const PL = flightPlanFor(from, to); let FPH: FlightPath = null; try { FPH = PL ? flightPathFor(from, to) : null; } catch (e) { FPH = null; }
+  const plan = PL && FPH && FPH.wpD ? PL : null;
+  if (PL && !plan) keep = false;   // the runways not known yet: worked out again with the plan once they are
+  if (plan && plan.climbIas) P.climbIas = plan.climbIas;
+  if (plan && plan.descIas) P.descIas = plan.descIas;
+  const routeNm = plan ? FPH.len : Math.max(3, gc * P.airway + (gc > 40 ? P.procNm : gc * 0.05));
   const track0 = A && B ? bearingDeg(A.pos, B.pos) : 90;
-  const latAt = (frac: number) => A && B ? gcInterpolate(A.pos, B.pos, clamp(frac, 0, 1))[1] : 50;
-  const trackAt = (frac: number) => A && B && gc > 5 ? bearingDeg(gcInterpolate(A.pos, B.pos, clamp(frac, 0, 0.99)), B.pos) : track0;
+  const latAt = (frac: number) => plan ? pathAt(FPH, frac * FPH.len).pos[1] : A && B ? gcInterpolate(A.pos, B.pos, clamp(frac, 0, 1))[1] : 50;
+  const trackAt = (frac: number) => plan ? pathAt(FPH, frac * FPH.len).hdg : A && B && gc > 5 ? bearingDeg(gcInterpolate(A.pos, B.pos, clamp(frac, 0, 0.99)), B.pos) : track0;
+  // the plan's waypoints in order along the path: the level (and speed) to fly from each one on
+  const pw = plan ? plan.wps.filter(w => FPH.wpD[w.id] != null).map(w => ({ d: FPH.wpD[w.id], w })).sort((a, b) => a.d - b.d) : [];
+  const planAt = (d: number) => { let r = pw[0]; for (const x of pw) if (x.d <= d + 0.01) r = x; return r ? r.w : null; };
   const wind = (h: number, d: number) => tailwindKt(h, latAt(d / routeNm), trackAt(d / routeNm), month);
 
   // Descent as planned in the real world, worked out from the runway: established on final at
@@ -205,7 +214,8 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
     return { d, s };
   };
 
-  // cruise level: lower on short legs; odd thousands eastbound and even westbound (the semicircular rule)
+  // cruise level: lower on short legs; odd thousands eastbound and even westbound (the semicircular rule);
+  // with a plan, the level at its first waypoint (and never above what the type can reach)
   let cruise = Math.min(P.maxAlt, P.altBase + gc * P.climbPerNm);
   const east = track0 < 180;
   const level = (h: number) => {
@@ -213,11 +223,24 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
     if (h >= 3000 && (k % 2 === 1) !== east) k -= 1;
     return Math.max(k * 1000 + (P.jet || h >= 18000 ? 0 : 500), 1500);
   };
-  cruise = level(cruise);
-  let up = climbTo(cruise), down = descPlan(cruise);
-  while (up.d + down.todNm > routeNm * 0.95 && cruise > 2500) {
+  let cap = P.maxAlt, lastAlt = 0;
+  if (pw.length) {
+    cruise = clamp(pw[0].w.alt || cruise, 2000, P.maxAlt); lastAlt = clamp(pw[pw.length - 1].w.alt || cruise, 2000, P.maxAlt);
+    let up = climbTo(cruise), down = descPlan(lastAlt);
+    while (up.d + down.todNm > routeNm * 0.95 && cap > 2500) { cap -= 2000; cruise = Math.min(cruise, cap); lastAlt = Math.min(lastAlt, cap); up = climbTo(cruise); down = descPlan(lastAlt); }
+  } else cruise = level(cruise);
+  let up = climbTo(cruise), down = descPlan(pw.length ? lastAlt : cruise);
+  while (!pw.length && up.d + down.todNm > routeNm * 0.95 && cruise > 2500) {
     cruise = level(cruise - 2000); up = climbTo(cruise); down = descPlan(cruise);
   }
+  void up;
+  // the speed flown at a point: the plan's (Mach or indicated) where it sets one, otherwise the type's cruise
+  const tasAt = (d: number, h: number) => {
+    const w = planAt(d);
+    if (w && w.mach && P.jet) return Math.min(w.mach, P.mach + 0.04) * soundKt(h);
+    if (w && w.spd) return Math.min(iasToTas(w.spd, h), cruiseTas(P, t, h) * 1.12);
+    return cruiseTas(P, t, h);
+  };
 
   // fly it forwards
   const pts: ProfilePoint[] = [];
@@ -244,9 +267,11 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   // cruise until the top of descent
   const todNm = down.todNm;
   while (d < routeNm - todNm) {
-    const gs = Math.max(60, cruiseTas(P, t, h) + wind(h, d));
-    const step = Math.min(gs * STEP / 3600, routeNm - todNm - d);
-    s += step / gs * 3600; d += step; push('Cruise', gs);
+    const gs = Math.max(60, tasAt(d, h) + wind(h, d));
+    const step = Math.min(gs * STEP / 3600, routeNm - todNm - d), dtS = step / gs * 3600;
+    // step climbs and descents at the plan's waypoints: climbing at the type's rate near its ceiling, down at 1,500 ft/min
+    if (pw.length) { const w = planAt(d), want = Math.min(cap, w ? w.alt || h : h); if (Math.abs(want - h) > 1) h = want > h ? Math.min(want, h + Math.max(500, P.rocTop) * dtS / 60) : Math.max(want, h - 1500 * dtS / 60); }
+    s += dtS; d += step; push('Cruise', gs);
     if (step < 1e-6) break;
   }
   // descent, approach and final
@@ -259,7 +284,7 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   d = routeNm; h = 0; s += Math.round((SPD.vtd - 15) * KT / decel + 8); push('Landing', 15);
   s += taxiIn * 60; push('Taxi in', 0);
   const airS = s - taxiOut * 60 - taxiIn * 60;
-  const prof = { pts, totalS: s, routeNm, cruiseAlt: cruise, airS };
+  const prof = { pts, totalS: s, routeNm, cruiseAlt: pw.length ? Math.max(...pw.map(x => Math.min(cap, x.w.alt || cruise))) : cruise, airS };
   if (keep) _profiles[key] = prof;
   return prof;
 }
