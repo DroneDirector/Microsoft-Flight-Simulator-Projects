@@ -16,6 +16,7 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => typeof DESKTOP !== 'undefined' && DESKTOP ? '' : `<label class="tg-row"><span><b>Full screen</b><small>The phone's status bar and navigation buttons stay hidden. A swipe from the edge shows them for a moment (and the notification panel can still be pulled down); they hide again by themselves. Remembered by the phone.</small></span><button class="tg ${fullScreenOn() ? 'on' : ''}" role="switch" aria-checked="${fullScreenOn()}" data-act="fullscreen-toggle"><i></i></button></label>` },
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
   ] },
+  { id: 'pad', title: 'Controller', icon: 'play', items: [{ type: 'html', html: () => padSettingsHtml() }] },
   { id: 'booster', title: 'Game Booster', icon: 'power', items: [
     { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); boostDraw(); boostSample(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
   ] },

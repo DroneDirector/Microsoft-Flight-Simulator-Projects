@@ -3049,3 +3049,10 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .pl-prof-cv { width: 100%; height: 100%; display: block; }
 @media (max-width: 900px) { .planner { height: auto; } .pl-body { grid-template-columns: 1fr; } .pl-map { height: 46vh; } }
 .pl-wps input.warn { border-color: var(--amber); }
+
+/* the game controller's pointer */
+.pad-cursor { position: fixed; left: 0; top: 0; width: 24px; height: 24px; margin: -3px 0 0 -4px; z-index: 2147483647; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+.pad-cursor svg { width: 100%; height: 100%; fill: #fff; stroke: #0A182B; stroke-width: 1.6; stroke-linejoin: round; }
+.pad-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; margin-top: 8px; }
+.pad-map div { display: flex; flex-direction: column; padding: 7px 10px; border-radius: 10px; background: var(--panel-2); }
+.pad-map b { font-size: 13px; } .pad-map small { color: var(--ink-2); font-size: 12px; }

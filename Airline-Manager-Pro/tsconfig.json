@@ -148,6 +148,7 @@
     "src/ui/conduct-detail.ts",
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
+    "src/ui/gamepad.ts",
     "src/main.ts"
   ]
 }
