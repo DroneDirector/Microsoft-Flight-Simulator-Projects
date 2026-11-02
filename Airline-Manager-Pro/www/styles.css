@@ -3149,3 +3149,12 @@ body.aim-locked .office3d .of-aim { font-size: 22px; }
 .v3d-mini .v3d-info, .v3d-mini .v3d-status { display: none !important; }
 .v3d-mini .v3d-line { display: flex; align-items: center; gap: 18px; position: absolute; left: 50%; transform: translateX(-50%); }
 .v3d-line .vl-full { display: none; } .v3d-mini .v3d-line .vl-full { display: inline-grid; }
+
+/* Premium HD satellite imagery (demo) */
+.prem-sat { border-color: rgba(224,75,214,.35); background: linear-gradient(135deg, rgba(63,208,232,.08), rgba(224,75,214,.07)); }
+.prem-sat.on { border-color: rgba(63,208,232,.55); }
+.prem-sat .sc-h svg { color: #F2C66B; }
+.prem-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.prem-price b { display: block; } .prem-price small { color: var(--ink-3); }
+.prem-demo { display: flex; gap: 8px; align-items: flex-start; margin: 2px 0 0; padding: 9px 11px; border-radius: 10px; background: rgba(242,181,68,.1); border: 1px solid rgba(242,181,68,.28); color: #FFD891; font-size: 12.5px; line-height: 1.45; }
+.prem-demo svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }

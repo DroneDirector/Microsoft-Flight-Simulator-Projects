@@ -80,6 +80,7 @@ const SETTINGS: SetSection[] = [
         + row('mapNight', 'Day and night on the map', 'The night side of the Earth shaded on the map, moving with the sun.');
     } },
     { type: 'group', title: 'Satellite' },
+    { type: 'html', html: () => premiumSatHtml() },
     { type: 'toggle', key: 'v3dSat', label: 'Satellite imagery', hint: 'Shows the real ground from space (Sentinel-2 cloudless by EOX) instead of the map look. Can also be switched in the 3D view.' },
     { type: 'html', html: () => {
       if (!(State.settings as any).v3dSat) return '';
@@ -611,6 +612,18 @@ function animSettingsHtml(): string {
     ${seg('animBody', 'Body language', 'The small movements at rest: breathing, swaying, the head looking about. Low: still.')}
   </div>`;
 }
+/** HD satellite imagery as a Premium subscription (a demo for now: nothing is sold and no payment is taken). */
+function premiumSatHtml(): string {
+  const on = !!(State.settings as any).hdSatDemo;
+  return `<div class="set-card col prem-sat ${on ? 'on' : ''}">
+    <div class="sc-h">${icon('star')}<span><b>HD satellite imagery · Premium</b><small>Sharp satellite imagery of the whole world in the 3D view, streamed as you fly: runways, taxiways, terminals, roads and towns in detail, from high up and on final. No account and no key of your own: switch it on and fly.</small></span></div>
+    <div class="prem-row"><span class="prem-price"><b>Subscription</b><small>Monthly · price to be announced</small></span>
+      <button class="btn ${on ? 'ghost' : 'primary'} sm" data-act="hdsat-demo">${on ? 'End the demo' : 'Try the demo'}</button></div>
+    ${on ? `<p class="v3d-note ok">${icon('check')}Demo on: this is how Premium will look in Settings once it can be bought.</p>` : ''}
+    <p class="prem-demo">${icon('info')}<span><b>Demo mode.</b> Premium can't be bought yet: no payment is taken, and the imagery stays the standard Sentinel-2 imagery. The HD imagery is planned to come from Mapbox Satellite, paid per tile shown from the subscription.</span></p>
+  </div>`;
+}
+ACTIONS['hdsat-demo'] = () => { const S: any = State.settings; S.hdSatDemo = !S.hdSatDemo; Store.save(); Sound.tick(); try { rerenderSettingsBody(); } catch (e) { /* closed */ } };
 ACTIONS['cab-opt'] = el => {
   const S: any = State.settings, k = el.getAttribute('data-key'), v = el.getAttribute('data-v');
   if (v === 'auto') delete S[k]; else S[k] = v;
