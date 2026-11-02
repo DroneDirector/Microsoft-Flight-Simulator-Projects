@@ -1408,6 +1408,6 @@ function selfPose(S: any, hip: any, yaw: number, lean: number, sit: number, v: n
   m.pose({ t, yaw: 0, gaze: [0, 0], blink: 0, g, noHead: true });
   // the head bows to look down (S.pitch, the view's): the eyes go forward and down a little, so you see your feet
   const eye = hip.clone().add(selfEyeOff(S, yaw, lean)), dn = Math.max(0, -(S.pitch || 0));
-  if (dn > 0) eye.add(new THREE.Vector3(Math.sin(yaw) * 0.11 * Math.sin(dn), -0.06 * (1 - Math.cos(dn)), Math.cos(yaw) * 0.11 * Math.sin(dn)));
+  if (dn > 0) eye.add(new THREE.Vector3(Math.sin(yaw) * 0.16 * Math.sin(dn), -0.07 * (1 - Math.cos(dn)), Math.cos(yaw) * 0.16 * Math.sin(dn)));
   return eye;
 }

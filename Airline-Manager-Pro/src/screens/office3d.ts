@@ -904,9 +904,9 @@ function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; slide
   const pos = ph.P0.clone().lerp(hold, mv); pos.y += 0.09 * Math.sin(Math.PI * mv);   // up off the desk in an arc
   A.photoAt.position.copy(pos); A.photoAt.quaternion.copy(ph.q0).slerp(qh, mv); A.photoAt.updateMatrixWorld(true);
   out.at = A.photoAt.localToWorld(new T.Vector3(0, 0.09, 0));
-  out.lookK = Math.max(mv, 0.55 * down * (ph.st === 'reach' || ph.st === 'release' ? wL : 1));
+  out.lookK = ph.st === 'reach' || ph.st === 'release' ? 0.9 * wL : 0.92 + 0.08 * mv;   // you watch it all the way
   // the hands: the left reaches for it, the right joins it once it is up (each from where it rested)
-  const grip: any = { L: A.photoAt.localToWorld(new T.Vector3(-0.112, 0.07, -0.004)), R: A.photoAt.localToWorld(new T.Vector3(0.112, 0.07, -0.004)) }, w: any = { L: wL, R: wR };
+  const grip: any = { L: A.photoAt.localToWorld(new T.Vector3(-0.142, 0.075, -0.03)), R: A.photoAt.localToWorld(new T.Vector3(0.142, 0.075, -0.03)) }, w: any = { L: wL, R: wR };   // holding it by its sides, from a little behind
   out.arms = (m: any) => {
     const res: any = {}, rest = humanGesture({ kind: 'sit', v: 0 }, t);
     for (const sd of ['L', 'R'] as ('L' | 'R')[]) {
