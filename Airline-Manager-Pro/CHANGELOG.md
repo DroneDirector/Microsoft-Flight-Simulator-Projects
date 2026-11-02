@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.61 (2026-11-02)
+
+- pc-bridge airways: waypoint airways from SimConnect facility data (WAYPOINT/ROUTE), A* between SID exits and STAR entries (high or low), network and routes kept in the data folder; procedure legs carry their region; 'awy' link message
+- app: AirwayRoutes per city pair and class, kept on the device; flightPathFor/flightProfile fly them; planner fill from airways; setting to switch off
+- planner in the office menu (overlay); SimBrief plan import (planFromOfp) in the planner and Dispatch, behind the SimBrief switch
+
 ## 0.9.60 (2026-11-02)
 
 - flightplan + planner: plans per city pair (waypoints with level and speed, climb/descent speeds, alternate); flightPathFor routes through the waypoints, flightProfile flies their levels (step climbs/descents) and speeds with winds along the path; route view on the world map (overlay, tap and drag hooks), vertical profile, SIGMETs along the route, METAR/TAF, winds, FAA NOTAM API with the user's key (relayed by the PC app)

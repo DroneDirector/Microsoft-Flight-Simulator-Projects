@@ -55,7 +55,7 @@ SCREENS.dispatch = {
             <div><small>Block fuel</small><b>${num(ofp.fuel.ramp)} kg</b></div><div><small>Trip</small><b>${num(ofp.fuel.trip)} kg</b></div><div><small>Reserve</small><b>${num(ofp.fuel.reserve)} kg</b></div>
             <div><small>Take-off weight</small><b>${num(ofp.towKg)} kg</b></div><div><small>Landing weight</small><b>${num(ofp.lawKg)} kg</b></div><div><small>Fuel cost here</small><b>${money(Math.round(ofp.fuel.ramp * fuelPrice(ofp.from)), { compact: true })}</b></div>
           </div>
-          <div class="btn-row"><button class="btn primary sm" data-act="pln-send" data-from="${esc(ofp.from)}" data-to="${esc(ofp.to)}">${icon('pc')}Send to the simulator</button><button class="btn ghost sm" data-act="pln-save" data-from="${esc(ofp.from)}" data-to="${esc(ofp.to)}">${icon('download')}Save .PLN</button><button class="btn ghost sm" data-act="ofp-use">${icon('routes')}Make it my next leg</button></div>
+          <div class="btn-row"><button class="btn ghost sm" data-act="ofp-plan">${icon('routes')}Use in the Flight planner</button><button class="btn primary sm" data-act="pln-send" data-from="${esc(ofp.from)}" data-to="${esc(ofp.to)}">${icon('pc')}Send to the simulator</button><button class="btn ghost sm" data-act="pln-save" data-from="${esc(ofp.from)}" data-to="${esc(ofp.to)}">${icon('download')}Save .PLN</button><button class="btn ghost sm" data-act="ofp-use">${icon('routes')}Make it my next leg</button></div>
           <small class="muted">Fetched ${esc(dateStr(new Date(ofp.at)))}. The simulator flight plan follows SimBrief's waypoints.</small>`
         : `<p class="fine-print">${icon('info')}Plan your flight on SimBrief, then get it here: route, fuel and weights, and a flight plan for the simulator in one tap.</p>`}
       </div>` : ''}
@@ -128,4 +128,13 @@ ACTIONS['page-discord'] = () => {
   const c = company(), fl = fleetOf(c.id);
   Online.discord('any', c.name, `${fl.length} aircraft, ${State.routes.filter(r => r.companyId === c.id && !r.test).length} routes, popularity ${Math.round(c.reputation || 0)}/100.`, [['Hub', c.hub], ['Balance', money(c.balance, { compact: true })], ['Flights logged', num(State.logbook.length)]]);
   toast('Posted to Discord', 'ok');
+};
+
+/** Your SimBrief flight plan as the plan flights on its route fly (Flight planner). */
+ACTIONS['ofp-plan'] = () => {
+  const P = planFromOfp(SimBrief.ofp()); if (!P) { toast('This flight plan has no route between two known airports', 'warn'); return; }
+  const old = plansAll()[P.key]; if (old) P.v = old.v; planSave(P);
+  PlannerUi.from = P.from; PlannerUi.to = P.to; PlannerUi.sel = '';
+  const b = document.createElement('b'); b.setAttribute('data-screen', 'planner'); ACTIONS.go(b, null);
+  toast(`Flights ${P.from} → ${P.to} now fly your SimBrief route`, 'ok');
 };

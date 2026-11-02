@@ -81,7 +81,7 @@ function padBack() {
   padRumble(0.15, 0.2, 40);
   const layer = document.querySelector('.layer, .modal-back, .sheet-back, .ct-modal:not([hidden])');
   if (layer) { try { closeAll(); } catch (e) { /* none */ } return; }
-  if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) { try { ofLeave(); } catch (e) { /* none */ } return; }
+  if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) { try { if (OfficeRoom.overlay) ofPlannerClose(); else ofLeave(); } catch (e) { /* none */ } return; }
   if (typeof CourtRoom !== 'undefined' && CourtRoom.on) { try { ctLeaveAsk(); } catch (e) { /* none */ } return; }
   if (typeof V3d !== 'undefined' && V3d.open) { try { ACTIONS['v3d-close'](null as any, null as any); } catch (e) { /* none */ } return; }
   if (State.screen !== 'ops') { const b = document.createElement('b'); b.setAttribute('data-screen', 'ops'); ACTIONS.go(b, null); }
@@ -127,7 +127,7 @@ function padLoop() {
     const hit = (i: number) => B[i] && !Pad.prev[i], rel = (i: number) => !B[i] && Pad.prev[i];
     const any = lx || ly || rx || ry || l2 > 0.05 || r2 > 0.05 || B.some(Boolean);
     if (any) Pad.last = now;
-    const v3 = typeof V3d !== 'undefined' && V3d.open, of = typeof OfficeRoom !== 'undefined' && OfficeRoom.on, ct = typeof CourtRoom !== 'undefined' && CourtRoom.on;
+    const v3 = typeof V3d !== 'undefined' && V3d.open, of = typeof OfficeRoom !== 'undefined' && OfficeRoom.on && !OfficeRoom.overlay, ct = typeof CourtRoom !== 'undefined' && CourtRoom.on;
     const sens = +padOpt('padSpeed', 1) || 1;
     // ---- the world views: the sticks move and look ----
     if (v3) {

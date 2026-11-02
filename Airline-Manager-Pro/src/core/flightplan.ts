@@ -8,7 +8,7 @@
 // Waypoints are named the way pilots write a position without a published name: degrees and minutes of
 // latitude and longitude (5530N02015W), or an airport's code when it is one.
 
-interface PlanWp { id: string; name: string; lat: number; lon: number; alt: number; spd?: number; mach?: number; apt?: string }
+interface PlanWp { id: string; name: string; lat: number; lon: number; alt: number; spd?: number; mach?: number; apt?: string; via?: string }
 interface FlightPlanR { key: string; from: string; to: string; wps: PlanWp[]; climbIas?: number; descIas?: number; altn?: string; on: boolean; v: number; at: number; typeId?: string }
 
 /** The plan the Flight planner is showing (worked out as flown even while it is switched off). */
@@ -47,3 +47,21 @@ function planSave(p: FlightPlanR) {
 }
 /** The flight level as pilots say it (FL350), or feet below the transition. */
 function altText(ft: number): string { return ft >= 18000 ? 'FL' + Math.round(ft / 100) : num(Math.round(ft / 100) * 100) + ' ft'; }
+
+/** A plan from your SimBrief flight plan: its waypoints and airways (not the departure and arrival procedures,
+ *  which the flight takes from the runway in use), the level at each (the cruise level through the climb, step
+ *  climbs where SimBrief has them), its cruise speeds and its alternate. */
+function planFromOfp(o: Ofp): FlightPlanR {
+  if (!o || !o.from || !o.to || !apt(o.from) || !apt(o.to)) return null;
+  const en = o.fixes.filter(x => !x.proc && x.type !== 'apt' && x.ident !== o.from && x.ident !== o.to);
+  if (!en.length) return null;
+  const cruise = o.cruiseFt || Math.max(...en.map(x => x.alt)) || 35000;
+  let lvl = cruise; const wps: PlanWp[] = [];
+  for (const x of en) {
+    if (x.stage === 'CRZ' && x.alt >= 10000) lvl = x.alt;   // step climbs and descents in the cruise
+    const w: PlanWp = { id: uid(), name: x.ident || coordName(x.lat, x.lon), lat: x.lat, lon: x.lon, alt: lvl, via: x.via && x.via !== 'DCT' ? x.via : '' };
+    if (x.stage === 'CRZ') { if (x.mach) w.mach = Math.round(x.mach * 100) / 100; else if (x.ias) w.spd = Math.round(x.ias); }
+    wps.push(w);
+  }
+  return { key: planKey(o.from, o.to), from: o.from, to: o.to, wps, altn: o.altn && apt(o.altn) ? o.altn : '', on: true, v: 1, at: Date.now(), src: 'simbrief' } as any;
+}

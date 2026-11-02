@@ -98,6 +98,7 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'simRate', label: 'Simulation speed', hint: 'How much company time passes for each real day.', options: [['week', '1 day = 1 week'], ['month', '1 day = 1 month'], ['quarter', '1 day = 3 months']], when: () => State.settings.timeMode === 'sim' },
   ] },
   { id: 'sync', title: 'Simulator link', icon: 'sync', items: [
+    { type: 'html', html: () => { const on = (State.settings as any).realAirways !== false; return `<label class="tg-row"><span><b>Real airways from Flight Simulator</b><small>While linked: airliners and cargo jets fly the high airways and turboprops and light aircraft the low ones, between where their departures end and their arrivals begin, from the simulator's own navigation data. Each route is worked out once and kept on this device.</small></span><button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="v3d-opt" data-key="realAirways"><i></i></button></label>`; } },
     { type: 'html', html: () => {
       const on = Link.status === 'connected', pc = Link.pc;
       const sub = on ? `${Link.sim && Link.sim.connected ? esc(Link.sim.sim) : 'Flight Simulator not running'} on ${esc(pc.name)}, ${esc(pc.ip)}${Link.via !== 'wifi' ? ', through your phone\'s ' + (Link.via === 'usb' ? 'USB tethering' : 'hotspot') : ''}${Link.latency ? ', ' + Link.latency + ' ms' : ''}`

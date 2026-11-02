@@ -131,7 +131,7 @@ const _profiles: { [k: string]: FlightProfile } = {};
 /** The whole flight from off-blocks to on-blocks, sampled about every 20 seconds. */
 function flightProfile(typeId: string, from: string, to: string, when?: number): FlightProfile {
   const month = new Date(when || Date.now()).getMonth();
-  const key = typeId + '|' + from + '|' + to + '|' + month + planSig(from, to);
+  const CLS = awyClass(typeId), key = typeId + '|' + from + '|' + to + '|' + month + planSig(from, to) + (planSig(from, to) ? '' : AirwayRoutes.sig(from, to, CLS));
   if (_profiles[key]) return _profiles[key];
   const t = acType(typeId) || AIRCRAFT[0];
   // where the airports are: from the airport list, or from their runways; if neither is known yet (the world
@@ -145,15 +145,17 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   if (CF && CF.climbMach) P.climbMach = CF.climbMach;
   const gc = A && B ? gcDistanceNm(A.pos, B.pos) : 200;
   // a flight plan from the planner: flown along its path, at its levels and speeds
-  const PL = flightPlanFor(from, to); let FPH: FlightPath = null; try { FPH = PL ? flightPathFor(from, to) : null; } catch (e) { FPH = null; }
-  const plan = PL && FPH && FPH.wpD ? PL : null;
+  const PL = flightPlanFor(from, to), AWR = !PL ? AirwayRoutes.get(from, to, CLS) : null;
+  let FPH: FlightPath = null; try { FPH = PL || AWR ? flightPathFor(from, to, false, CLS) : null; } catch (e) { FPH = null; }
+  const plan = PL && FPH && FPH.wpD ? PL : null, onAwy = !PL && AWR && FPH && (FPH as any).awy ? true : false;
+  if (AWR && !onAwy) keep = false;
   if (PL && !plan) keep = false;   // the runways not known yet: worked out again with the plan once they are
   if (plan && plan.climbIas) P.climbIas = plan.climbIas;
   if (plan && plan.descIas) P.descIas = plan.descIas;
-  const routeNm = plan ? FPH.len : Math.max(3, gc * P.airway + (gc > 40 ? P.procNm : gc * 0.05));
+  const routeNm = plan || onAwy ? FPH.len : Math.max(3, gc * P.airway + (gc > 40 ? P.procNm : gc * 0.05));
   const track0 = A && B ? bearingDeg(A.pos, B.pos) : 90;
-  const latAt = (frac: number) => plan ? pathAt(FPH, frac * FPH.len).pos[1] : A && B ? gcInterpolate(A.pos, B.pos, clamp(frac, 0, 1))[1] : 50;
-  const trackAt = (frac: number) => plan ? pathAt(FPH, frac * FPH.len).hdg : A && B && gc > 5 ? bearingDeg(gcInterpolate(A.pos, B.pos, clamp(frac, 0, 0.99)), B.pos) : track0;
+  const latAt = (frac: number) => plan || onAwy ? pathAt(FPH, frac * FPH.len).pos[1] : A && B ? gcInterpolate(A.pos, B.pos, clamp(frac, 0, 1))[1] : 50;
+  const trackAt = (frac: number) => plan || onAwy ? pathAt(FPH, frac * FPH.len).hdg : A && B && gc > 5 ? bearingDeg(gcInterpolate(A.pos, B.pos, clamp(frac, 0, 0.99)), B.pos) : track0;
   // the plan's waypoints in order along the path: the level (and speed) to fly from each one on
   const pw = plan ? plan.wps.filter(w => FPH.wpD[w.id] != null).map(w => ({ d: FPH.wpD[w.id], w })).sort((a, b) => a.d - b.d) : [];
   const planAt = (d: number) => { let r = pw[0]; for (const x of pw) if (x.d <= d + 0.01) r = x; return r ? r.w : null; };

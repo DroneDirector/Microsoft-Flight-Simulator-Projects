@@ -8,7 +8,7 @@
 
 import { EventEmitter } from 'events';
 
-export interface ProcLeg { t: number; fix: string; lat: number; lon: number; alt: number; crs: number; dist: number; turn: number; arcLat?: number; arcLon?: number }
+export interface ProcLeg { t: number; fix: string; lat: number; lon: number; alt: number; crs: number; dist: number; turn: number; arcLat?: number; arcLon?: number; reg?: string }
 export interface ProcTransition { name: string; rwy?: string; legs: ProcLeg[] }
 export interface Procedure { name: string; kind: 'sid' | 'star' | 'app'; type?: number; suffix?: string; rwy?: string; common: ProcLeg[]; runways: ProcTransition[]; enroute: ProcTransition[] }
 export interface AirportProcedures { icao: string; lat: number; lon: number; sids: Procedure[]; stars: Procedure[]; apps: Procedure[] }
@@ -16,7 +16,7 @@ export interface AirportProcedures { icao: string; lat: number; lon: number; sid
 const DEF_PROC = 7300;
 const DESIGNATOR = ['', 'L', 'R', 'C', 'W', 'A', 'B', ''];
 const T = { AIRPORT: 0, APPROACH: 5, APPROACH_TRANSITION: 6, APPROACH_LEG: 7, FINAL_APPROACH_LEG: 8, MISSED_APPROACH_LEG: 9, DEPARTURE: 10, ARRIVAL: 11, RUNWAY_TRANSITION: 12, ENROUTE_TRANSITION: 13 };
-const LEG_FIELDS = ['TYPE', 'FIX_ICAO', 'FIX_LATITUDE', 'FIX_LONGITUDE', 'COURSE', 'ROUTE_DISTANCE', 'ALTITUDE1', 'TURN_DIRECTION', 'ARC_CENTER_FIX_LATITUDE', 'ARC_CENTER_FIX_LONGITUDE'];
+const LEG_FIELDS = ['TYPE', 'FIX_ICAO', 'FIX_LATITUDE', 'FIX_LONGITUDE', 'COURSE', 'ROUTE_DISTANCE', 'ALTITUDE1', 'TURN_DIRECTION', 'ARC_CENTER_FIX_LATITUDE', 'ARC_CENTER_FIX_LONGITUDE', 'FIX_REGION'];
 
 function rwyName(n: number, d: number): string { return n > 0 && n <= 36 ? String(n).padStart(2, '0') + (DESIGNATOR[d] || '') : ''; }
 function str(v: any): string { return String(v || '').replace(/\0.*$/, '').trim(); }
@@ -71,8 +71,9 @@ export class ProcReader extends EventEmitter {
 
   private leg(d: any): ProcLeg {
     const t = d.readInt32(), fix = str(d.readString8()), lat = d.readFloat64(), lon = d.readFloat64(), crs = d.readFloat32(), dist = d.readFloat32(), alt = d.readFloat32(), turn = d.readInt32();
-    const arcLat = d.readFloat64(), arcLon = d.readFloat64();
+    const arcLat = d.readFloat64(), arcLon = d.readFloat64(); let reg = ''; try { reg = str(d.readString8()); } catch (e) { /* older simulators */ }
     const l: ProcLeg = { t, fix, lat: round6(lat), lon: round6(lon), alt: Math.round(alt), crs: Math.round(crs * 10) / 10, dist: Math.round(dist * 100) / 100, turn };
+    if (reg) l.reg = reg;   // the fix's region (two letters), to find it among the airways
     if (Math.abs(arcLat) > 1e-6 || Math.abs(arcLon) > 1e-6) { l.arcLat = round6(arcLat); l.arcLon = round6(arcLon); }
     return l;
   }

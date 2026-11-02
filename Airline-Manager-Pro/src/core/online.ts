@@ -49,7 +49,7 @@ function saveTextFile(name: string, mime: string, text: string): Promise<boolean
 }
 
 /* ---------- SimBrief ---------- */
-interface OfpFix { ident: string; type: string; lat: number; lon: number; alt: number; via: string; stage: string }
+interface OfpFix { ident: string; type: string; lat: number; lon: number; alt: number; via: string; stage: string; ias?: number; mach?: number; proc?: boolean }
 interface Ofp {
   at: number; from: string; to: string; altn: string; flight: string; airline: string; acType: string; reg: string; route: string; cruiseFt: number;
   blockMin: number; airMin: number; nm: number; pax: number; cargoKg: number; zfwKg: number; towKg: number; lawKg: number;
@@ -70,7 +70,9 @@ const SimBrief = {
       const lbs = d.params && /lbs/i.test(d.params.units), kg = (v: any) => Math.round((+v || 0) * (lbs ? 0.453592 : 1));
       const g = d.general || {}, w = d.weights || {}, f = d.fuel || {}, t = d.times || {};
       const fx = (d.navlog && d.navlog.fix) ? (Array.isArray(d.navlog.fix) ? d.navlog.fix : [d.navlog.fix]) : [];
-      const fixes: OfpFix[] = fx.map((x: any) => ({ ident: String(x.ident || ''), type: String(x.type || ''), lat: +x.pos_lat, lon: +x.pos_long, alt: +x.altitude_feet || 0, via: String(x.via_airway || ''), stage: String(x.stage || '') }))
+      const mach = (x: any) => { const m = +x.mach; return m > 0 && m < 1 ? m : +x.mach_thousandths > 0 ? +x.mach_thousandths / 1000 : 0; };
+      const fixes: OfpFix[] = fx.map((x: any) => ({ ident: String(x.ident || ''), type: String(x.type || ''), lat: +x.pos_lat, lon: +x.pos_long, alt: +x.altitude_feet || 0, via: String(x.via_airway || ''), stage: String(x.stage || ''),
+        ias: +x.ind_airspeed || 0, mach: mach(x), proc: String(x.is_sid_star) === '1' }))
         .filter((x: OfpFix) => isFinite(x.lat) && isFinite(x.lon));
       const o: Ofp = {
         at: Date.now(), from: (d.origin || {}).icao_code || '', to: (d.destination || {}).icao_code || '', altn: (d.alternate || {}).icao_code || '',

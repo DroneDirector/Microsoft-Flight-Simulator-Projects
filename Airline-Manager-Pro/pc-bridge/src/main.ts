@@ -67,7 +67,12 @@ export function run(source: SimSource, server: LinkServer, log: (s: string) => v
   });
   // the airport view asks for an airport's layout; the airport search for every airport in the sim
   server.on('message', (c: any, m: any) => {
-    if (m.type === 'procs') {
+    if (m.type === 'awy') {
+      // an airway route for the app: high (airliners, cargo jets) or low (turboprops, light aircraft)
+      const from = String(m.from || '').toUpperCase().slice(0, 8), to = String(m.to || '').toUpperCase().slice(0, 8), high = m.cls !== 'L';
+      if (!source.getAirwayRoute) c.send({ type: 'awy', from, to, cls: high ? 'H' : 'L', error: 'No simulator airways' });
+      else source.getAirwayRoute(from, to, high).then(r => c.send({ type: 'awy', from, to, cls: high ? 'H' : 'L', route: r }), (e: any) => c.send({ type: 'awy', from, to, cls: high ? 'H' : 'L', error: String(e && e.message || e) }));
+    } else if (m.type === 'procs') {
       const icao = String(m.icao || '').toUpperCase().slice(0, 8);
       if (!source.getProcedures) c.send({ type: 'procs', icao, error: 'No simulator procedures' });
       else source.getProcedures(icao).then(p => c.send({ type: 'procs', icao, procs: p }), (e: any) => c.send({ type: 'procs', icao, error: String(e && e.message || e) }));
@@ -192,6 +197,7 @@ export async function main(replay?: { file: string; speed: number }) {
     let lib: any;
     try { lib = loadSimConnect(); } catch (e) { fatal('The SimConnect library is missing or damaged. Unzip the PC app again, keeping the lib folder next to the .exe.', e); return; }
     source = new SimConnectSource(lib);
+    try { (source as any).dataDir = dataDir(); } catch (e) { /* the system's temporary folder instead */ }
   }
   source.on('status', (ok: boolean, text: string) => { if (text !== status) writeLog('Flight Simulator: ' + text); status = text; redraw(); });
   source.on('note', (t: string) => writeLog(t));
