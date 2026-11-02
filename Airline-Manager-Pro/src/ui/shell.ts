@@ -111,6 +111,7 @@ function railScrollBind() {
 ACTIONS['rail-scroll'] = el => { const r = $('.rail-items'); if (r) r.scrollBy({ top: +el.getAttribute('data-d') * r.clientHeight * 0.6, behavior: 'smooth' }); };
 function refresh() {
   renderTopbar();
+  try { if (typeof ofScreenRefresh === 'function') ofScreenRefresh(); } catch (e) { /* the office shows it next time */ }
   const view = $('#view');
   const st = view.scrollTop, cur = view.firstElementChild as HTMLElement, html = `<section class="screen screen-${State.screen}">${SCREENS[State.screen].render()}</section>`;
   // the same screen again: change only what changed (text, numbers, a new row), so nothing flashes or

@@ -741,7 +741,11 @@ function v3dLoop(now: number) {
   // while the loading screen covers the view, the scene is drawn only a few times a second: the loading
   // screen stays smooth and the device's time goes to loading instead
   const VL: any = V3d;
-  if (V3d.loaded || !VL.drawnAt || now - VL.drawnAt > 450) { VL.drawnAt = now; V3d.r.render(V3d.scene, V3d.cam); }
+  if (V3d.loaded || !VL.drawnAt || now - VL.drawnAt > 450) {
+    VL.drawnAt = now;
+    if (VL.cabinFwdFor) { try { cabinOutsidePass(V3d.planes[VL.cabinFwdFor]); } catch (e) { /* the windows keep the last view */ } }
+    V3d.r.render(V3d.scene, V3d.cam);
+  }
 
   v3dClockStep(now);
   // callsigns over the aircraft

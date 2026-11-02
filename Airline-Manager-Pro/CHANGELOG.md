@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.62 (2026-11-02)
+
+- cabin windows: the outside drawn into a small render target from the same eye (cabin hidden, wings and clouds shown) and shown in each window; shades removed
+- cabin crew: hand-over of a cup or meal tray to the passenger answered, then 9 s at the row
+- office: schedule overlay (ofScreenOpen, kept up to date from refresh), dialogue close button and placement above the places row, family photo added to the room again, visitor waits 3 s and walks a planned route (grid search round the door leaf, walls and furniture), detailed laptop
+
 ## 0.9.61 (2026-11-02)
 
 - pc-bridge airways: waypoint airways from SimConnect facility data (WAYPOINT/ROUTE), A* between SID exits and STAR entries (high or low), network and routes kept in the data folder; procedure legs carry their region; 'awy' link message
