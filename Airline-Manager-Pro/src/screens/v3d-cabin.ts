@@ -280,11 +280,13 @@ function cabinLowMem(): boolean { return !(typeof DESKTOP !== 'undefined' && DES
 function cabinOpt(k: string): string { const v = (State.settings as any)[k]; return v == null ? 'auto' : String(v); }
 const CABIN_SEAT_NEAR = ['Off', 'Close by', 'Nearby rows', 'Far', 'Every seat'], CABIN_SEAT_M = [0, 3, 5.5, 9, 1e9];
 /** How far around you the seats are drawn in full detail (metres; further away a lighter seat, faded between). */
-function cabinSeatRange(): number { const v = cabinOpt('cabSeatNear'); if (v !== 'auto') return CABIN_SEAT_M[clamp(+v, 0, 4)]; return [0, 3, 5.5, 1e9][cabinQ()]; }
+function cabinSeatRange(): number { const v = cabinOpt('cabSeatNear'); if (v !== 'auto') return CABIN_SEAT_M[clamp(+v, 0, 4)]; return CABIN_SEAT_M[cabinSeatAuto()]; }
+/** Detailed seats on Automatic: on the PC every seat from Very high up, on phones and tablets the nearby rows. */
+function cabinSeatAuto(): number { const q = cabinQ(); return q === 3 ? 4 : cabinIsPc() ? [1, 2, 4][q] : [0, 1, 1][q]; }
 const CABIN_HD_N = [0, 4, 8, 12, 20, 48];
 /** How many of the passengers around you are drawn as detailed figures. */
 function cabinHdCount(): number { const v = cabinOpt('cabHd'); if (v !== 'auto') return CABIN_HD_N[clamp(+v, 0, 5)]; return cabinHdAuto(); }
-function cabinHdAuto(): number { const q = cabinQ(); return q === 3 ? 48 : cabinIsPc() ? [4, 8, 12][q] : cabinLowMem() ? 3 : [3, 4, 6][q]; }
+function cabinHdAuto(): number { const q = cabinQ(); return q === 3 ? 48 : cabinIsPc() ? [6, 10, 20][q] : cabinLowMem() ? 2 : [2, 3, 4][q]; }
 function cabinIsPc(): boolean { return typeof DESKTOP !== 'undefined' && !!DESKTOP; }
 const CABIN_SCALE = [0.75, 1, 1.5, 2, 3];
 /** The cabin's drawing sharpness against the view's normal one (auto: finer than the screen at the top settings,

@@ -6,6 +6,7 @@
 - cabin: supersampling automatic only on PC (and Ultra); frame guard lowers the pixel ratio while the frame rate is low; low-memory devices default to Medium
 - v3d-cabinpax: detailed passenger count and detail from settings (fewer on phones), built only while the camera is still, crossfaded with the simple figures
 - mood light shader skips lines that face away or are out of reach
+- human: lighter figures (q < 0.6) get fewer, shorter-jointed hair strands; cabin crew detail follows the cabin quality (full at Ultra); PC automatic settings generous, phones lighter
 - settings: Graphics → Cabin part by part (detailed seats, sharpness, frame guard, mood lighting, passengers, detailed passengers and their detail)
 
 ## 0.9.57 (2026-11-02)
