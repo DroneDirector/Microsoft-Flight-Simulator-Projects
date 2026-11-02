@@ -59,8 +59,8 @@ async def main():
                     await pg.screenshot(path=f'{OUT}/{key}-{name}-full.png', full_page=True)
                 if key == 'home' and name == 'laptop':
                     # the carousel turns and the middle screen opens full size
-                    await pg.click('.ams-hero__nav--next'); await pg.wait_for_timeout(1200)
-                    await pg.click('.ams-hero__p--b'); await pg.wait_for_timeout(900)
+                    await pg.click('.ams-hero__nav--next', force=True); await pg.wait_for_timeout(1200)
+                    await pg.click('.ams-hero__p--b', force=True); await pg.wait_for_timeout(900)
                     await pg.screenshot(path=f'{OUT}/home-carousel-open.png')
                 await c.close()
         # Elementor editor
