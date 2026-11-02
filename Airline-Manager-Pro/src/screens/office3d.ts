@@ -349,7 +349,7 @@ OfficeRoom.open = function (inc?: any) {
   const R = OfficeRoom; if (R.on) R.close(true);
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   const p: any = inc ? staffById(inc.staffId) : null; if (inc && !p) { toast('This person no longer works for you', 'info'); return; }
-  R.on = true; R.inc = inc || null; R.p = p; R.mode = inc ? 'interview' : 'visit'; R.keys = {}; R.stick = [0, 0]; R.pct = 0; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0; R.flush = false; R.cond = null; R.doorT = 0; R.last = 0; R.view = ''; R.vis = null; R.loadT0 = performance.now();
+  R.on = true; R.inc = inc || null; R.p = p; R.mode = inc ? 'interview' : 'visit'; R.keys = {}; R.stick = [0, 0]; R.pct = 0; R.asked = []; R.answers = 0; R.decided = false; R.ended = false; R.started = false; R.rescued = false; R.talkUntil = 0; R.flush = false; R.cond = null; R.doorT = 0; R.last = 0; R.view = ''; R.vis = null; R.loadT0 = performance.now();
   const q = typeof cabinQ === 'function' ? cabinQ() : 2, co = company();
   const root = document.createElement('div'); root.className = 'court3d office3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
@@ -834,7 +834,7 @@ function ofInviteNow(id: string) {
   Sound.tick();
   // whoever was here before has left
   if (R.vis && R.vis.pivot && R.vis.m) { try { R.A.root.remove(R.vis.pivot); R.vis.pivot.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); } catch (e) { /* gone */ } }
-  R.vis = null; R.inc = inc; R.p = p; R.mode = 'interview'; R.cond = null; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0;
+  R.vis = null; R.inc = inc; R.p = p; R.mode = 'interview'; R.cond = null; R.asked = []; R.answers = 0; R.decided = false; R.ended = false; R.started = false; R.rescued = false; R.talkUntil = 0;
   R.seat = true; R.view = 'sit'; R.look = { yaw: 0, pitch: -0.08 };
   for (const sel of ['.of-spots', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
   const top = R.root.querySelector('.ct-top b') as HTMLElement; if (top) top.textContent = `Your office: ${p.name}, ${String(inc.title).toLowerCase()}`;
@@ -1134,12 +1134,14 @@ function ofDecide(k: string) {
   // what you tell them, in your own voice
   const mine = ofPick(OF_MY_DEC[k] || ['']), meWho = myWho(k === 'dismiss' || k === 'court' ? 'neutral' : ''), you = R.root.querySelector('.of-you') as HTMLElement;
   if (you && mine) you.innerHTML = `<span><b>You</b>${esc(mine)}</span>${voiceButton(mine, meWho, 'Play what you said')}`;
-  let left = false; const leave = () => { if (left) return; left = true; ofExit(); };
-  if ((State.settings as any).officeAutoVoice && State.settings.mechanicVoice && !State.settings.muteAll) {
+  // they stay in their chair until they have answered and you have told them they are dismissed
+  R.endK = k; R.endVoice = voice;
+  let ready = false; const done = () => { if (ready || !OfficeRoom.on || OfficeRoom.p !== p) return; ready = true; ofEndReady(); };
+  if (ofAutoVoice()) {
     R.talkUntil = 0; R.sayText = '';
-    try { Voice.speak(mine, () => setTimeout(() => { if (OfficeRoom.on && OfficeRoom.p === p) Voice.speak(text, () => setTimeout(leave, 1200), voice); }, 250), meWho); } catch (e) { /* no voice */ }
-    setTimeout(leave, 16000);   // in any case
-  } else setTimeout(leave, 2600);
+    try { Voice.speak(mine, () => setTimeout(() => { if (OfficeRoom.on && OfficeRoom.p === p) Voice.speak(text, () => setTimeout(done, 500), voice); }, 250), meWho); } catch (e) { /* no voice */ }
+    setTimeout(done, 20000);   // in any case
+  } else setTimeout(done, ofReadMs(text));
   // the decision itself, as on the report
   const el = { getAttribute: (a: string) => a === 'data-id' ? inc.id : a === 'data-strong' ? ((p.warnings || 0) >= 1 ? '1' : '0') : null } as any;
   const keepToast = toast; void keepToast;
@@ -1170,11 +1172,52 @@ function ofDecide(k: string) {
   try { closeAll(); } catch (e) { /* none */ }
   (R.root.querySelector('.ct-ctl') as HTMLElement).innerHTML = '';
 }
+/* ---------- the end of the conversation: you dismiss them; they may say something; then they leave ---------- */
+const OF_END = ['Okay, that\'s it. You are dismissed.', 'That\'s all for now. You are dismissed.', 'Okay, that\'s it. You can go.', 'We\'re done here. You are dismissed.'];
+// what they say on their way out (sometimes nothing), by what you decided and how they took it
+const OF_BYE: { [d: string]: { [att: string]: string[] } } = {
+  keep: { honest: ['Thank you. I won\'t let you down.', 'Thank you. Really.', ''], defensive: ['Thanks.', ''], lying: ['Thank you.', ''], dismissive: ['', 'Right.'] },
+  improve: { honest: ['Thank you for listening.', 'Thank you. It means a lot.', ''], defensive: ['Thanks. I\'ll hold you to that.', ''], lying: ['Thank you.', ''], dismissive: ['We\'ll see.', ''] },
+  discipline: { honest: ['I understand. It won\'t happen again.', ''], defensive: ['Fine.', 'If you say so.', ''], lying: ['Fine.', ''], dismissive: ['Whatever.', ''] },
+  dismiss: { honest: ['I understand. Thank you for the chance.', ''], defensive: ['This isn\'t fair, and you know it.', 'Fine.', ''], lying: ['You\'ll regret this.', 'Fine.', ''], dismissive: ['Good luck finding someone else.', ''] },
+  court: { honest: ['I understand.', ''], defensive: ['I\'ll see you in court, then.', ''], lying: ['You can\'t prove anything.', ''], dismissive: ['', 'Whatever.'] },
+};
+function ofAutoVoice(): boolean { return !!((State.settings as any).officeAutoVoice && State.settings.mechanicVoice && !State.settings.muteAll); }
+function ofReadMs(text: string): number { return Math.max(2200, Math.min(9000, 900 + String(text || '').length * 55)); }
+/** Their answer is heard: now you can tell them they are dismissed. */
+function ofEndReady() {
+  const R = OfficeRoom, c = R.root && R.root.querySelector('.ct-ctl') as HTMLElement; if (!c || R.ended) return;
+  c.innerHTML = `<button class="btn primary" data-of="end">That's it. You are dismissed.</button>`;
+  ofBoxOpen();
+}
+/** You dismiss them: in your voice; then whatever they have to say; then they get up and go. */
+function ofEnd() {
+  const R = OfficeRoom, p = R.p, V = R.vis; if (R.ended || !p) return; R.ended = true; Voice.stop();
+  const c = R.root.querySelector('.ct-ctl') as HTMLElement; if (c) c.innerHTML = '';
+  const mine = ofPick(OF_END), meWho = myWho('neutral'), you = R.root.querySelector('.of-you') as HTMLElement;
+  if (you) you.innerHTML = `<span><b>You</b>${esc(mine)}</span>${voiceButton(mine, meWho, 'Play what you said')}`;
+  const att = (V && V.attitude) || 'defensive', bye = ofPick((OF_BYE[R.endK] || OF_BYE.keep)[att] || ['']);
+  let gone = false; const leave = () => { if (gone || !OfficeRoom.on || OfficeRoom.p !== p) return; gone = true; ofExit(); };
+  let byeSaid = false;
+  const sayBye = () => {
+    if (byeSaid || !OfficeRoom.on || OfficeRoom.p !== p) return; byeSaid = true;
+    if (!bye) { setTimeout(leave, 500); return; }
+    ofSay(p.name, bye, 'Before they go'); if (V) V.say = att; R.sayText = bye; R.sayAt = Date.now();
+    R.talkUntil = (performance.now() - R.t0) / 1000 + ofReadMs(bye) / 1000;
+    const sb = R.root.querySelector('.ct-say') as HTMLElement; if (sb) sb.innerHTML = voiceButton(bye, R.endVoice, 'Play');
+    if (ofAutoVoice()) { R.talkUntil = 0; R.sayText = ''; try { Voice.speak(bye, () => setTimeout(leave, 700), R.endVoice); } catch (e) { /* no voice */ } setTimeout(leave, 12000); }
+    else setTimeout(leave, ofReadMs(bye));
+  };
+  if (ofAutoVoice()) { try { Voice.speak(mine, () => setTimeout(sayBye, 300), meWho); } catch (e) { /* no voice */ } setTimeout(() => { if (!Voice.speaking) sayBye(); }, 9000); }
+  else setTimeout(sayBye, 1600);
+  Sound.tick();
+}
 function ofClick(b: HTMLElement) {
   const k = b.getAttribute('data-of');
   if (k === 'leave') ofLeave();
   else if (k === 'ask') { Voice.stop(); ofAsk(b.getAttribute('data-k')); }
   else if (k === 'dec') ofDecide(b.getAttribute('data-k'));
+  else if (k === 'end') ofEnd();
   else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else ofSpot(s); }
   else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
   else if (k === 'back') { Sound.tick(); ofVisitUi(); }
