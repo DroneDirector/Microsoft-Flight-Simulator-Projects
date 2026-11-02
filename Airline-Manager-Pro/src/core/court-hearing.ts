@@ -94,7 +94,7 @@ function hearingDue(c: any, st: any): 'wait' | 'done' {
     try { Sound.chime(); toast(`Court is in session: ${HEAR_TITLES[st.key] || 'hearing'}`, 'warn', { label: 'Go to court', act: 'court-attend', data: c.id }); renderTopbar(); } catch (e) { /* not ready */ }
     Store.save(); return 'wait';
   }
-  if (now > st.deadline) { hearingAuto(c, st, 'absent'); return 'done'; }
+  if (now > st.deadline && c.hear.kind !== 'accident') { hearingAuto(c, st, 'absent'); return 'done'; }   // after an accident the court waits for you
   return 'wait';
 }
 /** The verdict waits (up to 12 hours) for decisions only you can make: the settlement and the plea. */
@@ -144,6 +144,7 @@ function hearingAuto(c: any, st: any, how: 'standin' | 'absent' | 'off', skip?: 
 function hearingDaySummary(c: any, key: string): string {
   const h = c.hear, f: HearFacts = h.facts;
   if (h.kind === 'perjury') return key === 'hear1' ? `You stood trial for perjury. The court heard the transcript of your evidence and the records that contradict it.${c.ch && c.ch.plea ? ' You pleaded guilty.' : ''}` : '';
+  if (h.kind === 'accident') return key === 'hear1' ? `The court heard the accident investigators, the witnesses and your evidence.${h.lies ? ' Some of your answers did not match the records.' : h.honest ? ' You answered openly.' : ''}` : key === 'hear2' ? `The trial: the court heard the person at fault, the families and your last word.${c.ch && c.ch.plea ? ' The airline pleaded guilty.' : ''}` : '';
   if (h.kind === 'staff') return key === 'hear1' ? `The court heard the airline's evidence about ${c.name}: the conduct report and the staff record.${h.lies ? ' Parts of the airline\'s evidence did not match the records.' : ''}` : key === 'hear2' ? `${c.name} took the stand and answered the airline's questions.${h.caught ? ' The answers did not always match the evidence.' : ''} Both sides closed their case.` : '';
   if (key === 'hear1') return `The prosecution presented the investigation report and the airline's maintenance records${f.open ? `, including ${f.open} unrepaired ${f.open === 1 ? 'defect' : 'defects'} on ${f.reg}` : ''}. ${h.lies ? 'Some of the airline\'s answers were contradicted by its own records.' : h.honest ? 'The airline answered the court\'s questions openly.' : 'The airline gave guarded answers.'}`;
   if (key === 'hear2') return `The court heard the airline's chief mechanic, a surviving passenger and the family of one of the victims.`;
@@ -154,7 +155,8 @@ function hearingDaySummary(c: any, key: string): string {
 /** After a day in court: the next days move so there's always time between them; the papers report it. */
 function hearingAfterDay(c: any, st: any) {
   const now = Date.now(); let t = now;
-  for (const s of c.stages) { if (s.done || s === st) continue; t = Math.max(s.at, t + 5 * 3600e3); s.at = t; s.reminded = false; }
+  const gap = c.hear && c.hear.kind === 'accident' ? invGap() * 0.5 : 5 * 3600e3;
+  for (const s of c.stages) { if (s.done || s === st) continue; t = Math.max(s.at, t + gap); s.at = t; s.reminded = false; }
   State.notices.unshift({ id: uid(), kind: 'authority' as any, title: `${c.name}: ${st.title.toLowerCase()}`, body: st.text, time: 'Now', at: now, read: false, ref: c.id } as any);
   try { newsHearing(c, st); } catch (e) { /* no paper today */ }
   Store.save(); try { renderTopbar(); refresh(); } catch (e) { /* not ready */ }
@@ -205,6 +207,7 @@ function hearingObject(c: any): boolean { const p = c.ch.lawyer === 'top' ? 0.65
 
 /* ---------- what is said in court ---------- */
 function hearingScript(c: any, key: string): HearLine[] {
+  if (c.hear && c.hear.kind === 'accident') return hearingScriptAccident(c, key);   // after an accident investigation (investigation.ts)
   if (c.hear && c.hear.kind === 'staff') return hearingScriptStaff(c, key);   // a case you brought against your staff
   if (c.hear && c.hear.kind === 'perjury') return hearingScriptPerjury(c, key);   // your own trial, for lying in one
   const h = c.hear, f: HearFacts = h.facts, co = company(c.companyId), me: any = myPilot();

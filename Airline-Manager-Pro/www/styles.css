@@ -2959,6 +2959,15 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .of-x { position: sticky; top: 0; float: right; margin: -4px -6px 0 8px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 99px; background: rgba(255,255,255,.06); border: 1px solid rgba(214,168,92,.35); color: #F3ECE0; cursor: pointer; z-index: 1; }
 .of-x:hover { background: rgba(214,168,92,.25); }
 .of-x svg { width: 15px; height: 15px; }
+.inv-rep .inv-cause { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; margin: 10px 0; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+.inv-rep .inv-cause small { width: 100%; color: var(--ink-3); }
+.inv-rep .inv-cause b { font-size: 15px; }
+.inv-chain { margin: 6px 0 10px; padding-left: 0; list-style: none; counter-reset: ic; }
+.inv-chain li { position: relative; padding: 7px 10px 7px 36px; margin: 0 0 6px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); font-size: 13.5px; line-height: 1.4; counter-increment: ic; }
+.inv-chain li::before { content: counter(ic); position: absolute; left: 9px; top: 7px; width: 19px; height: 19px; border-radius: 99px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--panel-3); color: var(--amber, #F5B544); }
+.inv-chain li:not(:last-child)::after { content: ''; position: absolute; left: 18px; bottom: -7px; width: 1px; height: 7px; background: var(--line); }
+.inv-chain li:last-child { border-color: color-mix(in srgb, var(--red, #F06A6A) 60%, var(--line)); }
+.inv-wit { margin: 4px 0 10px; padding-left: 18px; font-size: 13px; color: var(--ink-2); }
 .of-you:empty { display: none; }
 .of-you { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px dashed rgba(214,168,92,.35); }
 .of-you > span { flex: 1; color: #E9DFCF; font-size: 14px; line-height: 1.4; }

@@ -178,6 +178,7 @@ ACTIONS['open-notice'] = el => {
   else if ((n as any).txs) flightsMoneyPopup((n as any).txs);
   else if (n.ref && /^va-/.test(String(n.ref))) vaNoticeOpen(String(n.ref));
   else if (n.ref && /^case-/.test(String(n.ref))) courtPopup(String(n.ref));
+  else if (n.ref && /^inv-/.test(String(n.ref))) invPopup(String(n.ref));
   else if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);
   else if (n.kind === 'flight' && n.ref && /^scan-/.test(n.ref)) scanPopup(n.ref.slice(5));
@@ -432,8 +433,9 @@ ACTIONS['crash-decide'] = el => {
     crashSiteFor(l);
     if (d.dead || d.level === 'destroyed') {
       try { setTimeout(() => newsCrash({ key: l.id, c: co, typeId: a.typeId, reg: a.reg, callsign: l.callsign, from: l.from, to: l.to, pax: l.pax, dead: d.dead > 0, cause: d.dead ? `${d.dead} ${d.dead === 1 ? 'person' : 'people'} died and ${d.injured} were injured. ${d.salvage ? 'The aircraft was badly damaged.' : 'The aircraft was destroyed.'}` : undefined }), 4000); } catch (e) { /* ignore */ }
-      try { const nc = (window as any).courtNeglectCheck; if (d.dead && nc) nc(a, l, d); } catch (e) { /* no court */ }
     }
+    // the accident investigation board looks into every registered crash (investigation.ts)
+    try { investigationOpen({ key: l.id, cid: co.id, reg: a.reg, typeId: a.typeId, from: l.from, to: l.to, pax: l.pax || 0, dead: d.dead, injured: d.injured, level: d.level, parts: d.parts, you: true, notes: l.notes, fpm: l.landingFpm, g: l.g, cond: l.condBefore != null ? l.condBefore : a.condition, issues: (State.issues as any[]).filter(i => i.reg === a.reg && i.status === 'open' && i.title.indexOf('rash') < 0).map(i => i.title) }); } catch (e) { /* no investigation */ }
   } else {
     try { const list = crashSites(); const i = list.findIndex(c => c.id === l.id); if (i >= 0) { list.splice(i, 1); Store.save(); } } catch (e) { /* none */ }
   }

@@ -152,25 +152,19 @@ function conditionRisk(a: any, f: any): boolean {
   return false;
 }
 
-/** A serious accident. Investigators decide whether poor maintenance caused it; if so, the airline is prosecuted. */
+/** A serious accident of an aircraft flown by your crew. The accident investigation board looks into it
+ *  (investigation.ts): the cause, and whether anyone goes to court, follow from the airline's real state. */
 function conditionAccident(a: any, f: any) {
-  const S: any = State, co = company(a.companyId), mq = maintQuality(a.companyId);
-  const overdue = State.issues.filter((i: any) => i.reg === a.reg && i.status === 'open').length;
-  const fault = clamp((0.6 - mq.q) * 1.5 + overdue * 0.15 + (35 - a.condition) / 60, 0, 0.95);
-  const airlineFault = Math.random() < fault;
-  const dead = Math.random() < 0.35;
-  const typeId = a.typeId;
+  const co = company(a.companyId), typeId = a.typeId, pax = f.pax || 0;
+  // how bad: the worse the aircraft's state, the worse the accident
+  const sev = clamp((40 - (a.condition || 40)) / 40 + State.issues.filter((i: any) => i.reg === a.reg && i.status === 'open').length * 0.12, 0, 1);
+  const dead = sev > 0.45 ? Math.max(1, Math.round(pax * (0.15 + 0.6 * sev))) : 0, injured = Math.min(pax - dead, Math.round(pax * (0.2 + 0.5 * sev)));
+  const issues = (State.issues as any[]).filter(i => i.reg === a.reg && i.status === 'open').map(i => i.title);
+  try { investigationOpen({ key: f.id || uid(), cid: co.id, reg: a.reg, typeId, from: f.from, to: f.to, pax, dead, injured, level: 'destroyed', parts: ['Fuselage broken', 'Wings', 'Engines'], you: false, pilotId: f.pilotId, notes: '', cond: a.condition, issues }); } catch (e) { /* no investigation */ }
   courtWriteOff(a, { reg: a.reg } as any);
-  try { setTimeout(() => newsCrash({ key: f.id || uid(), c: co, typeId, reg: a.reg, callsign: f.callsign, from: f.from, to: f.to, pax: f.pax, dead }), 5000); } catch (e) { /* ignore */ }
-  State.notices.unshift({ id: uid(), kind: 'pilot', ref: 'crash3d-' + f.to, title: `Serious accident: ${f.callsign}`, body: `${a.reg} crashed on arrival at ${f.to}. ${dead ? 'There were fatalities.' : 'Everyone on board survived, some with injuries.'} The accident investigation board has opened an investigation.`, time: 'Now', read: false } as any);
+  try { setTimeout(() => newsCrash({ key: f.id || uid(), c: co, typeId, reg: a.reg, callsign: f.callsign, from: f.from, to: f.to, pax, dead: dead > 0 }), 5000); } catch (e) { /* ignore */ }
+  State.notices.unshift({ id: uid(), kind: 'pilot', ref: 'crash3d-' + f.to, title: `Serious accident: ${f.callsign}`, body: `${a.reg} crashed on arrival at ${f.to}. ${dead ? `${dead} ${dead === 1 ? 'person' : 'people'} died.` : 'Everyone on board survived, some with injuries.'} The accident investigation board has opened an investigation.`, time: 'Now', read: false } as any);
   try { Progress.popularity(dead ? -30 : -15, 'A serious accident'); } catch (e) { /* ignore */ }
-  if (airlineFault) {
-    const why = [mq.coverage < 0.8 ? 'too few mechanics for the fleet' : '', mq.skill && mq.skill < 0.65 ? 'poorly qualified, unreliable mechanics' : '', overdue ? `${overdue} known ${overdue === 1 ? 'defect' : 'defects'} left unrepaired` : '', a.condition < 35 ? `the aircraft flown in a condition of ${Math.round(a.condition)}%` : ''].filter(Boolean).join(', ');
-    _courtCrash = { reg: a.reg, typeId, from: f.from, to: f.to, pax: f.pax, dead: dead ? Math.max(1, Math.round((f.pax || 100) * (0.1 + Math.random() * 0.6))) : 0, cond: a.condition, issues: State.issues.filter((i: any) => i.reg === a.reg && i.status === 'open').map((i: any) => i.title) };
-    try { openCourtCase({ id: 'airline-' + co.id, name: co.name, look: null, base: co.hub, companyId: co.id }, 'airline', dead ? 1 : 2, why); } finally { _courtCrash = null; }
-  } else {
-    State.notices.unshift({ id: uid(), kind: 'pilot', title: 'Accident report: not the airline\'s fault', body: `The investigation found that the ${a.reg} accident was not caused by its maintenance. No charges against ${co.name}.`, time: 'Now', read: false } as any);
-  }
 }
 
 function startConditionClock() {

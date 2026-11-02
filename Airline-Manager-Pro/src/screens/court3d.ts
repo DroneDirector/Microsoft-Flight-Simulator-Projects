@@ -563,8 +563,22 @@ function ctCast(c: any, st: any, judges: number, q: number) {
     P('you', A.seats.def[1], yl, 'exec', me ? me.name : 'You', `Accountable manager, ${co.name}`, yl.sex || 'm');
     const lw = mk('law-' + c.id); P('lawyer', A.seats.def[0], ctLook('law-' + c.id, lw.sex as any, 'counsel'), 'exec', lw.name, 'Your lawyer', lw.sex);
     const fl = mk('fam-' + c.id); P('famlawyer', A.seats.fam, ctLook('fam-' + c.id, fl.sex as any, 'counsel'), 'exec', fl.name, c.hear && c.hear.kind === 'perjury' ? 'Counsel for the wronged employee' : 'Counsel for the families', fl.sex);
+    // after an accident investigation: the investigator, the eyewitnesses and a survivor on day one, the person at
+    // fault on the stand at the trial (investigation.ts); each takes the witness box in turn
+    const inv: any = c.hear && c.hear.kind === 'accident' ? invById(c.hear.inv) : null;
+    if (inv) {
+      const civ = (l: any) => Object.assign({}, l, { civil: true, top: 'jacket', uniform: 0, neck: 'open', hat: 'none', bottom: 'trousers', shoes: 'oxford' });
+      if (st.key === 'hear1') {
+        const iv = mk('inv-' + c.id); P('investigator', A.seats.witness, ctLook('inv-' + c.id, iv.sex as any, 'counsel'), 'exec', iv.name, `Investigator, ${inv.authority.replace(/^the /, '')}`, iv.sex);
+        for (const w of inv.witnesses) P(w.key, A.seats.witness, ctLook(inv.id + w.key, w.sex, 'public'), 'exec', w.name, w.title, w.sex, { hidden: true });
+      }
+      if (st.key === 'hear2') {
+        const p: any = inv.cause === 'aircraft' && inv.mechId ? staffById(inv.mechId) : inv.cause === 'pilot' && !inv.you && !inv.pilotDied && inv.pilotId ? staffById(inv.pilotId) : null;
+        if (p) P('accused', A.seats.witness, p.look ? civ(p.look) : ctLook('acc-' + c.id, p.sex || 'm', 'public'), 'exec', p.name, `${ROLE_NAMES[personRole(p)] || 'Staff'}, at fault according to the investigation`, (p.look && p.look.sex) || p.sex || 'm');
+      }
+    }
     // the witnesses take the stand one at a time
-    if (st.key === 'hear2') {
+    else if (st.key === 'hear2') {
       const mechs: any[] = staffOf(c.companyId, 'mech'), chief: any = mechs.slice().sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))[0];
       const wl = chief && chief.look ? Object.assign({}, chief.look, { civil: true, top: 'jacket', uniform: 0, neck: 'open', hat: 'none', bottom: 'trousers', shoes: 'oxford' }) : ctLook('chief-' + c.id, 'm', 'counsel');
       P('witness', A.seats.witness, wl, 'exec', chief ? chief.name : makePerson('chief-' + c.id, 'mech', c.companyId, co.hub).name, 'Chief mechanic, witness', (chief && chief.sex) || 'm');
@@ -656,7 +670,7 @@ function ctShotOf(key: string) {
   const R = CourtRoom, T = THREE, p = R.people[key];
   if (!p) { R.shot = { pos: new T.Vector3(6.5, 3.4, 9.5), at: new T.Vector3(0, 1.4, -5) }; return; }
   const h = ctHead(p), f = new T.Vector3(Math.sin(p.seat.yaw), 0, Math.cos(p.seat.yaw)), sd = new T.Vector3(f.z, 0, -f.x);
-  const far = /^judge/.test(key) ? 5.2 : key === 'witness' || key === 'survivor' ? 3.6 : /^relative/.test(key) ? 3.0 : 3.2, off = key === 'you' ? -1.1 : 0.9;
+  const far = /^judge/.test(key) ? 5.2 : key === 'witness' || key === 'survivor' || p.seat === R.A.seats.witness ? 3.6 : /^relative/.test(key) ? 3.0 : 3.2, off = key === 'you' ? -1.1 : 0.9;
   const pos = h.clone().add(f.multiplyScalar(far)).add(sd.multiplyScalar(off)); pos.y = h.y + (/^judge/.test(key) ? -0.25 : 0.15);
   pos.x = clamp(pos.x, -7.4, 7.4); pos.z = clamp(pos.z, -8.4, 10);
   R.shot = { pos, at: h.clone().add(new T.Vector3(0, /^judge/.test(key) ? -0.75 : -0.55, 0)) };   // the speaker sits above the dialogue box

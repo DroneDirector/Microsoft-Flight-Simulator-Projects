@@ -163,6 +163,7 @@ function courtAdvance() {
   const conduct = conductOn();   // crew cases pause while conduct reports are switched off; the airline's follow Settings → Court
   if (conduct) try { courtReleases(); whistleAdvance(); } catch (e) { /* ignore */ }
   try { hearingReminders(); hearingWatchDaily(); courtLeakCheck(); } catch (e) { /* ignore */ }
+  try { investigationsAdvance(); } catch (e) { /* ignore */ }
   const now = Date.now(); let changed = false;
   for (const c of S.cases as CourtCase[]) {
     if (c.status !== 'open' && !(c as any).appealing) continue;
@@ -172,7 +173,8 @@ function courtAdvance() {
       if ((c as any).hear && /^hear[0-9A]$/.test(st.key)) { if (hearingDue(c, st) === 'wait') break; changed = true; continue; }
       if ((c as any).hear && st.key === 'verdict' && !hearingVerdictReady(c)) break;   // your decisions first
       st.done = true; changed = true;
-      if (st.key === 'verdict') courtVerdictApply(c, st);
+      if (st.key === 'prelim' && (c as any).hear && (c as any).hear.kind === 'accident') invPrelimApply(c, st);
+      if (st.key === 'verdict') { courtVerdictApply(c, st); if ((c as any).hear && (c as any).hear.kind === 'accident') invAccusedOutcome(c, c.status === 'guilty'); }
       if (st.key === 'appeal') courtAppealApply(c, st);
       courtNotice(c, st);
     }
