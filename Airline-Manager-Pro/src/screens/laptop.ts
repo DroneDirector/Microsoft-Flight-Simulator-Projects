@@ -15,7 +15,9 @@
 
 interface LapMail { id: string; at: number; from: string; addr: string; subject: string; body: string; kind: 'court' | 'report' | 'lease' | 'family' | 'bank' | 'note'; ref?: string; read?: boolean; acts?: { label: string; act: string; data?: string; kind?: string }[]; done?: string; offer?: any; fam?: any }
 interface CalNote { id: string; date: string; text: string; told?: boolean }
-interface SubAcct { id: string; name: string; kind: string; balance: number; opened: number }
+interface SubAcct { id: string; name: string; kind: string; balance: number; opened: number; tx?: { at: number; label: string; amount: number }[] }
+/** A line in an account of your own's history (newest first, the last 300 kept). */
+function lapSubTx(a: SubAcct, label: string, amount: number) { a.tx = a.tx || []; a.tx.unshift({ at: Date.now(), label, amount }); if (a.tx.length > 300) a.tx.length = 300; }
 
 const LAP_APPS: [string, string, string, string][] = [
   ['mail', 'Mail', 'mail', '#3FA2F0'], ['calendar', 'Calendar', 'calendar', '#F06A6A'], ['bank', 'Bank', 'bank', '#2FBF8F'], ['photos', 'Screenshots', 'camera', '#B07CF0'],
@@ -286,10 +288,26 @@ function lapBankHtml(): string {
     ${subs.map(a => `<button class="lk-acct ${tab === a.id ? 'on' : ''}" data-act="lap-bank-tab" data-k="${a.id}"><small>${esc(a.kind)}</small><b>${money(a.balance)}</b><i>${esc(a.name)}</i></button>`).join('')}
     <button class="lk-acct lk-new" data-act="lap-bank-tab" data-k="new">${icon('plus')}<b>New account</b><i>Savings, a reserve…</i></button></div>`;
   const opts = [['main', 'Company account']].concat(subs.map(a => [a.id, a.name])).map(o => `<option value="${o[0]}">${esc(o[1])}</option>`).join('');
-  const move = `<div class="lk-move"><b>Move money</b><div class="lk-mr"><select class="le-in lk-from">${opts}</select><span>${icon('chevron')}</span><select class="le-in lk-to">${opts.replace(/value="main">/, 'value="main">').replace(/<option value="([^"]+)"/g, (s, v) => v === (subs[0] && subs[0].id) ? `<option selected value="${v}"` : s)}</select><input class="le-in lk-amt" type="number" min="0" step="1000" placeholder="Amount"><button class="btn primary sm" data-act="lap-bank-move">Move</button></div></div>`;
+  const move = `<div class="lk-move"><b>Move money</b><div class="lk-mr"><select class="le-in lk-from">${opts}</select><span>${icon('chevron')}</span><select class="le-in lk-to">${opts.replace(/value="main">/, 'value="main">').replace(/<option value="([^"]+)"/g, (s, v) => v === (tab !== 'main' && tab !== 'new' ? tab : subs[0] && subs[0].id) ? `<option selected value="${v}"` : s)}</select><input class="le-in lk-amt" type="number" min="0" step="1000" placeholder="Amount"><button class="btn primary sm" data-act="lap-bank-move">Move</button></div></div>`;
   let main = '';
   if (tab === 'new') main = `<div class="lk-newf"><b>Open an account</b><input class="le-in lk-nm" maxlength="30" placeholder="Name, for example Rainy day fund"><div class="seg lk-kind">${['Savings', 'Maintenance reserve', 'Fuel fund', 'Expansion', 'Other'].map((k, i) => `<button class="${i === 0 ? 'on' : ''}" data-act="lap-bank-kind" data-k="${k}">${k}</button>`).join('')}</div><button class="btn primary" data-act="lap-bank-open">${icon('plus')}Open the account</button><p class="fine-print">${icon('info')}Money in your own accounts is kept aside: the airline doesn't spend it until you move it back.</p></div>`;
-  else if (tab !== 'main') { const a = subs.filter(x => x.id === tab)[0]; main = a ? `<div class="lk-sub"><small>${esc(a.kind)} · opened ${esc(dateStr(new Date(a.opened)).slice(0, 10))}</small><h3>${esc(a.name)}</h3><b class="lk-big">${money(a.balance)}</b>${move}<button class="btn ghost sm" data-act="lap-bank-close" data-id="${a.id}" ${a.balance ? 'disabled title="Move the money out first"' : ''}>${icon('trash')}Close this account</button></div>` : ''; }
+  else if (tab !== 'main') {
+    const a = subs.filter(x => x.id === tab)[0];
+    if (a) {
+      // its own money in and out: what was moved in, what was taken out
+      const atx = (a.tx || []).slice(), known = atx.reduce((s2, t) => s2 + t.amount, 0);
+      if (Math.abs(a.balance - known) > 0.5) atx.push({ at: a.opened, label: 'Balance brought forward', amount: a.balance - known });   // accounts opened before the history was kept
+      const recent = (t: { at: number }) => Date.now() - t.at < 30 * 864e5;
+      const aIn = atx.filter(t => t.amount > 0 && recent(t)).reduce((s2, t) => s2 + t.amount, 0), aOut = atx.filter(t => t.amount < 0 && recent(t)).reduce((s2, t) => s2 + t.amount, 0);
+      const aList = atx.filter(t => fil === 'all' || (fil === 'in' ? t.amount > 0 : t.amount < 0));
+      main = `<div class="lk-sub"><small>${esc(a.kind)} · opened ${esc(dateStr(new Date(a.opened)).slice(0, 10))}</small><h3>${esc(a.name)}</h3><b class="lk-big">${money(a.balance)}</b>
+        <div class="lk-sum"><div><small>In, last 30 days</small><b class="green">${money(aIn)}</b></div><div><small>Out, last 30 days</small><b class="red">${money(aOut)}</b></div><div><small>In since it was opened</small><b>${money(atx.filter(t => t.amount > 0).reduce((s2, t) => s2 + t.amount, 0))}</b></div></div>
+        ${move}
+        <div class="lk-txh"><b>Transactions</b><span class="seg">${[['all', 'All'], ['in', 'In'], ['out', 'Out']].map(f => `<button class="${fil === f[0] ? 'on' : ''}" data-act="lap-bank-fil" data-k="${f[0]}">${f[1]}</button>`).join('')}</span></div>
+        <div class="lk-tx">${aList.map(t => { const d = dateStr(new Date(t.at)); return `<div class="lk-t"><span><b>${esc(t.label)}</b><small>${esc(d.slice(0, 10))} ${esc(d.slice(11))}</small></span><b class="${t.amount < 0 ? 'red' : 'green'}">${t.amount > 0 ? '+' : ''}${money(t.amount)}</b></div>`; }).join('') || `<p class="muted">${fil === 'all' ? 'No money has come in or gone out yet. Move some in above.' : fil === 'in' ? 'Nothing has come in yet.' : 'Nothing has gone out yet.'}</p>`}</div>
+        <button class="btn ghost sm" data-act="lap-bank-close" data-id="${a.id}" ${a.balance ? 'disabled title="Move the money out first"' : ''}>${icon('trash')}Close this account</button></div>`;
+    }
+  }
   else main = `<div class="lk-sum"><div><small>In, last 30 days</small><b class="green">${money(inM)}</b></div><div><small>Out, last 30 days</small><b class="red">${money(outM)}</b></div><div><small>All your accounts</small><b>${money(total)}</b></div>${loans.length ? `<div><small>Loans left to pay</small><b>${money(loans.reduce((s, l) => s + l.left, 0))}</b></div>` : ''}</div>
       ${move}
       <div class="lk-txh"><b>Transactions</b><span class="seg">${[['all', 'All'], ['in', 'In'], ['out', 'Out']].map(f => `<button class="${fil === f[0] ? 'on' : ''}" data-act="lap-bank-fil" data-k="${f[0]}">${f[1]}</button>`).join('')}</span></div>
@@ -318,6 +336,9 @@ ACTIONS['lap-bank-move'] = () => {
   if (from === 'main') co.balance -= amt; else A.balance -= amt;
   if (to === 'main') co.balance += amt; else B.balance += amt;
   const nm = (k: string) => k === 'main' ? 'Company account' : (subs.filter(a => a.id === k)[0] || { name: '' }).name;
+  // each account of your own keeps its own history of money in and out
+  if (A) lapSubTx(A, to === 'main' ? 'To the company account' : `To your account: ${nm(to)}`, -amt);
+  if (B) lapSubTx(B, from === 'main' ? 'From the company account' : `From your account: ${nm(from)}`, amt);
   if (from === 'main' || to === 'main') State.txns.unshift({ id: uid(), companyId: co.id, date: dateStr(new Date()).slice(0, 10), time: dateStr(new Date()).slice(11), label: from === 'main' ? `To your account: ${nm(to)}` : `From your account: ${nm(from)}`, amount: from === 'main' ? -amt : amt, kind: 'transfer' as any, lines: [] } as any);
   Store.save(); Sound.purchase(); try { animateBalance(b0, co.balance); renderTopbar(); } catch (e) { /* ignore */ } lapRender(true); toast(`${money(amt)} moved to ${nm(to)}`, 'ok');
 };
