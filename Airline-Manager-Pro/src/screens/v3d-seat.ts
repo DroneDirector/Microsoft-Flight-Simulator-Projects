@@ -1,18 +1,20 @@
 // The cabin seats in detail: upholstered cushions with real depth (padded panels, side bolsters, seams pressed
 // into the padding with double stitching beside them), a two-tone headrest with wings, a grab handle on top and
 // moulded armrests that curve down to the seat front, as on a modern slimline economy seat. How finely they are
-// made follows the cabin quality (Settings → Graphics → Cabin), and the seams always get extra points so they
-// stay crisp. Every part is one shared shape drawn for all the seats at once.
+// made follows the cabin quality (Settings → Graphics → Cabin). The seats near you are drawn in full detail and
+// the ones further away in a lighter version with the same look, each fading over to the other as you move, so
+// nothing pops. Every part is one shared shape drawn for all the seats at once.
 
 const SeatParts: any = { key: '' };
 
 /** Sample positions 0…1: evenly spread, with extra ones close to the edges (the rounded border) and either
  *  side of each seam (the groove). */
-function seatSamples(n: number, seams: number[], edge: number): number[] {
-  const s: number[] = [];
+function seatSamples(n: number, seams: number[], edge: number, fine: number): number[] {
+  const s: number[] = [], ne = [0, 2, 3, 6][fine];
   for (let i = 0; i <= n; i++) s.push(i / n);
-  for (let i = 1; i <= 6; i++) { const e = edge * Math.pow(i / 6, 1.6); s.push(e, 1 - e); }
-  for (const m of seams) for (const o of [-0.03, -0.016, -0.008, -0.003, 0, 0.003, 0.008, 0.016, 0.03]) s.push(m + o);
+  for (let i = 1; i <= ne; i++) { const e = edge * Math.pow(i / ne, 1.6); s.push(e, 1 - e); }
+  const offs = [[], [-0.008, 0, 0.008], [-0.016, -0.006, 0, 0.006, 0.016], [-0.03, -0.016, -0.008, -0.003, 0, 0.003, 0.008, 0.016, 0.03]][fine];
+  for (const m of seams) for (const o of offs) s.push(m + o);
   return s.filter(x => x >= 0 && x <= 1).sort((a, b) => a - b).filter((x, i, a) => i === 0 || x - a[i - 1] > 1e-4);
 }
 
@@ -20,9 +22,9 @@ function seatSamples(n: number, seams: number[], edge: number): number[] {
  *  seams (fractions of the width and height), raised bolsters at the sides, and (two-sided) a padded back too.
  *  Built flat (x across, y up, z out) with u,v from 0 to 1 over the face; the back face uses the lower half of
  *  the texture, the front the upper half. */
-function seatPillow(w: number, h: number, d: number, o: { n: number; m: number; seamU?: number[]; seamV?: number[]; seamD?: number; bol?: number; bolW?: number; r?: number; two?: number; wing?: number }): any {
+function seatPillow(w: number, h: number, d: number, o: { n: number; m: number; fine?: number; seamU?: number[]; seamV?: number[]; seamD?: number; bol?: number; bolW?: number; r?: number; two?: number; wing?: number }): any {
   const T = THREE, su = o.seamU || [], sv = o.seamV || [], r = o.r || 0.12, sd = o.seamD == null ? 0.006 : o.seamD;
-  const U = seatSamples(o.n, su, r), Vv = seatSamples(o.m, sv, r);
+  const fine = o.fine == null ? 3 : o.fine, U = seatSamples(o.n, su, r, fine), Vv = seatSamples(o.m, sv, r, fine);
   const round = (t: number) => { const e = Math.min(t, 1 - t) / r; return e >= 1 ? 1 : Math.sqrt(Math.max(0, 1 - (1 - e) * (1 - e))); };
   const groove = (t: number, s: number[], len: number) => { let g = 0; for (const m of s) { const x = (t - m) * len / 0.0055; g = Math.max(g, Math.exp(-x * x)); } return g; };
   const height = (u: number, v: number, back: boolean) => {
@@ -116,29 +118,35 @@ function cabinSeatParts(Wg: number, st: CabinStyle): any {
   if (SeatParts.key === key) return SeatParts.parts;
   if (SeatParts.parts) for (const k in SeatParts.parts) { const p = SeatParts.parts[k]; if (p && p.dispose) p.dispose(); }
   const Q = (a: number[]) => a[q];
-  // the back cushion: three padded panels between two side bolsters, on the seat back's sloping face
-  const bW = Wg * 0.86, bH = 0.42, bSU = [0.16, 0.84], bSV = [0.36, 0.7];
-  const back = seatPlace(seatPillow(bW, bH, 0.04, { n: Q([6, 14, 26, 44]), m: Q([8, 18, 32, 56]), seamU: bSU, seamV: bSV, bol: 0.03, bolW: 0.16, r: 0.1, seamD: 0.007 }),
-    [0.158, 0.585, 0], [0.07, 0.42, 0], [-0.42, 0.07, 0]);
-  // the seat cushion: the front roll and the seat, with bolsters at the sides
-  const sW = Wg * 0.9, sH = 0.37, sSU = [0.15, 0.85], sSV = [0.3];
-  const seat = seatPlace(seatPillow(sW, sH, 0.05, { n: Q([6, 14, 24, 40]), m: Q([5, 12, 20, 34]), seamU: sSU, seamV: sSV, bol: 0.018, bolW: 0.15, r: 0.14, seamD: 0.008 }),
-    [-0.245, 0.535, 0], [1, 0, 0], [0, 1, 0]);
-  // the headrest: padded both sides, wings at the sides of its front, on top of the back
-  const hW = Wg * 0.9, hH = 0.25;
-  const head = seatPlace(seatPillow(hW, hH, 0.055, { n: Q([6, 12, 22, 36]), m: Q([4, 8, 14, 24]), seamU: [0.24, 0.76], seamV: [], two: 1, wing: 0.03, r: 0.2, seamD: 0.005 }),
-    [0.228, 1.02, 0], [0.06, 1, 0], [-1, 0.06, 0]);
-  // the grab handle along the top of the back
-  const hc = new T.CatmullRomCurve3([new T.Vector3(0.3, 1.2, -Wg * 0.3), new T.Vector3(0.315, 1.29, -Wg * 0.24), new T.Vector3(0.318, 1.305, 0), new T.Vector3(0.315, 1.29, Wg * 0.24), new T.Vector3(0.3, 1.2, Wg * 0.3)]);
-  const handle = new T.TubeGeometry(hc, Q([8, 16, 28, 44]), 0.011, Q([5, 8, 10, 14]), false);
+  // the seat's measures (the textures and the shapes share them)
+  const bW = Wg * 0.86, bH = 0.42, bSU = [0.16, 0.84], bSV = [0.36, 0.7], sW = Wg * 0.9, sH = 0.37, sSU = [0.15, 0.85], sSV = [0.3], hW = Wg * 0.9, hH = 0.25;
+  /** The upholstered parts and the handle, made as finely as quality level qq asks (fine: the extra points at the seams). */
+  const geoSet = (qq: number, fine: number) => {
+    const G = (a: number[]) => a[qq];
+    // the back cushion: three padded panels between two side bolsters, on the seat back's sloping face
+    const back = seatPlace(seatPillow(bW, bH, 0.04, { n: G([6, 14, 26, 44]), m: G([8, 18, 32, 56]), fine, seamU: bSU, seamV: bSV, bol: 0.03, bolW: 0.16, r: 0.1, seamD: 0.007 }),
+      [0.158, 0.585, 0], [0.07, 0.42, 0], [-0.42, 0.07, 0]);
+    // the seat cushion: the front roll and the seat, with bolsters at the sides
+    const seat = seatPlace(seatPillow(sW, sH, 0.05, { n: G([6, 14, 24, 40]), m: G([5, 12, 20, 34]), fine, seamU: sSU, seamV: sSV, bol: 0.018, bolW: 0.15, r: 0.14, seamD: 0.008 }),
+      [-0.245, 0.535, 0], [1, 0, 0], [0, 1, 0]);
+    // the headrest: padded both sides, wings at the sides of its front, on top of the back
+    const head = seatPlace(seatPillow(hW, hH, 0.055, { n: G([6, 12, 22, 36]), m: G([4, 8, 14, 24]), fine, seamU: [0.24, 0.76], seamV: [], two: 1, wing: 0.03, r: 0.2, seamD: 0.005 }),
+      [0.228, 1.02, 0], [0.06, 1, 0], [-1, 0.06, 0]);
+    // the grab handle along the top of the back
+    const hc = new T.CatmullRomCurve3([new T.Vector3(0.3, 1.2, -Wg * 0.3), new T.Vector3(0.315, 1.29, -Wg * 0.24), new T.Vector3(0.318, 1.305, 0), new T.Vector3(0.315, 1.29, Wg * 0.24), new T.Vector3(0.3, 1.2, Wg * 0.3)]);
+    const handle = new T.TubeGeometry(hc, G([6, 16, 28, 44]), 0.011, G([4, 8, 10, 14]), false);
+    for (const g of [back, seat, head, handle]) g.computeBoundingSphere();
+    return { back, seat, head, handle };
+  };
+  const hi = geoSet(q, q), lo = q === 0 ? hi : geoSet(0, 0);
   // the armrest: a moulded arm running back from a rounded nose, curving down to the seat front, with a padded top
   const as = new T.Shape();
   as.moveTo(0.19, 0.745); as.lineTo(-0.18, 0.745); as.quadraticCurveTo(-0.265, 0.745, -0.268, 0.69);
   as.bezierCurveTo(-0.27, 0.6, -0.235, 0.47, -0.17, 0.4); as.lineTo(-0.125, 0.405); as.bezierCurveTo(-0.175, 0.47, -0.205, 0.58, -0.2, 0.655);
   as.quadraticCurveTo(-0.198, 0.672, -0.17, 0.675); as.lineTo(0.19, 0.69); as.quadraticCurveTo(0.21, 0.715, 0.19, 0.745);
-  const arm = new T.ExtrudeGeometry(as, { depth: 0.042, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.007, bevelSegments: Q([1, 2, 3, 5]), curveSegments: Q([4, 10, 18, 28]) });
+  const arm = new T.ExtrudeGeometry(as, { depth: 0.042, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.007, bevelSegments: Q([1, 2, 2, 5]), curveSegments: Q([4, 8, 12, 28]) });
   arm.translate(0, 0, -0.021); arm.computeVertexNormals();
-  const pad = seatPlace(seatPillow(0.05, 0.34, 0.016, { n: Q([3, 6, 8, 12]), m: Q([6, 12, 20, 32]), r: 0.3 }), [-0.17, 0.744, 0], [1, 0, 0], [0, 1, 0]);
+  const pad = seatPlace(seatPillow(0.05, 0.34, 0.016, { n: Q([3, 6, 8, 12]), m: Q([6, 10, 14, 32]), fine: q, r: 0.3 }), [-0.17, 0.744, 0], [1, 0, 0], [0, 1, 0]);
   // textures: the upholstery (white, tinted by each seat's colour) and the headrest, two-tone in front (the light
   // centre panel) with the airline's own cloth on the back
   const seatC = new T.Color(st.seat), headC = new T.Color(st.head);
@@ -153,15 +161,33 @@ function cabinSeatParts(Wg: number, st: CabinStyle): any {
     (u) => (u > 0.24 && u < 0.76 ? HC : SC), 'top',
     (u, v) => { if (!cdat) return SC; const px = Math.floor(u * (cw - 1)), py = Math.floor((1 - v) * (ch - 1)), o = (py * cw + px) * 4; return [cdat[o] / 255, cdat[o + 1] / 255, cdat[o + 2] / 255]; });
   const ns = Q([0.6, 0.8, 1, 1.1]);
-  const mk = (t: any, side?: number) => { const m = cabinMat(0xFFFFFF, { map: t.map, normalMap: t.nrm, normalScale: new T.Vector2(ns, ns), side: side == null ? T.FrontSide : side }); return m; };
+  const mk = (t: any, side?: number) => seatFadeMat(cabinMat(0xFFFFFF, { map: t.map, normalMap: t.nrm, normalScale: new T.Vector2(ns, ns), side: side == null ? T.FrontSide : side }));
   const plastic = cabinMat(0xFFFFFF, { map: cabinSatinTex() });
   const parts = {
-    back, seat, head, handle, arm, pad,
+    hi, lo, arm, pad,
     backM: mk(up, T.DoubleSide), seatM: mk(sp, T.DoubleSide), headM: mk(hd, T.DoubleSide), armM: plastic,
-    padM: cabinMat(0x2A2D33, { map: cabinLeatherTex() }), handleM: cabinMat(0x24272C, { map: cabinSatinTex() }),
+    padM: cabinMat(0x2A2D33, { map: cabinLeatherTex() }), handleM: seatFadeMat(cabinMat(0x24272C, { map: cabinSatinTex() })),
     dispose() { /* shapes are shared and kept until the quality changes */ },
   };
-  for (const g of [back, seat, head]) g.computeBoundingSphere();
   SeatParts.key = key; SeatParts.parts = parts;
   return parts;
+}
+
+/** A seat material that can fade each seat in and out (dithered, so it needs no sorting): reads the seat's own
+ *  fade from the aFade attribute of the shape it draws. */
+function seatFadeMat(m: any): any {
+  m.alphaHash = true;
+  const ob = m.onBeforeCompile; m.onBeforeCompile = (sh: any, r: any) => { ob(sh, r);
+    sh.vertexShader = 'attribute float aFade;\nvarying float vFade;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vFade = aFade;');
+    sh.fragmentShader = 'varying float vFade;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.a *= vFade;'); };
+  m.customProgramCacheKey = () => 'cabin-seat';
+  return m;
+}
+/** Seats of one detail drawn n at a time: the shape shared, each seat with its own place, colour and fade. */
+function seatMesh(geo: any, mat: any, n: number): any {
+  const T = THREE, g = new T.BufferGeometry();
+  for (const k in geo.attributes) g.setAttribute(k, geo.attributes[k]);
+  g.setIndex(geo.index); g.boundingSphere = geo.boundingSphere;
+  const fa = new T.InstancedBufferAttribute(new Float32Array(Math.max(1, n)).fill(1), 1); fa.setUsage(T.DynamicDrawUsage); g.setAttribute('aFade', fa);
+  const m = new T.InstancedMesh(g, mat, Math.max(1, n)); m.count = 0; return m;
 }

@@ -19,7 +19,7 @@ const CabinPax: any = { key: '', mode: '', t0: 0 };
  *  walking (w), and how visible they are (a). */
 function cabinPaxPose(G: any, f: any, x: number, y: number, yaw: number, k: number, ph: number, w: number, a: number) {
   f.pose = { x, y, yaw, k, ph, w, a };   // kept for the detailed figure (v3d-cabin's nearby passengers)
-  if (f.hd) a = 0;                        // shown by the detailed figure instead
+  if (f.hd) a *= 1 - f.hd.mix;            // shown by the detailed figure instead (fading over to it)
   const T = THREE, P = G.userData.people.userData.parts, zf = G.userData.people.userData.zf, S = f.sc, at = f.at;
   const V = (bx: number, by: number, bz: number) => _av(bx, by, bz);
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -156,7 +156,14 @@ function cabinPaxStart(P: any, G: any, pg: any, mode: string, now: number) {
  * detailed ones follow you, a few at a time, so the view never stalls. They sit, rise, walk and fade as the
  * others do (cabinPaxStep). How many: Settings → 3D view → Cabin quality. */
 const CabinHD: any = { key: '', last: 0 };
-function cabinHdMax(): number { return [8, 16, 28, 48][typeof cabinQ === 'function' ? cabinQ() : 1] || 16; }
+function cabinHdMax(): number { return cabinHdCount(); }
+const CABIN_HD_Q = ['Light', 'Normal', 'High', 'Highest'];
+/** How finely each detailed passenger is made (Settings → Graphics → Cabin; auto follows the cabin quality, lighter on
+ *  devices with little memory). */
+function cabinHdDetail(): number {
+  const v = cabinOpt('cabHdQ'); if (v !== 'auto') return [0.35, 0.5, 0.7, 0.9][clamp(+v, 0, 3)];
+  const q = cabinQ(); return q === 3 ? 0.9 : cabinLowMem() ? 0.35 : cabinIsPc() ? [0.35, 0.5, 0.7][q] : 0.5;
+}
 function cabinHdStep(G: any, dt: number) {
   const pg = G.userData.people; if (!pg || !pg.userData.figs || !Human || !V3d.cam) return;
   const T = THREE, H = CabinHD, figs: any[] = pg.userData.figs, zf = pg.userData.zf;
@@ -166,10 +173,20 @@ function cabinHdStep(G: any, dt: number) {
   G.updateMatrixWorld(); const cam = G.worldToLocal(V3d.cam.position.clone()), cx = cam.x, cy = -cam.z;
   const dist = (f: any) => { const p = f.pose || { x: f.at.x - 0.17, y: f.at.y }; return Math.hypot(p.x - cx, (p.y - cy) * 0.6); };
   const want = figs.filter(f => !f.pose || f.pose.a > 0.01).map(f => [dist(f), f] as [number, any]).sort((a, b) => a[0] - b[0]).slice(0, cabinHdMax()).map(x => x[1]);
-  // those no longer near go back to the simple figure; the nearest missing one is built (one at a time)
-  for (const f of figs) if (f.hd && want.indexOf(f) < 0 && dist(f) > 2.5) cabinHdDrop(f, G);
-  const now = performance.now();
-  if (now - H.last > 120) { const f = want.filter(x => !x.hd)[0]; if (f) { H.last = now; try { cabinHdBuild(f, G); } catch (e) { f.hdFail = true; } } }
+  // those no longer near fade back to the simple figure; the nearest missing one is built (one at a time, and
+  // only while you stand still, so walking stays smooth)
+  for (const f of figs) if (f.hd) f.hd.leave = want.indexOf(f) < 0 && dist(f) > 2.5;
+  const now = performance.now(), moved = H.cam ? Math.hypot(cx - H.cam[0], cy - H.cam[1]) / Math.max(0.016, dt) : 0; H.cam = [cx, cy];
+  H.still = moved < 0.25 ? (H.still || 0) + dt : 0;
+  if (H.still > 0.35 && now - H.last > (cabinLowMem() ? 400 : 120)) { const f = want.filter(x => !x.hd)[0]; if (f) { H.last = now; try { cabinHdBuild(f, G); } catch (e) { f.hdFail = true; } } }
+  // the fade between the two: the detailed figure comes in over the simple one, or goes, in about half a second
+  for (const f of figs) {
+    const h = f.hd; if (!h) continue;
+    h.mix = Math.max(0, Math.min(1, h.mix + (h.leave ? -1 : 1) * dt * 2));
+    if (h.leave && h.mix <= 0) { cabinHdDrop(f, G); continue; }
+    const base = f.pose ? f.pose.a : 1;
+    for (const [m, i] of cabinHdParts(f, G)) { const fa = m.geometry.attributes.aFade; if (fa) { fa.setX(i, base * (1 - Math.min(1, h.mix * 1.4))); fa.needsUpdate = true; } }
+  }
   // pose every detailed passenger as their simple figure would be
   const t = now / 1000;
   for (const f of figs) {
@@ -187,16 +204,16 @@ function cabinHdStep(G: any, dt: number) {
     g = cabinLerpG(g, sit, sk);
     h.g = h.g ? cabinLerpG(h.g, g, Math.min(1, dt * 7)) : g;
     m.pose({ t: tt, yaw: 0, gaze: [Math.sin(tt * 0.27 + h.t0) * 0.3, 0], blink: (tt % 4.3) < 0.12 ? 1 : 0, g: h.g });
-    cabinHdFade(h, ps.a);
+    cabinHdFade(h, ps.a * h.mix);
   }
 }
 function cabinHdBuild(f: any, G: any) {
   const T = THREE, L = dressed(f.p.look, 'fa' as any);   // exactly as the passenger list draws them
-  const m = Human.build(L, 'fa', '#2C8CFF', av3Style(), [0.35, 0.5, 0.7, 0.9][typeof cabinQ === 'function' ? cabinQ() : 1] || 0.5);
+  const m = Human.build(L, 'fa', '#2C8CFF', av3Style(), cabinHdDetail());
   const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); G.add(pivot);
   m.root.traverse((o: any) => { o.frustumCulled = false; o.renderOrder = 41; });
-  f.hd = { m, pivot, holder, t0: Math.random() * 10, a: 1 };
-  cabinHdHideSimple(f, G);
+  f.hd = { m, pivot, holder, t0: Math.random() * 10, a: -1, mix: 0, leave: false };
+  cabinHdFade(f.hd, 0);
 }
 function cabinHdDrop(f: any, G: any) {
   const h = f.hd; if (!h) return; f.hd = null;
