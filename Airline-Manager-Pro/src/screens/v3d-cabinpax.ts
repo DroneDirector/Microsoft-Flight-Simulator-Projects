@@ -18,6 +18,8 @@ const CabinPax: any = { key: '', mode: '', t0: 0 };
  *  forward), how far they are into sitting (k: 0 standing … 1 seated), their stride (ph) and how much they are
  *  walking (w), and how visible they are (a). */
 function cabinPaxPose(G: any, f: any, x: number, y: number, yaw: number, k: number, ph: number, w: number, a: number) {
+  f.pose = { x, y, yaw, k, ph, w, a };   // kept for the detailed figure (v3d-cabin's nearby passengers)
+  if (f.hd) a = 0;                        // shown by the detailed figure instead
   const T = THREE, P = G.userData.people.userData.parts, zf = G.userData.people.userData.zf, S = f.sc, at = f.at;
   const V = (bx: number, by: number, bz: number) => _av(bx, by, bz);
   const cy = Math.cos(yaw), sy = Math.sin(yaw);
@@ -145,4 +147,73 @@ function cabinPaxStart(P: any, G: any, pg: any, mode: string, now: number) {
   }
   for (const e of L) cabinPaxPose(G, e.f, e.x, e.y, e.yaw, e.k, 0, 0, e.a);
   C.list = L; void pax;
+}
+
+/* ---------- the passengers near you, in full detail ----------
+ * The passengers in the rows around you are the same detailed figures as your staff (graphics/human.ts): the same
+ * bodies, and the face, hair and clothes from the passenger list (the very look its pictures are drawn from). Further
+ * away the simple figures stand in, as nobody can tell the difference there. As you move about the cabin the
+ * detailed ones follow you, a few at a time, so the view never stalls. They sit, rise, walk and fade as the
+ * others do (cabinPaxStep). How many: Settings → 3D view → Cabin quality. */
+const CabinHD: any = { key: '', last: 0 };
+function cabinHdMax(): number { return [8, 16, 28, 48][typeof cabinQ === 'function' ? cabinQ() : 1] || 16; }
+function cabinHdStep(G: any, dt: number) {
+  const pg = G.userData.people; if (!pg || !pg.userData.figs || !Human || !V3d.cam) return;
+  const T = THREE, H = CabinHD, figs: any[] = pg.userData.figs, zf = pg.userData.zf;
+  if (H.key !== pg.uuid) { cabinHdFree(); H.key = pg.uuid; H.built = []; }
+  if (!Human.ready) { if (!H.loading) { H.loading = true; Human.load().then(() => { H.loading = false; }, () => { H.loading = false; }); } return; }
+  // where you are, in the cabin's own measures
+  G.updateMatrixWorld(); const cam = G.worldToLocal(V3d.cam.position.clone()), cx = cam.x, cy = -cam.z;
+  const dist = (f: any) => { const p = f.pose || { x: f.at.x - 0.17, y: f.at.y }; return Math.hypot(p.x - cx, (p.y - cy) * 0.6); };
+  const want = figs.filter(f => !f.pose || f.pose.a > 0.01).map(f => [dist(f), f] as [number, any]).sort((a, b) => a[0] - b[0]).slice(0, cabinHdMax()).map(x => x[1]);
+  // those no longer near go back to the simple figure; the nearest missing one is built (one at a time)
+  for (const f of figs) if (f.hd && want.indexOf(f) < 0 && dist(f) > 2.5) cabinHdDrop(f, G);
+  const now = performance.now();
+  if (now - H.last > 120) { const f = want.filter(x => !x.hd)[0]; if (f) { H.last = now; try { cabinHdBuild(f, G); } catch (e) { f.hdFail = true; } } }
+  // pose every detailed passenger as their simple figure would be
+  const t = now / 1000;
+  for (const f of figs) {
+    if (!f.hd) continue;
+    const ps = f.pose || { x: f.at.x - 0.17, y: f.at.y, yaw: 0, k: 1, ph: 0, w: 0, a: 1 }, h = f.hd, m = h.m;
+    const k = ps.k, sk = k * k * (3 - 2 * k), top = m.top || 1.7, seatTop = zf + 0.585;   // on the cushion
+    // the hips back into the seat when seated
+    const hx = ps.x + ((f.at.x + 0.07) - ps.x) * sk;   // back in the seat, knees clear of the seat in front
+    h.pivot.position.copy(_av(hx, ps.y, zf + sk * (seatTop - zf)));
+    h.holder.position.y = -sk * top * 0.52;
+    h.pivot.rotation.y = Math.atan2(-Math.cos(ps.yaw), Math.sin(ps.yaw));   // facing forward along the cabin when yaw is 0
+    h.pivot.scale.setScalar(f.sc);
+    const tt = t + h.t0, walk = humanGesture({ kind: 'walk', v: 1 }, ps.ph / 5.65), sit = humanGesture({ kind: 'sit', v: 0 }, tt);
+    let g = cabinLerpG(humanGesture(null, tt), walk, Math.min(1, ps.w || 0));
+    g = cabinLerpG(g, sit, sk);
+    h.g = h.g ? cabinLerpG(h.g, g, Math.min(1, dt * 7)) : g;
+    m.pose({ t: tt, yaw: 0, gaze: [Math.sin(tt * 0.27 + h.t0) * 0.3, 0], blink: (tt % 4.3) < 0.12 ? 1 : 0, g: h.g });
+    cabinHdFade(h, ps.a);
+  }
+}
+function cabinHdBuild(f: any, G: any) {
+  const T = THREE, L = dressed(f.p.look, 'fa' as any);   // exactly as the passenger list draws them
+  const m = Human.build(L, 'fa', '#2C8CFF', av3Style(), [0.35, 0.5, 0.7, 0.9][typeof cabinQ === 'function' ? cabinQ() : 1] || 0.5);
+  const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); G.add(pivot);
+  m.root.traverse((o: any) => { o.frustumCulled = false; o.renderOrder = 41; });
+  f.hd = { m, pivot, holder, t0: Math.random() * 10, a: 1 };
+  cabinHdHideSimple(f, G);
+}
+function cabinHdDrop(f: any, G: any) {
+  const h = f.hd; if (!h) return; f.hd = null;
+  G.remove(h.pivot); h.pivot.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((mm: any) => mm.dispose()); });
+  const ps = f.pose; if (ps) cabinPaxPose(G, f, ps.x, ps.y, ps.yaw, ps.k, ps.ph, ps.w, ps.a); else cabinHdShowSimple(f, G);
+}
+function cabinHdFree() { /* the cabin group is thrown away with everything in it */ }
+/** The simple figure steps aside for the detailed one (and comes back when it goes). */
+function cabinHdParts(f: any, G: any): [any, number][] {
+  const P = G.userData.people.userData.parts, out: [any, number][] = [[P.torso, f.ti], [P.neck, f.ni], [P.head, f.hi], [P.hair, f.ri], [P.long, f.li], [P.arms, f.ai], [P.arms, f.ai + 1], [P.thighs, f.gi], [P.thighs, f.gi + 1], [P.shins, f.si], [P.shins, f.si + 1]];
+  return out.filter(x => x[1] >= 0);
+}
+function cabinHdHideSimple(f: any, G: any) { for (const [m, i] of cabinHdParts(f, G)) { const fa = m.geometry.attributes.aFade; if (fa) { fa.setX(i, 0); fa.needsUpdate = true; } } }
+function cabinHdShowSimple(f: any, G: any) { for (const [m, i] of cabinHdParts(f, G)) { const fa = m.geometry.attributes.aFade; if (fa) { fa.setX(i, 1); fa.needsUpdate = true; } } }
+/** Fading at the door: the figure's own materials go see-through (the hair, drawn its own way, goes when faint). */
+function cabinHdFade(h: any, a: number) {
+  if (Math.abs((h.a == null ? 1 : h.a) - a) < 0.01) return; h.a = a;
+  h.pivot.visible = a > 0.02;
+  h.pivot.traverse((o: any) => { if (!o.material) return; for (const mm of Array.isArray(o.material) ? o.material : [o.material]) { if (mm.isShaderMaterial) { o.visible = a > 0.5; continue; } mm.transparent = a < 0.999; mm.opacity = a; mm.depthWrite = a > 0.6; } });
 }

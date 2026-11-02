@@ -536,6 +536,7 @@ function v3dCabinFwdCam(P: any) {
   }
   try { cabinCrewStep(P, G, night); } catch (e) { /* the crew stays where it is */ }
   try { const tn = performance.now() / 1000, CP: any = CabinPax; const dtp = Math.min(0.1, Math.max(0, tn - (CP.lastT || tn))); CP.lastT = tn; cabinPaxStep(P, G, dtp); } catch (e) { /* passengers stay where they are */ }
+  try { const CH: any = CabinHD, tn2 = performance.now() / 1000, dth = Math.min(0.1, Math.max(0, tn2 - (CH.lastT || tn2))); CH.lastT = tn2; cabinHdStep(G, dth); } catch (e) { /* the simple figures stay */ }
   if (G.userData.wins) { const k = Math.max(0.08, Math.min(1, amb)); G.userData.wins.material.color.setRGB(k * (1 - 0.6 * night), k * (1 - 0.5 * night), k); }
 }
 function v3dCabinFwdLeave(P: any) {
