@@ -548,12 +548,39 @@ function ofVisitUi(afterInterview?: boolean) {
   const sp = R.root.querySelector('.of-spots') as HTMLElement, box = R.root.querySelector('.ct-box') as HTMLElement, pad = R.root.querySelector('.ct-pad') as HTMLElement, hint = R.root.querySelector('.ct-hint') as HTMLElement;
   if (!afterInterview) box.hidden = true;
   sp.hidden = false;
-  sp.innerHTML = [['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']].map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
+  const nRep = ofOpenReports().length;
+  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
   pad.hidden = R.seat;
   if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · drag to look · click your chair to sit · click the door to leave' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
   else hint.hidden = true;
 }
+/** The open conduct reports about people who still work for you, newest first. */
+function ofOpenReports(): any[] { return ((State as any).incidents || []).filter((x: any) => x.status === 'open' && staffById(x.staffId)); }
+/** From the office: the open conduct reports, each with who it is about, what happened and when; pick one to invite them in. */
+function ofReportsUi() {
+  const R = OfficeRoom, L = ofOpenReports();
+  ofSay('', L.length ? 'Who would you like to see?' : 'There are no open conduct reports.', 'Conduct reports');
+  (R.root.querySelector('.ct-opts') as HTMLElement).innerHTML = L.slice(0, 12).map((inc: any) => { const p = staffById(inc.staffId);
+    return `<button class="of-rep" data-of="invite" data-id="${esc(inc.id)}"><b>${esc(p.name)}</b><small>${esc(inc.title)} · ${esc(inc.date || '')}</small><span>Invite in</span></button>`; }).join('');
+}
+/** The person comes up: you sit down at your desk, there is a knock, and they walk in and sit facing you. */
+function ofInviteNow(id: string) {
+  const R = OfficeRoom, inc = ofOpenReports().filter((x: any) => x.id === id)[0], p = inc && staffById(inc.staffId);
+  if (!p) { toast('This report is closed or the person no longer works for you', 'info'); return; }
+  if (R.mode === 'interview' && R.vis && !R.decided && R.vis.state !== 'gone') { toast(`Finish your conversation with ${R.p.name} first`, 'info'); return; }
+  Sound.tick();
+  // whoever was here before has left
+  if (R.vis && R.vis.pivot && R.vis.m) { try { R.A.root.remove(R.vis.pivot); R.vis.pivot.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); } catch (e) { /* gone */ } }
+  R.vis = null; R.inc = inc; R.p = p; R.mode = 'interview'; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0;
+  R.seat = true; R.view = 'sit'; R.look = { yaw: 0, pitch: -0.08 };
+  for (const sel of ['.of-spots', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
+  const top = R.root.querySelector('.ct-top b') as HTMLElement; if (top) top.textContent = `Your office: ${p.name}, ${String(inc.title).toLowerCase()}`;
+  ofSay('', `${p.name} is on the way up…`, 'Conduct report');
+  const go = () => { if (!R.on || R.p !== p) return; try { ofVisitor(); } catch (e) { R.vis = null; } ofKnock(); setTimeout(() => ofEnter(), 900); };
+  setTimeout(() => { if (Human.ready) go(); else Human.load().then(go, go); }, 1800);
+}
 function ofSpot(k: string) {
+  if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
   const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true;
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
   else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
@@ -698,6 +725,7 @@ function ofClick(b: HTMLElement) {
   else if (k === 'ask') { Voice.stop(); ofAsk(b.getAttribute('data-k')); }
   else if (k === 'dec') ofDecide(b.getAttribute('data-k'));
   else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else ofSpot(s); }
+  else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
 }
 
 ACTIONS['office-open'] = () => { closeAll(); OfficeRoom.open(); };

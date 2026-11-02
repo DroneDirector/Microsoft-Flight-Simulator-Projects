@@ -550,6 +550,8 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     g.userData.crewAt = { aisleY, aisles, zf, x0, x1, rowX, paxRows, mood: st.mood, firstX, lastX, half: width / 2 + 0.05 };
     // the row numbers and seat letters, on a lit placard under the bins at the aisle side of each block of seats,
     // as on board (passengers find their seats by them)
+    // twin-aisle cabins: a row of bins over the middle block too, hanging from the ceiling
+    if (aisles.length >= 2 && g.userData.bin && st.bin !== 'none') { try { cabinCentreBins(g, x0, len, aisles[0] + aisleW / 2, aisles[aisles.length - 1] - aisleW / 2, g.userData.bin.zb, binH * 1.2, mBin, V); } catch (e) { /* no centre bins */ } }
     try { const lab = cabinRowLabels(rowX, blocks, letters, seatY, seatW, aisles, zf, V, g.userData.bin); if (lab) g.add(lab); } catch (e) { /* no placards */ } }
   return g;
 }
@@ -818,6 +820,25 @@ function cabinSeatBackTex(screen: boolean): any {
 /** The placards with the row number and the seat letters, as on board: a white plate along the bin's lower edge,
  *  facing down towards the aisle, with the row number, a person (the aisle), the seat letters in boxes from the
  *  aisle seat out to the window seat, and a window. All in one mesh drawn from one picture. */
+/** The centre bins of a twin-aisle cabin: a rounded box over the middle block from front to back, its doors
+ *  bulging a little, with door joints, handles and the passenger service panel underneath. */
+function cabinCentreBins(g: any, x0: number, len: number, yL: number, yR: number, zb: number, bh: number, mBin: any, V: (x: number, y: number, z: number) => any) {
+  const T = THREE, W = yR - yL, r = 0.07, bulge = 0.025, S = new T.Shape();
+  S.moveTo(yL + r, 0); S.lineTo(yR - r, 0); S.quadraticCurveTo(yR, 0, yR + bulge * 0.4, r);
+  S.quadraticCurveTo(yR + bulge, bh * 0.5, yR, bh); S.lineTo(yL, bh); S.quadraticCurveTo(yL - bulge, bh * 0.5, yL - bulge * 0.4, r); S.quadraticCurveTo(yL, 0, yL + r, 0);
+  const geo = new T.ExtrudeGeometry(S, { depth: len, bevelEnabled: false, curveSegments: cabinQv([3, 6, 10, 16]) });
+  geo.rotateY(Math.PI / 2);   // the outline across the cabin, drawn out along it
+  const m = new T.Mesh(geo, mBin); m.position.copy(V(x0, 0, zb)); m.position.z = 0; g.add(m);
+  // the passenger service panel underneath, and the door joints and handles on both faces
+  const psu = new T.Mesh(new T.BoxGeometry(len, 0.03, W * 0.8), cabinMat(0xA4A9AF)); psu.position.copy(V(x0 + len / 2, (yL + yR) / 2, zb - 0.012)); g.add(psu);
+  const n = Math.ceil(len / 1.5), seam = new T.InstancedMesh(new T.BoxGeometry(0.008, bh * 0.85, 0.006), cabinMat(0xB9BEC4), n * 2), hdl = new T.InstancedMesh(new T.BoxGeometry(0.2, 0.035, 0.02), cabinMat(0x8E949B), n * 2), M = new T.Matrix4(), q = new T.Quaternion(), one = new T.Vector3(1, 1, 1);
+  for (let i = 0; i < n; i++) for (const [j, y] of [[0, yL - 0.024], [1, yR + 0.024]] as [number, number][]) {
+    M.compose(V(x0 + 0.75 + i * 1.5, y, zb + bh * 0.5), q, one); seam.setMatrixAt(i * 2 + j, M);
+    M.compose(V(x0 + 1.5 + i * 1.5, y, zb + bh * 0.22), q, one); hdl.setMatrixAt(i * 2 + j, M);
+  }
+  g.add(seam, hdl);
+  g.userData.bin.mid = { yL, yR };
+}
 function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters: string, seatY: number[], seatW: number, aisles: number[], zf: number, V: (x: number, y: number, z: number) => any, bin?: { zb: number; lip: number }): any {
   const T = THREE, rows = Object.keys(rowX).map(Number).sort((a, b) => a - b); if (!rows.length || !aisles.length) return null;
   // which blocks face which aisle, and their letters from the aisle seat to the window seat
@@ -841,7 +862,9 @@ function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters
     for (const L of sd.txt) { x.strokeRect(px, cy + 14, 24, 28); x.fillText(L, px + 12, cy + 29); px += 26; }
     x.beginPath(); x.ellipse(px + 9, cy + 28, 6, 11, 0, 0, 6.3); x.lineWidth = 3; x.stroke(); x.beginPath(); x.ellipse(px + 9, cy + 28, 3, 7, 0, 0, 6.3); x.fill();
     // the plate: along the bin's lower edge over the aisle seat, tilted to face down and towards the aisle
-    const pz = bin ? bin.zb - 0.03 : zf + 1.7, py = bin && aisles.length === 1 ? Math.sign(sd.y - aisles[0]) * (bin.lip + 0.1) : sd.y;   // on the panel under the bin, near its edge over the aisle seat
+    // on the panel under the bin, near its edge over the aisle seat: the side bins, or (twin aisles) the centre bins
+    const mid = bin && (bin as any).mid, inMid = mid && sd.y > mid.yL - 0.01 && sd.y < mid.yR + 0.01;
+    const pz = bin ? bin.zb - 0.03 : zf + 1.7, py = !bin ? sd.y : inMid ? (sd.dir > 0 ? mid.yR : mid.yL) - sd.dir * 0.1 : aisles.length === 1 ? Math.sign(sd.y - aisles[0]) * (bin.lip + 0.1) : Math.sign(sd.y) * (bin.lip + 0.1);
     const ctr = V(rowX[r] - 0.02, py, pz), o0 = V(0, 0, 0), n = V(0, sd.dir * 0.5, -0.87).sub(o0).normalize();
     const along = V(-1, 0, 0).sub(o0).normalize(), right = along.clone().multiplyScalar(sd.dir > 0 ? 1 : -1);   // the text runs along the cabin, upright as seen from the aisle
     const upv = new T.Vector3().crossVectors(n, right).normalize();   // the edge towards the aisle is the top of the text

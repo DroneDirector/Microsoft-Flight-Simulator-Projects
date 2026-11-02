@@ -2972,3 +2972,29 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .cab-opts .ch-row { flex-wrap: wrap; gap: 8px; }
 .cab-opts .ch-row > span { flex: 1 1 260px; min-width: 0; }
 .cab-opts .seg { flex-wrap: wrap; max-width: 100%; }
+
+/* the office: conduct reports to invite in */
+.office3d .ct-opts .of-rep { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: 2px 12px; align-items: center; text-align: left; width: 100%; }
+.office3d .of-rep b { grid-column: 1; font-size: 14px; }
+.office3d .of-rep small { grid-column: 1; opacity: .75; font-size: 12px; }
+.office3d .of-rep span { grid-column: 2; grid-row: 1 / span 2; font-weight: 700; color: #E8C46A; }
+
+/* inside the aircraft: the flight in one line along the bottom, instead of the card */
+.v3d-line { display: none; }
+.v3d-inside .v3d-info, .v3d-inside .v3d-status { display: none !important; }
+.v3d-inside .v3d-line { display: flex; align-items: center; gap: 18px; position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom));
+  max-width: calc(100% - 24px); padding: 8px 10px 8px 18px; border-radius: 16px; background: rgba(8, 20, 36, .74); border: 1px solid rgba(255, 255, 255, .08);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); color: var(--ink); white-space: nowrap; z-index: 3; }
+.v3d-line .vl-cs { font: 700 15px var(--display); letter-spacing: .02em; }
+.v3d-line .vl-route { display: flex; align-items: center; gap: 8px; }
+.v3d-line .vl-route b { font: 700 14px var(--display); }
+.v3d-line .vl-track { position: relative; display: block; width: 90px; height: 2px; background: repeating-linear-gradient(90deg, rgba(224, 75, 214, .55) 0 5px, transparent 5px 9px); }
+.v3d-line .vl-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--magenta); border-radius: 2px; }
+.v3d-line .vl-plane { position: absolute; top: 50%; transform: translate(-50%, -50%); color: #fff; display: grid; }
+.v3d-line .vl-plane svg { width: 14px; height: 14px; }
+.v3d-line .vl-i { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.v3d-line .vl-i small { font-size: 10px; color: var(--ink-2); }
+.v3d-line .vl-i b { font: 600 14px var(--display); font-variant-numeric: tabular-nums; }
+.v3d-line .vl-btns { display: flex; gap: 4px; margin-left: 2px; }
+.v3d-line .vl-btns .icon-btn { width: 32px; height: 32px; }
+@media (max-width: 760px) { .v3d-line .vl-opt { display: none; } .v3d-inside .v3d-line { gap: 12px; } .v3d-line .vl-track { width: 54px; } }
