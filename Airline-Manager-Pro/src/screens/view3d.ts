@@ -213,6 +213,7 @@ function v3dBind() {
 function v3dDist(): number { const p = V3d.planes[V3d.target]; const span = p ? shapeOf(p.type).span : 35; return V3d.dist || (V3d.mode === 'tower' ? 0 : span * 1.9 + 25); }
 
 function v3dTap(x: number, y: number) {
+  if (aimLocked(V3d.cv)) { x = innerWidth / 2; y = innerHeight / 2; }   // walking with the mouse taken: what is at the dot in the middle
   if (V3d.mode === 'cabin' || V3d.mode === 'walk') { try { if (cabinTap(x, y)) return; } catch (e) { /* the aircraft below */ } }
   const T = THREE, ray = new T.Raycaster(), v = new T.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
   ray.setFromCamera(v, V3d.cam);

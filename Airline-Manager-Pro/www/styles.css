@@ -3116,3 +3116,8 @@ body.of-over .toast, body.of-over .toasts { z-index: 990; }
 
 /* inside Operations or the office, the way into Operations is not needed */
 .ops3d .sched-opsroom, .office3d .sched-opsroom { display: none; }
+
+/* walking with the mouse taken by the view: no pointer, a small dot in the middle */
+.walk-dot { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255,255,255,.85); box-shadow: 0 0 0 1.5px rgba(0,0,0,.35), 0 0 10px rgba(111,227,245,.8); pointer-events: none; z-index: 6; opacity: 0; transition: opacity .3s; }
+body.aim-locked .walk-dot { opacity: 1; }
+body.aim-locked .office3d .of-aim { font-size: 22px; }

@@ -12,6 +12,9 @@ const CabinWalk: any = {
 
 function cabinWalkStart() {
   const W = CabinWalk; W.on = true; W.started = false;
+  // on the PC the view takes the mouse straight away (no pointer; turn as far as you like); a dot marks the middle
+  if (DESKTOP && V3d.cv) aimLock(V3d.cv as any);
+  if (V3d.root && !V3d.root.querySelector('.walk-dot')) { const d = document.createElement('div'); d.className = 'walk-dot'; V3d.root.appendChild(d); }
   if (!W.bound) {
     W.bound = true;
     const set = (e: KeyboardEvent, on: boolean) => {
@@ -34,9 +37,11 @@ function cabinWalkStart() {
 }
 function cabinWalkStop() {
   const W = CabinWalk; if (!W.on) return; W.on = false; W.keys = {}; W.stick = [0, 0];
+  if (W.glow) { W.glow.hide(); W.glow.dispose(); W.glow = null; }
   try { if (document.pointerLockElement === V3d.cv) document.exitPointerLock(); } catch (e) { /* not locked */ }
   const pad = V3d.root && V3d.root.querySelector('.walk-pad'); if (pad) pad.remove();
   const hint = V3d.root && V3d.root.querySelector('.walk-hint'); if (hint) hint.remove();
+  const dot = V3d.root && V3d.root.querySelector('.walk-dot'); if (dot) dot.remove();
 }
 
 /** The stick for walking on a touch screen (and a short hint on the PC). */
@@ -94,6 +99,27 @@ function cabinWalkCam(P: any, G: any, body: any, up: any) {
   const eye = body.localToWorld(_av(W.x, W.y, at.zf + 1.64 + bob));
   const ahead = body.localToWorld(_av(W.x + Math.cos(pitch) * fx, W.y + Math.cos(pitch) * fy, at.zf + 1.64 + bob + Math.sin(pitch)));
   V3d.cam.position.copy(eye); V3d.cam.up.copy(up); V3d.cam.lookAt(ahead); V3d.cam.up.set(0, 1, 0);
+  try { cabinWalkGlow(G, dt); } catch (e) { /* no glow */ }
+}
+/** Whoever you look at (the dot in the middle) and can talk to glows softly: crew and passengers within reach. */
+function cabinWalkGlow(G: any, dt: number) {
+  const W = CabinWalk, T = THREE;
+  if (!W.glow || W.glow.mesh.parent !== V3d.scene) W.glow = new AimGlow(V3d.scene);
+  V3d.cam.updateMatrixWorld();
+  const ray = new T.Raycaster(); ray.setFromCamera(new T.Vector2(0, 0), V3d.cam);
+  const eye = V3d.cam.position; let best: any = null, bd = 0.32;
+  for (const m of (CabinCrew.members || [])) {
+    if (m.hidden || !m.holder) continue; const h = (m.m && m.m.top) || 1.7, sit = m.sitK > 0.5;
+    const c = m.holder.localToWorld(new T.Vector3(0, h * (sit ? 0.42 : 0.55), 0)); if (c.distanceTo(eye) > 3.2) continue;
+    const d = ray.ray.distanceToPoint(c); if (d < bd) { bd = d; best = { c, half: new T.Vector3(0.3, h * (sit ? 0.34 : 0.52), 0.3) }; }
+  }
+  const pg = G.userData.people;
+  if (pg && pg.userData.who) for (const w of pg.userData.who) {
+    const c = G.localToWorld(w.head.clone().add(new T.Vector3(0, -0.22, 0))); if (c.distanceTo(eye) > 3.2) continue;
+    const d = ray.ray.distanceToPoint(c); if (d < bd) { bd = d; best = { c, half: new T.Vector3(0.28, 0.4, 0.28).multiplyScalar(w.sc || 1) }; }
+  }
+  if (best && V3d.mode === 'walk') W.glow.show(best.c, best.half); else W.glow.hide();
+  W.glow.step(dt);
 }
 /** The crew and the trolley are in the way too. */
 function cabinWalkBumps(x: number, y: number, at: any): boolean {
