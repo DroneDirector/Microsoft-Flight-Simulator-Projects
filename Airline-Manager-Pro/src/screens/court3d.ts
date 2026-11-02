@@ -520,7 +520,7 @@ CourtRoom.close = function (quiet?: boolean) {
   const R = CourtRoom; if (!R.on) return; R.on = false;
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   try { Voice.stop(); } catch (e) { /* ignore */ }
-  try { R.scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m: any) => { for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose(); m.dispose(); }); }); R.ren.dispose(); } catch (e) { /* ignore */ }
+  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null;
   R.root.remove(); R.people = {}; R.crowd = [];
   if (!quiet) { try { refresh(); if (R.c) courtPopup(R.c.id); } catch (e) { /* ignore */ } }
 };
@@ -626,7 +626,7 @@ function ctFrame() {
     gT.shake += p.gazeYaw * 0.75;
     if (/^relative/.test(k) && R.mourn) { gT.nod += 0.25; }
     p.g = p.g ? cabinLerpG(p.g, gT, Math.min(1, dt * 6)) : gT;
-    p.m.pose({ t, yaw: 0, gaze: [p.gazeYaw * 0.4, 0], blink: (t % 4.3) < 0.12 ? 1 : 0, g: p.g });
+    p.m.pose({ t, yaw: 0, gaze: [p.gazeYaw * 0.4, 0], blink: (t % 4.3) < 0.12 ? 1 : 0, g: p.g, talk: R.speaker === k && R.sayText ? humanSpeech(R.sayText, R.sayAt) : 0 });
   }
   if (R.empty) { ctWalk(dt); R.ren.render(R.scene, R.cam); return; }
   // the camera eases to the shot, and you can look around it
@@ -657,7 +657,7 @@ function ctShotOf(key: string) {
 function ctBox(): any { const b = CourtRoom.root.querySelector('.ct-box') as HTMLElement; b.hidden = false; return b; }
 function ctSay(key: string, text: string, mood?: string) {
   const R = CourtRoom, p = R.people[key] || R.people[key === 'relative' ? 'relative' : key];
-  R.speaker = key; R.talkUntil = (performance.now() - R.t0) / 1000 + Math.max(2.5, text.split(/\s+/).length * 0.36);
+  R.speaker = key; R.talkUntil = (performance.now() - R.t0) / 1000 + Math.max(2.5, text.split(/\s+/).length * 0.36); R.sayText = text; R.sayAt = Date.now();
   if (p && p.seat && key !== 'judge' && !/^judge|clerk|witness|survivor|defendantW/.test(key) && p.seat !== R.A.seats.witness) p.wantSit = 0;   // counsel, you and relatives stand to speak (the witness box sits)
   // whoever speaks from the witness box is the one in it; the defendant leaves their table for it
   if (p && p.seat === R.A.seats.witness && p.pivot) { for (const k in R.people) { const o = R.people[k]; if (o !== p && o.seat === R.A.seats.witness && o.pivot && k !== 'you') { o.pivot.visible = false; if (o.pair && R.people[o.pair]) R.people[o.pair].pivot.visible = true; } } p.pivot.visible = true; if (p.pair && R.people[p.pair]) R.people[p.pair].pivot.visible = false; }
@@ -720,7 +720,7 @@ function ctClick(b: HTMLElement) {
   else if (k === 'leave') ctLeaveAsk();
   else if (k === 'stay') (R.root.querySelector('.ct-modal') as HTMLElement).hidden = true;
   else if (k === 'pay') { (R.root.querySelector('.ct-modal') as HTMLElement).hidden = true; ctPayLeave(); }
-  else if (k === 'exit') CourtRoom.close();
+  else if (k === 'exit') ctExitToMain();
   else if (k === 'spot') ctSpot(b.getAttribute('data-k'));
   else if (k === 'own') {
     // your question to the defendant: you ask (standing at your table), they answer from the stand, the judge may comment
@@ -775,7 +775,7 @@ function ctEnd() {
 }
 /** Leaving before the court rises: only with a board member standing in, for a large sum. */
 function ctLeaveAsk() {
-  const R = CourtRoom; if (R.empty || R.finished || R.key === 'verdict' || (R.c.hear && R.c.hear.standIn)) { CourtRoom.close(); return; }
+  const R = CourtRoom; if (R.empty || R.finished || R.key === 'verdict' || (R.c && R.c.hear && R.c.hear.standIn)) { ctExitToMain(); return; }
   const m = R.root.querySelector('.ct-modal') as HTMLElement, cost = standInCost(R.c), co = company(R.c.companyId);
   m.hidden = false;
   m.innerHTML = `<div class="ct-mbox"><h3>The hearing is not over</h3><p>If you leave the courtroom now, a member of ${esc(co.name)}'s board must take your place for the rest of the case. That costs <b>${money(cost)}</b>. From then on the hearings go ahead without you, but the big decisions (a settlement, a plea, an appeal) still come to you.</p>
@@ -786,7 +786,16 @@ function ctPayLeave() {
   standInHire(c);
   const real = c.stages.filter((s: any) => s.key === R.key)[0];
   if (real && !real.done) hearingAuto(c, real, 'standin', R.answered);
-  CourtRoom.close();
+  ctExitToMain();
+}
+/** Out of the courtroom: the court's loading screen while the room is cleared from memory and the app comes back. */
+function ctExitToMain() {
+  const R = CourtRoom; if (!R.on) return; const c = R.c;
+  exitSplash('court', 'The courtroom', [
+    { pct: 30, step: 'The court rises…', run: () => CourtRoom.close(true) },
+    { pct: 55, step: 'Clearing the courtroom from memory…', run: exitFreeMemory },
+    { pct: 85, step: 'Loading your airline…', run: () => refresh() },
+  ], () => { if (c) { try { courtPopup(c.id); } catch (e) { /* none */ } } });
 }
 /** The judge's gavel: two knocks on wood. */
 function ctGavel() {
@@ -872,11 +881,11 @@ ACTIONS['court-enter'] = () => courtEnter();
 /* ---------- the loading screen ---------- */
 /** The courtroom's loading screen: the scales of justice weighing, in walnut, gold and deep blue, with a
  *  courthouse front and a progress bar that runs until the room, the people and the light are ready. */
-function ctLoaderHtml(title: string, step: string, emblem?: string): string {
+function ctLoaderHtml(title: string, step: string, emblem?: string, scene?: string): string {
   const cols = Array.from({ length: 8 }, (_, i) => `<rect x="${118 + i * 40}" y="120" width="16" height="118" rx="3"/>`).join('');
   return `<div class="ct-loader">
     <div class="ctl-glow"></div>
-    <svg class="ctl-house" viewBox="0 0 560 260" aria-hidden="true"><path d="M90 116 L280 34 L470 116 Z"/><rect x="96" y="112" width="368" height="10"/>${cols}<rect x="88" y="238" width="384" height="10"/><rect x="72" y="248" width="416" height="12"/></svg>
+    ${scene || `<svg class="ctl-house" viewBox="0 0 560 260" aria-hidden="true"><path d="M90 116 L280 34 L470 116 Z"/><rect x="96" y="112" width="368" height="10"/>${cols}<rect x="88" y="238" width="384" height="10"/><rect x="72" y="248" width="416" height="12"/></svg>`}
     <div class="ctl-rings"><i></i><i></i></div>
     ${emblem || `<svg class="ctl-scales" viewBox="0 0 200 200" aria-hidden="true">
       <defs><linearGradient id="ctlG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6DB8E"/><stop offset=".55" stop-color="#C8963E"/><stop offset="1" stop-color="#8A5E22"/></linearGradient></defs>

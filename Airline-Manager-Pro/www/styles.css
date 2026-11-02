@@ -3072,3 +3072,33 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 body.of-over .layer { z-index: 975; }
 body.of-over .toast, body.of-over .toasts { z-index: 990; }
 .office3d .of-pl-body > .screen { padding: 0; }
+
+/* the Operations office */
+.ops3d .ct-top b { font-family: Inter, Arial, sans-serif; letter-spacing: .02em; }
+.ops3d .op-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.ops3d .op-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 99px; background: rgba(255,255,255,.06); border: 1px solid rgba(120,190,240,.3); color: #DDEBF7; font: 600 13px Inter, sans-serif; cursor: pointer; }
+.ops3d .op-tabs button svg { width: 15px; height: 15px; }
+.ops3d .op-tabs button.on { background: #2FB4E8; color: #061321; border-color: #2FB4E8; }
+.ops3d .op-spots button.on, .ops3d .op-spots button:hover { background: rgba(47,180,232,.25); }
+.ops3d .op-spots button { border-color: rgba(120,190,240,.4); background: rgba(8,22,36,.82); }
+.ops3d .op-hint { position: absolute; left: 50%; top: 74px; transform: translateX(-50%); padding: 7px 14px; border-radius: 99px; background: rgba(8,22,36,.8); color: #DDEBF7; font: 500 13px Inter, sans-serif; pointer-events: none; white-space: nowrap; }
+.ops3d .of-pl-body .places-card, .office3d .of-pl-body .places-card { display: none; }
+.ops3d .ct-loader, .exit-ops .ct-loader { background: radial-gradient(ellipse at 50% 42%, #10263C 0%, #08121E 60%, #04080E 100%); }
+.ops3d .ctl-glow, .exit-ops .ctl-glow { background: radial-gradient(circle, rgba(47,180,232,.22), rgba(47,180,232,0) 65%); }
+.ops3d .ctl-house, .exit-ops .ctl-house { fill: #0F2235; }
+.ops3d .ctl-rings i, .exit-ops .ctl-rings i { border-color: rgba(47,180,232,.18); border-top-color: #2FB4E8; }
+.ops3d .ctl-name b, .exit-ops .ctl-name b { color: #9BE7FF; font-family: Inter, Arial, sans-serif; letter-spacing: .08em; }
+.ops3d .ctl-fill, .exit-ops .ctl-fill { background: linear-gradient(90deg, #1B4F8A, #2FB4E8, #9BE7FF); }
+.ops3d .ctl-tip, .exit-ops .ctl-tip, .ops3d .ctl-info b, .exit-ops .ctl-info b { color: #9BE7FF; }
+.ops3d .ctl-scales, .exit-ops .ctl-scales { filter: drop-shadow(0 0 24px rgba(47,180,232,.4)); }
+.ops-emb .ops-b1 { animation: opsBar 2.4s ease-in-out infinite; } .ops-emb .ops-b2 { animation: opsBar 2.4s ease-in-out -.8s infinite; } .ops-emb .ops-b3 { animation: opsBar 2.4s ease-in-out -1.6s infinite; }
+.ops-emb .ops-now { animation: opsNow 6s linear infinite; }
+@keyframes opsBar { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@keyframes opsNow { from { transform: translateX(-50px); } to { transform: translateX(40px); } }
+.places-card .place.opsroom > svg:first-child { color: #2FB4E8; }
+/* leaving a 3D place: its own loading screen over everything while the app comes back */
+.exit-splash { position: fixed; inset: 0; z-index: 2000; background: #0A0F16; }
+.exit-splash .ct-loader, .exit-splash .v3d-load { position: absolute; inset: 0; opacity: 1; }
+.exit-splash.out { opacity: 0; transition: opacity .7s ease; pointer-events: none; }
+.exit-splash .ct-loader { color: #F3ECE0; }
+@media (prefers-reduced-motion: reduce) { .ops-emb .ops-b1, .ops-emb .ops-b2, .ops-emb .ops-b3, .ops-emb .ops-now { animation: none; } }

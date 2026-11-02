@@ -141,6 +141,7 @@
     "src/screens/v3d-cabinpax.ts",
     "src/screens/court3d.ts",
     "src/screens/office3d.ts",
+    "src/screens/ops3d.ts",
     "src/data/stars.ts",
     "src/screens/v3d-sky.ts",
     "src/ui/qol.ts",
@@ -149,6 +150,7 @@
     "src/screens/v3d-terrain.ts",
     "src/screens/view3d.ts",
     "src/ui/gamepad.ts",
+    "src/ui/exit-splash.ts",
     "src/main.ts"
   ]
 }

@@ -100,6 +100,11 @@ function cabinTrolley(): any {
 }
 
 /* ---------- what is said ---------- */
+/** How far someone's mouth is open now, from the last thing they said (the cabin's talk log). */
+function cabinTalkJaw(key: string): any {
+  const L = CabinCrew.talk.log[key]; if (!L || !L.length) return 0;
+  const ln = L[L.length - 1]; return Date.now() - ln.at < 20000 ? humanSpeech(ln.text, ln.at) : 0;
+}
 function cabinSay(key: string, line: TalkLine, pos: () => any) {
   const T = CabinCrew.talk, L = T.log[key] = T.log[key] || [];
   L.push(line); if (L.length > 6) L.shift();
@@ -298,7 +303,7 @@ function cabinCrewStep(P: any, G: any, night: number) {
     const top = m.m.top || 1.7, drop = Math.max(0, top * 0.52 - 0.49) * m.sitK;
     m.holder.position.copy(_av(m.x, w.sit ? (aisle + m.side) * (1 - m.sitK) + w.side * m.sitK : aisle + m.side, at.zf - drop));
     m.holder.rotation.y = m.yaw;
-    m.m.pose({ t: tt, yaw: 0, gaze: [Math.sin(tt * 0.3) * 0.35, 0], blink: (tt % 4.1) < 0.12 ? 1 : 0, g: m.g });
+    m.m.pose({ t: tt, yaw: 0, gaze: [Math.sin(tt * 0.3) * 0.35, 0], blink: (tt % 4.1) < 0.12 ? 1 : 0, g: m.g, talk: cabinTalkJaw('crew:' + (m.person && m.person.name)) });
   }
   cabinTalkMarks();
   cabinTurnHead();

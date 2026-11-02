@@ -132,7 +132,15 @@ function v3dClose() {
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
 // closing from the free camera: back to the normal Overview
-ACTIONS['v3d-close'] = () => { const free = V3d.mode === 'free'; (V3d as any).fcLeaving = true; v3dClose(); (V3d as any).fcLeaving = false; if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } };
+ACTIONS['v3d-close'] = () => {
+  if (!V3d.open || ExitSplash.on) return;
+  const free = V3d.mode === 'free';
+  exitSplash('v3d', '3D view', [
+    { pct: 30, step: 'Landing the camera…', run: () => { (V3d as any).fcLeaving = true; v3dClose(); (V3d as any).fcLeaving = false; } },
+    { pct: 55, step: 'Clearing the 3D world from memory…', run: () => { try { if (CabinOut.rt) CabinOut.rt.dispose(); CabinOut.rt = null; } catch (e) { /* none */ } exitFreeMemory(); } },
+    { pct: 85, step: free ? 'Loading the Overview…' : 'Loading the map…', run: () => { if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } else { try { refresh(); } catch (e) { /* ignore */ } } } },
+  ]);
+};
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
