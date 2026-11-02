@@ -29,6 +29,10 @@
   long straight taxiways up to about 30 kt; approaching the runway or the stand 5–10 kt; pushback 3–5 kt.
 
 ## Working rules
+- **People are one figure system everywhere**: staff, pilots, mechanics, passengers, your own avatar, the people in the
+  office and the courtroom are all built with `src/graphics/human.ts` (`Human.build`), from the same look the app's
+  pictures use (`dressed(look, role)`). An improvement to how people look must show in every place they appear:
+  the app's pictures, the cabin, the 3D views, the office and the courtroom. Never add a separate figure for one place.
 - Sign every commit as `DroneDirector <simon@dronedirector.fo>`, with no co-author or session lines.
 - Never mention in code, comments, text or commits that anything is made with AI.
 - Licences of anything used must allow commercial sale.

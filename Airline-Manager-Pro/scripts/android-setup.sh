@@ -36,9 +36,11 @@ grep -q 'appCategory' "$MAN" || sed -i 's/<application/<application android:appC
 grep -q 'android.game_mode_config' "$MAN" || sed -i 's|</application>|    <meta-data android:name="android.game_mode_config" android:resource="@xml/game_mode_config" />\n    </application>|' "$MAN"
 grep -q 'amp_widget_desc' "$RES/values/strings.xml" || sed -i 's|</resources>|    <string name="amp_widget_desc">Balance, next flight and aircraft in the air</string>\n</resources>|' "$RES/values/strings.xml"
 grep -q 'StatusWidget' "$MAN" || sed -i 's|</application>|    <receiver android:name=".StatusWidget" android:exported="false"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/amp_widget_info" /></receiver>\n    </application>|' "$MAN"
-for P in ACCESS_WIFI_STATE ACCESS_NETWORK_STATE CHANGE_WIFI_MULTICAST_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION; do
+for P in ACCESS_WIFI_STATE ACCESS_NETWORK_STATE CHANGE_WIFI_MULTICAST_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION KILL_BACKGROUND_PROCESSES; do
   grep -q "android.permission.$P\"" "$MAN" || sed -i "s|</manifest>|    <uses-permission android:name=\"android.permission.$P\" />\n</manifest>|" "$MAN"
 done
+# Game Booster (Android 13 and older): the apps on the home screen it may close in the background
+grep -q '<queries>' "$MAN" || sed -i 's|<application|<queries><intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent></queries>\n    <application|' "$MAN"
 GR=android/app/build.gradle
 # sign every build with the fixed test key (signing/), so new APKs install over the old one
 if ! grep -q 'airlinemanagerpro-test' "$GR"; then

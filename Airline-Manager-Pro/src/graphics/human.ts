@@ -30,7 +30,7 @@ function humanGesture(mood: any, t: number): any {
     g.legs = mood.v ? [-0.22 * w, 0.35 * Math.max(0, w), 0.22 * w, 0.35 * Math.max(0, -w)] : [0, 0, 0, 0]; g.lean = 0.08; g.bob = mood.v ? 0.008 * Math.abs(w) : 0; return g; }
   if (mood && mood.kind === 'serve') { const sd = mood.v || 1, k = 0.5 + 0.5 * S(t * 1.3), reach = [1.15 + 0.15 * k, 0.55, -0.1, 0.35], rest = [0.55, 0.1, 0.4, 1.3];
     const g = base(sd > 0 ? rest : reach, sd > 0 ? reach : rest); g.legs = [0, 0, 0, 0]; g.lean = 0.12; g.tilt = 0.12 * sd; g.shake = 0.35 * sd; return g; }
-  if (mood && mood.kind === 'sit') { const g = base([0.55, 0.12, 0.35, 1.25], [0.55, 0.12, 0.35, 1.25]); g.legs = [-1.5, 1.5, -1.5, 1.5]; g.calm = 0.5; return g; }
+  if (mood && mood.kind === 'sit') { const g = base([0.32, 0.14, 0.12, 0.8], [0.32, 0.14, 0.12, 0.8]); g.legs = [-1.5, 1.5, -1.5, 1.5]; g.calm = 0.5; return g; }
   if (!mood || !mood.kind) return base([0.04 + 0.02 * S(t * 0.6), 0.08, 0, 0.12 + ease], [0.04 + 0.02 * S(t * 0.6 + 1), 0.08, 0, 0.12 + ease]);
   const v = mood.v || 0, f = (hz: number, ph?: number) => S(t * hz * Math.PI * 2 + (ph || 0));
   if (mood.kind === 'beg') {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.57 (2026-11-02)
+
+- cabin: mood lights as analytic line lights in the cabin material (side wall wash, ceiling coves in pools, bin doors), day/night strength, white lines dimmed at night; up-facing depth shading
+- v3d-seat: detailed seats (padded, seamed cushions with bolsters, two-tone winged headrests, grab handle, moulded armrests with pads) with generated upholstery and normal textures; shared armrests
+- cabin quality renamed Low / Medium / Very high (default) / Ultra; supersampling at the top two levels
+- v3d-cabinpax: nearest passengers drawn with Human.build from the passenger list's look; seated pose rests the hands in the lap; manifest faces use the same figures
+- booster: live charts (PC from the PC app, phone from AppTools.boostStats); PC closes picked programs and keeps them closed while the app is open (pc-bridge booster.ts); Android 13 and older closes background apps every 30 s
+
 ## 0.9.56 (2026-11-01)
 
 - v3d-cabinpax: boarding and deboarding (poses for standing, walking, sitting down and rising; aisle and galley queues; aisle-first and window-first orders; door fades; real-world rates); passenger figures get lower legs and a per-person fade (alpha hash)

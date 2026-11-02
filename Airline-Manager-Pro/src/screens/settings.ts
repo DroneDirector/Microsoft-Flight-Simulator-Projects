@@ -17,7 +17,7 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
   ] },
   { id: 'booster', title: 'Game Booster', icon: 'power', items: [
-    { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
+    { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); boostDraw(); boostSample(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
   ] },
   { id: 'licence', title: 'Registration', icon: 'key', items: [
     { type: 'html', html: () => licenceHtml() },
@@ -51,11 +51,11 @@ const SETTINGS: SetSection[] = [
     { type: 'group', title: 'Cabin' },
     { type: 'html', html: () => {
       const q = cabinQ();
-      const note = q === 3 ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: the cabin is drawn at your screen's full sharpness with the finest curves, a warmer device and more battery use.</p>`
+      const note = q === 3 ? `<p class="v3d-note warn">${icon('alert')}Ultra might affect performance: the cabin is drawn at up to three times your screen's sharpness with the finest curves and seats, a warmer device and more battery use.</p>`
         : q === 0 ? `<p class="v3d-note ok">${icon('info')}Low settings might improve performance on slower phones and PCs.</p>` : '';
-      return `<div class="set-card col"><div class="sc-h">${icon('layers')}<span><b class="cq-h">Cabin quality: ${CABIN_Q_NAMES[q]}</b><small>How finely the cabin views are made: the curves of the overhead bins, walls, seats, headrests and passengers. Extreme is the very best: the smoothest curves, the cabin drawn at your screen's full sharpness and the sharpest textures.</small></span></div>
+      return `<div class="set-card col"><div class="sc-h">${icon('layers')}<span><b class="cq-h">Cabin quality: ${CABIN_Q_NAMES[q]}</b><small>How finely the cabin views are made: the seats (padding, seams and stitching, armrests), the curves of the overhead bins and walls, and the passengers. Very high is the standard: detailed seats and smooth edges. Ultra is the very best: the finest seats and curves, the sharpest textures and the cabin drawn at up to three times your screen's sharpness.</small></span></div>
         <input type="range" class="v3d-cabq" min="0" max="3" step="1" value="${q}" aria-label="Cabin quality">
-        <div class="v3d-scale"><span>Low</span><span>Medium</span><span>High</span><span>Extreme</span></div>${note}</div>`;
+        <div class="v3d-scale"><span>Low</span><span>Medium</span><span>Very high</span><span>Ultra</span></div>${note}</div>`;
     } },
     { type: 'group', title: 'Sky and water' },
     { type: 'html', html: () => {

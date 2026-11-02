@@ -70,6 +70,41 @@ public class AppToolsPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /* ---------- Game Booster readings (for its charts) ---------- */
+
+    /** Memory, processor speed, temperature and the app's own memory, plus what the booster closed. */
+    @PluginMethod
+    public void boostStats(PluginCall call) {
+        JSObject r = new JSObject();
+        try {
+            android.app.ActivityManager am = (android.app.ActivityManager) getContext().getSystemService(Context.ACTIVITY_SERVICE);
+            android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo(); am.getMemoryInfo(mi);
+            r.put("memTotalMb", mi.totalMem / 1048576); r.put("memAvailMb", mi.availMem / 1048576); r.put("lowMem", mi.lowMemory);
+            android.os.Debug.MemoryInfo dm = new android.os.Debug.MemoryInfo(); android.os.Debug.getMemoryInfo(dm); r.put("appMb", dm.getTotalPss() / 1024);
+            // each core's speed against its top speed (where the phone lets apps read it)
+            double sum = 0; int n = 0, cores = Runtime.getRuntime().availableProcessors();
+            for (int i = 0; i < Math.max(cores, 8); i++) {
+                long cur = readNum("/sys/devices/system/cpu/cpu" + i + "/cpufreq/scaling_cur_freq"), max = readNum("/sys/devices/system/cpu/cpu" + i + "/cpufreq/cpuinfo_max_freq");
+                if (cur > 0 && max > 0) { sum += Math.min(1.0, (double) cur / max); n++; }
+            }
+            if (n > 0) r.put("cpuSpeed", Math.round(sum / n * 100));
+            r.put("cores", cores);
+            Intent b = getContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (b != null) r.put("battTemp", b.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0);
+            android.os.PowerManager pm = (android.os.PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            if (pm != null && Build.VERSION.SDK_INT >= 29) r.put("thermal", pm.getCurrentThermalStatus());
+            if (pm != null && Build.VERSION.SDK_INT >= 30) { float h = pm.getThermalHeadroom(0); if (!Float.isNaN(h)) r.put("headroom", Math.round(h * 100)); }
+            r.put("sdk", Build.VERSION.SDK_INT);
+            r.put("canClose", MainActivity.canCloseOthers());
+            r.put("closeRounds", MainActivity.closeRounds); r.put("closeAsked", MainActivity.closeAsked); r.put("freedMb", MainActivity.freedMb); r.put("lastFreedMb", MainActivity.lastFreedMb);
+        } catch (Exception e) { r.put("error", String.valueOf(e.getMessage())); }
+        call.resolve(r);
+    }
+
+    private static long readNum(String file) {
+        try (java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(file))) { String l = in.readLine(); return l == null ? 0 : Long.parseLong(l.trim()); } catch (Exception e) { return 0; }
+    }
+
     /* ---------- Battery ---------- */
 
     /** Charge level, whether it is charging, and how: cable (AC or USB), wireless or not plugged in. */

@@ -208,7 +208,7 @@ function paxFacesLazy() {
       const df = el.getAttribute('data-face') || '', cut = df.indexOf('|'), fid = df.slice(0, cut), key = df.slice(cut + 1);
       const f = State.live.filter(x => x.id === fid)[0]; if (!f) continue;
       const p = manifestOf(f).filter(x => x.key === key)[0]; if (!p) continue;
-      el.innerHTML = avatarSvg2d(p.look, 'fa', { view: 'bust', still: true }); el.classList.add('done');
+      el.innerHTML = avatarSvg(p.look, 'fa', { view: 'bust', still: true });   // the same figure as in the cabin and on the card el.classList.add('done');
     }
   };
   draw(); [120, 400, 800].forEach(ms => setTimeout(draw, ms));   // again once the window has opened

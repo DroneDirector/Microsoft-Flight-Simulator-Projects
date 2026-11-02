@@ -155,6 +155,8 @@ function v3dCabinCam(P: any, mode: string) {
   if (V3d.cam.fov !== 62 || V3d.cam.near > 0.03) { V3d.cam.fov = 62; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
   // the cabin's light: daylight from the window, warm cabin lights at night
   const night = (V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0, amb = (V3dSky as any).amb || 1;
+  CabinLight.ln.value = 0;   // the window seat view has no mood lights of its own
+  try { V3d.cam.updateMatrixWorld(); CabinLight.up.value.set(0, 1, 0).transformDirection(V3d.cam.matrixWorldInverse); } catch (e) { CabinLight.up.value.set(0, 0, 0); }
   CabinLight.self.value = 0.55 * (1 - night * 0.82) + 0.0 * amb; CabinLight.warm.value.setRGB(1, 0.97 - 0.2 * night, 0.92 - 0.05 * night);
 
 }
@@ -183,7 +185,28 @@ function v3dCabinLeave(P: any) {
 const V3dCabinF: any = { key: '', grp: null };
 /** A cabin surface: lit by the cabin's own lights in its own colour (people, seats, walls keep their colours),
  *  with a little shading from the light outside on top. */
-const CabinLight = { self: { value: 0.8 }, warm: { value: new THREE.Color(1, 1, 1) } };
+const CabinLight: any = { self: { value: 0.8 }, warm: { value: new THREE.Color(1, 1, 1) },
+  // the blue mood lights: real light sources (lines of light) that light the surfaces around them: the side walls
+  // below the bins, the ceiling above them and, from the lit ceiling, the bins' doors. Each line: its two ends and
+  // the way it shines (in view space, set every frame), its colour and strength, its reach and its fixture spacing.
+  la: { value: Array.from({ length: 6 }, () => new THREE.Vector3()) }, lb: { value: Array.from({ length: 6 }, () => new THREE.Vector3()) },
+  ld: { value: Array.from({ length: 6 }, () => new THREE.Vector3(0, -1, 0)) }, lc: { value: Array.from({ length: 6 }, () => new THREE.Color(0, 0, 0)) },
+  lr: { value: [0.4, 0.4, 0.4, 0.4, 0.4, 0.4] }, ls: { value: [0, 0, 0, 0, 0, 0] }, ln: { value: 0 },
+  // which way is up in the cabin (view space): surfaces facing up catch a little more of the ceiling light, those
+  // facing down a little less, so padding, curves and folds show their depth
+  up: { value: new THREE.Vector3(0, 0, 0) } };
+const CABIN_LIGHT_GLSL = `
+  { vec3 lp = -vViewPosition; vec3 lsum = vec3(0.0);
+    for (int i = 0; i < 6; i++) { if (i >= uLN) break;
+      vec3 ab = uLB[i] - uLA[i]; float l2 = max(dot(ab, ab), 1e-4); float t = clamp(dot(lp - uLA[i], ab) / l2, 0.0, 1.0);
+      vec3 L = uLA[i] + ab * t - lp; float d = max(length(L), 0.03); vec3 l = L / d;
+      float ndl = max(dot(normal, l), 0.0), aim = max(dot(-l, uLD[i]), 0.0);
+      float fall = 1.0 / (1.0 + (d / uLR[i]) * (d / uLR[i]));
+      float seg = 1.0; if (uLS[i] > 0.0) { float u = fract(t * sqrt(l2) / uLS[i]); seg = 0.12 + 0.88 * smoothstep(0.0, 0.25, u) * smoothstep(1.0, 0.75, u); }
+      lsum += uLC[i] * ndl * aim * fall * seg; }
+    float shade = 1.0 - 0.08 * length(uUp) + 0.14 * dot(normal, uUp);
+    float blueK = min(0.55, dot(lsum, vec3(0.25, 0.45, 0.3)) * 0.7);   // where the blue light falls, the white light is weaker (the bins shade it)
+    totalEmissiveRadiance += diffuseColor.rgb * (uWarm * uSelf * shade * (1.0 - blueK) + lsum); }`;
 function cabinMat(color: number, o?: any): any {
   const m = new THREE.MeshLambertMaterial(Object.assign({ color, fog: false }, o || {}));
   m.userData.noDim = true;
@@ -191,15 +214,35 @@ function cabinMat(color: number, o?: any): any {
   try { if (m.map && V3d.r) { const an = cabinQ() === 3 ? V3d.r.capabilities.getMaxAnisotropy() : cabinQ() === 2 ? 4 : 1; if (m.map.anisotropy !== an) { m.map.anisotropy = an; m.map.needsUpdate = true; } } } catch (e) { /* default filtering */ }
   m.onBeforeCompile = (sh: any) => {
     sh.uniforms.uSelf = CabinLight.self; sh.uniforms.uWarm = CabinLight.warm;
-    sh.fragmentShader = 'uniform float uSelf; uniform vec3 uWarm;\n' + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * uWarm * uSelf;');
+    sh.uniforms.uLA = CabinLight.la; sh.uniforms.uLB = CabinLight.lb; sh.uniforms.uLD = CabinLight.ld; sh.uniforms.uLC = CabinLight.lc; sh.uniforms.uLR = CabinLight.lr; sh.uniforms.uLS = CabinLight.ls; sh.uniforms.uLN = CabinLight.ln; sh.uniforms.uUp = CabinLight.up;
+    sh.fragmentShader = 'uniform float uSelf; uniform vec3 uWarm; uniform vec3 uLA[6]; uniform vec3 uLB[6]; uniform vec3 uLD[6]; uniform vec3 uLC[6]; uniform float uLR[6]; uniform float uLS[6]; uniform int uLN; uniform vec3 uUp;\n'
+      + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + CABIN_LIGHT_GLSL);
   };
   return m;
+}
+/** The blue mood lights each frame: where they are as seen from the camera, and how bright. By day they are on
+ *  but a little softer; at night, with the cabin's white lights dimmed, the blue fills the walls and the ceiling. */
+function cabinMoodLights(G: any, dim: number) {
+  const T = THREE, L: any[] = G.userData.lights || [], n = Math.min(6, L.length), cam = V3d.cam;
+  cam.updateMatrixWorld(); G.updateMatrixWorld();
+  const M = new T.Matrix4().multiplyMatrices(cam.matrixWorldInverse, G.matrixWorld), N = new T.Matrix3().setFromMatrix4(M);
+  const night = Math.min(1, dim / 0.86), blue = new T.Color(0.16, 0.38, 1);
+  const k: any = { wall: 1.6 + 2.0 * night, cove: 1.3 + 3.9 * night, bins: 0.35 + 1.3 * night };
+  for (let i = 0; i < n; i++) {
+    const l = L[i];
+    CabinLight.la.value[i].copy(l.a).applyMatrix4(M); CabinLight.lb.value[i].copy(l.b).applyMatrix4(M);
+    CabinLight.ld.value[i].copy(l.d).applyMatrix3(N).normalize();
+    CabinLight.lc.value[i].copy(blue).multiplyScalar(k[l.kind] || 1);
+    CabinLight.lr.value[i] = l.r; CabinLight.ls.value[i] = l.seg;
+  }
+  CabinLight.ln.value = n;
+  CabinLight.up.value.set(0, 1, 0).applyMatrix3(N).normalize();
 }
 const _people: any = {};
 /** Cabin quality (Settings → Graphics → Cabin): 0 low, 1 medium, 2 high, 3 extreme. It sets how finely the
  *  curves of the bins, walls, seats, headrests and people are made, and at extreme the cabin is also drawn at
  *  the screen's full sharpness with the sharpest texture filtering. */
-const CABIN_Q_NAMES = ['Low', 'Medium', 'High', 'Extreme'];
+const CABIN_Q_NAMES = ['Low', 'Medium', 'Very high', 'Ultra'];
 function cabinQ(): number { const v = (State.settings as any).v3dCabinQ; return v == null ? 2 : clamp(Math.round(+v), 0, 3); }
 function cabinQv(v: number[]): number { return v[cabinQ()]; }
 /** A smooth closed outline through the points (or the plain outline at low quality). */
@@ -227,7 +270,10 @@ function cabinSweep(pts: number[][], len: number): any {
 /** At extreme quality the cabin is drawn at the screen's full sharpness while you are in it. */
 function cabinSharp(on: boolean) {
   const r = V3d.r; if (!r) return;
-  const want = on && cabinQ() === 3 ? Math.min(window.devicePixelRatio || 1, 3) : 0;
+  // drawn finer than the screen's own pixels at the top settings, so edges stay smooth (very high: up to 2×,
+  // ultra: up to 3×)
+  const dpr = window.devicePixelRatio || 1, q = cabinQ();
+  const want = !on ? 0 : q === 3 ? Math.min(Math.max(dpr, 2), 3) : q === 2 ? Math.min(Math.max(dpr, 1.5), 2) : 0;
   if (want && !(V3d as any).dprWas) { (V3d as any).dprWas = r.getPixelRatio(); r.setPixelRatio(Math.max(want, (V3d as any).dprWas)); }
   else if (!want && (V3d as any).dprWas) { r.setPixelRatio((V3d as any).dprWas); (V3d as any).dprWas = 0; }
 }
@@ -300,10 +346,14 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     const led = new T.MeshBasicMaterial({ color: 0x2E6BFF, toneMapped: false }); led.userData.noDim = true; (g.userData.leds = g.userData.leds || []).push(led);
     const lip = new T.Mesh(new T.BoxGeometry(len, 0.02, 0.04), led); lip.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.97), zb - 0.006)); g.add(lip);
     const wl = new T.Mesh(new T.BoxGeometry(len, 0.016, 0.03), led); wl.position.copy(V(x0 + len / 2, side * (wallY - 0.02), zb - 0.04)); g.add(wl);
-    if (!V3dCabinF.washTex) V3dCabinF.washTex = cabinCanvas(4, 64, (gg) => { const gr = gg.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, 'rgba(40,100,255,1)'); gr.addColorStop(1, 'rgba(40,100,255,0)'); gg.fillStyle = gr; gg.fillRect(0, 0, 4, 64); });
-    const washM = new T.MeshBasicMaterial({ map: V3dCabinF.washTex, transparent: true, opacity: 0.8, blending: T.NormalBlending, depthWrite: false, fog: false }); washM.userData.noDim = true; (g.userData.washes = g.userData.washes || []).push(washM);
-    const wash = new T.Mesh(new T.PlaneGeometry(len, 0.55), washM); wash.position.copy(V(x0 + len / 2, side * (wallY - 0.05), zb - 0.3)); if (side < 0) wash.rotation.y = Math.PI; wash.renderOrder = 45; g.add(wash);
-    const bwash = new T.Mesh(new T.PlaneGeometry(len, bd * 0.9), washM); bwash.rotation.x = Math.PI / 2; bwash.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.5), zb - 0.012)); bwash.renderOrder = 45; g.add(bwash);   // the bins' underside, lit blue
+    // the light itself: lines of blue light that light the wall below (from just inside the strip, shining down and
+    // out onto the wall), the ceiling above the bins (from the bins' tops, in pools one fixture after another) and,
+    // from the lit ceiling, the bins' doors
+    const L = (g.userData.lights = g.userData.lights || []);
+    L.push({ kind: 'wall', a: V(x0 + 0.2, side * (wallY - 0.16), zb - 0.05), b: V(x1 - 0.2, side * (wallY - 0.16), zb - 0.05), d: _av(0, side * 0.62, -0.78).normalize(), r: 0.75, seg: 0 });
+    L.push({ kind: 'cove', a: V(x0 + 0.2, side * (wallY - bd - 0.04), zb + bh + 0.04), b: V(x1 - 0.2, side * (wallY - bd - 0.04), zb + bh + 0.04), d: _av(0, -side * 0.72, 0.69).normalize(), r: 1.1, seg: 1.52 });
+    const cy = Math.max(0.3, wallY - bd - 0.25), cz = zc + Math.sqrt(Math.max(0.01, ri * ri - cy * cy)) - 0.08;
+    L.push({ kind: 'bins', a: V(x0 + 0.2, side * cy, cz), b: V(x1 - 0.2, side * cy, cz), d: _av(0, side * 0.86, -0.5).normalize(), r: 0.75, seg: 1.52 });
     if (side === -1) V3dCabin.mood = up;
   }
   // the ceiling: two long white light lines down the middle
@@ -371,15 +421,13 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     hg.rotateY(-Math.PI / 2); hg.translate(0.28, 1.0, 0); hg.scale(1, 1, 1.5 / 0.93);
     V3dCabinF.headGeo = hg;
   }
-  const lam = (c: number) => cabinMat(c);
-  const cush = new T.InstancedMesh(V3dCabinF.seatGeo, cabinMat(0xFFFFFF, { map: cabinLeatherTex() }), nSeats);
-  const back = new T.InstancedMesh(new T.BoxGeometry(0.42, 0.06, 0.05), lam(0xFFFFFF), nSeats * 2);   // armrests, along the seat: light grey with a dark pad
-  const pad = new T.InstancedMesh(new T.BoxGeometry(0.36, 0.022, 0.055), cabinMat(0x2A2D33, { map: cabinLeatherTex() }), nSeats * 2);
-  // the cloth cover over the back of each headrest, in a pattern of your airline's own colour
-  const coverTex = cabinCoverTex(company().color || '#C8102E');
-  const cover = new T.InstancedMesh(new T.PlaneGeometry(0.26, 0.21), cabinMat(0xFFFFFF, { map: coverTex, side: T.DoubleSide }), nSeats);
-  const head = new T.InstancedMesh(V3dCabinF.headGeo, cabinMat(0xFFFFFF, { map: cabinLeatherTex() }), nSeats);
-  let k = 0; const seatAt: { [k: string]: any } = {};
+  // the seat's frame and shell (light moulded plastic) and its upholstered parts: back and seat cushions,
+  // headrest, grab handle, armrests with padded tops (v3d-seat.ts)
+  const SP = cabinSeatParts(seatW * 0.94, st), seatUp = new T.Color(st.seat), premUp = premColor, shellC = new T.Color(0xD9DCE0);
+  const cush = new T.InstancedMesh(V3dCabinF.seatGeo, cabinMat(0xFFFFFF, { map: cabinSatinTex() }), nSeats);
+  const bk = new T.InstancedMesh(SP.back, SP.backM, nSeats), sc = new T.InstancedMesh(SP.seat, SP.seatM, nSeats), head = new T.InstancedMesh(SP.head, SP.headM, nSeats), hdl = new T.InstancedMesh(SP.handle, SP.handleM, nSeats);
+  const arm = new T.InstancedMesh(SP.arm, SP.armM, nSeats + 40), pad = new T.InstancedMesh(SP.pad, SP.padM, nSeats + 40);
+  let k = 0, na = 0; const seatAt: { [k: string]: any } = {}, armAt: { [k: string]: boolean } = {};
   for (let r = 1; r <= rows; r++) {
     const c = rowsCls[r], prem = c !== 'Y', n = prem ? Math.max(2, abreast - 2) : abreast;
     for (let i = 0; i < abreast; i++) {
@@ -387,15 +435,23 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
       const skip = prem && n < abreast && ((abreast === 6 && (i === 1 || i === 4)) || (abreast === 4 && false) || (abreast >= 9 && (i === 1 || i === abreast - 2)));
       if (skip) continue;
       const sy = seatY[i] + (prem && abreast === 6 ? (i < 3 ? 0.12 : -0.12) * (i === 0 || i === 5 ? -1 : 1) : 0), wS = prem ? seatW * 1.35 : seatW * 0.94, X = rowX[r];
-      const q = new T.Quaternion(), pk = prem ? 1.25 : 1;
-      M.compose(V(X, sy, zf), q, new T.Vector3(pk, pk, wS)); cush.setMatrixAt(k, M); cush.setColorAt(k, prem ? premColor : seatColor);
-      M.compose(V(X, sy, zf), q, new T.Vector3(pk, pk, wS * 0.98)); head.setMatrixAt(k, M); head.setColorAt(k, prem ? premColor : headDark);
-      M.compose(V(X + 0.312 * pk, sy, zf + 1.13 * pk), new T.Quaternion().setFromEuler(new T.Euler(0, Math.PI / 2, 0)), new T.Vector3(wS / 0.4, 1, 1)); cover.setMatrixAt(k, M);
-      for (const sd of [-1, 1]) { const ai = k * 2 + (sd > 0 ? 1 : 0); M.compose(V(X - 0.02, sy + sd * wS * 0.5, zf + 0.66), q, new T.Vector3(1, 1, 1)); back.setMatrixAt(ai, M); back.setColorAt(ai, new T.Color(0xC9CDD2)); M.compose(V(X - 0.02, sy + sd * wS * 0.5, zf + 0.7), q, new T.Vector3(1, 1, 1)); pad.setMatrixAt(ai, M); }
+      const q = new T.Quaternion(), pk = prem ? 1.25 : 1, ws = wS / (seatW * 0.94);
+      M.compose(V(X, sy, zf), q, new T.Vector3(pk, pk, wS)); cush.setMatrixAt(k, M); cush.setColorAt(k, shellC);
+      M.compose(V(X, sy, zf), q, new T.Vector3(pk, pk, ws));
+      bk.setMatrixAt(k, M); sc.setMatrixAt(k, M); head.setMatrixAt(k, M); hdl.setMatrixAt(k, M);
+      const uc = prem ? premUp : seatUp; bk.setColorAt(k, uc); sc.setColorAt(k, uc); head.setColorAt(k, prem ? new T.Color(0.8, 0.8, 0.84) : new T.Color(1, 1, 1));
+      // armrests between the seats: one each, shared by neighbours
+      for (const sd of [-1, 1]) {
+        const ay = sy + sd * wS * 0.5, ak = r + '|' + Math.round(ay * 50);
+        if (armAt[ak] || na >= arm.count) continue; armAt[ak] = true;
+        M.compose(V(X, ay, zf), q, new T.Vector3(pk, pk, 1)); arm.setMatrixAt(na, M); pad.setMatrixAt(na, M); na++;
+      }
       seatAt[r + letters[i]] = { x: X, y: sy, prem }; k++;
     }
   }
-  cush.count = head.count = cover.count = k; back.count = pad.count = k * 2; g.add(pad, cover);
+  cush.count = bk.count = sc.count = head.count = hdl.count = k; arm.count = pad.count = na;
+  for (const m of [cush, bk, sc, head]) if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  g.add(bk, sc, hdl, arm, pad);
   // the back of every seat: the tray table and its latch, the pocket, and on long-haul cabins the screen
   const longHaul = abreast >= 7 || /a350|b777|b787|b747/.test(s.cockpit);
   // the back of every seat: a light moulded shell with the screen (long haul) or a phone holder, the tray table
@@ -407,7 +463,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     M.compose(V(a.x + 0.37, a.y, zf + 0.8), qp, new T.Vector3(seatW * 0.82, 0.54, 1)); panel.setMatrixAt(t2++, M);   // just behind the shell
   }
   panel.count = t2; g.add(panel);
-  g.add(cush, back, head);
+  g.add(cush, head);
   // the passengers
   if (cabinPeopleOn() && list.length) { const pg = cabinPeople(list, seatAt, zf, V); g.add(pg); g.userData.people = pg; }
   g.userData.pax = { list: list.length, seated: list.filter(p => seatAt[p.seat]).length };
@@ -526,16 +582,18 @@ function v3dCabinFwdCam(P: any) {
   CabinLight.self.value = 0.7 * (1 - dim) + 0.07 * dim;
   const md = new T.Color(G.userData.crewAt ? G.userData.crewAt.mood : 0xBFD8FF);
   CabinLight.warm.value.setRGB(1 - dim * (1 - md.r * 0.75), 0.99 - dim * (1 - md.g * 0.7), 0.98 - dim * (1 - md.b * 0.95));
-  for (const gm of G.userData.glows || []) gm.color.setRGB(1, 1, 1).lerp(md.clone().multiplyScalar(0.55), dim);
+  // the white light lines are switched down at night, leaving a faint blue glow
+  for (const gm of G.userData.glows || []) gm.color.setRGB(1, 1, 1).lerp(new T.Color(0.1, 0.22, 0.6), Math.min(1, dim / 0.86));
   // the blue mood lighting stays on, a little softer at night
   for (const lm of G.userData.leds || []) lm.color.setRGB(0.18, 0.42, 1).multiplyScalar(1 - dim * 0.4);
-  for (const wm of G.userData.washes || []) wm.opacity = 0.8 * (1 - dim * 0.35);
+  cabinMoodLights(G, dim);
   if (Math.abs((G.userData.nightWas == null ? -1 : G.userData.nightWas) - dim) > 0.05) {
     G.userData.nightWas = dim;
     for (const rl of G.userData.rls || []) { const first = !rl.instanceColor; for (let i = 0; i < rl.count; i++) { const on = cloudHash(i, rl.count, 77) < 0.14 || dim < 0.3; rl.setColorAt(i, new T.Color(on ? 0xFFF1D6 : 0x3A3E46)); } if (rl.instanceColor) rl.instanceColor.needsUpdate = true; if (first) rl.material.needsUpdate = true; }
   }
   try { cabinCrewStep(P, G, night); } catch (e) { /* the crew stays where it is */ }
   try { const tn = performance.now() / 1000, CP: any = CabinPax; const dtp = Math.min(0.1, Math.max(0, tn - (CP.lastT || tn))); CP.lastT = tn; cabinPaxStep(P, G, dtp); } catch (e) { /* passengers stay where they are */ }
+  try { const CH: any = CabinHD, tn2 = performance.now() / 1000, dth = Math.min(0.1, Math.max(0, tn2 - (CH.lastT || tn2))); CH.lastT = tn2; cabinHdStep(G, dth); } catch (e) { /* the simple figures stay */ }
   if (G.userData.wins) { const k = Math.max(0.08, Math.min(1, amb)); G.userData.wins.material.color.setRGB(k * (1 - 0.6 * night), k * (1 - 0.5 * night), k); }
 }
 function v3dCabinFwdLeave(P: any) {
