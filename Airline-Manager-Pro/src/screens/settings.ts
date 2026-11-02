@@ -141,6 +141,8 @@ const SETTINGS: SetSection[] = [
     { type: 'choice', key: 'groundHandling', label: 'Apron crew: mechanics, drivers and baggage handlers', hint: 'Your hub and every other base always need your own apron crew: without ground crew there, no aircraft can be unloaded, loaded, fuelled or pushed back, so none can leave. Bases only: everywhere else the local handling company turns your aircraft round for a fee. Every airport: you can also keep your own apron crew at any airport you fly to. Co-pilots and cabin crew are always your own.', options: [['base', 'Bases only'], ['everywhere', 'Every airport']] },
     { type: 'group', title: 'Court' },
     { type: 'toggle', key: 'courtOn', label: 'Court hearings', hint: 'When an accident with deaths is blamed on how the airline is run (aircraft not serviced, mechanics underpaid, tired or not qualified), the airline goes to court and you answer the judge\'s questions in the courtroom, over a couple of days. Your answers affect your company rating. Off: the airline is never taken to court, and open hearings finish on their own.' },
+    { type: 'html', html: () => { const v = courtTruthLevel(); return `<div class="set-card col"><div class="sc-h">${icon('alert')}<span><b class="tr-h">Lies in court come out: ${COURT_TRUTH_NAMES[v]}</b><small>How likely it is that something untrue you say in court is found out: by the judge there and then, or later, when it leaks to the papers and you are charged with perjury.</small></span></div>
+      <input type="range" class="court-truth" min="0" max="3" step="1" value="${v}" aria-label="How likely lies in court come out"><div class="v3d-scale"><span>Never</span><span>Rarely</span><span>Sometimes</span><span>Often</span></div></div>`; } },
     { type: 'html', html: () => `<div class="set-card">${icon('shield')}<span><b>The courtroom</b><small>Walk into the courtroom any time. With no hearing on it is empty; during a hearing everyone is there.</small></span><button class="btn ghost sm" data-act="court-enter">Enter the courtroom</button></div>` },
     { type: 'group', title: 'Conduct' },
     { type: 'toggle', key: 'officeAutoVoice', label: 'Play answers aloud in the office', hint: 'When you call someone into your office over a conduct report, their answers play by themselves. Off: tap the play button to hear them.' },
@@ -598,3 +600,7 @@ ACTIONS['cab-opt'] = el => {
   if (v === 'auto') delete S[k]; else S[k] = v;
   Store.save(); Sound.tick(); rerenderSettingsBody();
 };
+
+// how likely lies in court come out: kept when let go
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('court-truth')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.tr-h'); if (h) h.textContent = 'Lies in court come out: ' + COURT_TRUTH_NAMES[+el.value]; });
+document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('court-truth')) return; (State.settings as any).courtTruth = +el.value; Store.save(); });

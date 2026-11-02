@@ -162,7 +162,7 @@ function courtAdvance() {
   const S: any = State; if (!S.cases) return;
   const conduct = conductOn();   // crew cases pause while conduct reports are switched off; the airline's follow Settings → Court
   if (conduct) try { courtReleases(); whistleAdvance(); } catch (e) { /* ignore */ }
-  try { hearingReminders(); hearingWatchDaily(); } catch (e) { /* ignore */ }
+  try { hearingReminders(); hearingWatchDaily(); courtLeakCheck(); } catch (e) { /* ignore */ }
   const now = Date.now(); let changed = false;
   for (const c of S.cases as CourtCase[]) {
     if (c.status !== 'open' && !(c as any).appealing) continue;

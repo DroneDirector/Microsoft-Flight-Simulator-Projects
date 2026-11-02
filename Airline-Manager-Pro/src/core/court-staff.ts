@@ -11,8 +11,19 @@
 //    evidence, or pressing hard); how they answer depends on the kind of person they are (honest, defensive,
 //    dismissive or lying, the same as in your office). A colleague is heard, both sides close, and you make
 //    your statement as the injured party: leniency, a fair hearing or the full penalty, and damages.
+//  - Lies have a way of coming out. Every answer you gave that wasn't true (an exaggeration, a denial the records
+//    contradict) may leak after the verdict, even if the court believed you: the papers have it, your company
+//    rating falls, a wrongful conviction is overturned and the employee compensated, and you are charged with
+//    perjury and stand trial yourself (the defendant's chair, your own lawyer, the same courtroom).
 //  - Then the verdict and the sentence, read out in court. They are suspended while the case runs. Found guilty,
 //    prison or a lost licence ends the job, otherwise you decide; acquitted, they come back to work.
+
+/** How likely lies in court come out (Settings → Court): never, rarely (the standard), sometimes, often. */
+const COURT_TRUTH_NAMES = ['Never', 'Rarely', 'Sometimes', 'Often'];
+function courtTruthLevel(): number { const v = (State.settings as any).courtTruth; return v == null ? 1 : clamp(Math.round(+v), 0, 3); }
+/** Caught out by the court there and then, and leaking later (each untrue answer). */
+function courtCatchP(): number { return [0, 0.15, 0.35, 0.6][courtTruthLevel()]; }
+function courtLeakP(): number { return [0, 0.1, 0.25, 0.45][courtTruthLevel()]; }
 
 /** The reports that can go to court: what the charge is and the range of sentences. */
 const COURT_REPORTABLE: { [title: string]: { charge: string; months: number[]; fine: number[]; licence?: boolean; damage?: number } } = {
@@ -113,7 +124,7 @@ function hearingScoreStaff(c: any, q: HearQ, kind: string, quiet?: boolean): { s
   switch (kind) {
     case 'honest': h.honest++; h.pAdj += q.truth ? 0.03 : 0.02; d = 0.6; break;
     case 'lie':   // an exaggeration or a denial the records contradict: found out more often than not
-      h.lies++; if (Math.random() < 0.65) { h.pAdj -= 0.12; d = -2; say = (q.after && q.after.caught) || 'That is not what the records show. The court will weigh your evidence accordingly.'; } else { h.pAdj += 0.02; d = -0.3; } break;
+      h.lies++; if (Math.random() < courtCatchP()) { h.pAdj -= 0.12; d = -2; say = (q.after && q.after.caught) || 'That is not what the records show. The court will weigh your evidence accordingly.'; } else { h.pAdj += 0.02; d = -0.3; } break;
     case 'deflect': h.pAdj -= 0.03; d = -0.3; break;
     case 'silent': d = 0; break;
     case 'sorry': h.plea = 'lenient'; h.sevK *= 0.8; d = 1; break;      // ask for leniency
@@ -182,11 +193,99 @@ function hearingScriptStaff(c: any, key: string): HearLine[] {
   return L;
 }
 
+/** The papers follow a case you brought: each day in court, and the verdict. */
+function newsStaffCase(c: any, what: string) {
+  const co: any = company(c.companyId), base = apt(co.hub), h = c.hear, me: any = myPilot(), you = me ? me.name : 'the airline\'s accountable manager', sp: any = staffById(c.staffId), rn = sp && ROLE_NAMES[personRole(sp)] ? ROLE_NAMES[personRole(sp)].toLowerCase() : 'employee';
+  const head = what === 'hear1' ? `${co.name} takes ${c.name} to court` : what === 'hear2' ? (h.caught ? `${c.name}'s story falls apart in court` : `${c.name} takes the stand`) : c.status === 'guilty' ? `${c.name} found guilty: ${c.offence.toLowerCase()}` : `${c.name} cleared in ${co.name} case`;
+  const stand = what === 'hear1' ? `${you} gave evidence against the ${rn} at ${c.court}.${h.lies ? ' Parts of the evidence were questioned.' : ''}`
+    : what === 'hear2' ? `${c.name} answered the airline's questions from the witness box.${h.caught ? ' The answers did not match the evidence.' : ''}` : c.status === 'guilty' ? `The court found ${c.name} guilty of ${c.charge.charAt(0).toLowerCase() + c.charge.slice(1)}. Sentence: ${c.sentence}.` : `The court found ${c.name} not guilty.`;
+  try { newsPublish({ paper: newsPaper(c.country), section: 'Courts', place: base ? base.city : '', headline: head, standfirst: stand, body: [c.summary, `The case was brought by ${co.name}.`], quote: [h.plea === 'full' ? 'The airline wanted the full penalty. It made that very clear.' : 'Both sides were heard. Now it is for the court.', 'A court reporter'], art: { kind: 'court' }, companyId: co.id } as any); } catch (e) { /* no paper today */ }
+}
 /** After the verdict of a case you brought: the job, the damages, the person back at work if acquitted. */
 function courtStaffAftermath(c: any, guilty: boolean) {
   const h = c.hear, co: any = company(c.companyId);   // the job itself is settled by courtAftermath
   if (guilty && h.claim && h.damage && co) payTxn(co.id, `Damages from ${c.name}: ${c.offence}`, h.damage, 'other', [[c.court, h.damage]]);
   State.notices.unshift({ id: uid(), kind: 'authority' as any, title: `Verdict: ${c.name}`, body: guilty ? `Guilty of ${c.charge.charAt(0).toLowerCase() + c.charge.slice(1)}. ${c.sentence}.` : `Not guilty. ${c.name} returns to work.`, time: 'Now', at: Date.now(), read: false, ref: c.id } as any);
+  newsStaffCase(c, 'verdict');
   h.verdictReady = true;
   try { toast('The verdict is in', 'warn', { label: 'Hear it in court', act: 'court-verdict', data: c.id }); } catch (e) { /* not ready */ }
+  // what you said that wasn't true may come out later, whatever the verdict
+  if (h.lies > 0 && Math.random() < 1 - Math.pow(1 - courtLeakP(), h.lies)) { c.leakAt = Date.now() + (24 + Math.random() * 72) * 3600e3; c.wasGuilty = guilty; }
+}
+
+/** Every so often: has a lie told in court come out? */
+function courtLeakCheck() {
+  const now = Date.now();
+  for (const c of ((State as any).cases || []) as any[]) if (c.leakAt && !c.leaked && now >= c.leakAt) { c.leaked = true; try { courtLeak(c); } catch (e) { /* next time */ } }
+}
+/** The truth comes out: in the papers, in your rating, for the employee, and a perjury case against you. */
+function courtLeak(c: any) {
+  const co: any = company(c.companyId), me: any = myPilot(), you = me ? me.name : 'The accountable manager', base = apt(co.hub), p: any = staffById(c.staffId);
+  const how = ['an internal email', 'a colleague who was in the meeting', 'the airline\'s own rosters and payroll', 'a recording of the meeting'][Math.floor(Math.random() * 4)];
+  co.reputation = Math.max(0, Math.round(((co.reputation || 50) - 10) * 10) / 10);
+  const S: any = State; S.popLog = S.popLog || []; S.popLog.unshift({ t: Date.now(), cid: co.id, d: -10, why: 'Lied in court about an employee', v: co.reputation });
+  let wronged = '';
+  if (c.status === 'guilty') {
+    // the conviction rested partly on what you said: overturned, and the airline pays
+    const pay = Math.round((40000 + Math.random() * 160000) / 1000) * 1000;
+    c.status = 'acquitted'; c.quashed = true; c.sentence = '';
+    payTxn(co.id, `Compensation to ${c.name} after a wrongful conviction`, -pay, 'fees', [[c.court, -pay]]);
+    if (p && p.suspended) { p.suspended = ''; p.status = 'standby'; }
+    wronged = ` ${c.name}'s conviction has been overturned, and the airline pays ${money(pay)} in compensation.`;
+  }
+  State.notices.unshift({ id: uid(), kind: 'authority' as any, title: 'Your evidence in court has come out', body: `${how.charAt(0).toUpperCase() + how.slice(1)} shows that parts of what you told ${c.court} about ${c.name} were not true.${wronged} The prosecutor has opened a perjury investigation against you.`, time: 'Now', at: Date.now(), read: false, ref: c.id } as any);
+  try { newsPublish({ paper: newsPaper(c.country), section: 'Courts', place: base ? base.city : '', headline: `${co.name} boss lied in court to convict an employee`, standfirst: `${how.charAt(0).toUpperCase() + how.slice(1)} contradicts the evidence ${you} gave against ${c.name}.${wronged}`, body: [`The case of ${c.name}, charged with ${c.charge.charAt(0).toLowerCase() + c.charge.slice(1)}, was heard at ${c.court}.`, `Parts of the airline's evidence have now been shown to be untrue. The prosecutor is investigating ${you} for perjury.`],
+    quote: ['Nobody is above the law, including the people who run airlines.', 'A legal commentator'], art: { kind: 'court' }, companyId: co.id } as any); } catch (e) { /* no paper today */ }
+  openPerjuryCase(c);
+  try { Sound.chime(); toast('Your evidence in court has come out', 'warn', { label: 'Open', act: 'open-notice', data: State.notices[0].id }); renderTopbar(); } catch (e) { /* not ready */ }
+  Store.save();
+}
+/** The case against you: perjury and a false accusation. One day in court, then the verdict. */
+function openPerjuryCase(c0: any) {
+  const me: any = myPilot(), now = Date.now(), H1 = 3600e3;
+  const c: any = {
+    id: 'case-' + uid(), staffId: 'you', name: me ? me.name : 'The accountable manager', role: 'airline', look: me ? me.look : null, companyId: c0.companyId,
+    offence: 'Lied under oath to convict an employee', charge: `Perjury and making a false accusation against ${c0.name}`, summary: `In the trial of ${c0.name}, the airline's accountable manager gave evidence that has since been shown to be untrue.`,
+    country: c0.country, court: c0.court, authority: c0.authority, opened: now, status: 'open', guiltyP: 0.7, fatal: false, reg: '',
+    offDef: { w: 0, title: 'Lied under oath to convict an employee', charge: 'Perjury', text: '', months: [0, 8], fine: [10000, 80000] },
+    stages: [
+      { at: now, key: 'arrest', title: 'Perjury investigation', text: `The police have opened a perjury investigation against you over your evidence in the trial of ${c0.name}.` },
+      { at: now + 20 * H1, key: 'charge', title: 'Charged', text: `The prosecutor has charged you with perjury and making a false accusation against ${c0.name}.` },
+      { at: now + 44 * H1, key: 'hear1', title: 'Your trial: perjury', text: '' },
+      { at: now + 66 * H1, key: 'verdict', title: 'Verdict', text: '' },
+    ],
+  };
+  try { courtSetup(c); } catch (e) { /* the basic case still runs */ }
+  c.stages = c.stages.filter((s: any) => s.key !== 'report'); c.rec = undefined;
+  c.hear = { kind: 'perjury', from: c0.id, facts: {}, pAdj: 0, sevK: 1, lies: 0, honest: 0, absent: 0, rating: 0, standIn: null, log: [] as string[], appealAdj: 0, said: (c0.hear.log || []).filter((x: string) => /:lie$/.test(x)).map((x: string) => x.split(':')[0]) };
+  const S: any = State; S.cases = S.cases || []; S.cases.unshift(c);
+  courtNotice(c, c.stages[0]);
+  return c;
+}
+/** Your own trial for perjury: the transcript, the evidence against it, and the questions. */
+function hearingScriptPerjury(c: any, key: string): HearLine[] {
+  const h = c.hear, c0: any = ((State as any).cases || []).filter((x: any) => x.id === h.from)[0] || {}, co = company(c.companyId), me: any = myPilot(), you = me ? me.name : 'the accountable manager';
+  const said: { [k: string]: string } = { tell: 'that the employee had been careless for a long time and everybody knew it', short: 'that the airline was fully staffed and paid well', talked: 'that you had a long talk with the employee before going to the police' };
+  const lines = (h.said || []).map((k: string) => said[k]).filter(Boolean);
+  const L: HearLine[] = [];
+  if (key === 'hear1') {
+    L.push({ who: 'clerk', text: `All rise. ${c.court.replace(/^the /, 'The ')} is in session. The prosecution against ${you}, accountable manager of ${co.name}.` });
+    L.push({ who: 'judge', text: `Please be seated. ${you}, you are charged with perjury and with making a false accusation against ${c0.name || 'an employee'}. You will be asked questions. Answer them truthfully.` });
+    L.push({ who: 'prosecutor', text: 'Exhibit one: the transcript of the defendant\'s evidence in the earlier trial.', ex: { title: 'Exhibit 1 · Transcript of your evidence', rows: lines.length ? lines.map((t: string, i: number) => [`Statement ${i + 1}`, `You told the court ${t}.`] as [string, string]) : [['Statement', 'Evidence the records contradict']] } });
+    L.push({ who: 'prosecutor', text: 'Exhibit two: the records that show otherwise.', ex: { title: 'Exhibit 2 · The records', rows: [['Conduct report', c0.summary || '—'], ['Rosters and payroll', 'As kept by the airline'], ['Meetings', 'As recorded in the airline\'s own calendar and emails']] } });
+    L.push({ who: 'judge', text: '', q: { id: 'pj-true', asker: 'judge', truth: true, text: `${you}, was everything you told the court in the trial of ${c0.name || 'your employee'} true?`,
+      opts: [{ t: 'No. I said things that weren\'t true. I wanted it to go our way, and I was wrong.', kind: 'honest' }, { t: 'Yes. Everything I said was true.', kind: 'lie' }, { t: 'I gave my evidence as I remembered it.', kind: 'deflect' }],
+      after: { honest: 'The court notes your admission.', lie: 'The exhibits before the court say otherwise. The court notes it.', deflect: 'Your memory does not explain the records.' } } });
+    L.push({ who: 'prosecutor', text: '', q: { id: 'pj-why', asker: 'prosecutor', truth: true, text: `Why did you say it? Did you want ${c0.name || 'the employee'} convicted, whatever the truth?`,
+      opts: [{ t: `I'm sorry. ${c0.name || 'They'} didn't deserve that, and the airline will put it right.`, kind: 'sorry' }, { t: 'I was protecting my airline.', kind: 'defend' }, { t: 'I have nothing to add.', kind: 'silent' }],
+      after: { sorry: 'The court notes it.', defend: 'Protecting your airline does not include lying to a court.', silent: '' } } });
+    L.push({ who: 'judge', text: '', q: { id: 'plea', asker: 'judge', truth: true, decision: true, text: 'How do you plead?', opts: [{ t: 'Guilty.', kind: 'plea' }, { t: 'Not guilty.', kind: 'noplea' }], after: { plea: 'The court records a guilty plea.', noplea: 'The court records a plea of not guilty.' } } });
+    L.push({ who: 'judge', text: 'The court will give its verdict at the next sitting. The court is adjourned.' });
+  } else if (key === 'verdict') {
+    const guilty = c.status === 'guilty';
+    L.push({ who: 'clerk', text: 'All rise. The court is in session for the verdict.' });
+    L.push({ who: 'judge', text: guilty ? `Please be seated. ${you}, the court finds you guilty of perjury and of making a false accusation. The sentence is ${c.sentence}.` : `Please be seated. ${you}, the court finds you not guilty.` });
+    L.push({ who: 'judge', text: 'The case is closed. The court is adjourned.' });
+  }
+  return L;
 }

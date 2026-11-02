@@ -556,7 +556,7 @@ function ctCast(c: any, st: any, judges: number, q: number) {
     const yl = me && me.look ? Object.assign({}, me.look, { civil: true, top: 'jacket', uniform: 2, hat: 'none', neck: me.look.sex === 'f' ? 'open' : 'tie', bottom: 'trousers' }) : ctLook('you', 'm', 'counsel');
     P('you', A.seats.def[1], yl, 'exec', me ? me.name : 'You', `Accountable manager, ${co.name}`, yl.sex || 'm');
     const lw = mk('law-' + c.id); P('lawyer', A.seats.def[0], ctLook('law-' + c.id, lw.sex as any, 'counsel'), 'exec', lw.name, 'Your lawyer', lw.sex);
-    const fl = mk('fam-' + c.id); P('famlawyer', A.seats.fam, ctLook('fam-' + c.id, fl.sex as any, 'counsel'), 'exec', fl.name, 'Counsel for the families', fl.sex);
+    const fl = mk('fam-' + c.id); P('famlawyer', A.seats.fam, ctLook('fam-' + c.id, fl.sex as any, 'counsel'), 'exec', fl.name, c.hear && c.hear.kind === 'perjury' ? 'Counsel for the wronged employee' : 'Counsel for the families', fl.sex);
     // the witnesses take the stand one at a time
     if (st.key === 'hear2') {
       const mechs: any[] = staffOf(c.companyId, 'mech'), chief: any = mechs.slice().sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))[0];
@@ -570,7 +570,7 @@ function ctCast(c: any, st: any, judges: number, q: number) {
   // the relatives in the front row, the press at the back, the public between
   const pub = A.seats.pub as any[], nPub = [8, 11, 15, 20][q] || 11;
   const front = pub.filter(s => s.row === 0 && s.side < 0).slice(1, 5), press = pub.filter(s => s.row === 6 && s.side > 0).slice(0, 2);
-  const rel = mk('rel-' + c.id + 0, 0.55); if (!staffCase || c.fatal) front.forEach((s, i) => { const r2 = i ? mk('rel-' + c.id + i, 0.55) : rel; P(i ? 'relative' + i : 'relative', s, ctLook('rel-' + c.id + i, r2.sex as any, 'mourn'), 'exec', r2.name, 'Relative of a victim', r2.sex); });
+  const rel = mk('rel-' + c.id + 0, 0.55); if ((!staffCase || c.fatal) && !(c.hear && c.hear.kind === 'perjury')) front.forEach((s, i) => { const r2 = i ? mk('rel-' + c.id + i, 0.55) : rel; P(i ? 'relative' + i : 'relative', s, ctLook('rel-' + c.id + i, r2.sex as any, 'mourn'), 'exec', r2.name, 'Relative of a victim', r2.sex); });
   press.forEach((s, i) => { const p = mk('press-' + c.id + i); P('press' + i, s, ctLook('press-' + c.id + i, p.sex as any, 'public'), 'exec', p.name, 'Press', p.sex); });
   const r = ctRng(seedOf(c.id + st.key)), free = pub.filter(s => front.indexOf(s) < 0 && press.indexOf(s) < 0 && !(s.row === 0 && s.side < 0)), used: any = {};
   for (let i = 0; i < nPub && free.length; i++) { let k = Math.floor(r() * free.length); let tries = 0; while ((used[k] || used[k - 1] || used[k + 1]) && tries++ < 20) k = Math.floor(r() * free.length); used[k] = 1; const p = mk('pub-' + c.id + st.key + i); P('pub' + i, free[k], ctLook('pub-' + c.id + st.key + i, p.sex as any, 'public'), 'exec', p.name, 'Public', p.sex, { crowd: true }); }

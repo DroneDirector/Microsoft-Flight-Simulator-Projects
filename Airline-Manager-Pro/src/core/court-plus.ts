@@ -60,7 +60,7 @@ function courtDecide(c: any): { guilty: boolean; r: CourtResult } {
   let p = c.guiltyP;
   p += ({ none: 0.05, basic: 0, good: -0.08, top: -0.15 } as any)[ch.lawyer] || 0;
   if (ch.stance === 'evidence') p += 0.07;
-  if (c.role === 'airline') {
+  if (c.role === 'airline' && !(c.hear && c.hear.kind === 'perjury')) {
     if (ch.stance === 'cooperate') p -= 0.05; if (ch.acted) p -= 0.1;
     // your record as the accountable manager
     try { if (groupPayRatio(c.companyId, 'mech').ratio < 0.9) p += 0.1; } catch (e) { /* ignore */ }
