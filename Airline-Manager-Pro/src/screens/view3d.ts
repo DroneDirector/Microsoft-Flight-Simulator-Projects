@@ -185,6 +185,29 @@ function v3dSize() {
   V3d.cam.aspect = w / h; V3d.cam.updateProjectionMatrix();
 }
 
+/** Floatplanes with wheels in their floats (amphibians): 1 = wheels down, landing on or rolling along a runway at a land
+ *  airport; 0 = wheels up, for water (a seaplane base, a water runway, or no runway near) and in cruise. */
+function v3dAmphibWheels(g: any, w: any, ph: string): number {
+  const near = /final|landing|touchdown|flare|approach|roll|taxi|take-?off|lift-?off|gate|parked|boarding|pushback/.test(ph) || w.onGround;
+  if (!near) return 0;
+  const A = apt(g.from), B = g.to && !g.noDest ? apt(g.to) : null;
+  const dA = A ? gcDistanceNm([w.lon, w.lat], A.pos) : 1e9, dB = B ? gcDistanceNm([w.lon, w.lat], B.pos) : 1e9;
+  const icao = /final|landing|touchdown|flare|approach/.test(ph) ? (B ? g.to : g.from) : dA <= dB ? g.from : g.to;
+  return v3dWaterAt(icao, w.lat, w.lon) ? 0 : 1;
+}
+/** Is the place this aircraft lands on (or stands on) water? The nearest runway of the airport's layout decides (a
+ *  water runway, or none within 3 km); without a layout, a seaplane base is water. */
+function v3dWaterAt(icao: string, lat: number, lon: number): boolean {
+  const L: any = (typeof AirportLayouts !== 'undefined' && AirportLayouts.cache[String(icao || '').toUpperCase()]) || null;
+  if (L && L.runways && L.runways.length) {
+    let best: any = null, bd = 1e9;
+    for (const r of L.runways) { const d = gcDistanceNm([lon, lat], [r.lon, r.lat]) * 1852; if (d < bd) { bd = d; best = r; } }
+    if (best && bd < 3000) return best.surf === 9;
+  }
+  const W: any = typeof World !== 'undefined' ? World.get(icao) : null;
+  return !!(W && W.size === 3);
+}
+
 /** Drag to look around, pinch or scroll to zoom, tap an aircraft for its flight. */
 function v3dBind() {
   const cv = V3d.cv; cv.style.touchAction = 'none';
@@ -687,7 +710,9 @@ function v3dLoop(now: number) {
     // failures and emergencies: an engine on fire, a stopped engine, fire crews on the runway, the tow in
     let fireI = -1, outI = -1, feI: any = null;
     try { const FF: any = g; feI = FF.depAt && !FF.real && !FF.you ? flightEl(FF, Date.now()) : null; fireI = engineFire(FF, feI ? feI.el : undefined); outI = engineOut(FF, feI ? feI.el : undefined); } catch (e) { /* none */ }
-    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI } as any);
+    // floatplanes with wheels in their floats: wheels down to land on a runway (and on it), up for water
+    const PA: any = P; if (s.gear && s.gear.floats) { const wantA = v3dAmphibWheels(g, w, ph); PA.amph = PA.amph == null ? wantA : PA.amph + (wantA - PA.amph) * Math.min(1, dt * 0.6); }
+    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI, amphib: PA.amph } as any);
     try { v3dEmergencyStep(P, g, fireI, feI, now, ground, w); } catch (e) { /* no effects */ }
     // the air blown forward out of the open reversers kicks up spray and dust from the runway
     if (PR.rev > 0.6 && now - (PR.revAt || 0) > 90) {
@@ -711,6 +736,7 @@ function v3dLoop(now: number) {
     let tm = [0, 0, 0, 0];
     if (!w.onGround) { try { tm = v3dTurbMotion(P, v3dTurbAt(P, w.lon, w.lat, w.altM / 0.3048, (w.altM - ground) / 0.3048, !!g.you), now / 1000); } catch (e) { /* calm */ } }
     P.model.position.y += tm[0];
+    if (PA.amph && P.model.userData.body && P.model.userData.body.userData.ampLift) P.model.position.y += P.model.userData.body.userData.ampLift * PG.gw;   // standing on the wheels below the floats
     P.model.rotateZ(-(P.pitch + tm[2]) * D2R);   // nose up
     P.model.rotateX(-(P.bank + tm[1]) * D2R);   // a turn to the right lowers the right wing
     (P.model.userData as any).flex = tm[3] * Math.max(0.5, shapeOf(P.type).span / 30);
