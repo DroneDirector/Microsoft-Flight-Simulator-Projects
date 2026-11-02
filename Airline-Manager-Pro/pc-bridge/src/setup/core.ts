@@ -228,12 +228,20 @@ export async function uninstall(o: RemoveOpts, report: (p: Progress) => void): P
 /** The folder (and the program still running from it) goes once this program has closed. */
 export function removeFolderAfterExit(dir: string) {
   if (process.platform !== 'win32') { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* gone */ } return; }
-  const bat = path.join(os.tmpdir(), 'amp-remove-' + process.pid + '.cmd');
-  // (a pause with ping: "timeout" doesn't wait in a window-less command; Windows lets go of a program's own file
-  // a moment after it closes, so the folder is tried again for up to a minute)
-  fs.writeFileSync(bat, ['@echo off', ':wait', `tasklist /FI "PID eq ${process.pid}" 2>nul | find "${process.pid}" >nul && (ping -n 2 127.0.0.1 >nul & goto wait)`,
-    'cd /d "%TEMP%"', 'set /a n=0', ':again', `rmdir /s /q "${dir}" 2>nul`, `if exist "${dir}" (set /a n+=1 & ping -n 2 127.0.0.1 >nul & if %n% lss 60 goto again)`, '(goto) 2>nul & del "%~f0"', ''].join('\r\n'));
-  const ch = spawn('cmd.exe', ['/c', bat], { detached: true, stdio: 'ignore', windowsHide: true }); ch.unref();
+  // a hidden PowerShell: waits for this program to close, then removes the folder, trying again every second for a
+  // minute (Windows lets go of a program's own file a moment after it closes); what it did goes to amp-remove.log
+  const script = [
+    "$ErrorActionPreference = 'SilentlyContinue'",
+    "$log = Join-Path $env:TEMP 'amp-remove.log'",
+    "Add-Content $log ((Get-Date -Format o) + ' waiting for ' + $env:AMP_PID)",
+    "Wait-Process -Id ([int]$env:AMP_PID) -Timeout 120",
+    "Set-Location $env:TEMP",
+    "for ($i = 0; $i -lt 60 -and (Test-Path -LiteralPath $env:AMP_DIR); $i++) { Remove-Item -LiteralPath $env:AMP_DIR -Recurse -Force; if (Test-Path -LiteralPath $env:AMP_DIR) { Start-Sleep -Seconds 1 } }",
+    "Add-Content $log ((Get-Date -Format o) + ' ' + $env:AMP_DIR + ' gone: ' + (-not (Test-Path -LiteralPath $env:AMP_DIR)) + ' after ' + $i + ' tries')",
+  ].join('; ');
+  const ch = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-Command', script],
+    { detached: true, stdio: 'ignore', windowsHide: true, cwd: os.tmpdir(), env: Object.assign({}, process.env, { AMP_PID: String(process.pid), AMP_DIR: dir }) });
+  ch.unref();
 }
 
 /** Run this Setup again with administrator rights (for Program Files and other protected folders). */

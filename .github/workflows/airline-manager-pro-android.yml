@@ -128,7 +128,8 @@ jobs:
           Write-Output "3. Removing it"
           $code = RunIt (Join-Path $dir "AirlineManagerPro-PC.exe") @("--uninstall","--silent"); Write-Output "Uninstall answered $code"
           for ($i = 0; $i -lt 30 -and (Test-Path $dir); $i++) { Start-Sleep -Seconds 1 }
-          if (Test-Path $dir) { Write-Output "The folder is still there:"; Get-ChildItem -Recurse $dir | Select-Object -First 10 FullName; exit 1 }
+          Get-Content (Join-Path $env:TEMP "amp-remove.log") -ErrorAction SilentlyContinue
+          if (Test-Path $dir) { Write-Output "The folder is still there:"; Get-ChildItem -Recurse -Force $dir | Select-Object -First 10 FullName; exit 1 }
           if (Test-Path (Join-Path $desk "Airline Manager Pro.lnk")) { Write-Output "The shortcut is still there"; exit 1 }
           if (Test-Path $key) { Write-Output "The Apps entry is still there"; exit 1 }
           if (-not (Test-Path $chosen)) { Write-Output "The chosen folder itself was removed (it must stay)"; exit 1 }

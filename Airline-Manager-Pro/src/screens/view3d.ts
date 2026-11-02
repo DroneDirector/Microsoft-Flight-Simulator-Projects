@@ -54,7 +54,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null; V3d.shown = 0;   // the loading bar starts from nothing every time
   v3dCrashGuard(true);
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
-  V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
+  V3d.open = true; V3d.target = id; (V3d as any).camBase = null; (V3d as any).lastF = null; (V3d as any).lastW = null; (V3d as any).parkedAt = 0; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = id.indexOf('apt:') === 0 ? 'free' : 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0; (V3d as any).fc = null; (V3d as any).fcStart = id.indexOf('apt:') === 0;
   const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
@@ -143,6 +143,7 @@ ACTIONS['v3d-close'] = () => {
 };
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
+  if (/^(tower|fwd|cabin|winL|winR)$/.test(V3d.mode)) { V3d.yaw = 0; V3d.pitch = 0; }   // these start looking the natural way
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
   V3d.root.classList.toggle('v3d-free', V3d.mode === 'free'); V3d.root.classList.toggle('v3d-win', /^win/.test(V3d.mode)); V3d.root.classList.toggle('v3d-walk', V3d.mode === 'walk'); V3d.root.classList.toggle('v3d-inside', V3d.mode === 'cabin' || V3d.mode === 'walk' || /^win/.test(V3d.mode)); if (V3d.mode === 'walk') cabinWalkStart(); else cabinWalkStop();
@@ -536,9 +537,15 @@ function v3dLoop(now: number) {
   if (document.hidden || now - V3d.last < 1000 / (gameBoost() ? 60 : V3D_FPS) - 2) return;
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
   V3d.frames = (V3d.frames || 0) + 1;   // counted for the Game Booster's frame-rate chart
-  const T = THREE, f: any = v3dAptOnly() || v3dTargetFlight();
+  const T = THREE, VK: any = V3d;
+  let f: any = v3dAptOnly() || v3dTargetFlight();
+  // the flight has ended: the aircraft stays where it parked and every camera, drag and the controller still work
+  if (f) { VK.lastF = f; VK.parkedAt = 0; }
+  else if (VK.lastF && VK.lastF.id === V3d.target && VK.lastW) { f = VK.lastF; if (!VK.parkedAt) { VK.parkedAt = now; const st = V3d.root.querySelector('.v3d-status'); if (st) st.textContent = 'Parked: this flight has ended'; } }
   if (!f) { const st = V3d.root.querySelector('.v3d-status'); if (st) st.textContent = 'This flight has ended'; V3d.r.render(V3d.scene, V3d.cam); return; }
-  const w0 = v3dWhere(f);
+  const parked = !!VK.parkedAt;
+  const w0 = parked ? Object.assign({}, VK.lastW, { onGround: true, phase: 'parked', vs: 0, turn: 0 }) : v3dWhere(f);
+  if (!parked) VK.lastW = w0;
   // the centre: follow the aircraft to the next airport, or move with it over open country
   const ctr = v3dCentre(f, [w0.lon, w0.lat]);
   if (V3d.mode === 'free' && V3d.origin) v3dFreeRecentre();
@@ -552,7 +559,7 @@ function v3dLoop(now: number) {
   // other airlines' aircraft: only those near enough and in front of the camera are drawn
   const tfc = Traffic.live(), fr = new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(V3d.cam.projectionMatrix, V3d.cam.matrixWorldInverse));
   const tfcNear = tfc.filter((g: any) => { const a = apt(g.from), b = apt(g.to); if (!a || !b || !V3d.origin) return false; const pp = flightPathPos(g); if (!pp) return false; g._ll = pp.pos; return gcDistanceNm(V3d.origin, pp.pos) < 24; });
-  for (const g of (State.live as any[]).concat(tfcNear)) {
+  for (const g of (State.live as any[]).concat(tfcNear, parked ? [f] : [])) {
     const w = g.id === f.id ? w0 : v3dWhere(g);
     const q = v3dXY(w.lon, w.lat); if (Math.hypot(q[0], q[1]) > 40000 && g.id !== f.id) continue;
     if ((g as any).tfc) {
@@ -726,7 +733,7 @@ function v3dLoop(now: number) {
       const body = P.model.userData.body, eye = new T.Vector3(-0.6, s.ground + s.h * 0.78, 0);   // just ahead of the windscreen
       P.model.updateMatrixWorld(); body.updateMatrixWorld();
       const at = body.localToWorld(eye.clone()), q = P.model.getWorldQuaternion(new T.Quaternion());
-      const yaw = clamp(V3d.yaw, -2.4, 2.4), pit = clamp(V3d.pitch, -0.8, 0.8);
+      const yaw = V3d.yaw, pit = clamp(V3d.pitch, -1.2, 1.0);   // all the way round
       const dir = new T.Vector3(-Math.cos(pit) * Math.cos(yaw), Math.sin(pit), Math.cos(pit) * Math.sin(yaw)).applyQuaternion(q);
       const up = new T.Vector3(0, 1, 0).applyQuaternion(q);
       V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
@@ -737,6 +744,11 @@ function v3dLoop(now: number) {
       const want = V3d.dist ? centre.clone().add(tw.clone().sub(centre).normalize().multiplyScalar(V3d.dist)) : tw;
       V3d.cam.position.lerp(want, Math.min(1, dt * 3));
       V3d.cam.lookAt(centre);
+      if (V3d.yaw || V3d.pitch) {   // looking about from the tower: all the way round, up and down
+        const dirT = centre.clone().sub(V3d.cam.position).normalize().applyAxisAngle(new T.Vector3(0, 1, 0), -V3d.yaw);
+        const sideT = new T.Vector3().crossVectors(dirT, new T.Vector3(0, 1, 0)).normalize(); dirT.applyAxisAngle(sideT, clamp(V3d.pitch, -1.2, 1.2));
+        V3d.cam.lookAt(V3d.cam.position.clone().add(dirT));
+      }
       const d = V3d.cam.position.distanceTo(centre);
       V3d.cam.fov = clamp(2 * Math.atan(s.span * 2.2 / d) / D2R, 3, 55); V3d.cam.updateProjectionMatrix();
     } else {

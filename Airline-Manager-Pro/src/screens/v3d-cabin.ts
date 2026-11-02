@@ -149,7 +149,7 @@ function v3dCabinCam(P: any, mode: string) {
   // a small look around within the window (drag), back to the wing tip on its own
   const q = P.model.getWorldQuaternion(new T.Quaternion()), up = new T.Vector3(0, 1, 0).applyQuaternion(q);
   const dir = to.clone().sub(at).normalize(), side = new T.Vector3().crossVectors(dir, up).normalize();
-  const yaw = clamp(V3d.yaw, -0.35, 0.35), pit = clamp(V3d.pitch, -0.3, 0.3);
+  const yaw = clamp(V3d.yaw, -0.6, 0.6), pit = clamp(V3d.pitch, -0.45, 0.45);   // out of the window: as far as it shows
   dir.applyAxisAngle(up, -yaw).applyAxisAngle(side, pit);
   V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
   if (V3d.cam.fov !== 62 || V3d.cam.near > 0.03) { V3d.cam.fov = 62; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
@@ -686,7 +686,7 @@ function v3dCabinFwdCam(P: any) {
   else {
     const e = G.userData.eye, l = G.userData.look, at = body.localToWorld(_av(e[0], e[1], e[2])), to = body.localToWorld(_av(l[0], l[1], l[2]));
     const dir = to.clone().sub(at).normalize(), side = new T.Vector3().crossVectors(dir, up).normalize();
-    dir.applyAxisAngle(up, -clamp(V3d.yaw, -0.9, 0.9)).applyAxisAngle(side, clamp(V3d.pitch, -0.4, 0.3));
+    dir.applyAxisAngle(up, -V3d.yaw).applyAxisAngle(side, clamp(V3d.pitch, -0.9, 0.6));   // look all the way round the cabin
     V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
   }
   if (V3d.cam.fov !== 70 || V3d.cam.near > 0.03) { V3d.cam.fov = 70; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
