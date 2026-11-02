@@ -21,6 +21,20 @@ function weatherChip(f: LiveFlight): string {
     <b>${String(Math.round(w.windDir)).padStart(3, '0')}° ${w.windKt} kt, ${vis}, ${w.tempC}°C</b><small>${sky}, ${turb}, QNH ${w.qnhHpa}</small></span></div>`;
 }
 
+/** The flight card made small (or full size again): on the map, the Overview and in the 3D view, all at once.
+ *  It shrinks downwards and stays where it is (its bottom edge doesn't move); it can still be dragged. */
+ACTIONS['fc-min'] = () => {
+  const S: any = State.settings; S.fcMini = !S.fcMini; Store.save(); Sound.tick();
+  document.querySelectorAll('.flight-card').forEach((c: Element) => {
+    const box = (c.closest('.sel-pop') || c).parentElement as HTMLElement, b0 = c.getBoundingClientRect().bottom;
+    c.classList.toggle('mini', !!S.fcMini);
+    if (!box || !c.closest('.sel-pop')) return;
+    const b1 = c.getBoundingClientRect().bottom, m = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(box.style.transform || ''), x = m ? +m[1] : 0, y = m ? +m[2] : 0;
+    box.style.transform = `translate(${x}px, ${y + (b0 - b1)}px)`;
+  });
+  try { if (typeof V3d !== 'undefined' && V3d.open && V3d.root) { V3d.root.classList.toggle('v3d-mini', !!S.fcMini); v3dShowInfo(); } } catch (e) { /* not open */ }
+};
+
 function flightCard(f: LiveFlight): string {
   const a = plane(f.reg), t = acType(a.typeId), A = apt(f.from), B = apt(f.to);
   const dist = A && B ? gcDistanceNm(A.pos, B.pos) : 0;
@@ -31,8 +45,12 @@ function flightCard(f: LiveFlight): string {
   const altTxt = f.alt < 50 ? 'Ground' : f.alt < 18000 ? num(Math.round(f.alt / 100) * 100) + ' ft' : 'FL' + Math.round(f.alt / 100);
   const fuelOk = (State as any).myLoad.fuelKg >= (State as any).myLoad.tripFuelKg + (State as any).myLoad.reserveKg;
   return `
-  <div class="card flight-card" data-fc="${esc(f.id)}">
-    <div class="fc-top"><span class="fc-cs">${esc(f.callsign)}</span>${liveChip(f.reg, 'flying')}<span class="fc-ac">${esc(f.reg)}, ${esc(t.model)}</span></div>
+  <div class="card flight-card ${(State.settings as any).fcMini ? 'mini' : ''}" data-fc="${esc(f.id)}">
+    <div class="fc-mini"><span class="fc-cs">${esc(f.callsign)}</span>
+      <span><small>Arrives in</small><b>${arrivesIn(f)}</b></span><span><small>Remaining</small><b>${f.noDest ? '—' : num(left) + ' nm'}</b></span>
+      <span><small>Altitude</small><b>${altTxt}</b></span><span><small>Ground speed</small><b>${f.gs ? num(f.gs) + ' kt' : '—'}</b></span>
+      <button class="icon-btn fc-min" data-act="fc-min" aria-label="Show all the details" title="Show all the details">${icon('down', 'flip-v')}</button></div>
+    <div class="fc-top"><span class="fc-cs">${esc(f.callsign)}</span>${liveChip(f.reg, 'flying')}<span class="fc-ac">${esc(f.reg)}, ${esc(t.model)}</span><button class="icon-btn fc-min" data-act="fc-min" aria-label="Minimise" title="Minimise">${icon('down')}</button></div>
     <div class="fc-route">
       <div><b>${esc(f.from)}</b><small>${esc(A.city)}</small></div>
       <div class="fc-track"><i class="fc-fill" style="width:${(f.t * 100).toFixed(1)}%"></i><i class="fc-plane" style="left:${(f.t * 100).toFixed(1)}%">${icon('fleet')}</i></div>

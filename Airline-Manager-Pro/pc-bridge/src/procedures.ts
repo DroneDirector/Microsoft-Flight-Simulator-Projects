@@ -7,6 +7,7 @@
 // how legs are put under the right transition.
 
 import { EventEmitter } from 'events';
+import { nextRequestId } from './reqid';
 
 export interface ProcLeg { t: number; fix: string; lat: number; lon: number; alt: number; crs: number; dist: number; turn: number; arcLat?: number; arcLon?: number; reg?: string }
 export interface ProcTransition { name: string; rwy?: string; legs: ProcLeg[] }
@@ -23,7 +24,7 @@ function str(v: any): string { return String(v || '').replace(/\0.*$/, '').trim(
 
 export class ProcReader extends EventEmitter {
   private defined = false;
-  private nextReq = 7400;
+ 
   private pending: { [req: number]: { icao: string; out: AirportProcedures; byId: { [id: number]: any }; last: any; lastProc: any; lastTrans: any; done: (p: AirportProcedures | null, err?: string) => void; timer: any } } = {};
   private cache: { [icao: string]: AirportProcedures } = {};
 
@@ -61,7 +62,7 @@ export class ProcReader extends EventEmitter {
     if (this.cache[icao]) return Promise.resolve(this.cache[icao]);
     return new Promise((resolve, reject) => {
       try { this.define(); } catch (e) { return reject(new Error('This version of the simulator can\'t give procedures')); }
-      const req = this.nextReq++;
+      const req = nextRequestId();
       const out: AirportProcedures = { icao, lat: 0, lon: 0, sids: [], stars: [], apps: [] };
       const done = (res: AirportProcedures | null, err?: string) => { const p = this.pending[req]; if (p) clearTimeout(p.timer); delete this.pending[req]; if (res) { this.cache[icao] = res; resolve(res); } else reject(new Error(err || 'No procedures')); };
       this.pending[req] = { icao, out, byId: {}, last: null, lastProc: null, lastTrans: null, done, timer: setTimeout(() => done(out.sids.length || out.stars.length || out.apps.length ? out : null, 'The simulator didn\'t answer'), 20000) };

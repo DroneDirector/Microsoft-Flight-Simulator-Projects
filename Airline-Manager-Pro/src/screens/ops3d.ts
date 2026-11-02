@@ -207,7 +207,7 @@ function opsOpen2(root: HTMLElement, q: number) {
       scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
     } catch (e) { /* no reflections */ }
     ctProgress(35, 'Filling the archive…', R);
-    R.A = opsBuild(scene, q);
+    R.A = opsBuild(scene, q); R.glow = new AimGlow(scene);
     ctProgress(65, 'Loading the schedule…', R);
     opsMonitorDraw();
     const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
@@ -216,7 +216,7 @@ function opsOpen2(root: HTMLElement, q: number) {
     R.look = { yaw: 0, pitch: -0.16 };
     let drag: any = null, moved = 0;
     cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* none */ } });
-    cv.addEventListener('pointermove', e => { if (drag) { moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = clamp(drag.yaw - (e.clientX - drag.x) * 0.004, -2.4, 2.4); R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.1, 0.8); } else opsHover(e); });
+    cv.addEventListener('pointermove', e => { if (drag) { moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.1, 0.8); } else opsHover(e); });
     cv.addEventListener('pointerup', e => { if (drag && moved < 6) opsClickAt(e); drag = null; });
     root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-op]') as HTMLElement; if (b) opsClick(b); });
     R.key$ = (e: KeyboardEvent) => {
@@ -245,7 +245,7 @@ function opsOpen2(root: HTMLElement, q: number) {
 function opsFrame() {
   const R = OpsRoom, T = THREE, now = performance.now() / 1000, dt = Math.min(0.05, now - (R.last || now)); R.last = now;
   const k = R.keys || {};
-  if (k.arrowleft) R.look.yaw = clamp(R.look.yaw + dt * 1.4, -2.4, 2.4); if (k.arrowright) R.look.yaw = clamp(R.look.yaw - dt * 1.4, -2.4, 2.4);
+  if (k.arrowleft) R.look.yaw += dt * 1.4; if (k.arrowright) R.look.yaw -= dt * 1.4;   // the chair turns all the way round
   if (k.arrowup) R.look.pitch = clamp(R.look.pitch + dt, -1.1, 0.8); if (k.arrowdown) R.look.pitch = clamp(R.look.pitch - dt, -1.1, 0.8);
   // the view eases to where you look (a button below turns you to the monitor or the archives)
   if (R.aim) { R.look.yaw += (R.aim.yaw - R.look.yaw) * Math.min(1, dt * 4); R.look.pitch += (R.aim.pitch - R.look.pitch) * Math.min(1, dt * 4); if (Math.abs(R.aim.yaw - R.look.yaw) < 0.005) R.aim = null; }
@@ -254,6 +254,7 @@ function opsFrame() {
   R.cam.position.set(0, 1.2 - 0.075 * ze, 0.76 - 0.5 * ze);
   const yaw = Math.PI + R.look.yaw * (1 - ze), p = R.look.pitch * (1 - ze) + 0.0 * ze;
   R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
+  if (R.glow) { if (R.overlay || R.zoomAnim) R.glow.hide(); R.glow.step(dt); }
   if (R.A && R.A.monScr) R.A.monScr.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, zk * 1.4)));   // the screen lights up as it opens
   R.ren.render(R.scene, R.cam);
 }
@@ -263,8 +264,12 @@ function opsAimed(e: PointerEvent): string {
   const h = R.A ? rc.intersectObjects(R.A.hits, false)[0] : null; return h ? h.object.userData.act : '';
 }
 function opsHover(e: PointerEvent) {
-  const R = OpsRoom; if (R.loading || R.overlay || !DESKTOP) return;
-  const a = opsAimed(e), cv = R.root.querySelector('canvas') as HTMLElement; cv.style.cursor = a ? 'pointer' : '';
+  const R = OpsRoom; if (R.loading || R.overlay) return;
+  const T = THREE, rc = new T.Raycaster(), r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect();
+  rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam);
+  const h = R.A ? rc.intersectObjects(R.A.hits, false)[0] : null, cv = R.root.querySelector('canvas') as HTMLElement;
+  cv.style.cursor = h ? 'pointer' : '';
+  if (R.glow) { if (h) R.glow.showObj(h.object); else R.glow.hide(); }   // what you can use glows softly under the mouse
 }
 function opsClickAt(e: PointerEvent) {
   const R = OpsRoom; if (R.loading || R.overlay) return;
@@ -365,7 +370,7 @@ OpsRoom.close = function (quiet?: boolean) {
   const R = OpsRoom; if (!R.on) return; R.on = false;
   R.overlay = null; document.body.classList.remove('of-over');
   cancelAnimationFrame(R.raf); clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
-  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null;
+  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null; R.glow = null;
   R.root.remove();
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };

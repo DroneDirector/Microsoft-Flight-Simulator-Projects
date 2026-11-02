@@ -139,6 +139,7 @@
     "src/screens/v3d-cabincrew.ts",
     "src/screens/v3d-walk.ts",
     "src/screens/v3d-cabinpax.ts",
+    "src/graphics/aim.ts",
     "src/screens/court3d.ts",
     "src/screens/office3d.ts",
     "src/screens/ops3d.ts",

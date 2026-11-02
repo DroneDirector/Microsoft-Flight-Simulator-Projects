@@ -372,21 +372,27 @@ function ofOpen2(root: HTMLElement, q: number) {
     scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
   } catch (e) { /* no reflections */ }
   ctProgress(15, 'Arranging the desk…', R);
-  const A = ofBuild(scene, q); R.A = A;
+  const A = ofBuild(scene, q); R.A = A; R.glow = new AimGlow(scene);
   ctProgress(40, 'Hanging the pictures…', R);
   const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
   fit(); R.fit = fit; window.addEventListener('resize', fit);
   // looking: drag (or the mouse once the view has it on the PC), the arrow keys in the chair
   R.look = { yaw: 0, pitch: -0.08 }; R.seat = true; R.free = { x: 0, z: 0.98, v: 0, bob: 0 };
-  let drag: any = null, moved = 0;
-  cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; cv.setPointerCapture(e.pointerId); });
+  let drag: any = null, moved = 0, justLocked = false;
+  cv.addEventListener('pointerdown', e => {
+    // walking on the PC: the view takes the mouse (no pointer, turn as far as you like); a click then uses what glows
+    if (!R.seat && DESKTOP && e.pointerType === 'mouse') { drag = null; if (!aimLocked(cv)) { justLocked = true; aimLock(cv); } return; }
+    drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; cv.setPointerCapture(e.pointerId); });
+  R.mm$ = (e: MouseEvent) => { if (R.on && !R.seat && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
+  document.addEventListener('mousemove', R.mm$);
   cv.addEventListener('pointermove', e => { if (!drag) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); });
-  cv.addEventListener('pointerup', e => { if (drag && moved < 6) ofClickAt(e); drag = null; });
+  cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else ofClickAt(); return; } justLocked = false; if (drag && moved < 6) ofClickAt(e); drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); });
   R.key$ = (e: KeyboardEvent) => {
     if (!R.on) return; const k = e.key.toLowerCase();
     if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); ofPlannerClose(); } return; }   // the planner has the keys (typing)
-    if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); ofLeave(); return; }
+    if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; ofLeave(); return; }   // the first Esc only gives the mouse back
+    if (k === 'h' && !R.seat) { e.preventDefault(); R.root.classList.toggle('ui-off'); return; }   // walking: hide or show the controls
     if (/^(w|a|s|d|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
   };
   R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; };
@@ -429,7 +435,7 @@ OfficeRoom.close = function (quiet?: boolean) {
   const R = OfficeRoom; if (!R.on) return; R.on = false;
   R.overlay = null; document.body.classList.remove('of-over');
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
-  try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* none */ }
+  document.removeEventListener('mousemove', R.mm$); aimUnlock(); R.glow = null;
   try { Voice.stop(); } catch (e) { /* ignore */ }
   exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null;
   R.root.remove(); R.vis = null;
@@ -626,6 +632,7 @@ function ofFrame() {
     const k = R.keys || {}; if (k.arrowleft) R.look.yaw = clamp(R.look.yaw + dt * 1.4, -2.6, 2.6); if (k.arrowright) R.look.yaw = clamp(R.look.yaw - dt * 1.4, -2.6, 2.6); if (k.arrowup) R.look.pitch = clamp(R.look.pitch + dt, -1.25, 0.9); if (k.arrowdown) R.look.pitch = clamp(R.look.pitch - dt, -1.25, 0.9);
     const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
   } else ofWalk(dt);
+  if (R.glow) { if (R.seat) R.glow.hide(); R.glow.step(dt); }
   R.ren.render(R.scene, R.cam);
 }
 function ofBlocked(x: number, z: number): boolean {
@@ -644,22 +651,25 @@ function ofWalk(dt: number) {
   R.cam.position.set(F.x, 1.64 + Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1), F.z);
   const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p))));
   // what's in front of you: the chair (sit) or the door (leave)
-  const aim = R.root.querySelector('.of-aim') as HTMLElement, hint = ofAimed();
-  if (aim) { aim.hidden = false; aim.textContent = hint === 'sit' ? 'Click to sit in your chair' : hint === 'door' ? 'Click the door to leave the office' : '+'; aim.classList.toggle('on', !!hint); }
+  const aim = R.root.querySelector('.of-aim') as HTMLElement, obj = ofAimedObj(), hint = obj ? obj.userData.act : '';
+  if (R.glow) { if (obj) R.glow.showObj(obj); else R.glow.hide(); }   // what you can use glows softly
+  if (aim) { aim.hidden = false; aim.textContent = hint === 'sit' ? 'Click to sit in your chair' : hint === 'door' ? 'Click the door to leave the office' : '·'; aim.classList.toggle('on', !!hint); }
 }
-function ofAimed(e?: PointerEvent): string {
+function ofAimed(e?: PointerEvent): string { const o = ofAimedObj(e); return o ? o.userData.act : ''; }
+/** What you can use at the mouse (or, walking, at the dot in the middle), within reach. */
+function ofAimedObj(e?: PointerEvent): any {
   const R = OfficeRoom, T = THREE, rc = new T.Raycaster();
-  if (e) { const r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect(); rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam); }
+  if (e && !aimLocked()) { const r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect(); rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam); }
   else rc.setFromCamera(new T.Vector2(0, 0), R.cam);
   const h = rc.intersectObjects(R.A.hits, false)[0];
-  return h && h.distance < 2.6 ? h.object.userData.act : '';
+  return h && h.distance < 2.6 ? h.object : null;
 }
-function ofClickAt(e: PointerEvent) {
+function ofClickAt(e?: PointerEvent) {
   const R = OfficeRoom; if (R.seat || R.loading) return;
   const a = ofAimed(e) || ofAimed();
   if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); R.doorT = 1; setTimeout(() => ofExitToMain(), 650); }
 }
-function ofSit() { const R = OfficeRoom; R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = true; ofVisitUi(); Sound.tick(); }
+function ofSit() { aimUnlock(); const R = OfficeRoom; R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = true; ofVisitUi(); Sound.tick(); }
 function ofPad() {
   const R = OfficeRoom, pad = R.root.querySelector('.ct-pad') as HTMLElement; if (!pad) return;
   const knob = pad.firstElementChild as HTMLElement; let id = -1;
@@ -680,7 +690,7 @@ function ofVisitUi(afterInterview?: boolean) {
   const nRep = ofOpenReports().length;
   sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['planner', 'Flight planner'], ['schedule', 'Schedule'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
   pad.hidden = R.seat;
-  if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · drag to look · click your chair to sit · click the door to leave' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
+  if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · the mouse looks around, all the way round · click what glows · H hides the controls · Esc for the menu' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
   else hint.hidden = true;
   ofFit();
 }
@@ -738,9 +748,10 @@ function ofSpot(k: string) {
   if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
   if (k === 'planner' || k === 'schedule') { Sound.tick(); ofScreenOpen(k); return; }
   const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true;
+  if (k !== 'free') aimUnlock();
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
   else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
-  else if (k === 'free') { R.seat = false; R.free = { x: 0.9, z: 1.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.05 }; }
+  else if (k === 'free') { R.seat = false; R.free = { x: 0.9, z: 1.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.05 }; aimLock(R.root.querySelector('canvas') as HTMLElement); }
   else { R.seat = false; const S: any = { paint: [-1.4, 0.4, Math.PI / 2 - 0.05, 0.05], window: [1.6, -0.4, -Math.PI / 2, -0.04], map: [0, -2.1, 0, 0.08] }[k]; R.free = { x: S[0], z: S[1], v: 0, bob: 0 }; R.look = { yaw: S[2], pitch: S[3] }; }
   ofVisitUi(true);
   const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = R.seat;

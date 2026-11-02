@@ -7,6 +7,7 @@
 // the order it is defined, one message per airport, runway, taxi point, stand, taxi path and taxi name.
 
 import { EventEmitter } from 'events';
+import { nextRequestId } from './reqid';
 
 export interface AirportLayout {
   icao: string; name: string; lat: number; lon: number; alt: number; magvar: number;
@@ -26,7 +27,7 @@ const DESIGNATOR = ['', 'L', 'R', 'C', 'W', 'A', 'B', ''];
 
 export class LayoutReader extends EventEmitter {
   private defined = false;
-  private nextReq = 7200;
+ 
   private pending: { [req: number]: { icao: string; l: AirportLayout; done: (l: AirportLayout | null, err?: string) => void; timer: any } } = {};
   private cache: { [icao: string]: AirportLayout } = {};
 
@@ -55,7 +56,7 @@ export class LayoutReader extends EventEmitter {
     if (this.cache[icao]) return Promise.resolve(this.cache[icao]);
     return new Promise((resolve, reject) => {
       try { this.define(); } catch (e) { return reject(new Error('This version of the simulator can\'t give airport layouts')); }
-      const req = this.nextReq++;
+      const req = nextRequestId();
       const l: AirportLayout = { icao, name: '', lat: 0, lon: 0, alt: 0, magvar: 0, runways: [], points: [], parks: [], paths: [], names: [] };
       const done = (res: AirportLayout | null, err?: string) => { clearTimeout(this.pending[req] && this.pending[req].timer); delete this.pending[req]; if (res) { this.cache[icao] = res; resolve(res); } else reject(new Error(err || 'No layout')); };
       this.pending[req] = { icao, l, done, timer: setTimeout(() => done(l.lat || l.runways.length ? l : null, 'The simulator didn\'t answer'), 15000) };

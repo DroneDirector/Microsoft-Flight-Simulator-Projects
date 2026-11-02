@@ -54,9 +54,9 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null; V3d.shown = 0;   // the loading bar starts from nothing every time
   v3dCrashGuard(true);
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
-  V3d.open = true; V3d.target = id; (V3d as any).camBase = null; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
+  V3d.open = true; V3d.target = id; (V3d as any).camBase = null; (V3d as any).lastF = null; (V3d as any).lastW = null; (V3d as any).parkedAt = 0; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = id.indexOf('apt:') === 0 ? 'free' : 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0; (V3d as any).fc = null; (V3d as any).fcStart = id.indexOf('apt:') === 0;
-  const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
+  const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '') + ((State.settings as any).fcMini ? ' v3d-mini' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
       <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['cabin', 'Cabin'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera'], ['walk', 'Walk']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
@@ -66,6 +66,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-info"></div>
     <div class="v3d-line"></div>
     <div class="v3d-status"></div>
+    <button class="v3d-uitog" data-act="v3d-ui" aria-label="Hide or show the controls" title="Hide or show the controls (H)">${icon('focus')}<span>Hide controls</span></button>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
     <div class="v3d-free-ui">
       <div class="fc-stick" data-fc="stick"><i></i><small>Move</small></div>
@@ -141,8 +142,23 @@ ACTIONS['v3d-close'] = () => {
     { pct: 85, step: free ? 'Loading the Overview…' : 'Loading the map…', run: () => { if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } else { try { refresh(); } catch (e) { /* ignore */ } } } },
   ]);
 };
+/** Walking and the free camera: the controls can be hidden for a clean view (the button, H, or R3 on a controller). */
+function v3dUi(show?: boolean) {
+  const r = V3d.root; if (!r) return;
+  const on = show == null ? r.classList.contains('ui-off') : show;
+  r.classList.toggle('ui-off', !on);
+  const b = r.querySelector('.v3d-uitog span'); if (b) b.textContent = on ? 'Hide controls' : 'Show controls';
+}
+ACTIONS['v3d-ui'] = () => { Sound.tick(); v3dUi(); };
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (!V3d.open || !/^(walk|free)$/.test(V3d.mode) || e.key.toLowerCase() !== 'h' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target as HTMLElement; if (t && t.closest && t.closest('input, textarea, [contenteditable]')) return;
+  e.preventDefault(); v3dUi();
+});
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
+  if (V3d.root) { V3d.root.setAttribute('data-m', V3d.mode); if (!/^(walk|free)$/.test(V3d.mode)) v3dUi(true); }
+  if (/^(tower|fwd|cabin|winL|winR)$/.test(V3d.mode)) { V3d.yaw = 0; V3d.pitch = 0; }   // these start looking the natural way
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
   V3d.root.classList.toggle('v3d-free', V3d.mode === 'free'); V3d.root.classList.toggle('v3d-win', /^win/.test(V3d.mode)); V3d.root.classList.toggle('v3d-walk', V3d.mode === 'walk'); V3d.root.classList.toggle('v3d-inside', V3d.mode === 'cabin' || V3d.mode === 'walk' || /^win/.test(V3d.mode)); if (V3d.mode === 'walk') cabinWalkStart(); else cabinWalkStop();
@@ -213,6 +229,7 @@ function v3dBind() {
 function v3dDist(): number { const p = V3d.planes[V3d.target]; const span = p ? shapeOf(p.type).span : 35; return V3d.dist || (V3d.mode === 'tower' ? 0 : span * 1.9 + 25); }
 
 function v3dTap(x: number, y: number) {
+  if (aimLocked(V3d.cv)) { x = innerWidth / 2; y = innerHeight / 2; }   // walking with the mouse taken: what is at the dot in the middle
   if (V3d.mode === 'cabin' || V3d.mode === 'walk') { try { if (cabinTap(x, y)) return; } catch (e) { /* the aircraft below */ } }
   const T = THREE, ray = new T.Raycaster(), v = new T.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
   ray.setFromCamera(v, V3d.cam);
@@ -245,7 +262,7 @@ function v3dLineHtml(f: LiveFlight): string {
   return `<span class="vl-cs">${esc(f.callsign)}</span>
     <span class="vl-route"><b>${esc(f.from)}</b><i class="vl-track"><i class="vl-fill" style="width:${(f.t * 100).toFixed(1)}%"></i><i class="vl-plane" style="left:${(f.t * 100).toFixed(1)}%">${icon('fleet')}</i></i><b>${f.noDest ? '—' : esc(f.to)}</b></span>
     ${it('Phase', esc(f.phase), 'vl-ph')}${it('Altitude', altTxt)}${it('Speed', f.gs ? num(f.gs) + ' kt' : '—', 'vl-opt')}${it('Remaining', f.noDest ? '—' : num(left) + ' nm', 'vl-opt')}${it('Arrives in', arrivesIn(f))}
-    <span class="vl-btns"><button class="icon-btn" data-act="pax-list" data-id="${esc(f.id)}" aria-label="Passenger list" title="Passenger list">${icon('pax')}</button><button class="icon-btn" data-act="loadsheet" data-id="${esc(f.id)}" aria-label="Loadsheet" title="Loadsheet">${icon('fuel')}</button></span>`;
+    <span class="vl-btns"><button class="icon-btn vl-full" data-act="fc-min" aria-label="Show all the details" title="Show all the details">${icon('down', 'flip-v')}</button><button class="icon-btn" data-act="pax-list" data-id="${esc(f.id)}" aria-label="Passenger list" title="Passenger list">${icon('pax')}</button><button class="icon-btn" data-act="loadsheet" data-id="${esc(f.id)}" aria-label="Loadsheet" title="Loadsheet">${icon('fuel')}</button></span>`;
 }
 
 /* ---------- positions ---------- */
@@ -356,7 +373,8 @@ function v3dBuildingTextures(): any {
 
 function v3dBuildAirport(L: AirportLayout) {
   const T = THREE, g = new T.Group(), e = L.alt || 0;
-  (V3d as any).lastL = L;
+  v3dNoteSwitch(L);
+  (V3d as any).lastL = L; (V3d as any).lastLAt = Date.now();
   const loc = (x: number, y: number) => { const ll = [L.lon + x / (111320 * Math.cos(L.lat * D2R)), L.lat + y / 110540]; return v3dXY(ll[0], ll[1]); };
   // the ground's height where it is known (the terrain may still be loading: then the airport's elevation)
   const gy = (x: number, z: number) => { if (!V3dTerrain.rings.length) return e; const ll = v3dLonLat(x, z); return V3dTerrain.ground(ll[0], ll[1]) - v3dCurve(x, z); };
@@ -491,6 +509,23 @@ function airportSheet(L: AirportLayout, loc: (x: number, y: number) => number[],
   return m;
 }
 
+/** The airport you are looking at was drawn again from a different layout (a better one arrived, or it was
+ *  wrong): APT-02 in Settings > Updates and errors, with what was shown before and after, ready to copy. */
+function v3dNoteSwitch(L: AirportLayout) {
+  const VP: any = V3d, P: AirportLayout = VP.lastL;
+  if (!P || !L || P === L || String(P.icao) !== String(L.icao) || !V3d.airport) return;
+  const shownS = (Date.now() - (VP.lastLAt || Date.now())) / 1000;
+  if (shownS < 2) return;   // replaced before it was really seen
+  const sig = (x: AirportLayout) => `${x.source}${x.gen ? ' (taxiways laid out from the runways)' : ''}, "${x.name || ''}", ${(x.runways || []).length} runways (${(x.runways || []).map(r => `${r.a}/${r.b}`).join(', ')}), ${(x.parks || []).length} stands, ${(x.areas || []).filter(a => a.k === 'terminal').length} terminal buildings`;
+  const a: any = apt(L.icao), f: any = (() => { try { return v3dAptOnly() || v3dTargetFlight(); } catch (e) { return null; } })();
+  let where = ''; try { const w = f ? v3dWhere(f) : null; if (w && a) where = `${(gcDistanceNm([w.lon, w.lat], a.pos)).toFixed(1)} nm from the airport, ${Math.round(w.altM * 3.281)} ft, ${w.onGround ? 'on the ground' : 'flying'} (${w.phase || ''})`; } catch (e) { /* unknown */ }
+  try {
+    ErrorLog.add('3d', `APT-02 · ${a ? a.name : L.icao}: the airport changed while in view`,
+      `${L.icao} was shown for ${Math.round(shownS)} s with ${P.source === 'runways' ? 'a layout made from its runways only' : P.source === 'osm' ? 'the OpenStreetMap layout' : 'Flight Simulator\'s layout'}, then drawn again with ${L.source === 'sim' ? 'Flight Simulator\'s layout' : L.source === 'osm' ? 'the OpenStreetMap layout' : 'its runways only'}.`,
+      [`Code: APT-02 (airport layout replaced while shown)`, `Airport: ${L.icao}`, `Before: ${sig(P)}`, `After: ${sig(L)}`, `Shown for: ${shownS.toFixed(1)} s`, f ? `Flight: ${f.code || f.id} ${f.from}-${f.to}, ${where}` : '', `View: ${V3d.mode}`, `App ${APP.version}, linked: ${Link.status}`].filter(Boolean).join('\n'));
+  } catch (e) { /* no log */ }
+}
+
 /** Centre the view on an airport (its layout, its aircraft on the ground) or on open country. */
 function v3dRecentre(f: LiveFlight, w: { lon: number; lat: number }) {
   const ctr = v3dCentre(f, [w.lon, w.lat]);
@@ -517,9 +552,16 @@ function v3dLoop(now: number) {
   if (document.hidden || now - V3d.last < 1000 / (gameBoost() ? 60 : V3D_FPS) - 2) return;
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
   V3d.frames = (V3d.frames || 0) + 1;   // counted for the Game Booster's frame-rate chart
-  const T = THREE, f: any = v3dAptOnly() || v3dTargetFlight();
+  if (V3d.root && V3d.root.getAttribute('data-m') !== V3d.mode) { V3d.root.setAttribute('data-m', V3d.mode); if (!/^(walk|free)$/.test(V3d.mode)) v3dUi(true); }
+  const T = THREE, VK: any = V3d;
+  let f: any = v3dAptOnly() || v3dTargetFlight();
+  // the flight has ended: the aircraft stays where it parked and every camera, drag and the controller still work
+  if (f) { VK.lastF = f; VK.parkedAt = 0; }
+  else if (VK.lastF && VK.lastF.id === V3d.target && VK.lastW) { f = VK.lastF; if (!VK.parkedAt) { VK.parkedAt = now; const st = V3d.root.querySelector('.v3d-status'); if (st) st.textContent = 'Parked: this flight has ended'; } }
   if (!f) { const st = V3d.root.querySelector('.v3d-status'); if (st) st.textContent = 'This flight has ended'; V3d.r.render(V3d.scene, V3d.cam); return; }
-  const w0 = v3dWhere(f);
+  const parked = !!VK.parkedAt;
+  const w0 = parked ? Object.assign({}, VK.lastW, { onGround: true, phase: 'parked', vs: 0, turn: 0 }) : v3dWhere(f);
+  if (!parked) VK.lastW = w0;
   // the centre: follow the aircraft to the next airport, or move with it over open country
   const ctr = v3dCentre(f, [w0.lon, w0.lat]);
   if (V3d.mode === 'free' && V3d.origin) v3dFreeRecentre();
@@ -533,7 +575,7 @@ function v3dLoop(now: number) {
   // other airlines' aircraft: only those near enough and in front of the camera are drawn
   const tfc = Traffic.live(), fr = new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(V3d.cam.projectionMatrix, V3d.cam.matrixWorldInverse));
   const tfcNear = tfc.filter((g: any) => { const a = apt(g.from), b = apt(g.to); if (!a || !b || !V3d.origin) return false; const pp = flightPathPos(g); if (!pp) return false; g._ll = pp.pos; return gcDistanceNm(V3d.origin, pp.pos) < 24; });
-  for (const g of (State.live as any[]).concat(tfcNear)) {
+  for (const g of (State.live as any[]).concat(tfcNear, parked ? [f] : [])) {
     const w = g.id === f.id ? w0 : v3dWhere(g);
     const q = v3dXY(w.lon, w.lat); if (Math.hypot(q[0], q[1]) > 40000 && g.id !== f.id) continue;
     if ((g as any).tfc) {
@@ -564,15 +606,22 @@ function v3dLoop(now: number) {
     // flights the app flies itself keep clear of high ground: never lower than about 1,000 ft over the terrain
     // under them and just ahead, except close to the airports, where they are on the runway's own path
     // (your flight in the simulator is shown exactly where the simulator has it)
-    if (!w.onGround && !(g as any).real && V3dTerrain.rings.length) {
+    if (!(g as any).real && V3dTerrain.rings.length) {
       const PT: any = P; let lift = 0;
-      try {
-        const h = w.hdg, here = [w.lon, w.lat], T0 = Math.max(v3dGround(w.lon, w.lat), ...[0.8, 1.6, 2.4].map(nm => { const a = geoDest(here, h, nm); return v3dGround(a[0], a[1]); }));
+      if (!w.onGround) try {
+        const h = w.hdg, here = [w.lon, w.lat];
         const ap = [g.from, g.to].map(k => { const a = apt(k); return a && a.pos ? gcDistanceNm(here, a.pos) : 99; }), dA = Math.min(ap[0], ap[1]);
-        const clear = 300 * clamp((dA - 1.5) / 4, 0, 1) + 60;
-        lift = Math.max(0, T0 + clear - y);
+        // away from the airports: the ground under them and up to 2.4 nm ahead; within 6 nm of an airport only the
+        // ground right under them (the hills beside and beyond the runway must not hold an aircraft up on final),
+        // and the margin fades away to nothing on final so it follows the runway's own approach path down
+        const ahead = dA < 6 ? [] : [0.8, 1.6, 2.4];
+        const T0 = Math.max(v3dGround(w.lon, w.lat), ...ahead.map(nm => { const a = geoDest(here, h, nm); return v3dGround(a[0], a[1]); }));
+        const clear = dA < 6 ? 60 * clamp((dA - 2) / 4, 0, 1) : 300 * clamp((dA - 1.5) / 4, 0, 1) + 60;
+        lift = clear > 0 ? Math.max(0, T0 + clear - y) : 0;
       } catch (e) { /* no terrain here */ }
-      PT.lift = (PT.lift || 0) + (lift - (PT.lift || 0)) * Math.min(1, (typeof dt === 'number' ? dt : 0.05) * 1.2);
+      // eased both ways: what is left at touchdown goes in a second or two, never in one step
+      PT.lift = (PT.lift || 0) + (lift - (PT.lift || 0)) * Math.min(1, (typeof dt === 'number' ? dt : 0.05) * (lift > (PT.lift || 0) ? 1.2 : 1.6));
+      if (PT.lift < 0.05) PT.lift = 0;
       y += PT.lift;
     }
     P.tgt.set(q[0], y - v3dCurve(q[0], q[1]), q[1]);
@@ -707,7 +756,7 @@ function v3dLoop(now: number) {
       const body = P.model.userData.body, eye = new T.Vector3(-0.6, s.ground + s.h * 0.78, 0);   // just ahead of the windscreen
       P.model.updateMatrixWorld(); body.updateMatrixWorld();
       const at = body.localToWorld(eye.clone()), q = P.model.getWorldQuaternion(new T.Quaternion());
-      const yaw = clamp(V3d.yaw, -2.4, 2.4), pit = clamp(V3d.pitch, -0.8, 0.8);
+      const yaw = V3d.yaw, pit = clamp(V3d.pitch, -1.2, 1.0);   // all the way round
       const dir = new T.Vector3(-Math.cos(pit) * Math.cos(yaw), Math.sin(pit), Math.cos(pit) * Math.sin(yaw)).applyQuaternion(q);
       const up = new T.Vector3(0, 1, 0).applyQuaternion(q);
       V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
@@ -718,6 +767,11 @@ function v3dLoop(now: number) {
       const want = V3d.dist ? centre.clone().add(tw.clone().sub(centre).normalize().multiplyScalar(V3d.dist)) : tw;
       V3d.cam.position.lerp(want, Math.min(1, dt * 3));
       V3d.cam.lookAt(centre);
+      if (V3d.yaw || V3d.pitch) {   // looking about from the tower: all the way round, up and down
+        const dirT = centre.clone().sub(V3d.cam.position).normalize().applyAxisAngle(new T.Vector3(0, 1, 0), -V3d.yaw);
+        const sideT = new T.Vector3().crossVectors(dirT, new T.Vector3(0, 1, 0)).normalize(); dirT.applyAxisAngle(sideT, clamp(V3d.pitch, -1.2, 1.2));
+        V3d.cam.lookAt(V3d.cam.position.clone().add(dirT));
+      }
       const d = V3d.cam.position.distanceTo(centre);
       V3d.cam.fov = clamp(2 * Math.atan(s.span * 2.2 / d) / D2R, 3, 55); V3d.cam.updateProjectionMatrix();
     } else {
@@ -773,7 +827,7 @@ function v3dLoop(now: number) {
 function v3dLonLat(x: number, z: number): number[] { const o = V3d.origin; return [o[0] + x / (111320 * Math.cos(o[1] * D2R)), o[1] - z / 110540]; }
 
 function v3dRefreshInfo(f: LiveFlight) {
-  const ln = V3d.root && V3d.root.querySelector('.v3d-line') as HTMLElement; if (ln && V3d.root.classList.contains('v3d-inside')) ln.innerHTML = v3dLineHtml(f);
+  const ln = V3d.root && V3d.root.querySelector('.v3d-line') as HTMLElement; if (ln && (V3d.root.classList.contains('v3d-inside') || V3d.root.classList.contains('v3d-mini'))) ln.innerHTML = v3dLineHtml(f);
   const box = V3d.root && V3d.root.querySelector('.v3d-info .sel-pop') as HTMLElement; if (!box) return;
   const card = box.querySelector('.flight-card'); if (!card) return;
   const tmp = document.createElement('div'); tmp.innerHTML = flightCard(f);
@@ -790,7 +844,7 @@ function v3dRefreshInfo(f: LiveFlight) {
   const off = (box: HTMLElement) => { const m = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(box.style.transform || ''); return m ? [+m[1], +m[2]] : [0, 0]; };
   document.addEventListener('pointerdown', e => {
     const t = e.target as HTMLElement;
-    const head = t && t.closest && t.closest('.sel-pop .fc-top, .sel-pop .fc-route') as HTMLElement;
+    const head = t && t.closest && t.closest('.sel-pop .fc-top, .sel-pop .fc-route, .sel-pop .fc-mini') as HTMLElement;
     if (!head || (t.closest('button') && !t.closest('.fc-top'))) return;
     const box = head.closest('.sel-pop').parentElement as HTMLElement; if (!box) return;
     const o = off(box);

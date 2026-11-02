@@ -149,7 +149,7 @@ function v3dCabinCam(P: any, mode: string) {
   // a small look around within the window (drag), back to the wing tip on its own
   const q = P.model.getWorldQuaternion(new T.Quaternion()), up = new T.Vector3(0, 1, 0).applyQuaternion(q);
   const dir = to.clone().sub(at).normalize(), side = new T.Vector3().crossVectors(dir, up).normalize();
-  const yaw = clamp(V3d.yaw, -0.35, 0.35), pit = clamp(V3d.pitch, -0.3, 0.3);
+  const yaw = clamp(V3d.yaw, -0.6, 0.6), pit = clamp(V3d.pitch, -0.45, 0.45);   // out of the window: as far as it shows
   dir.applyAxisAngle(up, -yaw).applyAxisAngle(side, pit);
   V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
   if (V3d.cam.fov !== 62 || V3d.cam.near > 0.03) { V3d.cam.fov = 62; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }
@@ -419,18 +419,24 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   if (st.bin !== 'none') for (const side of [-1, 1]) {
     // the bin: a big rounded door bulging into the cabin from the ceiling down to a lip over the seats
     const bh = binH * 1.2, bd = binD * 1.04, N = cabinQv([6, 12, 24, 48]), prof: number[][] = [];
+    // the bins' lower edge about 1.8 m above the floor (head room over the seats), lower in small cabins; they
+    // meet the wall where the curved wall is at that height
+    const zb = Math.min(zf + 1.8, zc + ri * 0.48), wallY = Math.min(ri * 0.9, Math.sqrt(Math.max(0.01, ri * ri - (zb - zc) * (zb - zc))) - 0.02);
+    // their top follows the ceiling, so they sit flush against it all along (no gap above them): the height of the
+    // ceiling over a point xp in from the wall, from the bins' lower edge
+    const ceilAt = (xp: number) => zc + Math.sqrt(Math.max(0.01, ri * ri - (wallY - xp) * (wallY - xp))) - zb - 0.006;
+    const hT = Math.max(bh + 0.05, ceilAt(bd * 0.32));   // where the door's sweep begins, up against the ceiling
     const bez = (p0: number[], p1: number[], p2: number[], p3: number[], m: number, first: boolean) => { for (let i = first ? 0 : 1; i <= m; i++) { const t = i / m, u = 1 - t; prof.push([u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0], u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]]); } };
     // up in the ceiling, then the door's long convex sweep down into the cabin, a rounded lip, and the flat underside back to the wall
-    bez([0, bh + 0.07], [bd * 0.12, bh + 0.07], [bd * 0.22, bh + 0.065], [bd * 0.32, bh + 0.05], Math.max(2, N >> 2), true);
-    bez([bd * 0.32, bh + 0.05], [bd * 0.78, bh * 0.98], [bd * 1.03, bh * 0.62], [bd, bh * 0.16], N, false);
+    { const n0 = Math.max(3, N >> 2); for (let i = 0; i <= n0; i++) { const xp = bd * 0.32 * i / n0; prof.push([xp, Math.max(bh + 0.05, ceilAt(xp))]); } }   // along the ceiling
+    const lift = hT - (bh + 0.05);   // the door is that much taller where the ceiling is higher (scaled, the same shape)
+    bez([bd * 0.32, hT], [bd * 0.78, bh * 0.98 + lift * 0.85], [bd * 1.03, bh * 0.62 + lift * 0.4], [bd, bh * 0.16], N, false);
     bez([bd, bh * 0.16], [bd * 0.995, bh * 0.04], [bd * 0.985, 0], [bd * 0.92, 0], Math.max(3, N >> 1), false);
     prof.push([bd * 0.5, 0], [0, 0]);
     const geo = cabinSweep(prof, len);
     const m = new T.Mesh(geo, mBin); mBin.side = T.DoubleSide; mBin.fog = false;
-    // the bins' lower edge about 1.8 m above the floor (head room over the seats), lower in small cabins; they
-    // meet the wall where the curved wall is at that height
-    const zb = Math.min(zf + 1.8, zc + ri * 0.48), wallY = Math.min(ri * 0.9, Math.sqrt(Math.max(0.01, ri * ri - (zb - zc) * (zb - zc))) - 0.02), Mb = new T.Matrix4().makeBasis(_av(0, -side, 0), new T.Vector3(0, 1, 0), new T.Vector3(1, 0, 0));
-    Mb.setPosition(V(x0, side * wallY, zb)); m.matrixAutoUpdate = false; m.matrix.copy(Mb); g.userData.bin = { zb, lip: wallY - bd };   // where the bins' lower edge is (for the seat placards)
+    const Mb = new T.Matrix4().makeBasis(_av(0, -side, 0), new T.Vector3(0, 1, 0), new T.Vector3(1, 0, 0));
+    Mb.setPosition(V(x0, side * wallY, zb)); m.matrixAutoUpdate = false; m.matrix.copy(Mb); g.userData.bin = { zb, lip: wallY - bd, top: zb + hT };   // where the bins' lower edge is (for the seat placards)
     g.add(m);
     // underneath: the grey passenger service panel, with a pair of reading lights and air vents over every row
     const psu = new T.Mesh(new T.BoxGeometry(len, 0.035, bd * 0.95), lam2(0xA4A9AF)); psu.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.475), zb)); g.add(psu);
@@ -452,7 +458,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     g.add(handles);
     // light: a bright line where the bin meets the ceiling, and one along the wall above the windows
     const glow = new T.MeshBasicMaterial({ color: 0xFFFFFF }); glow.userData.noDim = true; (g.userData.glows = g.userData.glows || []).push(glow);
-    const up = new T.Mesh(new T.BoxGeometry(len, 0.02, 0.05), glow); up.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.35), zb + bh + 0.06)); g.add(up);
+    const up = new T.Mesh(new T.BoxGeometry(len, 0.02, 0.05), glow); up.position.copy(V(x0 + len / 2, side * (wallY - bd * 0.36), zb + hT - 0.012)); g.add(up);
     // the blue mood lighting: a strip under the bins' lip and one along the wall above the windows, and its glow
     // washing down the wall below the bins
     const led = new T.MeshBasicMaterial({ color: 0x2E6BFF, toneMapped: false }); led.userData.noDim = true; (g.userData.leds = g.userData.leds || []).push(led);
@@ -463,7 +469,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     // from the lit ceiling, the bins' doors
     const L = (g.userData.lights = g.userData.lights || []);
     L.push({ kind: 'wall', a: V(x0 + 0.2, side * (wallY - 0.16), zb - 0.05), b: V(x1 - 0.2, side * (wallY - 0.16), zb - 0.05), d: _av(0, side * 0.62, -0.78).normalize(), r: 0.75, seg: 0 });
-    L.push({ kind: 'cove', a: V(x0 + 0.2, side * (wallY - bd - 0.04), zb + bh + 0.04), b: V(x1 - 0.2, side * (wallY - bd - 0.04), zb + bh + 0.04), d: _av(0, -side * 0.72, 0.69).normalize(), r: 1.1, seg: 1.52 });
+    L.push({ kind: 'cove', a: V(x0 + 0.2, side * (wallY - bd * 0.38), zb + hT - 0.03), b: V(x1 - 0.2, side * (wallY - bd * 0.38), zb + hT - 0.03), d: _av(0, -side * 0.72, 0.69).normalize(), r: 1.1, seg: 1.52 });
     const cy = Math.max(0.3, wallY - bd - 0.25), cz = zc + Math.sqrt(Math.max(0.01, ri * ri - cy * cy)) - 0.08;
     L.push({ kind: 'bins', a: V(x0 + 0.2, side * cy, cz), b: V(x1 - 0.2, side * cy, cz), d: _av(0, side * 0.86, -0.5).normalize(), r: 0.75, seg: 1.52 });
     if (side === -1) V3dCabin.mood = up;
@@ -686,7 +692,7 @@ function v3dCabinFwdCam(P: any) {
   else {
     const e = G.userData.eye, l = G.userData.look, at = body.localToWorld(_av(e[0], e[1], e[2])), to = body.localToWorld(_av(l[0], l[1], l[2]));
     const dir = to.clone().sub(at).normalize(), side = new T.Vector3().crossVectors(dir, up).normalize();
-    dir.applyAxisAngle(up, -clamp(V3d.yaw, -0.9, 0.9)).applyAxisAngle(side, clamp(V3d.pitch, -0.4, 0.3));
+    dir.applyAxisAngle(up, -V3d.yaw).applyAxisAngle(side, clamp(V3d.pitch, -0.9, 0.6));   // look all the way round the cabin
     V3d.cam.position.copy(at); V3d.cam.up.copy(up); V3d.cam.lookAt(at.clone().add(dir)); V3d.cam.up.set(0, 1, 0);
   }
   if (V3d.cam.fov !== 70 || V3d.cam.near > 0.03) { V3d.cam.fov = 70; (V3d as any).nearWas = (V3d as any).nearWas || V3d.cam.near; V3d.cam.near = 0.02; V3d.cam.updateProjectionMatrix(); }

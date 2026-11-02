@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.65 (2026-11-02)
+
+- PC Setup (own installer window: drive and folder, desktop shortcut replaced, Start menu, Apps entry, progress; uninstall removes everything incl. the folder), app icon on the programs
+- free mode: pointer lock, glow on usable objects, endless turning, hide/show controls; touchpad look in 3D and rooms; D-pad on sliders and lists
+- 3D: parked cameras after a flight ends, 360° look, approach lights everywhere, smooth final (no hill clearance near airports), simulator request ids shared, layouts checked (APT-01, APT-02), late layouts drawn; flight card minimise
+- cabin: bins flush with the ceiling, seated passengers on the cushion; premium imagery demo
+
 ## 0.9.64 (2026-11-02)
 
 - ops3d: monitor moved forward and desk folders moved clear of it; the screens grow out of the monitor's outline with a camera glide in (and back out on closing), flash on the monitor; tab fade; reduce motion respected

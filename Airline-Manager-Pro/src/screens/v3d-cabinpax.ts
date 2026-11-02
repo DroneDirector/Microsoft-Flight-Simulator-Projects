@@ -192,7 +192,7 @@ function cabinHdStep(G: any, dt: number) {
   for (const f of figs) {
     if (!f.hd) continue;
     const ps = f.pose || { x: f.at.x - 0.17, y: f.at.y, yaw: 0, k: 1, ph: 0, w: 0, a: 1 }, h = f.hd, m = h.m;
-    const k = ps.k, sk = k * k * (3 - 2 * k), top = m.top || 1.7, seatTop = zf + 0.585;   // on the cushion
+    const k = ps.k, sk = k * k * (3 - 2 * k), top = m.top || 1.7, seatTop = zf + 0.645;   // the hip joints a hand's width above the cushion (its top is 0.55 m up), so the thighs rest on it
     // the hips back into the seat when seated
     const hx = ps.x + ((f.at.x + 0.07) - ps.x) * sk;   // back in the seat, knees clear of the seat in front
     h.pivot.position.copy(_av(hx, ps.y, zf + sk * (seatTop - zf)));
@@ -202,6 +202,9 @@ function cabinHdStep(G: any, dt: number) {
     const tt = t + h.t0, walk = humanGesture({ kind: 'walk', v: 1 }, ps.ph / 5.65), sit = humanGesture({ kind: 'sit', v: 0 }, tt);
     let g = cabinLerpG(humanGesture(null, tt), walk, Math.min(1, ps.w || 0));
     g = cabinLerpG(g, sit, sk);
+    // in an aircraft seat: the thighs slope gently down over the front of the cushion and the shins go slightly
+    // forward to the floor, so knees, shins and feet stay clear of the seat (not straight out through its edge)
+    if (sk > 0 && g.legs) { const SEAT = [-1.36, 1.12, -1.36, 1.12]; g.legs = g.legs.map((v: number, i: number) => v + (SEAT[i] - (sit.legs ? sit.legs[i] : v)) * sk); }
     h.g = h.g ? cabinLerpG(h.g, g, Math.min(1, dt * 7)) : g;
     m.pose({ t: tt, yaw: 0, gaze: [Math.sin(tt * 0.27 + h.t0) * 0.3, 0], blink: (tt % 4.3) < 0.12 ? 1 : 0, g: h.g, talk: f.p ? cabinTalkJaw('pax:' + f.p.key) : 0 });
     cabinHdFade(h, ps.a * h.mix);

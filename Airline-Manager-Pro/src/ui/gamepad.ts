@@ -128,7 +128,7 @@ function padLoop() {
     const hit = (i: number) => B[i] && !Pad.prev[i], rel = (i: number) => !B[i] && Pad.prev[i];
     const any = lx || ly || rx || ry || l2 > 0.05 || r2 > 0.05 || B.some(Boolean);
     if (any) Pad.last = now;
-    const v3 = typeof V3d !== 'undefined' && V3d.open, of = typeof OfficeRoom !== 'undefined' && OfficeRoom.on && !OfficeRoom.overlay, ct = typeof CourtRoom !== 'undefined' && CourtRoom.on;
+    const v3 = typeof V3d !== 'undefined' && V3d.open, op = typeof OpsRoom !== 'undefined' && OpsRoom.on && !OpsRoom.overlay, of = (typeof OfficeRoom !== 'undefined' && OfficeRoom.on && !OfficeRoom.overlay) || op, ct = typeof CourtRoom !== 'undefined' && CourtRoom.on;
     const sens = +padOpt('padSpeed', 1) || 1;
     // ---- the world views: the sticks move and look ----
     if (v3) {
@@ -142,10 +142,11 @@ function padLoop() {
       if (hit(4) || hit(5)) { const b = document.createElement('b'); b.setAttribute('data-d', hit(4) ? '-1' : '1'); try { ACTIONS['v3d-next'](b, null); } catch (e) { /* none */ } }
       if (hit(2)) { const ms = Array.from(V3d.root.querySelectorAll('.v3d-modes [data-m]')) as HTMLElement[], i = ms.findIndex(m => m.getAttribute('data-m') === V3d.mode); if (ms.length) { try { ACTIONS['v3d-mode'](ms[(i + 1) % ms.length], null); } catch (e) { /* none */ } } }
       if (hit(3)) { padCursor(!Pad.shown); }   // the 3D view's own buttons, with the cursor
+      if (hit(11) && /^(walk|free)$/.test(V3d.mode)) { try { v3dUi(); } catch (e) { /* none */ } }   // R3: hide or show the controls
     } else if (of || ct) {
-      const R: any = of ? OfficeRoom : CourtRoom;
+      const R: any = op ? OpsRoom : of ? OfficeRoom : CourtRoom;
       if (R.stick) R.stick = [lx, -ly];
-      if (R.look && (rx || ry)) { R.look.yaw = clamp(R.look.yaw - rx * dt * 1.6 * sens, -2.6, 2.6); R.look.pitch = clamp(R.look.pitch - ry * dt * 1.2 * sens, -1.0, 0.8); }
+      if (R.look && (rx || ry)) { R.look.yaw = R.look.yaw - rx * dt * 1.6 * sens; R.look.pitch = clamp(R.look.pitch - ry * dt * 1.2 * sens, -1.0, 0.8); }   // all the way round
       if (hit(3)) padCursor(!Pad.shown);
     }
     // ---- the pointer: the left stick (in the 3D views once shown with Triangle) ----
@@ -159,7 +160,7 @@ function padLoop() {
       if (ry || rx) padScrollAt(ry * 900 * dt, rx * 900 * dt);
       if ((l2 > 0.1 || r2 > 0.1) && now - Pad.wheelT > 100) { const el = padHover(); if (el && el.closest('canvas, .maplibregl-canvas')) { Pad.wheelT = now; padEvt('wheel', el, 0, { deltaY: (l2 - r2) * 120 }); } }
       if (hit(4)) padGo(-1); if (hit(5)) padGo(1);
-      if (now - Pad.navT > 160) { const dx = (B[15] ? 1 : 0) - (B[14] ? 1 : 0), dy = (B[13] ? 1 : 0) - (B[12] ? 1 : 0); if (dx || dy) { Pad.navT = now; padJump(dx, dy); } }
+      if (now - Pad.navT > 160) { const dx = (B[15] ? 1 : 0) - (B[14] ? 1 : 0), dy = (B[13] ? 1 : 0) - (B[12] ? 1 : 0); if (dx || dy) { Pad.navT = now; if (!(dx && padAdjust(dx))) padJump(dx, dy); } }
     } else if (V3d && V3d.open && V3d.mode === 'walk') {
       const K = CabinWalk.keys; K.arrowup = B[12]; K.arrowdown = B[13]; K.arrowleft = B[14]; K.arrowright = B[15];
     }
@@ -178,6 +179,34 @@ function padMoved() {
   const el = padHover();
   if (Pad.downEl) { Pad.dragged = true; padEvt('pointermove', Pad.downEl, 1); padEvt('mousemove', Pad.downEl, 1); }
   else if (el) { padEvt('pointermove', el, 0); padEvt('mousemove', el, 0); }
+}
+
+/** The D-pad's left and right on a slider or a list of choices under the pointer: one step down or up. */
+function padAdjust(d: number): boolean {
+  const el: any = Pad.shown ? padHover() : document.activeElement; if (!el) return false;
+  const ctl: any = el.closest ? el.closest('input[type=range], select') : null; if (!ctl || ctl.disabled) return false;
+  if (ctl.tagName === 'SELECT') { const n = ctl.options.length, i = clamp(ctl.selectedIndex + d, 0, n - 1); if (i === ctl.selectedIndex) return true; ctl.selectedIndex = i; }
+  else { const st = +ctl.step || (+ctl.max - +ctl.min) / 20 || 1, v = clamp(+ctl.value + d * st, +ctl.min, +ctl.max); if (v === +ctl.value) return true; ctl.value = String(v); ctl.dispatchEvent(new Event('input', { bubbles: true })); }
+  ctl.dispatchEvent(new Event('change', { bubbles: true })); try { Sound.tick(); } catch (e) { /* quiet */ }
+  return true;
+}
+
+/* ---------- looking about with the touchpad ---------- */
+/** What the touchpad turns right now: the free camera, the 3D view's camera, or a room's view (null: the pointer). */
+function padLookTarget(): any {
+  if (typeof V3d !== 'undefined' && V3d.open) { const F = (V3d as any).fc; return V3d.mode === 'free' && F ? { kind: 'free', o: F } : { kind: 'v3d' }; }
+  if (typeof OpsRoom !== 'undefined' && OpsRoom.on && !OpsRoom.overlay && OpsRoom.look) return { kind: 'room', o: OpsRoom.look };
+  if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on && !OfficeRoom.overlay && OfficeRoom.look) return { kind: 'room', o: OfficeRoom.look };
+  if (typeof CourtRoom !== 'undefined' && CourtRoom.on && CourtRoom.look) return { kind: 'room', o: CourtRoom.look };
+  return null;
+}
+function padLookTurn(t: any, dx: number, dy: number) {
+  if (t.kind === 'free') { t.o.yaw += dx; t.o.pitch = clamp(t.o.pitch - dy, -1.5, 1.4); }
+  else if (t.kind === 'v3d') { V3d.yaw -= dx; V3d.pitch = clamp(V3d.pitch - dy, -1.2, 1.2); }
+  else { t.o.yaw -= dx; t.o.pitch = clamp(t.o.pitch - dy, -1.1, 0.9); }
+}
+function padLookZoom(dy: number) {
+  if (typeof V3d !== 'undefined' && V3d.open && V3d.cv) padEvt('wheel', V3d.cv, 0, { clientX: innerWidth / 2, clientY: innerHeight / 2, deltaY: dy * 6 });
 }
 
 /* ---------- the touchpad as a mouse (PC): the controller's touch data, once allowed ---------- */
@@ -206,7 +235,13 @@ const PadHid: any = {
     if (a.on && !this.f) { this.f = { x: a.x, y: a.y }; this.t0 = now; this.moved = 0; this.two = false; }
     else if (a.on && this.f) {
       const dx = a.x - this.f.x, dy = a.y - this.f.y; this.f = { x: a.x, y: a.y }; this.moved += Math.abs(dx) + Math.abs(dy);
-      if (b.on) { this.two = true; padScrollAt(dy * 2.2, dx * 2.2); }
+      // in the 3D views and the rooms (while the pointer isn't shown): the touchpad turns the view, two fingers zoom
+      const look = padLookTarget();
+      if (look && !Pad.shown) {
+        if (b.on) { this.two = true; if (dy) padLookZoom(dy); }
+        else if (dx || dy) { padLookTurn(look, dx * 0.0042 * sens, dy * 0.0032 * sens); Pad.last = now; }
+      }
+      else if (b.on) { this.two = true; padScrollAt(dy * 2.2, dx * 2.2); }
       else if (dx || dy) { Pad.x = clamp(Pad.x + dx * k, 0, innerWidth - 2); Pad.y = clamp(Pad.y + dy * k, 0, innerHeight - 2); Pad.last = now; padCursor(true); padMoved(); }
     } else if (!a.on && this.f) {
       // a light tap clicks (a press on the touchpad clicks through the controller's own button)
@@ -220,7 +255,7 @@ ACTIONS['pad-touch'] = () => { PadHid.connect(true).then((ok: boolean) => { toas
 /** Settings → Controller. */
 function padSettingsHtml(): string {
   const S: any = State.settings, g = Pad.gp, tg = (k: string, d: boolean, l: string, h: string) => { const on = S[k] == null ? d : !!S[k]; return `<label class="tg-row"><span><b>${l}</b><small>${h}</small></span><button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="pad-opt" data-key="${k}" data-d="${d ? 1 : 0}"><i></i></button></label>`; };
-  const rows: [string, string][] = [['Left stick', 'The pointer · in 3D: move, walk or circle the camera'], ['Right stick', 'Scroll, zoom over a map · in 3D, the office and court: look around'], ['Cross / touchpad press', 'Click (hold to drag)'], ['Circle', 'Back'], ['Square', 'In 3D: the next camera'], ['Triangle', 'In 3D, the office and court: the pointer for their buttons'], ['L1 / R1', 'Previous / next page · in 3D: previous / next aircraft'], ['L2 / R2', 'Zoom out / in · free camera: down / up'], ['D-pad', 'Jump between buttons · walking: walk'], ['Options', 'Settings'], ['R3', 'The pointer to the middle'], ['L3', 'Walking: faster']];
+  const rows: [string, string][] = [['Left stick', 'The pointer · in 3D: move, walk or circle the camera'], ['Right stick', 'Scroll, zoom over a map · in 3D, the office and court: look around'], ['Cross / touchpad press', 'Click (hold to drag)'], ['Circle', 'Back'], ['Square', 'In 3D: the next camera'], ['Triangle', 'In 3D, the office and court: the pointer for their buttons'], ['L1 / R1', 'Previous / next page · in 3D: previous / next aircraft'], ['L2 / R2', 'Zoom out / in · free camera: down / up'], ['D-pad', 'Jump between buttons · left and right change a slider or a list under the pointer · walking: walk'], ['Touchpad', 'Slide: the pointer · in 3D, the offices and court: turn the view; two fingers: zoom (on the PC, once allowed below)'], ['Options', 'Settings'], ['R3', 'The pointer to the middle'], ['L3', 'Walking: faster']];
   return `<div class="set-card col"><div class="sc-h">${icon('play')}<span><b>${g ? esc(padName(g)) + ' connected' : 'No controller connected'}</b><small>${g ? 'Ready.' : 'Connect a PlayStation 5 controller (or another one) by cable or Bluetooth and press a button.'}</small></span></div>
       <div class="pad-map">${rows.map(r => `<div><b>${r[0]}</b><small>${r[1]}</small></div>`).join('')}</div></div>
     <div class="set-card col"><div class="sc-h">${icon('focus')}<span><b>The touchpad as a mouse</b><small>Slide a finger to move the pointer, tap to click, two fingers to scroll. ${DESKTOP ? 'Windows hands the touchpad over once you allow it here (once).' : 'On phones and tablets, Android decides what the touchpad does; a press on it always clicks.'}</small></span></div>
