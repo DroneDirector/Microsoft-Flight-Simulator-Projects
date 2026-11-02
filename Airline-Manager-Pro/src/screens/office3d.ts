@@ -422,7 +422,7 @@ function ofOpen2(root: HTMLElement, q: number) {
     // you: your own figure, seen from your eyes
     try {
       const me: any = myPilot(); R.me = selfBody(scene, me && me.look ? Object.assign({}, me.look, { hat: 'none' }) : ctLook('me', 'm', 'public'), company().color);
-      if (R.me) R.me.chair = new T2.Vector3(0, 1.2, 1.02).sub(selfEyeOff(R.me, Math.PI, 0));
+      if (R.me) { R.me.chair = new T2.Vector3(0, 0.64, 1.14); R.me.eye0 = R.me.chair.clone().add(selfEyeOff(R.me, Math.PI, 0)); }   // sitting on the cushion, back in the chair
     } catch (e) { R.me = null; }
     R.ph = null;
     next();
@@ -649,8 +649,8 @@ function ofFrame() {
     // leaning in to the laptop (and back), eased at both ends
     const e = lk * lk * (3 - 2 * lk), S = R.A.lapScr, c = new T.Vector3(), n = new T.Vector3(0, 0, 1);
     S.getWorldPosition(c); n.applyQuaternion(S.getWorldQuaternion(new T.Quaternion()));
-    const to = c.clone().add(n.multiplyScalar(0.42)), from = new T.Vector3(0, 1.2, 1.02);
-    if (R.me) { try { selfPose(R.me, R.me.chair, Math.PI, 0.22 * e, 1, 0, 0, now, dt); } catch (x) { R.me = null; } }
+    const to = c.clone().add(n.multiplyScalar(0.42)), from = R.me && R.me.eye0 ? R.me.eye0.clone() : new T.Vector3(0, 1.2, 1.02);
+    if (R.me) { try { R.me.pitch = 0; selfPose(R.me, R.me.chair, Math.PI, 0.22 * e, 1, 0, 0, now, dt); } catch (x) { R.me = null; } }
     R.cam.position.copy(from.lerp(to, e));
     const yaw = Math.PI + R.look.yaw, p = R.look.pitch, ahead = R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)));
     R.cam.lookAt(ahead.lerp(c, e));
@@ -659,7 +659,7 @@ function ofFrame() {
     // you in your chair: your body (leaning in and turning to reach for the photo), your eyes where your head is
     const P = ofPhotoStep(dt, now), ph = R.ph, S = R.me;
     let eye = new T.Vector3(0, 1.2, 1.02);
-    if (S) { try { eye = selfPose(S, S.chair, Math.PI + P.turn + clamp(R.look.yaw * 0.3, -0.4, 0.4) * (1 - P.lookK), P.lean, 1, 0, 0, now, dt, P.arms); } catch (e) { R.me = null; } }
+    if (S) { try { S.pitch = R.look.pitch * (1 - P.lookK); eye = selfPose(S, P.slide ? S.chair.clone().add(new T.Vector3(0, 0, -P.slide)) : S.chair, Math.PI + P.turn + clamp(R.look.yaw * 0.3, -0.4, 0.4) * (1 - P.lookK), P.lean, 1, 0, 0, now, dt, P.arms); } catch (e) { R.me = null; } }
     R.cam.position.copy(eye);
     const yaw = Math.PI + R.look.yaw;   // facing −z
     const k = R.keys || {};
@@ -689,7 +689,7 @@ function ofWalk(dt: number, now?: number) {
   const bobY = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
   R.cam.position.set(F.x, 1.64 + bobY, F.z);
   // your body under you: feet stepping, arms swinging; your eyes at your own height
-  if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now || 0, dt); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
+  if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); S.pitch = R.look.pitch; const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now || 0, dt); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
   const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p))));
   // what's in front of you: the chair (sit) or the door (leave)
   const aim = R.root.querySelector('.of-aim') as HTMLElement, obj = ofAimedObj(), hint = obj ? obj.userData.act : '';
@@ -765,7 +765,7 @@ function ofLapK(): number {
 function ofLapRect(): { x: number; y: number; w: number; h: number } {
   const R = OfficeRoom, T = THREE, cam = R.cam, S = R.A.lapScr, rr = R.root.getBoundingClientRect();
   const keep = cam.position.clone(), q = cam.quaternion.clone();
-  cam.position.set(0, 1.2, 1.02); const yaw = Math.PI + R.look.yaw, p = R.look.pitch;
+  if (R.me && R.me.eye0) cam.position.copy(R.me.eye0); else cam.position.set(0, 1.2, 1.02); const yaw = Math.PI + R.look.yaw, p = R.look.pitch;
   cam.lookAt(cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)))); cam.updateMatrixWorld();
   const [w, h] = S.userData.size || [0.32, 0.2]; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   for (const [x, y] of [[-w / 2, -h / 2], [w / 2, -h / 2], [-w / 2, h / 2], [w / 2, h / 2]]) {
@@ -882,8 +882,8 @@ function ofPhotoUi() {
   R.root.appendChild(b);
 }
 /** Each frame in the chair: where the photo is, your hands on it, how far you lean in and turn, where you look. */
-function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; lookK: number; at: any; arms: any } {
-  const R = OfficeRoom, ph = R.ph, A = R.A, T = THREE, out = { lean: 0, turn: 0, lookK: 0, at: null as any, arms: null as any };
+function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; slide: number; lookK: number; at: any; arms: any } {
+  const R = OfficeRoom, ph = R.ph, A = R.A, T = THREE, out = { lean: 0, turn: 0, slide: 0, lookK: 0, at: null as any, arms: null as any };
   if (!ph || !A || !A.photoAt) return out;
   const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, D = OF_PH_D;
   ph.t += dt;
@@ -895,10 +895,10 @@ function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; lookK
   else if (ph.st === 'release') { wL = 1 - E(ph.t / D.release); if (ph.t >= D.release) { R.ph = null; ofPhotoUi(); return out; } }
   // leaning in and turning to the desk while it is down there, upright again as it comes up
   const down = ph.st === 'reach' || ph.st === 'release' ? wL : 1 - mv;
-  out.lean = 0.34 * down; out.turn = 0.34 * down;
+  out.lean = 0.55 * down; out.turn = 0.45 * down; out.slide = 0.14 * down;   // forward on the seat, leaning in and turning to it
   // in your hands: a little in front of your eyes, tilted as you like, never quite still
   ph.tilt[0] += (ph.want[0] - ph.tilt[0]) * Math.min(1, dt * 5); ph.tilt[1] += (ph.want[1] - ph.tilt[1]) * Math.min(1, dt * 5);
-  const hold = new T.Vector3(0.0, 1.01, 0.63), S = Math.sin;
+  const e0 = R.me && R.me.eye0 ? R.me.eye0 : new T.Vector3(0, 1.2, 1.02), hold = new T.Vector3(e0.x, e0.y - 0.19, e0.z - 0.39), S = Math.sin;
   hold.x += 0.002 * S(t * 1.1) + 0.001 * S(t * 2.9); hold.y += 0.0025 * S(t * 0.8 + 1) + 0.001 * S(t * 3.3);
   const qh = new T.Quaternion().setFromEuler(new T.Euler(0.12 + ph.tilt[1] + 0.008 * S(t * 1.3), ph.tilt[0] + 0.012 * S(t * 0.9 + 2), 0.007 * S(t * 0.7), 'YXZ'));
   const pos = ph.P0.clone().lerp(hold, mv); pos.y += 0.09 * Math.sin(Math.PI * mv);   // up off the desk in an arc

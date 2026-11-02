@@ -280,11 +280,11 @@ function opsFrame() {
   R.doorK = (R.doorK || 0) + ((R.doorT || 0) - (R.doorK || 0)) * Math.min(1, dt * 3.5); if (R.A && R.A.door) R.A.door.rotation.y = R.doorK * 1.35;
   const zk = opsZoomK(), ze = zk * zk * (3 - 2 * zk);
   // you: your own figure (built once the figures are loaded), seen from your eyes
-  if (!R.meTried) { R.meTried = true; const mk = () => { try { if (!R.on || !R.scene) return; const me: any = myPilot(); R.me = selfBody(R.scene, me && me.look ? Object.assign({}, me.look, { hat: 'none' }) : ctLook('me', 'm', 'public'), company().color); if (R.me) R.me.chair = new T.Vector3(0, 1.2, 0.76).sub(selfEyeOff(R.me, Math.PI, 0)); } catch (e) { R.me = null; } }; if (Human.ready) mk(); else Human.load().then(mk, () => { /* without */ }); }
+  if (!R.meTried) { R.meTried = true; const mk = () => { try { if (!R.on || !R.scene) return; const me: any = myPilot(); R.me = selfBody(R.scene, me && me.look ? Object.assign({}, me.look, { hat: 'none' }) : ctLook('me', 'm', 'public'), company().color); if (R.me) { R.me.chair = new T.Vector3(0, 0.66, 0.86); R.me.eye0 = R.me.chair.clone().add(selfEyeOff(R.me, Math.PI, 0)); } /* on the cushion, back in the chair */ } catch (e) { R.me = null; } }; if (Human.ready) mk(); else Human.load().then(mk, () => { /* without */ }); }
   if (!R.seat) opsWalk(dt, now);
   else {
     R.cam.position.set(0, 1.2 - 0.075 * ze, 0.76 - 0.5 * ze);
-    if (R.me) { try { const by = Math.PI + R.look.yaw * (1 - ze); const eye = selfPose(R.me, R.me.chair, by, 0.2 * ze, 1, 0, 0, now, dt); R.cam.position.lerpVectors(eye, R.cam.position, ze); } catch (e) { R.me = null; } }
+    if (R.me) { try { const by = Math.PI + R.look.yaw * (1 - ze); R.me.pitch = R.look.pitch * (1 - ze); const eye = selfPose(R.me, R.me.chair, by, 0.2 * ze, 1, 0, 0, now, dt); R.cam.position.lerpVectors(eye, R.cam.position, ze); } catch (e) { R.me = null; } }
     const yaw = Math.PI + R.look.yaw * (1 - ze), p = R.look.pitch * (1 - ze) + 0.0 * ze;
     R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
   }
@@ -319,7 +319,7 @@ function opsWalk(dt: number, now?: number) {
   const bobY = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
   R.cam.position.set(F.x, 1.64 + bobY, F.z);
   // your body under you: feet stepping, arms swinging; your eyes at your own height
-  if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now || 0, dt); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
+  if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); S.pitch = R.look.pitch; const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now || 0, dt); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
   const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p))));
   // what's in front of you glows: the door (leave), the chair (sit), the monitor, the archives
   const obj = opsAimedObj(), hint = obj ? obj.userData.act : '', aim = R.root.querySelector('.op-dot') as HTMLElement;
@@ -371,7 +371,7 @@ function opsZoomK(): number {
 function opsMonRect(): { x: number; y: number; w: number; h: number } {
   const R = OpsRoom, T = THREE, cam = R.cam, A = R.A, rr = R.root.getBoundingClientRect();
   const keep = cam.position.clone(), q = cam.quaternion.clone();
-  cam.position.set(0, 1.2, 0.76); const yaw = Math.PI + R.look.yaw, p = R.look.pitch;
+  if (R.me && R.me.eye0) cam.position.copy(R.me.eye0); else cam.position.set(0, 1.2, 0.76); const yaw = Math.PI + R.look.yaw, p = R.look.pitch;
   cam.lookAt(cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)))); cam.updateMatrixWorld();
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   for (const [x, y, z] of [[-0.54, 0.16, -0.185], [0.54, 0.16, -0.185], [-0.54, -0.16, -0.185], [0.54, -0.16, -0.185], [0, 0.16, -0.3], [0, -0.16, -0.3]]) {
