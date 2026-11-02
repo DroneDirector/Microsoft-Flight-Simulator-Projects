@@ -255,7 +255,7 @@ function plRouteHtml(P: FlightPlanR): string {
   const U = PlannerUi, t = acType(U.typeId || plType()), jet = !!(t && (perfFor(t) as any).jet);
   const rows = P.wps.map((w, i) => {
     const d = plWpD(P, w.id), et = plTimeAt(d), wind = d != null && U.path ? Math.round(tailwindKt(w.alt, w.lat, pathAt(U.path, d).hdg, new Date().getMonth())) : null;
-    return `<tr class="${w.id === U.sel ? 'sel' : ''}" data-act="pl-sel" data-id="${w.id}"><td>${i + 1}</td><td><b>${esc(w.name)}</b><small>${w.lat.toFixed(2)}, ${w.lon.toFixed(2)}</small></td>
+    return `<tr class="${w.id === U.sel ? 'sel' : ''}" data-act="pl-sel" data-id="${w.id}"><td>${i + 1}</td><td><b>${esc(w.name)}</b><small>${w.via ? 'via ' + esc(w.via) + ' · ' : ''}${w.lat.toFixed(2)}, ${w.lon.toFixed(2)}</small></td>
       <td><input class="pl-alt ${t && w.alt > (perfFor(t) as any).maxAlt ? 'warn' : ''}" data-id="${w.id}" value="${altText(w.alt)}" aria-label="Level at ${esc(w.name)}" ${t && w.alt > (perfFor(t) as any).maxAlt ? `title="Above the ${esc(t.model)}'s ceiling: flown at ${altText((perfFor(t) as any).maxAlt)}"` : ''}>${t && w.alt > (perfFor(t) as any).maxAlt ? `<small class="amber">Ceiling ${altText((perfFor(t) as any).maxAlt)}</small>` : ''}</td>
       <td><input class="pl-spd" data-id="${w.id}" value="${w.mach ? 'M' + w.mach.toFixed(2).slice(1) : w.spd ? w.spd : ''}" placeholder="${jet ? 'Auto (M.78)' : 'Auto'}" aria-label="Speed from ${esc(w.name)}"></td>
       <td>${plHm(et)}</td><td class="${wind == null ? '' : wind >= 0 ? 'tail' : 'head'}">${wind == null ? '—' : (wind >= 0 ? '+' : '−') + Math.abs(wind)}</td>
@@ -269,7 +269,7 @@ function plRouteHtml(P: FlightPlanR): string {
       <tbody><tr class="apt"><td></td><td><b>${esc(P.from)}</b><small>${esc((apt(P.from) || { name: '' } as any).name)}</small></td><td colspan="5"><small>Departure</small></td></tr>${rows}<tr class="apt"><td></td><td><b>${esc(P.to)}</b><small>${esc((apt(P.to) || { name: '' } as any).name)}</small></td><td colspan="5"><small>Arrival${PlannerUi.prev ? ' · ' + plHm(PlannerUi.prev.airS) : ''}</small></td></tr></tbody></table>
     <div class="pl-add"><input class="pl-addin" placeholder="Add: an airport (EKVG), a position (6200N00700W) or 62.0 -7.0" aria-label="Add a waypoint"><button class="btn sm" data-act="pl-addtxt">${icon('plus')}Add</button></div>
     <small class="muted">Levels: FL350 or 35000; a waypoint's level is flown from it on (step climbs and descents at the waypoint). Speeds: M.82 or 280 (indicated knots), empty for the aircraft's own. Drag a waypoint on the map to move it.</small>
-    <div class="pl-btns"><button class="btn ghost sm" data-act="pl-reset">Start again: straight route</button><button class="btn ghost sm" data-act="pl-remove">Remove this plan</button></div>`;
+    <div class="pl-btns">${typeof svcOk === 'function' && svcOk('simbriefApi') && SimBrief.user() ? `<button class="btn sm" data-act="pl-simbrief">${icon('download')}From my SimBrief flight plan</button>` : ''}<button class="btn ghost sm" data-act="pl-reset">Start again: straight route</button><button class="btn ghost sm" data-act="pl-remove">Remove this plan</button></div>`;
 }
 function plWxHtml(P: FlightPlanR): string {
   const hz = plHazards(), path: FlightPath = PlannerUi.path, pr: FlightProfile = PlannerUi.prev;
@@ -324,3 +324,14 @@ ACTIONS['pl-addtxt'] = () => { const inp = document.querySelector('.pl-addin') a
 ACTIONS['pl-reset'] = () => { const P = plCur(); if (!P) return; const d = planDefault(P.from, P.to, PlannerUi.typeId || plType()); if (!d) return; P.wps = d.wps; planSave(P); plRecalc(); plFit(true); plPanelRedraw(); };
 ACTIONS['pl-remove'] = () => { const P = plCur(); if (!P) return; delete plansAll()[P.key]; Store.soon(); try { for (const k in _profiles) if (k.indexOf('|' + P.from + '|' + P.to + '|') >= 0) delete _profiles[k]; } catch (e) { /* none */ } toast('Plan removed: flights fly their own route', 'info'); plRecalc(); plPanelRedraw(); };
 ACTIONS['pl-on'] = () => { const P = plCur(); if (!P) return; P.on = !P.on; planSave(P); plRecalc(); Sound.tick(); plPanelRedraw(); toast(P.on ? `Flights ${P.from} → ${P.to} now fly this plan` : 'Flights fly their own route again', 'ok'); };
+
+ACTIONS['pl-simbrief'] = () => {
+  toast('Getting your SimBrief flight plan…', 'info');
+  SimBrief.fetch().then((o: Ofp) => {
+    const P = planFromOfp(o); if (!P) { toast('The SimBrief flight plan has no route between two known airports', 'warn'); return; }
+    const old = plansAll()[P.key]; if (old) P.v = old.v;
+    PlannerUi.from = P.from; PlannerUi.to = P.to; PlannerUi.sel = '';
+    planSave(P); plRecalc(); plFit(true); plPanelRedraw();
+    toast(`SimBrief plan ${P.from} → ${P.to}: ${P.wps.length} waypoints. Flights on this route now fly it.`, 'ok');
+  }, (e: any) => toast((e && e.message) || 'SimBrief could not be reached', 'warn'));
+};
