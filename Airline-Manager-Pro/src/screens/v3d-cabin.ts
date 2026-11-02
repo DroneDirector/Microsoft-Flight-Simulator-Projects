@@ -202,7 +202,7 @@ const CABIN_LIGHT_GLSL = `
       vec3 L = uLA[i] + ab * t - lp; float d = max(length(L), 0.03); vec3 l = L / d;
       float ndl = max(dot(normal, l), 0.0), aim = max(dot(-l, uLD[i]), 0.0);
       float fall = 1.0 / (1.0 + (d / uLR[i]) * (d / uLR[i]));
-      float seg = 1.0; if (uLS[i] > 0.0) { float u = fract(t * sqrt(l2) / uLS[i]); seg = 0.3 + 0.7 * smoothstep(0.0, 0.22, u) * smoothstep(1.0, 0.78, u); }
+      float seg = 1.0; if (uLS[i] > 0.0) { float u = fract(t * sqrt(l2) / uLS[i]); seg = 0.12 + 0.88 * smoothstep(0.0, 0.25, u) * smoothstep(1.0, 0.75, u); }
       lsum += uLC[i] * ndl * aim * fall * seg; }
     float shade = 1.0 - 0.08 * length(uUp) + 0.14 * dot(normal, uUp);
     float blueK = min(0.55, dot(lsum, vec3(0.25, 0.45, 0.3)) * 0.7);   // where the blue light falls, the white light is weaker (the bins shade it)
@@ -227,7 +227,7 @@ function cabinMoodLights(G: any, dim: number) {
   cam.updateMatrixWorld(); G.updateMatrixWorld();
   const M = new T.Matrix4().multiplyMatrices(cam.matrixWorldInverse, G.matrixWorld), N = new T.Matrix3().setFromMatrix4(M);
   const night = Math.min(1, dim / 0.86), blue = new T.Color(0.16, 0.38, 1);
-  const k: any = { wall: 1.5 + 1.0 * night, cove: 1.0 + 1.6 * night, bins: 0.35 + 0.75 * night };
+  const k: any = { wall: 1.6 + 2.0 * night, cove: 1.3 + 3.9 * night, bins: 0.35 + 1.3 * night };
   for (let i = 0; i < n; i++) {
     const l = L[i];
     CabinLight.la.value[i].copy(l.a).applyMatrix4(M); CabinLight.lb.value[i].copy(l.b).applyMatrix4(M);
@@ -351,9 +351,9 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
     // from the lit ceiling, the bins' doors
     const L = (g.userData.lights = g.userData.lights || []);
     L.push({ kind: 'wall', a: V(x0 + 0.2, side * (wallY - 0.16), zb - 0.05), b: V(x1 - 0.2, side * (wallY - 0.16), zb - 0.05), d: _av(0, side * 0.62, -0.78).normalize(), r: 0.75, seg: 0 });
-    L.push({ kind: 'cove', a: V(x0 + 0.2, side * (wallY - bd * 0.55), zb + bh + 0.08), b: V(x1 - 0.2, side * (wallY - bd * 0.55), zb + bh + 0.08), d: _av(0, -side * 0.45, 0.89).normalize(), r: 0.85, seg: 1.52 });
+    L.push({ kind: 'cove', a: V(x0 + 0.2, side * (wallY - bd - 0.04), zb + bh + 0.04), b: V(x1 - 0.2, side * (wallY - bd - 0.04), zb + bh + 0.04), d: _av(0, -side * 0.72, 0.69).normalize(), r: 1.1, seg: 1.52 });
     const cy = Math.max(0.3, wallY - bd - 0.25), cz = zc + Math.sqrt(Math.max(0.01, ri * ri - cy * cy)) - 0.08;
-    L.push({ kind: 'bins', a: V(x0 + 0.2, side * cy, cz), b: V(x1 - 0.2, side * cy, cz), d: _av(0, side * 0.7, -0.71).normalize(), r: 0.95, seg: 1.52 });
+    L.push({ kind: 'bins', a: V(x0 + 0.2, side * cy, cz), b: V(x1 - 0.2, side * cy, cz), d: _av(0, side * 0.86, -0.5).normalize(), r: 0.75, seg: 1.52 });
     if (side === -1) V3dCabin.mood = up;
   }
   // the ceiling: two long white light lines down the middle
@@ -582,7 +582,8 @@ function v3dCabinFwdCam(P: any) {
   CabinLight.self.value = 0.7 * (1 - dim) + 0.07 * dim;
   const md = new T.Color(G.userData.crewAt ? G.userData.crewAt.mood : 0xBFD8FF);
   CabinLight.warm.value.setRGB(1 - dim * (1 - md.r * 0.75), 0.99 - dim * (1 - md.g * 0.7), 0.98 - dim * (1 - md.b * 0.95));
-  for (const gm of G.userData.glows || []) gm.color.setRGB(1, 1, 1).lerp(md.clone().multiplyScalar(0.55), dim);
+  // the white light lines are switched down at night, leaving a faint blue glow
+  for (const gm of G.userData.glows || []) gm.color.setRGB(1, 1, 1).lerp(new T.Color(0.1, 0.22, 0.6), Math.min(1, dim / 0.86));
   // the blue mood lighting stays on, a little softer at night
   for (const lm of G.userData.leds || []) lm.color.setRGB(0.18, 0.42, 1).multiplyScalar(1 - dim * 0.4);
   cabinMoodLights(G, dim);
