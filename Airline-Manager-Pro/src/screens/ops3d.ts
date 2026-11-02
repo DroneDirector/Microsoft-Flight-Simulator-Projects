@@ -78,15 +78,15 @@ function opsBuild(scene: any, q: number) {
   for (const sx of [-1, 1]) { bx(0.06, 0.71, 0.7, mat.black, sx * 1.0, 0.355, -0.25); bx(0.08, 0.02, 0.76, mat.black, sx * 1.0, 0.01, -0.25); }
   bx(1.94, 0.3, 0.02, mat.black, 0, 0.55, -0.6);   // the modesty panel
   // the ultra-wide monitor: a curved 49-inch screen on a stand
-  { const r = 1.25, wA = 1.08, hA = 0.32, L = wA / r, y0 = 1.12, zc = -0.45 + r;
+  { const r = 1.25, wA = 1.08, hA = 0.32, L = wA / r, y0 = 1.12, zc = -0.3 + r;   // 30 cm behind the keyboard
     const sg = new T.CylinderGeometry(r, r, hA, 48, 1, true, Math.PI - L / 2, L); const uv = sg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i));
     const [c] = ctCanvas(2048, 608); A.monCv = c; const tex = ctTex(c); A.monTex = tex;
-    const scr = new T.Mesh(sg, new T.MeshBasicMaterial({ map: tex, toneMapped: false, side: T.DoubleSide })); scr.position.set(0, y0, zc); root.add(scr);
+    const scr = new T.Mesh(sg, new T.MeshBasicMaterial({ map: tex, toneMapped: false, side: T.DoubleSide })); scr.position.set(0, y0, zc); root.add(scr); A.monScr = scr; A.monY = y0; A.monZ = zc - r;
     const sh = new T.Mesh(new T.CylinderGeometry(r + 0.012, r + 0.012, hA + 0.03, 48, 1, true, Math.PI - (L + 0.03) / 2, L + 0.03), new T.MeshPhysicalMaterial({ color: 0x0E1013, roughness: 0.35, side: T.DoubleSide })); sh.position.set(0, y0, zc + 0.0); root.add(sh);
     const back = new T.Mesh(new T.CylinderGeometry(r + 0.045, r + 0.045, hA + 0.02, 48, 1, true, Math.PI - L / 2, L), mat.black); back.position.set(0, y0, zc); root.add(back);
-    bx(0.08, 0.28, 0.05, mat.metal, 0, 0.93, -0.52); bx(0.36, 0.012, 0.22, mat.metal, 0, 0.778, -0.5);
-    const hit = new T.Mesh(new T.BoxGeometry(1.15, 0.38, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, y0, -0.47); hit.userData.act = 'monitor'; root.add(hit); A.hits.push(hit);
-    const glow = new T.PointLight(0x9CC8FF, 0.9, 2.4, 1.6); glow.position.set(0, 1.12, -0.25); root.add(glow); }
+    bx(0.08, 0.28, 0.05, mat.metal, 0, 0.93, -0.37); bx(0.36, 0.012, 0.22, mat.metal, 0, 0.778, -0.35);
+    const hit = new T.Mesh(new T.BoxGeometry(1.15, 0.38, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, y0, -0.32); hit.userData.act = 'monitor'; root.add(hit); A.hits.push(hit);
+    const glow = new T.PointLight(0x9CC8FF, 0.9, 2.4, 1.6); glow.position.set(0, 1.12, -0.1); root.add(glow); }
   // the keyboard: a full-size board with real keys and a number pad, and the mouse on its mat
   { const kb = new T.Group(); kb.position.set(-0.05, 0.775, 0.0); root.add(kb);
     slab(0.44, 0.14, 0.018, 0.008, mat.black, 0, 0.018, 0, 0, kb);
@@ -102,9 +102,9 @@ function opsBuild(scene: any, q: number) {
     const hit = new T.Mesh(new T.BoxGeometry(0.9, 0.06, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0.1, 0.8, 0.02); hit.userData.act = 'monitor'; root.add(hit); A.hits.push(hit); }
   // archive folders stacked on the desk (left), a coffee cup and a phone
   { const cols = [0x2E4F7A, 0x8A2E2E, 0x2F6B4A, 0xB8862E, 0x3A3F46, 0x6B4A8A, 0x2E4F7A, 0xB8862E], r = ctRng(31);
-    let y = 0.775; for (let i = 0; i < 8; i++) { const h = 0.028 + r() * 0.02; bx(0.33, h, 0.25, M({ color: cols[i], roughness: 0.7 }), -0.82 + (r() - 0.5) * 0.03, y + h / 2, -0.32 + (r() - 0.5) * 0.03, (r() - 0.5) * 0.12); bx(0.31, 0.004, 0.23, mat.paper, -0.82 + (r() - 0.5) * 0.02, y + h + 0.002, -0.32, (r() - 0.5) * 0.08); y += h + 0.004; }
-    for (let i = 0; i < 4; i++) bx(0.06, 0.3, 0.24, M({ color: cols[(i + 3) % cols.length], roughness: 0.6 }), -0.55 + i * 0.065, 0.925, -0.52);
-    const hit = new T.Mesh(new T.BoxGeometry(0.6, 0.4, 0.4), new T.MeshBasicMaterial({ visible: false })); hit.position.set(-0.75, 0.95, -0.4); hit.userData.act = 'archives'; root.add(hit); A.hits.push(hit);
+    let y = 0.775; for (let i = 0; i < 8; i++) { const h = 0.028 + r() * 0.02; bx(0.33, h, 0.25, M({ color: cols[i], roughness: 0.7 }), -0.86 + (r() - 0.5) * 0.03, y + h / 2, -0.18 + (r() - 0.5) * 0.03, (r() - 0.5) * 0.12); bx(0.31, 0.004, 0.23, mat.paper, -0.86 + (r() - 0.5) * 0.02, y + h + 0.002, -0.18, (r() - 0.5) * 0.08); y += h + 0.004; }
+    for (let i = 0; i < 4; i++) bx(0.06, 0.3, 0.24, M({ color: cols[(i + 3) % cols.length], roughness: 0.6 }), -0.99 + i * 0.065, 0.925, -0.52);   // upright binders behind the stack
+    const hit = new T.Mesh(new T.BoxGeometry(0.6, 0.4, 0.4), new T.MeshBasicMaterial({ visible: false })); hit.position.set(-0.88, 0.95, -0.35); hit.userData.act = 'archives'; root.add(hit); A.hits.push(hit);
     add(new T.CylinderGeometry(0.04, 0.034, 0.1, 20), M({ color: 0xF4F4F2, roughness: 0.3 }), 0.72, 0.825, -0.1); add(new T.CylinderGeometry(0.036, 0.036, 0.004, 20), M({ color: 0x3A2216 }), 0.72, 0.872, -0.1);
     bx(0.075, 0.009, 0.155, mat.black, 0.82, 0.78, 0.12, 0.3); }
   // the fancy chair: a high-backed leather chair with a headrest, stitched in the company colour, on five wheels
@@ -237,7 +237,7 @@ function opsOpen2(root: HTMLElement, q: number) {
       setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); } opsUi(); }, wait);
     }, 40);
     R.iv = setInterval(() => { if (R.on && !document.hidden) opsMonitorDraw(); }, 5000);
-    const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !R.overlay) opsFrame(); };   // the room rests while a screen is open
+    const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && (!R.overlay || R.zoomAnim)) opsFrame(); };   // the room rests while a screen is open (not while it grows or shrinks)
     R.raf = requestAnimationFrame(loop);
   }, 30);
 }
@@ -249,9 +249,12 @@ function opsFrame() {
   if (k.arrowup) R.look.pitch = clamp(R.look.pitch + dt, -1.1, 0.8); if (k.arrowdown) R.look.pitch = clamp(R.look.pitch - dt, -1.1, 0.8);
   // the view eases to where you look (a button below turns you to the monitor or the archives)
   if (R.aim) { R.look.yaw += (R.aim.yaw - R.look.yaw) * Math.min(1, dt * 4); R.look.pitch += (R.aim.pitch - R.look.pitch) * Math.min(1, dt * 4); if (Math.abs(R.aim.yaw - R.look.yaw) < 0.005) R.aim = null; }
-  R.cam.position.set(0, 1.2, 0.76);
-  const yaw = Math.PI + R.look.yaw, p = R.look.pitch;
+  // the glide towards the monitor (0 in the chair … 1 close to the screen), eased at both ends
+  const zk = opsZoomK(), ze = zk * zk * (3 - 2 * zk);
+  R.cam.position.set(0, 1.2 - 0.075 * ze, 0.76 - 0.5 * ze);
+  const yaw = Math.PI + R.look.yaw * (1 - ze), p = R.look.pitch * (1 - ze) + 0.0 * ze;
   R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
+  if (R.A && R.A.monScr) R.A.monScr.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, zk * 1.4)));   // the screen lights up as it opens
   R.ren.render(R.scene, R.cam);
 }
 function opsAimed(e: PointerEvent): string {
@@ -279,8 +282,31 @@ function opsUi() {
     + `<button data-op="look" data-k="desk">At the desk</button><button data-op="look" data-k="archives">The archives</button>`;
   const hint = R.root.querySelector('.op-aim') as HTMLElement; if (hint) { hint.hidden = false; hint.textContent = DESKTOP ? 'Click the monitor to work · drag to look around · Esc to leave' : 'Tap the monitor to work · drag to look around'; hint.classList.add('op-hint'); setTimeout(() => { if (hint) hint.hidden = true; }, 6000); }
 }
+const OPS_ZOOM_MS = 750;
+function opsReduced(): boolean { try { return !!(State.settings as any).reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } }
+/** Where the camera is in the glide: 0 in the chair … 1 at the monitor. */
+function opsZoomK(): number {
+  const R = OpsRoom, Z = R.zoomAnim; if (!Z) return R.overlay ? 1 : 0;
+  const k = Math.min(1, (performance.now() - Z.t0) / OPS_ZOOM_MS);
+  if (k >= 1) { R.zoomAnim = null; if (Z.done) Z.done(); return Z.dir > 0 ? 1 : 0; }
+  return Z.dir > 0 ? k : 1 - k;
+}
+/** The monitor's screen on your screen, from the chair: the rectangle the screens grow out of and go back into. */
+function opsMonRect(): { x: number; y: number; w: number; h: number } {
+  const R = OpsRoom, T = THREE, cam = R.cam, A = R.A, rr = R.root.getBoundingClientRect();
+  const keep = cam.position.clone(), q = cam.quaternion.clone();
+  cam.position.set(0, 1.2, 0.76); const yaw = Math.PI + R.look.yaw, p = R.look.pitch;
+  cam.lookAt(cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)))); cam.updateMatrixWorld();
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const [x, y, z] of [[-0.54, 0.16, -0.185], [0.54, 0.16, -0.185], [-0.54, -0.16, -0.185], [0.54, -0.16, -0.185], [0, 0.16, -0.3], [0, -0.16, -0.3]]) {
+    const v = new T.Vector3(x, (A ? A.monY : 1.12) + y, z).project(cam), sx = (v.x + 1) / 2 * rr.width, sy = (1 - v.y) / 2 * rr.height;
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+  }
+  cam.position.copy(keep); cam.quaternion.copy(q); cam.updateMatrixWorld();
+  return { x: x0, y: y0, w: Math.max(40, x1 - x0), h: Math.max(30, y1 - y0) };
+}
 function opsScreenOpen(key: string) {
-  const R = OpsRoom; if (!R.on || !SCREENS[key]) return;
+  const R = OpsRoom; if (!R.on || !SCREENS[key] || R.zoomAnim) return;
   if (R.overlay) { opsScreenSwitch(key); return; }
   R.tab = key;
   for (const sel of ['.op-spots', '.op-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
@@ -288,6 +314,15 @@ function opsScreenOpen(key: string) {
   ov.innerHTML = `<div class="of-pl-head"><div class="op-tabs">${OPS_TABS.filter(t => SCREENS[t[0]]).map(t => `<button class="${t[0] === key ? 'on' : ''}" data-op="tab" data-k="${t[0]}">${icon(t[2])}${t[1]}</button>`).join('')}</div><button class="btn ghost sm" data-op="close">${icon('close')}Back to the desk</button></div><div class="of-pl-body"></div>`;
   R.root.appendChild(ov); R.overlay = ov; document.body.classList.add('of-over');
   opsScreenFill(key);
+  if (opsReduced()) return;
+  // the screen grows out of the monitor while you lean in towards it
+  const m = opsMonRect(), W = R.root.clientWidth, H = R.root.clientHeight;
+  ov.classList.add('op-zoom'); ov.style.transformOrigin = '0 0';
+  ov.style.transform = `translate(${m.x}px, ${m.y}px) scale(${m.w / W}, ${m.h / H})`; ov.style.opacity = '0';
+  const fx = document.createElement('div'); fx.className = 'op-zoom-fx'; fx.style.left = m.x + 'px'; fx.style.top = m.y + 'px'; fx.style.width = m.w + 'px'; fx.style.height = m.h + 'px'; R.root.appendChild(fx);
+  R.zoomAnim = { t0: performance.now(), dir: 1, done: () => { ov.classList.remove('op-zoom', 'op-zoom-go'); ov.style.transform = ''; ov.style.opacity = ''; ov.style.transformOrigin = ''; } };
+  void ov.offsetWidth;
+  requestAnimationFrame(() => { ov.classList.add('op-zoom-go'); ov.style.transform = 'translate(0px, 0px) scale(1, 1)'; ov.style.opacity = '1'; fx.classList.add('go'); setTimeout(() => fx.remove(), 900); });
 }
 function opsScreenFill(key: string) {
   const R = OpsRoom, body = R.overlay && R.overlay.querySelector('.of-pl-body') as HTMLElement; if (!body) return;
@@ -299,9 +334,15 @@ function opsScreenFill(key: string) {
 function opsScreenSwitch(key: string) { Sound.tick(); opsScreenFill(key); }
 /** Back to the desk (you stay in the Operations office); the monitor shows any change at once. */
 function opsScreenClose() {
-  const R = OpsRoom; if (!R.overlay) return;
-  R.overlay.remove(); R.overlay = null; document.body.classList.remove('of-over'); Sound.tick();
-  opsMonitorDraw(); opsUi();
+  const R = OpsRoom; if (!R.overlay || R.zoomAnim) return;
+  const ov = R.overlay; Sound.tick(); opsMonitorDraw();
+  const finish = () => { ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); opsUi(); };
+  if (opsReduced()) { finish(); return; }
+  // back into the monitor while you sit back in your chair, and the office comes into view around it
+  const m = opsMonRect(), W = R.root.clientWidth, H = R.root.clientHeight;
+  ov.style.pointerEvents = 'none'; ov.style.transformOrigin = '0 0'; ov.classList.add('op-zoom', 'op-zoom-go', 'op-zoom-back');
+  R.zoomAnim = { t0: performance.now(), dir: -1, done: finish };
+  requestAnimationFrame(() => { ov.style.transform = `translate(${m.x}px, ${m.y}px) scale(${m.w / W}, ${m.h / H})`; ov.style.opacity = '0'; });
 }
 /** After a change anywhere (a leg moved, a route added): the screen over the room and the monitor show it too. */
 function opsRefresh() {

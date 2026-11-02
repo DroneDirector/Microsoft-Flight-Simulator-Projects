@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.64 (2026-11-02)
+
+- ops3d: monitor moved forward and desk folders moved clear of it; the screens grow out of the monitor's outline with a camera glide in (and back out on closing), flash on the monitor; tab fade; reduce motion respected
+
 ## 0.9.63 (2026-11-02)
 
 - ops3d: Operations office (curved monitor drawn from scheduleBlocks, keyboard, mouse, chair, archive stack and rack), screens over the room (ops, schedule, dispatch, planner) kept up to date from refresh; own loader
