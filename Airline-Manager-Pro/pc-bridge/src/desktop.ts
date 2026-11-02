@@ -26,7 +26,22 @@ const TYPES: { [ext: string]: string } = {
 export interface DesktopPrefs { open: boolean; mode: 'window' | 'borderless' | 'fullscreen'; gpu: 'auto' | 'high' | 'low'; width: number; height: number; boost: boolean; boostClose: string[] }
 const DEFAULTS: DesktopPrefs = { open: true, mode: 'window', gpu: 'auto', width: 1600, height: 900, boost: false, boostClose: [] as string[] };
 
+/** The app's own window when the PC app brings its own browser engine (src/electron-main.ts); without it,
+ *  the window is Microsoft Edge in app mode, as before. */
+export interface WindowHost {
+  /** The program name the window runs as (the Game Booster never closes it). */
+  exe: string;
+  open(url: string, prefs: DesktopPrefs): boolean;
+  close(): void;
+  pid(): number;
+}
+
 export class Desktop {
+  static host: WindowHost | null = null;
+  /** Phones linked right now (the PC app keeps running for them when the window closes). */
+  static phones = 0;
+  /** The code and addresses a phone links with (shown in the app window: the PC app has no console window of its own). */
+  static linkInfo: () => any = () => ({});
   prefs: DesktopPrefs;
   private file: string;
   /** The browser program the app window runs in (never closed by the booster). */
@@ -54,6 +69,7 @@ export class Desktop {
     if (ip !== '127.0.0.1' && ip !== '::1') return false;
     const url = (req.url || '/').split('?')[0];
     if (url === '/api/desktop') return this.api(req, res), true;
+    if (url === '/api/link-info') { json(res, Object.assign({ phones: Desktop.phones }, Desktop.linkInfo())); return true; }
     // a newer copy of the PC app starting up asks this one to make way: close the window, then quit
     if (url === '/api/quit' && req.method === 'POST') { json(res, { ok: true }); this.closeWindow(); setTimeout(() => process.exit(0), 1500); return true; }
     if (url === '/api/backup') return this.backup(req, res), true;
@@ -170,6 +186,7 @@ export class Desktop {
    *  the windows are found by the app's own browser profile folder, which nothing else uses. Gently first (the
    *  window saves and closes as when you close it yourself), then for sure. */
   closeWindow(now?: boolean) {
+    if (Desktop.host) { try { Desktop.host.close(); } catch (e) { /* closed */ } return; }
     if (process.platform !== 'win32') return;
     const prof = path.join(this.dataDir, 'window').replace(/'/g, "''");
     const ps = `$p = '${prof}'; $l = @(Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'msedge.exe' -or $_.Name -eq 'chrome.exe') -and $_.CommandLine -and $_.CommandLine.Contains($p) });`
@@ -184,6 +201,13 @@ export class Desktop {
   /** Open the app window (Microsoft Edge in app mode, falling back to Chrome or the default browser). */
   openWindow() {
     const url = `http://127.0.0.1:${LINK_PORT}/`;
+    if (Desktop.host) {
+      this.windowExe = Desktop.host.exe;
+      const ok = Desktop.host.open(url, this.prefs);
+      this.windowPid = 0;   // the window is part of this program: the Game Booster sets this program's priority
+      this.applyBoost();
+      return ok;
+    }
     const profile = path.join(this.dataDir, 'window');
     const args = [`--app=${url}`, `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--disable-features=Translate,msUndersideButton',
       `--window-size=${this.prefs.width},${this.prefs.height}`, '--autoplay-policy=no-user-gesture-required'];

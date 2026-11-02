@@ -169,6 +169,7 @@ export async function main(replay?: { file: string; speed: number }) {
   const desktop = new Desktop(dir);
   try { desktop.applyBoost(); } catch (e) { /* normal priority */ }
   server.web = (req, res) => desktop.handle(req, res);
+  Desktop.linkInfo = () => ({ code: server.code, name: server.pcName, addresses: localAddresses() });
   const redraw = () => banner(server, status, phones, lines);
   const log = (s: string) => { writeLog(s); lines.push(new Date().toTimeString().slice(0, 8) + '  ' + s); if (lines.length > 200) lines.shift(); redraw(); };
   try { await server.start(); }
@@ -201,7 +202,7 @@ export async function main(replay?: { file: string; speed: number }) {
   }
   source.on('status', (ok: boolean, text: string) => { if (text !== status) writeLog('Flight Simulator: ' + text); status = text; redraw(); });
   source.on('note', (t: string) => writeLog(t));
-  server.on('clients', (n: number) => { phones = n; redraw(); });
+  server.on('clients', (n: number) => { phones = n; Desktop.phones = server.pairedClients().filter(c => c.device !== 'This PC').length; redraw(); });
   server.on('code', redraw);
   const tracker = run(source, server, log);
   // every real flight is recorded, so it can be played back exactly as the simulator sent it

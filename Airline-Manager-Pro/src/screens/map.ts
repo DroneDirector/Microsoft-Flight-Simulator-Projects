@@ -96,14 +96,21 @@ ACTIONS['map-layers'] = el => {
       <button class="ly-opt" data-act="pick-layer" data-style="street"><span class="ly-swatch street"><i></i><i></i><i></i></span><b>Street map</b><small>OpenStreetMap</small></button>
       <button class="ly-opt" data-act="pick-layer" data-style="satellite"><span class="ly-swatch sat"></span><b>Satellite</b><small>Sentinel-2</small></button>
     </div>`, { cls: 'layer-pick' });
-  const p = wrap.querySelector('.panel') as HTMLElement;
-  const w = 300;
-  p.style.width = w + 'px';
-  p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
-  const ph = p.offsetHeight || 200;
-  const below = r.bottom + 6, above = r.top - ph - 6;
-  p.style.top = Math.max(8, below + ph <= window.innerHeight - 8 ? below : above >= 8 ? above : window.innerHeight - ph - 8) + 'px';
+  placePop(wrap.querySelector('.panel') as HTMLElement, r, 300);
 };
+/** Place a pop-up next to the button that opened it, always fully inside the window. The page may be scaled (the
+ *  PC's interface size, the phone's text size): positions measured on screen are divided by that scale, as the
+ *  pop-up's own lengths are multiplied by it. */
+function placePop(p: HTMLElement, r: DOMRect, wWant: number, hFallback = 220) {
+  const z = +(window as any).__uiZoom || 1, W = window.innerWidth / z, H = window.innerHeight / z;
+  const R = { left: r.left / z, right: r.right / z, top: r.top / z, bottom: r.bottom / z };
+  const w = Math.min(wWant, W - 16);
+  p.style.width = w + 'px';
+  p.style.left = Math.max(8, Math.min(W - w - 8, R.right - w)) + 'px';
+  const ph = Math.min(p.offsetHeight || hFallback, H - 16), below = R.bottom + 6, above = R.top - ph - 6;
+  p.style.top = Math.max(8, below + ph <= H - 8 ? below : above >= 8 ? above : H - ph - 8) + 'px';
+  p.style.maxHeight = (H - 16) + 'px';
+}
 ACTIONS['pick-layer'] = el => { closeAll(); setMapStyle(el.getAttribute('data-style') as any); };
 
 function setMapStyle(style: 'classic' | 'street' | 'satellite') {
@@ -134,10 +141,7 @@ ACTIONS['map-search'] = el => {
   Sound.tick();
   const r = el.getBoundingClientRect();
   const wrap = openLayer('pop', `<div class="ms"><label class="apt-search">${icon('search')}<input id="map-q" type="search" placeholder="Airport name, city, ICAO or IATA" autocomplete="off"></label><div class="ms-list" id="map-q-list">${mapSearchResults('')}</div></div>`, { cls: 'map-search-pop' });
-  const p = wrap.querySelector('.panel') as HTMLElement, w = Math.min(340, window.innerWidth - 16);
-  p.style.width = w + 'px';
-  p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
-  p.style.top = Math.max(8, Math.min(window.innerHeight - 320, r.bottom + 6)) + 'px';
+  placePop(wrap.querySelector('.panel') as HTMLElement, r, 340, 320);
   setTimeout(() => { const i = $('#map-q') as HTMLInputElement; if (i) i.focus(); }, 60);
 };
 document.addEventListener('input', e => {

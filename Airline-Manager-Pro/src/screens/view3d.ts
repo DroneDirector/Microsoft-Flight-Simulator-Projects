@@ -48,9 +48,29 @@ function v3dTargetFlight(): any {
   return null;
 }
 function v3dAptOnly(): any { const k = String(V3d.target || ''); if (k.indexOf('apt:') !== 0) return null; const icao = k.slice(4), A = apt(icao); return A ? { id: k, from: icao, to: icao, real: true, pos: A.pos, alt: 0, hdg: 0, phase: 'Parked', callsign: icao } : null; }
+/** Opened from a screen in one of your offices (the Operations monitor, your laptop): the room is put away first, so
+ *  the graphics card has only the 3D view to draw (two 3D scenes at once can make it give up: "WebGL context lost"),
+ *  and you are back in the room, at the same screen, when you close the 3D view. */
+function v3dRoomSuspend() {
+  const O: any = typeof OpsRoom !== 'undefined' ? OpsRoom : null, F: any = typeof OfficeRoom !== 'undefined' ? OfficeRoom : null;
+  if (O && O.on) { (V3d as any).backTo = { room: 'ops', tab: O.overlay ? (O.overlay.getAttribute('data-screen') || O.tab) : '' }; O.close(true); return; }
+  if (F && F.on && !F.inc) { const lap = F.overlay && F.overlay.classList.contains('lap-screen'); (V3d as any).backTo = { room: 'office', lap, app: lap ? Lap.app : '', screen: !lap && F.overlay ? F.overlay.getAttribute('data-screen') : '' }; F.close(true); return; }
+  (V3d as any).backTo = null;
+}
+/** Back into the room the 3D view was opened from, at the same screen. */
+function v3dRoomResume(): boolean {
+  const B = (V3d as any).backTo; (V3d as any).backTo = null; if (!B) return false;
+  const ready = (R: any, then: () => void) => { const t0 = Date.now(), iv = setInterval(() => { if (!R.on) { clearInterval(iv); return; } if (!R.loading && R.A && Date.now() - t0 > 2600) { clearInterval(iv); try { then(); } catch (e) { /* stays in the room */ } } else if (Date.now() - t0 > 40000) clearInterval(iv); }, 250); };
+  try {
+    if (B.room === 'ops') { OpsRoom.open(); if (B.tab) ready(OpsRoom, () => opsScreenOpen(B.tab)); return true; }
+    if (B.room === 'office') { OfficeRoom.open(); if (B.lap) ready(OfficeRoom, () => { ofLaptopOpen(); if (B.app) setTimeout(() => { Lap.app = B.app; lapRender(); }, 60); }); else if (B.screen) ready(OfficeRoom, () => ofScreenOpen(B.screen)); return true; }
+  } catch (e) { /* back to the app */ }
+  return false;
+}
 function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const T = THREE;
   v3dClose();
+  try { v3dRoomSuspend(); } catch (e) { /* no room */ }
   V3d.aptReady = false; V3d.loadT0 = performance.now(); V3d.loaded = false; (V3d as any).pre = null; V3d.shown = 0;   // the loading bar starts from nothing every time
   v3dCrashGuard(true);
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
@@ -66,6 +86,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-info"></div>
     <div class="v3d-line"></div>
     <div class="v3d-status"></div>
+    <button class="v3d-shot" data-act="v3d-shot" aria-label="Take a screenshot" title="Take a screenshot (P)">${icon('camera')}</button>
     <button class="v3d-uitog" data-act="v3d-ui" aria-label="Hide or show the controls" title="Hide or show the controls (H)">${icon('focus')}<span>Hide controls</span></button>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
     <div class="v3d-free-ui">
@@ -139,7 +160,7 @@ ACTIONS['v3d-close'] = () => {
   exitSplash('v3d', '3D view', [
     { pct: 30, step: 'Landing the camera…', run: () => { (V3d as any).fcLeaving = true; v3dClose(); (V3d as any).fcLeaving = false; } },
     { pct: 55, step: 'Clearing the 3D world from memory…', run: () => { try { if (CabinOut.rt) CabinOut.rt.dispose(); CabinOut.rt = null; } catch (e) { /* none */ } exitFreeMemory(); } },
-    { pct: 85, step: free ? 'Loading the Overview…' : 'Loading the map…', run: () => { if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } else { try { refresh(); } catch (e) { /* ignore */ } } } },
+    { pct: 85, step: (V3d as any).backTo ? 'Back to your office…' : free ? 'Loading the Overview…' : 'Loading the map…', run: () => { if (v3dRoomResume()) return; if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } else { try { refresh(); } catch (e) { /* ignore */ } } } },
   ]);
 };
 /** Walking and the free camera: the controls can be hidden for a clean view (the button, H, or R3 on a controller). */
@@ -154,6 +175,12 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (!V3d.open || !/^(walk|free)$/.test(V3d.mode) || e.key.toLowerCase() !== 'h' || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target as HTMLElement; if (t && t.closest && t.closest('input, textarea, [contenteditable]')) return;
   e.preventDefault(); v3dUi();
+});
+// P takes a screenshot (any camera)
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (!V3d.open || e.key.toLowerCase() !== 'p' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  const t = e.target as HTMLElement; if (t && t.closest && t.closest('input, textarea, [contenteditable]')) return;
+  e.preventDefault(); ACTIONS['v3d-shot'](null, null);
 });
 ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
@@ -183,6 +210,29 @@ function v3dSize() {
   const w = innerWidth, h = innerHeight;
   V3d.r.setSize(w, h, false); V3d.cv.style.width = w + 'px'; V3d.cv.style.height = h + 'px';
   V3d.cam.aspect = w / h; V3d.cam.updateProjectionMatrix();
+}
+
+/** Floatplanes with wheels in their floats (amphibians): 1 = wheels down, landing on or rolling along a runway at a land
+ *  airport; 0 = wheels up, for water (a seaplane base, a water runway, or no runway near) and in cruise. */
+function v3dAmphibWheels(g: any, w: any, ph: string): number {
+  const near = /final|landing|touchdown|flare|approach|roll|taxi|take-?off|lift-?off|gate|parked|boarding|pushback/.test(ph) || w.onGround;
+  if (!near) return 0;
+  const A = apt(g.from), B = g.to && !g.noDest ? apt(g.to) : null;
+  const dA = A ? gcDistanceNm([w.lon, w.lat], A.pos) : 1e9, dB = B ? gcDistanceNm([w.lon, w.lat], B.pos) : 1e9;
+  const icao = /final|landing|touchdown|flare|approach/.test(ph) ? (B ? g.to : g.from) : dA <= dB ? g.from : g.to;
+  return v3dWaterAt(icao, w.lat, w.lon) ? 0 : 1;
+}
+/** Is the place this aircraft lands on (or stands on) water? The nearest runway of the airport's layout decides (a
+ *  water runway, or none within 3 km); without a layout, a seaplane base is water. */
+function v3dWaterAt(icao: string, lat: number, lon: number): boolean {
+  const L: any = (typeof AirportLayouts !== 'undefined' && AirportLayouts.cache[String(icao || '').toUpperCase()]) || null;
+  if (L && L.runways && L.runways.length) {
+    let best: any = null, bd = 1e9;
+    for (const r of L.runways) { const d = gcDistanceNm([lon, lat], [r.lon, r.lat]) * 1852; if (d < bd) { bd = d; best = r; } }
+    if (best && bd < 3000) return best.surf === 9;
+  }
+  const W: any = typeof World !== 'undefined' ? World.get(icao) : null;
+  return !!(W && W.size === 3);
 }
 
 /** Drag to look around, pinch or scroll to zoom, tap an aircraft for its flight. */
@@ -687,7 +737,9 @@ function v3dLoop(now: number) {
     // failures and emergencies: an engine on fire, a stopped engine, fire crews on the runway, the tow in
     let fireI = -1, outI = -1, feI: any = null;
     try { const FF: any = g; feI = FF.depAt && !FF.real && !FF.you ? flightEl(FF, Date.now()) : null; fireI = engineFire(FF, feI ? feI.el : undefined); outI = engineOut(FF, feI ? feI.el : undefined); } catch (e) { /* none */ }
-    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI } as any);
+    // floatplanes with wheels in their floats: wheels down to land on a runway (and on it), up for water
+    const PA: any = P; if (s.gear && s.gear.floats) { const wantA = v3dAmphibWheels(g, w, ph); PA.amph = PA.amph == null ? wantA : PA.amph + (wantA - PA.amph) * Math.min(1, dt * 0.6); }
+    if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI, amphib: PA.amph } as any);
     try { v3dEmergencyStep(P, g, fireI, feI, now, ground, w); } catch (e) { /* no effects */ }
     // the air blown forward out of the open reversers kicks up spray and dust from the runway
     if (PR.rev > 0.6 && now - (PR.revAt || 0) > 90) {
@@ -711,6 +763,7 @@ function v3dLoop(now: number) {
     let tm = [0, 0, 0, 0];
     if (!w.onGround) { try { tm = v3dTurbMotion(P, v3dTurbAt(P, w.lon, w.lat, w.altM / 0.3048, (w.altM - ground) / 0.3048, !!g.you), now / 1000); } catch (e) { /* calm */ } }
     P.model.position.y += tm[0];
+    if (PA.amph && P.model.userData.body && P.model.userData.body.userData.ampLift) P.model.position.y += P.model.userData.body.userData.ampLift * PG.gw;   // standing on the wheels below the floats
     P.model.rotateZ(-(P.pitch + tm[2]) * D2R);   // nose up
     P.model.rotateX(-(P.bank + tm[1]) * D2R);   // a turn to the right lowers the right wing
     (P.model.userData as any).flex = tm[3] * Math.max(0.5, shapeOf(P.type).span / 30);
@@ -1263,3 +1316,19 @@ function v3dClockStep(now: number) {
   if (el.textContent !== txt) el.innerHTML = `${icon('clock')}<b>${txt}</b>`;
   if (el.title !== title) { el.title = title; el.classList.toggle('sim', sim); }
 }
+
+/** A screenshot of the 3D view, kept with your screenshots (on your laptop and in your flight log). */
+ACTIONS['v3d-shot'] = () => {
+  if (!V3d.open || !V3d.r || !V3d.cv) return;
+  try {
+    V3d.r.render(V3d.scene, V3d.cam);   // drawn just now, so the picture is there to copy
+    const src = V3d.cv, W = src.width, H = src.height, big = document.createElement('canvas'), k = Math.min(1, 1920 / Math.max(W, H));
+    big.width = Math.round(W * k); big.height = Math.round(H * k); (big.getContext('2d') as CanvasRenderingContext2D).drawImage(src, 0, 0, big.width, big.height);
+    const th = document.createElement('canvas'), t = 320 / Math.max(big.width, big.height); th.width = Math.round(big.width * t); th.height = Math.round(big.height * t); (th.getContext('2d') as CanvasRenderingContext2D).drawImage(big, 0, 0, th.width, th.height);
+    const f: any = State.live.filter(x => x.id === V3d.target)[0], cap = `3D view${f ? ` · ${f.reg}, ${f.from} to ${f.to}` : V3d.icao ? ` · ${V3d.icao}` : ''}`;
+    const flash = document.createElement('div'); flash.className = 'v3d-flash'; V3d.root.appendChild(flash); setTimeout(() => flash.remove(), 600);
+    try { Sound.tick(); } catch (e) { /* quiet */ }
+    PhotoDb.put({ id: uid(), log: '3d', at: Date.now(), data: big.toDataURL('image/jpeg', 0.9), thumb: th.toDataURL('image/jpeg', 0.75), w: big.width, h: big.height, cap, mode: Mode.coop() ? 'coop' : 'solo' })
+      .then(() => toast('Screenshot saved: see it on your laptop, in the office', 'ok')).catch(() => toast('The screenshot could not be saved', 'warn'));
+  } catch (e) { toast('The screenshot could not be taken', 'warn'); }
+};

@@ -73,6 +73,8 @@ function renderTopbar() {
 let _navSeq = 0;
 function go(screen: string, instant?: boolean) {
   if (!SCREENS[screen]) screen = 'ops';
+  // at a monitor or the laptop in your offices: the screen opens there, where you are working
+  try { if (typeof roomGo === 'function' && roomGo(screen)) return; } catch (e) { /* the app's own view */ }
   const prev = State.screen;
   State.screen = screen;
   const navKey = SUB_PAGES[screen] || screen;
@@ -114,6 +116,10 @@ function refresh() {
   renderTopbar();
   try { if (typeof ofScreenRefresh === 'function') ofScreenRefresh(); } catch (e) { /* the office shows it next time */ }
   try { if (typeof opsRefresh === 'function') opsRefresh(); } catch (e) { /* Operations shows it next time */ }
+  try { if (typeof lapRefresh === 'function') lapRefresh(); } catch (e) { /* the laptop shows it next time */ }
+  // in one of your offices the app's own view is hidden behind the room: it is drawn again when you leave
+  // (two live maps of the same screen would otherwise take turns, and the one you look at flickers)
+  try { if ((typeof OpsRoom !== 'undefined' && OpsRoom.on) || (typeof OfficeRoom !== 'undefined' && OfficeRoom.on)) return; } catch (e) { /* draw it */ }
   const view = $('#view');
   const st = view.scrollTop, cur = view.firstElementChild as HTMLElement, html = `<section class="screen screen-${State.screen}">${SCREENS[State.screen].render()}</section>`;
   // the same screen again: change only what changed (text, numbers, a new row), so nothing flashes or
@@ -151,6 +157,9 @@ function patchChildren(from: Node, to: Node) {
 }
 const PATCH_KEEP = ['spot', 'tick-fade', 'shake'];
 function patchNode(o: Element, n: Element) {
+  // a live part drawn by code into an empty place in the page (a map, a chart): kept as it is, only its own
+  // attributes follow, so an update never wipes it (wiping and drawing it again makes it flicker)
+  if (o.id && !n.childNodes.length && o.querySelector && o.querySelector('canvas')) { for (let i = 0; i < n.attributes.length; i++) if (n.attributes[i].name !== 'class' && o.getAttribute(n.attributes[i].name) !== n.attributes[i].value) o.setAttribute(n.attributes[i].name, n.attributes[i].value); return; }
   // a different item in this place (another id): swap it rather than reshape it
   const ko = o.getAttribute('data-id'), kn = n.getAttribute('data-id');
   if (ko !== kn && ko && kn) { o.parentNode.replaceChild(n, o); return; }

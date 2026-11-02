@@ -506,6 +506,19 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
     const m = new T.Mesh(new T.CylinderGeometry(r, r, wdt, 16), mTyre); m.rotation.x = Math.PI / 2; m.position.copy(_av(x, y, r)); gearG.add(m);
     const hub = new T.Mesh(new T.CylinderGeometry(r * 0.5, r * 0.5, wdt * 1.04, 12), mMetal); hub.rotation.x = Math.PI / 2; hub.position.copy(_av(x, y, r)); gearG.add(hub);
   };
+  // amphibious floats: wheels inside each float (two at the bow, two just behind the step), lowered to land on a
+  // runway and drawn up into the float for water
+  const ampG = new T.Group(); ampG.visible = false; root.add(ampG);
+  const AMP_OUT = G.floats ? 0.34 : 0;   // how far the wheels stand out below the floats when down (m)
+  if (G.floats) {
+    const fl = G.floats, wr = 0.19, wd = 0.12;
+    for (const side of [1, -1]) for (const fx of [fl.x + fl.l * 0.1, fl.x + fl.l * 0.47]) {
+      const front = fx < fl.x + fl.l * 0.3, r = front ? wr * 0.8 : wr, y = side * fl.y;
+      const leg = cylBetween([fx, y, r - AMP_OUT + fl.d * 0.02], [fx, y, fl.d * 0.3], front ? 0.03 : 0.04, mMetal); ampG.add(leg);
+      const m = new T.Mesh(new T.CylinderGeometry(r, r, wd, 14), mTyre); m.rotation.x = Math.PI / 2; m.position.copy(_av(fx, y, r - AMP_OUT)); ampG.add(m);
+      const hub = new T.Mesh(new T.CylinderGeometry(r * 0.5, r * 0.5, wd * 1.04, 10), mMetal); hub.rotation.x = Math.PI / 2; hub.position.copy(_av(fx, y, r - AMP_OUT)); ampG.add(hub);
+    }
+  }
   if (G.floats) {
     const fl = G.floats;
     for (const side of [1, -1]) {
@@ -542,7 +555,7 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   // engines numbered as in the simulator: from the left wing tip to the right
   engPts.sort((a, b) => a.y - b.y); root.userData.engPts = engPts;
   const propIdx = props.map(p => engPts.findIndex(e => Math.abs(e.y - p.y) < 0.01));
-  root.userData.set = (o: { flaps?: number; gear?: number; spin?: number; spoilers?: number; reverse?: number }) => {
+  root.userData.set = (o: { flaps?: number; gear?: number; spin?: number; spoilers?: number; reverse?: number; amphib?: number }) => {
     if (o.reverse != null) for (const r of revParts) { const k = clamp(o.reverse, 0, 1); r.sleeve.position.copy(r.slide).multiplyScalar(k); r.casc.visible = k > 0.01; }
     if (o.spoilers != null) for (const p of spoilerParts) { const k = clamp(o.spoilers, 0, 1); p.visible = k > 0.02; p.quaternion.setFromAxisAngle(p.userData.axis, k * 0.85); }
     if (o.flaps != null) for (const p of flapParts) {
@@ -550,6 +563,8 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
       p.quaternion.setFromAxisAngle(p.userData.axis, -k * 0.62);
       p.children[0].position.copy(p.userData.slide).multiplyScalar(k);
     }
+    // amphibian wheels: 0 up inside the floats (water), 1 down below them (a runway); they slide straight down
+    if ((o as any).amphib != null && s.gear.floats) { const k = clamp((o as any).amphib, 0, 1); ampG.visible = k > 0.02; ampG.position.y = (1 - k) * AMP_OUT; root.userData.ampLift = k * AMP_OUT; }
     if (o.gear != null && !s.gear.fixed && !s.gear.floats) { gearG.visible = o.gear > 0.02; gearG.scale.y = 0.2 + 0.8 * clamp(o.gear, 0, 1); gearG.position.y = (1 - clamp(o.gear, 0, 1)) * s.ground * 0.55; }
     if (o.spin != null) props.forEach((p, i) => { const out = (o as any).stopped === propIdx[i]; if (!out) p.blades.rotation.x = o.spin; p.disc.visible = !out; });   // a stopped engine's propeller stands still (feathered)
   };

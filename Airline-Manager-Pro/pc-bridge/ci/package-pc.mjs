@@ -1,5 +1,7 @@
-// Packages the PC app for Windows: one .exe (Node single executable) plus node-simconnect
-// as its own unmodified library folder next to it (LGPL-3.0: replaceable by the user).
+// Packages the PC app for Windows: the app with its own browser engine (Electron, MIT, which brings Chromium:
+// AirlineManagerPro-PC.exe and its files), a small tools program without the engine (a Node single executable:
+// removing the app, the sim check, playing back recordings), and node-simconnect as its own unmodified library
+// folder next to them (LGPL-3.0: replaceable by the user).
 // Then the Setup program: the whole app folder packed inside one more single executable with its own window
 // (src/setup), the app's compass-star icon on both .exe files and on the shortcuts Setup makes.
 import { execSync } from 'node:child_process';
@@ -21,7 +23,7 @@ mkdirSync(pkg, { recursive: true });
 run('npx esbuild dist/cli.js --bundle --platform=node --format=cjs --target=node22 --external:node-simconnect --outfile=build/amp-pc.js');
 writeFileSync(join(out, 'sea.json'), JSON.stringify({ main: 'build/amp-pc.js', output: 'build/sea.blob', disableExperimentalSEAWarning: true }));
 run('node --experimental-sea-config build/sea.json');
-const exe = join(pkg, 'AirlineManagerPro-PC.exe'), ico = join(here, 'ci', 'app.ico'), publisher = app.publisher || 'DroneDirector';
+const exe = join(pkg, 'AirlineManagerPro-Tools.exe'), ico = join(here, 'ci', 'app.ico'), publisher = app.publisher || 'DroneDirector';
 copyFileSync(process.execPath, exe);
 // the app's icon and name on the program (before the app is put into it)
 function brand(file, description) {
@@ -35,9 +37,26 @@ function brand(file, description) {
       '--set-version-string', 'InternalName', app.appName], { stdio: 'inherit' });
   } catch (e) { console.log('Couldn\'t set the icon:', e.message); }
 }
-brand(exe, app.appName);
+brand(exe, app.appName + ' tools');
 run(`npx postject "${exe}" NODE_SEA_BLOB build/sea.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2`);
 copyFileSync(ico, join(pkg, 'app.ico'));
+
+// the app itself: its own browser engine (Electron's files, unchanged), renamed and with the app's icon
+const engine = join(here, 'node_modules', 'electron', 'dist');
+// npm may skip the package's own download step: run it (it fetches this exact Electron version's files and checks them)
+if (!existsSync(join(engine, 'version'))) run('node node_modules/electron/install.js');
+if (!existsSync(join(engine, 'electron.exe')) && process.platform === 'win32') throw new Error('Electron is missing (npm install)');
+cpSync(engine, pkg, { recursive: true });
+rmSync(join(pkg, 'resources', 'default_app.asar'), { force: true });
+const gameExe = join(pkg, 'AirlineManagerPro-PC.exe');
+if (existsSync(join(pkg, 'electron.exe'))) { rmSync(gameExe, { force: true }); copyFileSync(join(pkg, 'electron.exe'), gameExe); rmSync(join(pkg, 'electron.exe')); }
+if (existsSync(join(pkg, 'LICENSE'))) { copyFileSync(join(pkg, 'LICENSE'), join(pkg, 'LICENSE.electron.txt')); rmSync(join(pkg, 'LICENSE')); }
+brand(gameExe, app.appName);
+const res = join(pkg, 'resources', 'app');
+mkdirSync(res, { recursive: true });
+run(`npx esbuild dist/electron-main.js --bundle --platform=node --format=cjs --target=node22 --external:electron --external:node-simconnect --outfile="${join(res, 'main.js')}"`);
+writeFileSync(join(res, 'package.json'), JSON.stringify({ name: 'airline-manager-pro', productName: app.appName, version: app.version, main: 'main.js', private: true }, null, 2));
+console.log('Own browser engine: Electron ' + readFileSync(join(engine, 'version'), 'utf8').trim());
 
 // the app itself (the same build as the phone's), shown in its own window on this PC
 const web = join(here, '..', 'www');
@@ -67,12 +86,13 @@ writeFileSync(join(pkg, 'README.txt'), [
   '  Window, borderless or full screen, the size of everything, the graphics card and the sound output are in',
   '  Settings > Display. F11 switches full screen. It fits any screen, including ultrawide, without stretching.',
   '  Your airline is saved on this PC and backed up to Documents\\Airline Manager Pro.',
-  '  The window uses Microsoft Edge, which is part of Windows. Closed it? Type A and press Enter in the PC app.', '',
+  '  The app brings its own browser engine (Chromium), so it looks and runs the same on every PC.', '',
   'The phone app',
   '1. Start Microsoft Flight Simulator.',
   '2. Double-click AirlineManagerPro-PC.exe. When Windows asks, allow it on private networks',
   '   (and on public networks too if you will use your phone\'s hotspot).',
-  '3. On your phone: tap the link button at the top of the app, pick this PC and enter the 6-digit code shown in the window.',
+  '3. On your phone: tap the link button at the top of the app, pick this PC and enter the 6-digit code shown',
+  '   on the PC in Settings > Simulator link.',
   '   Phone and PC must be on the same Wi-Fi network, or this PC connected to your phone\'s hotspot.', '',
   'Using mobile data (phone hotspot)',
   '  Turn on the hotspot on your phone and connect this PC to it. Windows usually calls a phone hotspot a public',
@@ -80,8 +100,9 @@ writeFileSync(join(pkg, 'README.txt'), [
   '  the hotspot > Private network), or allow Airline Manager Pro PC on public networks in Windows Firewall.',
   '  The link uses about 5 MB an hour. Flight Simulator itself streams scenery and can use much more; you can',
   '  limit that in its Data settings.', '',
-  'Keep the window open while you fly. Your flights, landings, fuel, weights and damage are sent to the phone.',
-  'To try the link without Flight Simulator, run:  AirlineManagerPro-PC.exe --demo 30', '',
+  'Keep the app open while you fly. Your flights, landings, fuel, weights and damage are sent to the phone.',
+  'Closing the window while a phone is linked keeps the link going: the app\'s icon stays by the clock (right-click it to quit).',
+  'To try the link without Flight Simulator, run:  AirlineManagerPro-Tools.exe --demo 30', '',
   'Sim check',
   '  With a flight loaded in Flight Simulator, double-click "Check Flight Simulator.cmd". It reads everything the app',
   '  uses from the simulator and the loaded aircraft and saves a report in Documents\\Airline Manager Pro\\Diagnostics.', '',
@@ -89,17 +110,18 @@ writeFileSync(join(pkg, 'README.txt'), [
   '  Every flight is recorded to Documents\\Airline Manager Pro\\Recordings (the newest 30 are kept, about 1 MB an hour).',
   '  To play one back to the phone as if Flight Simulator were flying it, drag the recording onto "Play back a flight.cmd".',
   '  To fly without recording, run:  AirlineManagerPro-PC.exe --no-record', '',
-  'If something goes wrong, the window stays open with the error, and the details are saved in',
+  'If something goes wrong, a message shows the error, and the details are saved in',
   '%APPDATA%\\Airline Manager Pro\\pc-app.log. Send that file so the problem can be looked at.', '',
   'Licences',
   '  node-simconnect (lib/node_modules/node-simconnect) is used unmodified under the GNU LGPL v3.',
-  '  Its licence text is in that folder. You may replace that folder with another version of the library.', '',
+  '  Its licence text is in that folder. You may replace that folder with another version of the library.',
+  '  Electron (MIT): LICENSE.electron.txt. Chromium and the parts it uses: LICENSES.chromium.html.', '',
 ].join('\r\n'));
 // double-click shortcuts for the sim check and playing back a recording
-writeFileSync(join(pkg, 'Check Flight Simulator.cmd'), ['@echo off', 'cd /d "%~dp0"', 'AirlineManagerPro-PC.exe --check', ''].join('\r\n'));
+writeFileSync(join(pkg, 'Check Flight Simulator.cmd'), ['@echo off', 'cd /d "%~dp0"', 'AirlineManagerPro-Tools.exe --check', ''].join('\r\n'));
 writeFileSync(join(pkg, 'Play back a flight.cmd'), ['@echo off', 'cd /d "%~dp0"',
   'if "%~1"=="" (echo Drag a recording from Documents\\Airline Manager Pro\\Recordings onto this file. & pause & exit /b)',
-  'AirlineManagerPro-PC.exe --replay "%~1" 1', ''].join('\r\n'));
+  'AirlineManagerPro-Tools.exe --replay "%~1" 1', ''].join('\r\n'));
 console.log('Packaged', pkg);
 
 // ---------- the Setup program ----------

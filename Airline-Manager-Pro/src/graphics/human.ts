@@ -30,6 +30,32 @@ function humanSpeech(text: string, startMs: number, nowMs?: number): { open: num
   const i = Math.floor(pos), f = pos - i, k = f * f * (3 - 2 * f);
   return { open: (op(ch(i)) * (1 - k) + op(ch(i + 1)) * k) * (0.85 + 0.15 * Math.sin(t * 19)), round: rd(ch(i)) * (1 - k) + rd(ch(i + 1)) * k };
 }
+/** The mouth of a person who talks, everywhere people talk (office, court, cabin, and any new place): while their
+ *  line is heard as a voice, the mouth follows the voice from the moment it is heard to its end, again from the
+ *  start each time Play is pressed; with no voice, it follows the words being read (text, from atMs).
+ *  name: the person's name as it ends the voice's "role|sex|mood|name", or that whole voice; 'me' for your own voice. */
+function humanTalk(name: string, text?: string, atMs?: number): { open: number; round: number } | 0 {
+  const V: any = typeof Voice !== 'undefined' ? Voice : null;
+  // their line is being got ready to play: the mouth stays still until the voice is heard
+  if (V && V.speaking && name && humanVoiceIs(V.who, name) && (!V.audibleAt || Date.now() < V.audibleAt)) return 0;
+  if (V && V.speaking && V.audibleAt && name && humanVoiceIs(V.who, name)) {
+    const now = Date.now();
+    const t = V.text || '', cycle = (t.length + 1.5) / 13 * 1000;
+    return humanSpeech(t, V.audibleAt, V.audibleAt + ((now - V.audibleAt) % Math.max(400, cycle)));
+  }
+  return text ? humanSpeech(text, atMs || 0) : 0;
+}
+/** Is this voice ("role|sex|mood|name", or "me|…") this person's? */
+function humanVoiceIs(who: string, name: string): boolean {
+  const w = String(who || ''); if (!w) return false;
+  if (name.indexOf('|') >= 0) return w === name;   // a whole voice ("role|sex|mood|name")
+  if (name === 'me') return /^me(\||$)/.test(w);
+  return w.split('|')[3] === name;
+}
+/** Is this person's voice playing or about to play (being got ready)? Their mouth then follows only the voice. */
+function humanVoiceBusy(name: string): boolean { const V: any = typeof Voice !== 'undefined' ? Voice : null; return !!(V && V.speaking && name && humanVoiceIs(V.who, name)); }
+/** Is this person's voice being heard now (their mouth then follows it, not the text)? */
+function humanVoiceOn(name: string): boolean { const V: any = typeof Voice !== 'undefined' ? Voice : null; return !!(V && V.speaking && V.audibleAt && Date.now() >= V.audibleAt && humanVoiceIs(V.who, name)); }
 /** Only how far the mouth is open (see humanSpeech). */
 function humanTalk(text: string, startMs: number, nowMs?: number): number { return humanSpeech(text, startMs, nowMs).open; }
 function humanGesture(mood: any, t: number): any {

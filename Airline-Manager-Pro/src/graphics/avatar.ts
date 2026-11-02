@@ -19,6 +19,7 @@ interface Look {
   neck: 'tie' | 'scarf' | 'open';
   hat: 'none' | 'cap' | 'pillbox';
   uniform: number;         // index into UNIFORM_COLORS
+  voice?: string;          // your own pilot only: the voice you speak with (MY_VOICES in src/core/voice.ts)
 }
 
 type CrewRole = 'captain' | 'fo' | 'fa' | 'mech' | 'ground';

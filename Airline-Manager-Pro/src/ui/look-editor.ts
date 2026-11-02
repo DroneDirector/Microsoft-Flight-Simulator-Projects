@@ -49,7 +49,8 @@ function lookEditorBody(): string {
       <div class="le-group"><b>Nationality</b><select class="le-in" data-le-nat>${countriesSorted().map(c => `<option value="${c[0]}" ${c[0] === id.nat ? 'selected' : ''}>${flag(c[0])} ${esc(c[1])}</option>`).join('')}</select></div>
     </div>` : ''}
     <div class="le-group"><b>Male or female</b>${leChoice('sex', [['m', 'Male'], ['f', 'Female']], L.sex)}</div>
-    <div class="le-group"><b>Skin tone</b>${leSwatches('skin', SKIN_TONES, L.skin)}</div>`;
+    <div class="le-group"><b>Skin tone</b>${leSwatches('skin', SKIN_TONES, L.skin)}</div>
+    ${id ? leVoiceHtml(L) : ''}`;
   if (t === 'face') return `
     <div class="le-group"><b>Face shape</b>${leChoice('face', [['oval', 'Oval'], ['round', 'Round'], ['square', 'Square'], ['long', 'Long']], L.face)}</div>
     <div class="le-group"><b>Eyes</b>${leChoice('eyes', [['almond', 'Almond'], ['round', 'Round'], ['mono', 'Monolid']], L.eyes)}</div>
@@ -109,6 +110,23 @@ function leReadIdentity() {
   if (d && d.value) _le.id.dob = d.value;
   if (nt) _le.id.nat = nt.value;
 }
+
+/** Your own voice (your pilot only): what you say in conversations is spoken with it. */
+function leVoiceHtml(L: any): string {
+  const sex = L.sex === 'f' ? 'f' : 'm', list = MY_VOICES[sex], cur = L.voice && list.some(x => x[0] === L.voice) ? L.voice : MY_DEFAULT[sex];
+  const ready = VoicePack.state === 'ready', missing = ready ? list.filter(x => !voiceInstalled(x[0])).length : 0;
+  return `<div class="le-group"><b>Your voice</b><p class="muted">What you say to your crew, in your office and in court is spoken with it. Tap one to hear it.</p>
+    <div class="le-voices">${list.map(x => `<button class="le-voice ${x[0] === cur ? 'on' : ''}" data-act="le-voice" data-v="${x[0]}"><span class="lv-ic">${icon('volume')}</span><span><b>${esc(x[1])}</b><small>${esc(x[2])}</small></span></button>`).join('')}</div>
+    ${!ready ? `<p class="fine-print">${icon('info')}The natural voices come with the voice pack (Settings → Voices). Until then this device's own voice speaks for you.</p>`
+      : missing ? `<div class="btn-row"><button class="btn ghost sm" data-act="le-voice-dl">${icon('download')}Get the other ${missing} voices (about ${Math.max(1, Math.round(missing * 0.52))} MB)</button></div>` : ''}</div>`;
+}
+ACTIONS['le-voice'] = el => {
+  leReadIdentity();
+  const v = el.getAttribute('data-v'); (_le.look as any).voice = v;
+  $all('.look-pop .le-voice').forEach(b => b.classList.toggle('on', b === el));
+  try { Voice.stop(); Voice.speak('Tell me in your own words what happened.', undefined, `me|${_le.look.sex === 'f' ? 'f' : 'm'}|neutral|${v}`); } catch (e) { /* no voice */ }
+};
+ACTIONS['le-voice-dl'] = () => { leReadIdentity(); VoicePack.manifest = null; VoicePack.download().then(() => leRefresh(true)); toast('Getting the other voices…', 'info'); };
 
 ACTIONS['le-tab'] = el => {
   leReadIdentity(); _le.tab = el.getAttribute('data-t'); _le.cam = leCamForTab(_le.tab); Sound.tick();

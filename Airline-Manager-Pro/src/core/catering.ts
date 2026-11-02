@@ -105,9 +105,9 @@ ACTIONS['cat-buy'] = el => {
 };
 
 /* ---------- the storage card ---------- */
-/** Everything in storage: food and drink, jet fuel and spare parts, with what to order and how prices move. */
-function storageCardHtml(): string {
-  const c = company(), st = catStore(c.id), s = stockOf(c.id), real = !!(typeof realMarkets === 'function' && realMarkets());
+/** Food and drink in storage, one row each, with what to order and how prices move (the Food and drink market). */
+function catRowsParts(): { rows: string; real: boolean } {
+  const c = company(), st = catStore(c.id), real = !!(typeof realMarkets === 'function' && realMarkets());
   const spark = (v: number[]) => { if (v.length < 2) return ''; const lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1; return `<svg class="st-spark" viewBox="0 0 60 18" preserveAspectRatio="none"><polyline points="${v.map((x, i) => `${(i / (v.length - 1) * 60).toFixed(1)},${(16 - (x - lo) / r * 14).toFixed(1)}`).join(' ')}"/></svg>`; };
   const pct = (x: number) => `<b class="${x > 0.005 ? 'up' : x < -0.005 ? 'down' : ''}">${x > 0 ? '+' : ''}${(x * 100).toFixed(1)}%</b>`;
   const advice = (have: number, perDay: number, cap: number) => {
@@ -125,6 +125,12 @@ function storageCardHtml(): string {
       <div class="st-buy">${[need > 0 ? need : 0, 500, 2000].filter((q, i) => q > 0 || i > 0).slice(0, 3).map((q, i) => `<button class="btn ghost sm" data-act="cat-buy" data-k="${it.id}" data-q="${Math.max(50, Math.round(q / 50) * 50)}">${i === 0 && need > 0 ? 'A week\'s worth' : '+' + num(q)}</button>`).join('')}</div>
     </div>`;
   }).join('');
+  return { rows, real };
+}
+/** Everything in storage: food and drink, jet fuel and spare parts, with what to order and how prices move. */
+function storageCardHtml(): string {
+  const c = company(), s = stockOf(c.id), { rows, real } = catRowsParts();
+  const pct = (x: number) => `<b class="${x > 0.005 ? 'up' : x < -0.005 ? 'down' : ''}">${x > 0 ? '+' : ''}${(x * 100).toFixed(1)}%</b>`;
   const fuelDays = '', fuelM = marketIdx('fuel'), partsM = marketIdx('parts');
   const fuelRow = `<div class="st-row"><div class="st-name"><b>Jet fuel</b><small>${num(Math.round(s.fuelKg / 1000))} t at your bases · price ${pct(fuelM - 1)} against normal</small></div><div class="st-bar"><i style="width:${Math.min(100, s.fuelKg / fuelCapKg(c.id) * 100).toFixed(1)}%"></i></div><div class="st-adv">${s.fuelKg < fuelCapKg(c.id) * 0.1 ? '<span class="st-warn">Low: flights buy at the day\'s price</span>' : '<span class="st-ok">In stock</span>'}${fuelDays}</div><div class="st-mkt"><small>${real ? 'real US jet fuel price' : 'simulated market'}</small></div><div class="st-buy"><button class="btn ghost sm" data-act="go-finance-markets" data-k="fuel">Buy fuel</button></div></div>`;
   const partsRow = `<div class="st-row"><div class="st-name"><b>Spare parts</b><small>${money(s.parts, { compact: true })} in stock · price ${pct(partsM - 1)} against normal</small></div><div class="st-bar"><i style="width:${Math.min(100, s.parts / partsCap(c.id) * 100).toFixed(1)}%"></i></div><div class="st-adv">${s.parts < partsCap(c.id) * 0.1 ? '<span class="st-warn">Low: repairs buy at the day\'s price</span>' : '<span class="st-ok">In stock</span>'}</div><div class="st-mkt"><small>${real ? 'real US parts price index' : 'simulated market'}</small></div><div class="st-buy"><button class="btn ghost sm" data-act="go-finance-markets" data-k="parts">Buy parts</button></div></div>`;
@@ -132,7 +138,18 @@ function storageCardHtml(): string {
     ${cateringOn() ? rows : ''}${fuelRow}${partsRow}
     <p class="fine-print">${icon('info')}${real ? 'Prices follow the real US price indices for food, drinks and alcohol (Bureau of Labor Statistics), jet fuel (Energy Information Administration) and aircraft parts.' : 'Prices move on a simulated market (real-world prices are off or not available).'} The ground crew load each flight from these stores; what a flight needs that isn't in store is bought from the airport's caterer at the day's price plus their margin.</p></div>`;
 }
-ACTIONS['go-finance-markets'] = el => { try { (window as any)._mktTab = el.getAttribute('data-k'); _mktTab = el.getAttribute('data-k') as any; } catch (e) { /* default */ } const m = document.querySelector('.mkt-card'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+/** The Food and drink market: drinks and soft drinks, sweets and snacks, food and hot meals. */
+function foodMarketHtml(): string {
+  const { rows, real } = catRowsParts();
+  if (!cateringOn()) return `<p class="fine-print">${icon('info')}Catering storage is off (Settings → Passenger services): flights buy their food and drink at each airport.</p>`;
+  return `<div class="storage-card st-food">${rows}</div><p class="fine-print">${icon('info')}${real ? 'Prices follow the real US price indices for food, drinks and alcohol (Bureau of Labor Statistics).' : 'Prices move on a simulated market.'} Flights take what they need from your stores first.</p>`;
+}
+ACTIONS['go-finance-markets'] = el => {
+  // to that market's tab in Finance, and to its buy buttons
+  _mktTab = (el.getAttribute('data-k') || 'fuel') as any; Sound.tick();
+  if (State.screen !== 'finance') { closeAll(); go('finance'); } else refresh();
+  setTimeout(() => { const m = document.querySelector('.mkt-card'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 120);
+};
 
 /* ---------- loading a flight by hand ---------- */
 /** For a flight still boarding: what it needs, what's in store, and the ground crew loading it as you set it. */

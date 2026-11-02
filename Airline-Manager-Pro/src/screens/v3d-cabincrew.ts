@@ -103,7 +103,10 @@ function cabinTrolley(): any {
 /** How far someone's mouth is open now, from the last thing they said (the cabin's talk log). */
 function cabinTalkJaw(key: string): any {
   const L = CabinCrew.talk.log[key]; if (!L || !L.length) return 0;
-  const ln = L[L.length - 1]; return Date.now() - ln.at < 20000 ? humanSpeech(ln.text, ln.at) : 0;
+  const ln = L[L.length - 1];
+  // their line played as a voice (Hear): the mouth follows it, again each time it is played
+  for (let i = L.length - 1; i >= 0; i--) if (humanVoiceBusy(L[i].voice)) return humanTalk(L[i].voice);   // still until the voice is heard, then with it
+  return Date.now() - ln.at < 20000 ? humanSpeech(ln.text, ln.at) : 0;
 }
 function cabinSay(key: string, line: TalkLine, pos: () => any) {
   const T = CabinCrew.talk, L = T.log[key] = T.log[key] || [];

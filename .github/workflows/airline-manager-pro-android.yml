@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: amp-voice-pack-1
+      TAG: amp-voice-pack-2
     steps:
       - uses: actions/checkout@v4
 
@@ -45,9 +45,11 @@ jobs:
           echo "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d  src/voices.bin" | sha256sum -c
           python3 build_pack.py src/model.onnx src/voices.bin src/misaki out src/LICENSE-*.txt
           ls -la out
+          # published from main only (a test build elsewhere only checks that the pack builds)
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then echo "Not on main: the pack is built, not published"; exit 0; fi
           gh release create "$TAG" out/* --repo "$GITHUB_REPOSITORY" --target main --prerelease \
-            --title "Airline Manager Pro voice pack 1" \
-            --notes "Voices for the people in Airline Manager Pro. Downloaded once by the app (Settings → Voices). Kokoro-82M v1.0 and misaki pronunciation dictionaries, both Apache License 2.0; see NOTICE.txt and the licence files."
+            --title "Airline Manager Pro voice pack 2" \
+            --notes "Voices for the people in Airline Manager Pro. Downloaded once by the app (Settings → Voices); pack 2 adds every English voice and mixes of them, for choosing your own voice. Kokoro-82M v1.0 and misaki pronunciation dictionaries, both Apache License 2.0; see NOTICE.txt and the licence files."
 
   pc:
     name: PC app (Windows)
@@ -86,15 +88,40 @@ jobs:
       - name: Smoke test the packaged app
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "build/Airline Manager Pro PC/AirlineManagerPro-PC.exe" -ArgumentList "--demo","50" -PassThru -NoNewWindow
+          $dir = "build/Airline Manager Pro PC"
+          # the tools program (no browser engine): a demo flight and the link
+          $p = Start-Process -FilePath "$dir/AirlineManagerPro-Tools.exe" -ArgumentList "--demo","50" -PassThru -NoNewWindow
           Start-Sleep -Seconds 6
           $r = Invoke-RestMethod -Uri "http://127.0.0.1:47610/info"
-          Write-Output ("PC app answered: " + $r.app + " " + $r.version)
+          Write-Output ("Tools answered: " + $r.app + " " + $r.version)
           $h = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:47610/"
           if ($h.Content -notmatch "app.js") { Write-Output "The app page was not served"; Stop-Process -Id $p.Id -Force; exit 1 }
           Write-Output "The app page is served"
           Stop-Process -Id $p.Id -Force
           if ($r.app -ne "Airline Manager Pro") { exit 1 }
+          Start-Sleep -Seconds 2
+          # the app with its own browser engine: starts, opens its window, and the window loads the app and links to it
+          $g = Start-Process -FilePath "$dir/AirlineManagerPro-PC.exe" -PassThru
+          $log = Join-Path $env:APPDATA "Airline Manager Pro\pc-app.log"
+          $ok = $false
+          for ($i = 0; $i -lt 60 -and -not $ok; $i++) { Start-Sleep -Seconds 1; $ok = (Test-Path $log) -and (Select-String -Path $log -Pattern "Phone linked: This PC" -Quiet) }
+          Start-Sleep -Seconds 6
+          Write-Output "--- pc-app.log"; Get-Content $log -Tail 12 -ErrorAction SilentlyContinue
+          $procs = @(Get-Process AirlineManagerPro-PC -ErrorAction SilentlyContinue)
+          Write-Output ("Engine processes: " + $procs.Count + "; window: " + (($procs | Where-Object { $_.MainWindowTitle }) | Select-Object -First 1).MainWindowTitle)
+          # a picture of the window on the build machine (no graphics card there: drawn in software)
+          try { Add-Type -AssemblyName System.Windows.Forms, System.Drawing; $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height; $gr = [System.Drawing.Graphics]::FromImage($bmp); $gr.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); $bmp.Save("build/own-engine-window.png") } catch { Write-Output "No screen picture: $_" }
+          taskkill /F /IM AirlineManagerPro-PC.exe | Out-Null
+          if (-not (Select-String -Path $log -Pattern "Own browser engine: Electron" -Quiet)) { Write-Output "The app didn't start with its own browser engine"; exit 1 }
+          if (-not $ok) { Write-Output "The app window didn't load the app"; exit 1 }
+          Write-Output "The app runs with its own browser engine"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: own-engine-window
+          path: Airline-Manager-Pro/pc-bridge/build/own-engine-window.png
+          if-no-files-found: ignore
 
       - name: Test Setup (install into a chosen folder, shortcut, Apps entry, then remove everything)
         timeout-minutes: 10
@@ -115,7 +142,7 @@ jobs:
           Get-Content (Join-Path $env:TEMP "amp-setup.log") -ErrorAction SilentlyContinue
           if ($code -ne 0) { Write-Output "Setup failed: $code"; exit 1 }
           $dir = Join-Path $chosen "Airline Manager Pro"
-          foreach ($f in @("AirlineManagerPro-PC.exe", "app.ico", "install.json", "app\index.html", "lib\node_modules\node-simconnect\package.json")) { if (-not (Test-Path (Join-Path $dir $f))) { Write-Output "Missing after install: $f"; exit 1 } }
+          foreach ($f in @("AirlineManagerPro-PC.exe", "AirlineManagerPro-Tools.exe", "resources\app\main.js", "app.ico", "install.json", "app\index.html", "lib\node_modules\node-simconnect\package.json")) { if (-not (Test-Path (Join-Path $dir $f))) { Write-Output "Missing after install: $f"; exit 1 } }
           if (-not (Test-Path (Join-Path $desk "Airline Manager Pro.lnk"))) { Write-Output "No desktop shortcut"; exit 1 }
           if (Test-Path (Join-Path $desk "AMP old.lnk")) { Write-Output "The old shortcut was not replaced"; exit 1 }
           $lnk = $ws.CreateShortcut((Join-Path $desk "Airline Manager Pro.lnk")); Write-Output ("Shortcut: " + $lnk.TargetPath + " icon " + $lnk.IconLocation)

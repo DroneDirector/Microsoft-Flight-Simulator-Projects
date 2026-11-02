@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.66 (2026-11-02)
+
+- PC: Electron 44.9.0 host (own Chromium), Edge profile storage copied once, single instance, tray while a phone is linked, tools exe for uninstall/check/replay, link code in Settings; laptop browser via webview
+- laptop (office): zoom from the laptop screen, desktop and bar, Mail (court, reports, lease requests, family), Calendar, Bank with sub-accounts, Screenshots (3D camera button, P), Ranking, Career, Markets, Aircraft market, browser (Electron webview, Android LapBrowser plugin); roomGo for in-room links
+- investigations: preliminary report timing, reminders, sign or contest, causal chain from state, witnesses, accident court case (hear1, prelim, hear2, verdict) waiting for you
+- office talks: greeting voiced, your lines in your own voice (40 voices, pack 2), humanTalk mouths, minimise/reopen, conditions answer and rating
+- ops: walking, chair, door to Overview; 3D view suspends rooms; live map not patched away
+- floatplane wheels; food market tab; parts stock drives repair cost and time; pop-ups placed with the interface zoom
+
 ## 0.9.65 (2026-11-02)
 
 - PC Setup (own installer window: drive and folder, desktop shortcut replaced, Start menu, Apps entry, progress; uninstall removes everything incl. the folder), app icon on the programs
