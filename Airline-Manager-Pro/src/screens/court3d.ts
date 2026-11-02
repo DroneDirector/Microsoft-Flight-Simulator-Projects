@@ -619,7 +619,10 @@ function ctFrame() {
     p.pivot.rotation.x = amp * (0.012 * Math.sin(t * 0.37) + 0.006 * Math.sin(t * 0.91 + 1));
     p.pivot.rotation.z = amp * (0.014 * Math.sin(t * 0.29 + 2) + 0.005 * Math.sin(t * 0.77));
     // body language: seated, standing, speaking
-    const talking = R.speaker === k && R.talkUntil > now;
+    // their voice heard: the mouth follows it (from the start each time Play is pressed), not the reading time
+    const vn = k === 'you' ? 'me' : p.name, heard = humanVoiceOn(vn);
+    if (R.speaker === k && humanVoiceBusy(vn)) { R.talkUntil = 0; R.sayText = ''; }   // the voice leads: still until it is heard, then with it
+    const talking = heard || (R.speaker === k && R.talkUntil > now);
     let gT = humanGesture(null, t);
     if (talking && sk < 0.5) gT = ctTalkG(t);
     const sit = humanGesture({ kind: 'sit', v: 0 }, t);
@@ -632,7 +635,7 @@ function ctFrame() {
     gT.shake += p.gazeYaw * 0.75;
     if (/^relative/.test(k) && R.mourn) { gT.nod += 0.25; }
     p.g = p.g ? cabinLerpG(p.g, gT, Math.min(1, dt * 6)) : gT;
-    p.m.pose({ t, yaw: 0, gaze: [p.gazeYaw * 0.4, 0], blink: (t % 4.3) < 0.12 ? 1 : 0, g: p.g, talk: R.speaker === k && R.sayText ? humanSpeech(R.sayText, R.sayAt) : 0 });
+    p.m.pose({ t, yaw: 0, gaze: [p.gazeYaw * 0.4, 0], blink: (t % 4.3) < 0.12 ? 1 : 0, g: p.g, talk: humanTalk(vn, R.speaker === k ? R.sayText : '', R.sayAt) });
   }
   if (R.empty) { ctWalk(dt); R.ren.render(R.scene, R.cam); return; }
   // the camera eases to the shot, and you can look around it
@@ -672,7 +675,7 @@ function ctSay(key: string, text: string, mood?: string) {
   const b = ctBox(), name = p ? p.name : key, title = p ? p.title : '';
   (b.querySelector('.ct-who b') as HTMLElement).textContent = name; (b.querySelector('.ct-who small') as HTMLElement).textContent = title;
   (b.querySelector('.ct-text') as HTMLElement).textContent = text;
-  const voiceWho = `pax|${p && p.sex === 'f' ? 'f' : 'm'}|${mood || (/sorry|apolog/i.test(text) ? 'sorry' : 'neutral')}|${name}`;
+  const voiceWho = key === 'you' ? myWho(mood || '') : `pax|${p && p.sex === 'f' ? 'f' : 'm'}|${mood || (/sorry|apolog/i.test(text) ? 'sorry' : 'neutral')}|${name}`;   // you speak with your own voice
   (b.querySelector('.ct-say') as HTMLElement).innerHTML = voiceButton(text, voiceWho, 'Play');
   (b.querySelector('.ct-opts') as HTMLElement).innerHTML = '';
   if (/^All rise/.test(text) || /adjourned\.?$/.test(text)) ctGavel();

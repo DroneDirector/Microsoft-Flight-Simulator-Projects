@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: amp-voice-pack-1
+      TAG: amp-voice-pack-2
     steps:
       - uses: actions/checkout@v4
 
@@ -45,9 +45,11 @@ jobs:
           echo "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d  src/voices.bin" | sha256sum -c
           python3 build_pack.py src/model.onnx src/voices.bin src/misaki out src/LICENSE-*.txt
           ls -la out
+          # published from main only (a test build elsewhere only checks that the pack builds)
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then echo "Not on main: the pack is built, not published"; exit 0; fi
           gh release create "$TAG" out/* --repo "$GITHUB_REPOSITORY" --target main --prerelease \
-            --title "Airline Manager Pro voice pack 1" \
-            --notes "Voices for the people in Airline Manager Pro. Downloaded once by the app (Settings → Voices). Kokoro-82M v1.0 and misaki pronunciation dictionaries, both Apache License 2.0; see NOTICE.txt and the licence files."
+            --title "Airline Manager Pro voice pack 2" \
+            --notes "Voices for the people in Airline Manager Pro. Downloaded once by the app (Settings → Voices); pack 2 adds every English voice and mixes of them, for choosing your own voice. Kokoro-82M v1.0 and misaki pronunciation dictionaries, both Apache License 2.0; see NOTICE.txt and the licence files."
 
   pc:
     name: PC app (Windows)

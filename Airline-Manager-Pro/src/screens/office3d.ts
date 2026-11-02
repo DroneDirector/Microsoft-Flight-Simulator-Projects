@@ -346,13 +346,13 @@ OfficeRoom.open = function (inc?: any) {
   const R = OfficeRoom; if (R.on) R.close(true);
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   const p: any = inc ? staffById(inc.staffId) : null; if (inc && !p) { toast('This person no longer works for you', 'info'); return; }
-  R.on = true; R.inc = inc || null; R.p = p; R.mode = inc ? 'interview' : 'visit'; R.keys = {}; R.stick = [0, 0]; R.pct = 0; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0; R.flush = false; R.doorT = 0; R.last = 0; R.view = ''; R.vis = null; R.loadT0 = performance.now();
+  R.on = true; R.inc = inc || null; R.p = p; R.mode = inc ? 'interview' : 'visit'; R.keys = {}; R.stick = [0, 0]; R.pct = 0; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0; R.flush = false; R.cond = null; R.doorT = 0; R.last = 0; R.view = ''; R.vis = null; R.loadT0 = performance.now();
   const q = typeof cabinQ === 'function' ? cabinQ() : 2, co = company();
   const root = document.createElement('div'); root.className = 'court3d office3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
-    <div class="ct-top"><div><small>${esc(co.name)}</small><b>${inc ? `Your office: ${esc(p.name)}, ${esc(inc.title.toLowerCase())}` : 'Your office'}</b></div></div>
+    <div class="ct-top" data-of="boxopen" title="Show the conversation"><div><small>${esc(co.name)}</small><b>${inc ? `Your office: ${esc(p.name)}, ${esc(inc.title.toLowerCase())}` : 'Your office'}</b></div><i class="of-reopen">${icon('chevron')}</i></div>
     <button class="ct-leave" data-of="leave">${icon('close')}<span>Leave the office</span><kbd>Esc</kbd></button>
-    <div class="ct-box" hidden><button class="of-x" data-of="boxclose" aria-label="Close" title="Close">${icon('close')}</button><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><p class="of-tell"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
+    <div class="ct-box" hidden><button class="of-x" data-of="boxclose" aria-label="Close" title="Close (bring it back from the name at the top left)">${icon('close')}</button><button class="of-x of-min" data-of="boxmin" aria-label="Minimise" title="Minimise">${icon('down')}</button><div class="of-you"></div><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><p class="of-tell"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
     <div class="ct-spots of-spots" hidden></div><div class="ct-hint" hidden></div><div class="walk-pad ct-pad" hidden><i></i></div><div class="of-aim" hidden>+</div>
     ${ctLoaderHtml('Your office', inc ? `${p.name} is on the way up…` : 'Unlocking the door…', OF_WINGS)}`;
   document.body.appendChild(root);
@@ -592,7 +592,7 @@ function ofFrame() {
       const vWant = Math.min(1.0, Math.sqrt(2 * 1.4 * (d + (V.path.length > 1 ? 1 : 0)))); V.v += Math.max(-1.4 * dt, Math.min(1.4 * dt, vWant - V.v));
       const step = Math.min(d, V.v * dt); if (d > 1e-4) { V.x += dx / d * step; V.z += dz / d * step; V.dist += step; }
       const yawT = Math.atan2(dx, dz); let dy = yawT - V.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI; V.yaw += dy * Math.min(1, dt * 5);
-      if (d < 0.03) { V.path.shift(); if (!V.path.length) { V.v = 0; if (V.after === 'sit') { V.state = 'turning'; } else { V.state = 'gone'; V.pivot.visible = false; setTimeout(() => { R.doorT = 0; ofVisitUi(true); }, 600); } } }
+      if (d < 0.03) { V.path.shift(); if (!V.path.length) { V.v = 0; if (V.after === 'sit') { V.state = 'turning'; } else { V.state = 'gone'; V.pivot.visible = false; ofGone(); setTimeout(() => { R.doorT = 0; ofVisitUi(true); }, 600); } } }
     } else if (V.state === 'turning') {
       let dy = 0 - V.yaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI; V.yaw += dy * Math.min(1, dt * 3.5);
       if (Math.abs(dy) < 0.04) { V.yaw = 0; V.state = 'sitting'; V.wantSit = 1; }
@@ -606,7 +606,10 @@ function ofFrame() {
     const seated = sk > 0.5;
     V.pivot.rotation.x = (seated ? 1 : 1.2) * (0.011 * Math.sin(t * 0.37) + 0.005 * Math.sin(t * 0.91 + 1));
     V.pivot.rotation.z = (seated ? 1 : 1.2) * (0.012 * Math.sin(t * 0.29 + 2) + 0.004 * Math.sin(t * 0.77));
-    const talking = R.talkUntil > now;
+    // their voice heard: the mouth follows it (from the start each time Play is pressed), not the reading time
+    const heard = R.p && humanVoiceOn(R.p.name);
+    if (R.p && humanVoiceBusy(R.p.name)) { R.talkUntil = 0; R.sayText = ''; }   // the voice leads: still until it is heard, then with it
+    const talking = heard || R.talkUntil > now;
     let gT = V.state === 'walking' ? cabinLerpG(humanGesture(null, t), humanGesture({ kind: 'walk', v: 1 }, V.dist / 1.25), Math.min(1, V.v / 0.6)) : humanGesture(null, t);
     gT = cabinLerpG(gT, humanGesture({ kind: 'sit', v: 0 }, t), sk);
     // body language: how they feel about what they say
@@ -622,7 +625,7 @@ function ofFrame() {
     // they look at you (your eyes), unless they're avoiding them
     if (V.state === 'sitting') { const ey = R.cam.position, h = new T.Vector3(V.x, 1.25, zz); gT.nod += clamp(-(ey.y - h.y) / Math.max(0.5, Math.hypot(ey.x - h.x, ey.z - h.z)), -0.3, 0.3) * 0.6; }
     V.g = V.g ? cabinLerpG(V.g, gT, Math.min(1, dt * 6)) : gT;
-    V.m.pose({ t, yaw: 0, gaze: [0, 0.05], blink: (t % 4.1) < 0.12 ? 1 : 0, g: V.g, talk: R.sayText ? humanSpeech(R.sayText, R.sayAt) : 0 });
+    V.m.pose({ t, yaw: 0, gaze: [0, 0.05], blink: (t % 4.1) < 0.12 ? 1 : 0, g: V.g, talk: R.p ? humanTalk(R.p.name, R.sayText, R.sayAt) : 0 });
   }
   } catch (e) { ofRescue(e); }
   // you: in your chair (look around), or walking about
@@ -685,7 +688,7 @@ function ofVisitUi(afterInterview?: boolean) {
   const R = OfficeRoom; if (!R.on) return;
   R.mode = 'visit';
   const sp = R.root.querySelector('.of-spots') as HTMLElement, box = R.root.querySelector('.ct-box') as HTMLElement, pad = R.root.querySelector('.ct-pad') as HTMLElement, hint = R.root.querySelector('.ct-hint') as HTMLElement;
-  if (!afterInterview) box.hidden = true;
+  if (!afterInterview) { box.hidden = true; ofTopState(); }
   sp.hidden = false;
   const nRep = ofOpenReports().length;
   sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['planner', 'Flight planner'], ['schedule', 'Schedule'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
@@ -736,7 +739,7 @@ function ofInviteNow(id: string) {
   Sound.tick();
   // whoever was here before has left
   if (R.vis && R.vis.pivot && R.vis.m) { try { R.A.root.remove(R.vis.pivot); R.vis.pivot.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); } catch (e) { /* gone */ } }
-  R.vis = null; R.inc = inc; R.p = p; R.mode = 'interview'; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0;
+  R.vis = null; R.inc = inc; R.p = p; R.mode = 'interview'; R.cond = null; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0;
   R.seat = true; R.view = 'sit'; R.look = { yaw: 0, pitch: -0.08 };
   for (const sel of ['.of-spots', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
   const top = R.root.querySelector('.ct-top b') as HTMLElement; if (top) top.textContent = `Your office: ${p.name}, ${String(inc.title).toLowerCase()}`;
@@ -747,7 +750,7 @@ function ofInviteNow(id: string) {
 function ofSpot(k: string) {
   if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
   if (k === 'planner' || k === 'schedule') { Sound.tick(); ofScreenOpen(k); return; }
-  const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true;
+  const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true; ofTopState();
   if (k !== 'free') aimUnlock();
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
   else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
@@ -816,7 +819,16 @@ const OF_TELL: { [att: string]: string[] } = {
   dismissive: ['Leans back with their arms crossed.', 'Shrugs.', 'Glances at the window, bored.'],
   lying: ['Glances away as they answer.', 'Answers a little too quickly.', 'Touches their face, then looks back at you.'],
 };
+/** What you tell them when you decide (spoken in your own voice). */
+const OF_MY_DEC: { [d: string]: string[] } = {
+  improve: ['I hear you. You can stay, with no warning, and I\'ll make sure your working conditions improve.', 'You\'re right, and that\'s on me as much as on you. I\'ll look into it and fix it.'],
+  keep: ['You can stay. No warning this time.', 'All right. We\'ll leave it there. No warning.'],
+  discipline: ['I\'m giving you a formal warning. It goes on your record.', 'This is a written warning. Don\'t let it happen again.'],
+  dismiss: ['I\'m sorry, but I\'m letting you go. Today is your last day.', 'I can\'t keep you on. You\'re dismissed.'],
+  court: ['This is a matter for the police. I\'m reporting it.', 'I have no choice. I\'m handing this to the police.'],
+};
 const OF_REACT: { [d: string]: { [att: string]: string[] } } = {
+  improve: { honest: ['Thank you. That\'s all any of us are asking for.', 'Thank you. I\'ll still be more careful, I promise.'], defensive: ['Finally. Thank you. The others will be glad to hear it.', 'Thank you. That\'s fair, and it\'s what we need.'], dismissive: ['We\'ll see if anything actually changes.', 'Right. I\'ll believe it when I see it.'], lying: ['Good. Glad you see it my way.', 'Right. Thank you.'] },
   court: { honest: ['The police? …I understand. I\'ll tell them exactly what I told you.', 'I deserve that. I\'ll answer for it.'], defensive: ['The police? Over this? You can\'t be serious.', 'You\'re going to ruin my career over one mistake.'], dismissive: ['Fine. Let a judge decide. I\'ll see you in court.', 'Do what you want.'], lying: ['You\'ll regret this. They\'ll find I did nothing wrong.', 'Go ahead. You have no proof.'] },
   keep: { honest: ['Thank you. I won\'t let you down.', 'Thank you for hearing me out. It means a lot.'], defensive: ['Thank you. I\'m glad you see it my way.', 'Good. Thank you.'], dismissive: ['Right. Can I go now?', 'Fine.'], lying: ['Thank you. I knew you\'d see it was a mistake.', 'Good. I told you, there was nothing to it.'] },
   discipline: { honest: ['I understand. I deserved that.', 'That\'s fair. Thank you for the chance.'], defensive: ['I think that\'s unfair, but I\'ll accept it.', 'If you say so. I still think it\'s not all on me.'], dismissive: ['Whatever.', 'Fine. Write it down, then.'], lying: ['This is wrong. But fine.', 'You\'re making a mistake, but I\'ll sign it.'] },
@@ -831,10 +843,11 @@ function ofFill(s: string): string {
     .replace(/\{years\}/g, `${yrs} ${yrs === 1 ? 'year' : 'years'}`).replace(/\{did\}/g, did.replace(/\.$/, '.'));
 }
 function ofSay(who: string, text: string, title?: string, tell?: string) {
-  const R = OfficeRoom, b = R.root.querySelector('.ct-box') as HTMLElement; b.hidden = false;
+  const R = OfficeRoom, b = R.root.querySelector('.ct-box') as HTMLElement; b.hidden = false; b.classList.remove('min'); ofTopState();
   (b.querySelector('.ct-who b') as HTMLElement).textContent = who === 'you' ? 'You' : who || ''; (b.querySelector('.ct-who small') as HTMLElement).textContent = title || '';
   (b.querySelector('.ct-text') as HTMLElement).textContent = text; (b.querySelector('.of-tell') as HTMLElement).textContent = tell || '';
   (b.querySelector('.ct-say') as HTMLElement).innerHTML = ''; (b.querySelector('.ct-opts') as HTMLElement).innerHTML = ''; (b.querySelector('.ct-ctl') as HTMLElement).innerHTML = '';
+  const you = b.querySelector('.of-you') as HTMLElement; if (you) you.innerHTML = '';
   ofFit();
 }
 /** The dialogue sits above the row of places, never over it. */
@@ -847,13 +860,75 @@ function ofFit() {
 function ofBoxClose() {
   const R = OfficeRoom, b = R.root && R.root.querySelector('.ct-box') as HTMLElement; if (!b) return;
   try { Voice.stop(); } catch (e) { /* no voice */ }
-  Sound.tick(); b.hidden = true;
+  Sound.tick(); b.hidden = true; b.classList.remove('min'); ofTopState();
+}
+/** Minimise the dialogue to its name line (the voice carries on); the same button, or the line, opens it again. */
+function ofBoxMin() {
+  const R = OfficeRoom, b = R.root && R.root.querySelector('.ct-box') as HTMLElement; if (!b) return;
+  Sound.tick(); b.classList.toggle('min');
+  const m = b.querySelector('.of-min') as HTMLElement; if (m) { const on = b.classList.contains('min'); m.setAttribute('aria-label', on ? 'Open the conversation' : 'Minimise'); m.title = on ? 'Open the conversation' : 'Minimise'; }
+  ofFit(); ofTopState();
+}
+/** The visitor has left: their name goes from the top left, and the talk can't be brought back. */
+function ofGone() {
+  const R = OfficeRoom; if (!R.root) return;
+  const top = R.root.querySelector('.ct-top b') as HTMLElement; if (top) top.textContent = 'Your office';
+  const b = R.root.querySelector('.ct-box') as HTMLElement;
+  if (b) { b.hidden = true; b.classList.remove('min'); for (const sel of ['.ct-text', '.of-tell', '.ct-say', '.ct-opts', '.ct-ctl', '.of-you']) { const e = b.querySelector(sel) as HTMLElement; if (e) e.innerHTML = ''; } }
+  ofTopState();
+}
+/** The office name at the top left brings a closed or minimised conversation back, where it was. */
+function ofBoxOpen() {
+  const R = OfficeRoom, b = R.root && R.root.querySelector('.ct-box') as HTMLElement; if (!b) return;
+  const t = b.querySelector('.ct-text') as HTMLElement;
+  if (!t || !t.textContent || (!b.hidden && !b.classList.contains('min'))) return;
+  Sound.tick(); b.hidden = false; b.classList.remove('min'); b.classList.remove('back-in'); void b.offsetWidth; b.classList.add('back-in');
+  ofFit(); ofTopState();
+}
+/** The top left shows it can bring the conversation back while it is closed or minimised. */
+function ofTopState() {
+  const R = OfficeRoom; if (!R.root) return;
+  const b = R.root.querySelector('.ct-box') as HTMLElement, top = R.root.querySelector('.ct-top') as HTMLElement; if (!b || !top) return;
+  const t = b.querySelector('.ct-text') as HTMLElement;
+  top.classList.toggle('can-open', !!(t && t.textContent && (b.hidden || b.classList.contains('min'))));
+}
+/** They put it down to how they have to work: short of people, too many hours, the wrong equipment. Noted, so you
+ *  can answer it: agree and improve their working conditions, or not. Whether it's true is decided by the airline
+ *  itself (are there enough people in their job for the fleet?) and how worn out they are. */
+const OF_COND: [RegExp, 'staff' | 'hours' | 'equipment'][] = [
+  [/short of|not enough (people|staff)|stretched|staff we need|no one to help|nobody to help|the rosters|undermanned|understaffed|the system/i, 'staff'],
+  [/double shift|long shift|very long shift|worked .* day before|fell asleep|exhausted/i, 'hours'],
+  [/vehicle wouldn'?t start|equipment|tools? (were|was) (broken|missing)|no tug|broken/i, 'equipment'],
+];
+function ofCondCheck(text: string) {
+  const R = OfficeRoom; if (R.cond || !R.vis || R.vis.say === 'lying') return;
+  const m = OF_COND.filter(c => c[0].test(text))[0]; if (!m) return;
+  R.cond = { kind: m[1], truth: ofCondTrue(R.p, m[1], R.inc) };
+}
+function ofCondTrue(p: any, kind: string, inc: any): boolean {
+  const role = personRole(p), cid = p.companyId || State.companyId, n = Math.max(1, fleetOf(cid).length);
+  const need: any = { fa: 3, mech: 0.6, ground: 0.8 }, staff = need[role] ? staffOf(cid, role as any).length : 0;
+  const short = need[role] ? staff < need[role] * n : n > Math.max(1, (State.pilots || []).length) * 0.8;
+  const tired = (typeof p.mood === 'number' ? p.mood : 60) < 45;
+  if (kind === 'equipment') return short || (_hashStr(String(inc && inc.id || p.id)) % 2 === 0);
+  return short || tired;
+}
+/** Your company's standing (its reputation) after how you handled it. */
+function ofRep(d: number, why?: string) {
+  const co: any = company(); if (!co || !d) return;
+  co.reputation = Math.max(0, Math.min(100, Math.round(((co.reputation || 50) + d) * 10) / 10));
+  if (why) setTimeout(() => toast(why, d > 0 ? 'ok' : 'warn'), 3200);
 }
 function ofInterviewStart() {
   const R = OfficeRoom, p = R.p;
   if (!R.vis) R.vis = { attitude: ofAttitude(p), state: 'sitting', pivot: { visible: false }, path: [] };
   const hello = R.vis.attitude === 'dismissive' ? 'You wanted to see me.' : R.vis.attitude === 'honest' ? 'Thank you for seeing me. I think I know what this is about.' : 'You wanted to see me?';
   ofSay(p.name, hello, `${ROLE_NAMES[personRole(p)]}, ${p.base}`); R.sayText = hello; R.sayAt = Date.now();
+  // they say it out loud too (only what they say: your questions are never read out)
+  const att = R.vis.attitude, voice = `pax|${p.sex === 'f' ? 'f' : 'm'}|${att === 'honest' ? 'sorry' : att === 'dismissive' ? 'angry' : 'neutral'}|${p.name}`;
+  (R.root.querySelector('.ct-say') as HTMLElement).innerHTML = voiceButton(hello, voice, 'Play');
+  R.talkUntil = (performance.now() - R.t0) / 1000 + Math.max(2, hello.split(/\s+/).length * 0.36);
+  if ((State.settings as any).officeAutoVoice) { try { Voice.stop(); Voice.speak(hello, undefined, voice); } catch (e) { /* no voice */ } }
   ofQuestions();
 }
 function ofQuestions() {
@@ -861,7 +936,7 @@ function ofQuestions() {
   const left = OF_Q.filter(q => R.asked.indexOf(q[0]) < 0);
   (b.querySelector('.ct-opts') as HTMLElement).innerHTML = left.map(q => `<button class="ct-opt" data-of="ask" data-k="${q[0]}">${esc(ofFill(q[1]))}</button>`).join('');
   const p = R.p, strong = (p.warnings || 0) >= 1;
-  (b.querySelector('.ct-ctl') as HTMLElement).innerHTML = R.answers >= 1 ? `<span class="of-dec">Your decision:</span><button class="btn ghost" data-of="dec" data-k="keep">Keep them, no warning</button><button class="btn ghost" data-of="dec" data-k="discipline">${strong ? 'Final warning' : 'Discipline'}</button><button class="btn danger" data-of="dec" data-k="dismiss">Dismiss</button>${courtReportable(R.inc) ? '<button class="btn danger" data-of="dec" data-k="court">Report to the police</button>' : ''}` : '';
+  (b.querySelector('.ct-ctl') as HTMLElement).innerHTML = R.answers >= 1 ? `<span class="of-dec">Your decision:</span>${R.cond ? `<button class="btn primary" data-of="dec" data-k="improve">${R.cond.kind === 'equipment' ? 'I agree: I\'ll get you the right equipment' : R.cond.kind === 'hours' ? 'I agree: I\'ll sort out the hours' : 'I agree: I\'ll get you more people'}</button>` : ''}<button class="btn ghost" data-of="dec" data-k="keep">Keep them, no warning</button><button class="btn ghost" data-of="dec" data-k="discipline">${strong ? 'Final warning' : 'Discipline'}</button><button class="btn danger" data-of="dec" data-k="dismiss">Dismiss</button>${courtReportable(R.inc) ? '<button class="btn danger" data-of="dec" data-k="court">Report to the police</button>' : ''}` : '';
 }
 function ofAsk(k: string) {
   const R = OfficeRoom, V = R.vis, p = R.p; if (!V) return;
@@ -871,35 +946,69 @@ function ofAsk(k: string) {
   const att = Math.random() < stay ? base : ofPick(['honest', 'defensive', 'dismissive', 'lying'].filter(a => a !== base));
   V.say = att;
   const lines = OF_A[k][att], text = ofFill(ofPick(lines)), tell = ofPick(OF_TELL[att]);
+  const q = OF_Q.filter(x => x[0] === k)[0], mine = q ? ofFill(q[1]) : '', meWho = myWho('neutral');
   ofSay(p.name, text, `${ROLE_NAMES[personRole(p)]}, ${p.base}`, tell); R.sayText = text; R.sayAt = Date.now();
+  // what you asked, in your own voice (they never read your lines)
+  const you = R.root.querySelector('.of-you') as HTMLElement;
+  if (you && mine) you.innerHTML = `<span><b>You</b>${esc(mine)}</span>${voiceButton(mine, meWho, 'Play your question')}`;
   R.talkUntil = (performance.now() - R.t0) / 1000 + Math.max(2.5, text.split(/\s+/).length * 0.36);
   R.flush = att === 'dismissive' || (att === 'defensive' && Math.random() < 0.4);
   const voice = `pax|${p.sex === 'f' ? 'f' : 'm'}|${att === 'honest' ? 'sorry' : att === 'dismissive' ? 'angry' : 'neutral'}|${p.name}`;
   (R.root.querySelector('.ct-say') as HTMLElement).innerHTML = voiceButton(text, voice, 'Play');
-  if ((State.settings as any).officeAutoVoice) { try { Voice.stop(); Voice.speak(text, undefined, voice); } catch (e) { /* no voice */ } }
+  ofCondCheck(text);
+  if ((State.settings as any).officeAutoVoice && State.settings.mechanicVoice && !State.settings.muteAll) {
+    // you ask, then they answer: their mouth waits for their voice
+    R.talkUntil = 0; R.sayText = '';
+    try { Voice.stop(); const go = () => { if (OfficeRoom.on && OfficeRoom.p === p) Voice.speak(text, undefined, voice); }; if (mine) Voice.speak(mine, () => setTimeout(go, 250), meWho); else go(); } catch (e) { /* no voice */ }
+  }
   (R.inc as any).interview = { attitude: base, answers: R.answers, at: Date.now() };
   ofQuestions();
 }
 function ofDecide(k: string) {
   const R = OfficeRoom, inc = R.inc, p = R.p, V = R.vis; if (R.decided) return; R.decided = true; Voice.stop();
   const att = (V && V.attitude) || 'defensive', text = ofPick(OF_REACT[k][att]);
-  ofSay(p.name, text, k === 'keep' ? 'Kept on, no warning' : k === 'discipline' ? ((p.warnings || 0) >= 1 ? 'Final warning' : 'Disciplined') : k === 'court' ? 'Reported to the police' : 'Dismissed');
+  ofSay(p.name, text, k === 'improve' ? 'Working conditions to be improved' : k === 'keep' ? 'Kept on, no warning' : k === 'discipline' ? ((p.warnings || 0) >= 1 ? 'Final warning' : 'Disciplined') : k === 'court' ? 'Reported to the police' : 'Dismissed');
   if (V) V.say = att; R.sayText = text; R.sayAt = Date.now();
   R.talkUntil = (performance.now() - R.t0) / 1000 + 3; R.flush = k !== 'keep' && att !== 'honest';
   const voice = `pax|${p.sex === 'f' ? 'f' : 'm'}|${k === 'dismiss' && att !== 'honest' ? 'angry' : att === 'honest' ? 'sorry' : 'neutral'}|${p.name}`;
   (R.root.querySelector('.ct-say') as HTMLElement).innerHTML = voiceButton(text, voice, 'Play');
-  if ((State.settings as any).officeAutoVoice) { try { Voice.speak(text, undefined, voice); } catch (e) { /* no voice */ } }
+  // what you tell them, in your own voice
+  const mine = ofPick(OF_MY_DEC[k] || ['']), meWho = myWho(k === 'dismiss' || k === 'court' ? 'neutral' : ''), you = R.root.querySelector('.of-you') as HTMLElement;
+  if (you && mine) you.innerHTML = `<span><b>You</b>${esc(mine)}</span>${voiceButton(mine, meWho, 'Play what you said')}`;
+  let left = false; const leave = () => { if (left) return; left = true; ofExit(); };
+  if ((State.settings as any).officeAutoVoice && State.settings.mechanicVoice && !State.settings.muteAll) {
+    R.talkUntil = 0; R.sayText = '';
+    try { Voice.speak(mine, () => setTimeout(() => { if (OfficeRoom.on && OfficeRoom.p === p) Voice.speak(text, () => setTimeout(leave, 1200), voice); }, 250), meWho); } catch (e) { /* no voice */ }
+    setTimeout(leave, 16000);   // in any case
+  } else setTimeout(leave, 2600);
   // the decision itself, as on the report
   const el = { getAttribute: (a: string) => a === 'data-id' ? inc.id : a === 'data-strong' ? ((p.warnings || 0) >= 1 ? '1' : '0') : null } as any;
   const keepToast = toast; void keepToast;
   try {
     if (k === 'court') { inc.interview = inc.interview || { attitude: att, answers: R.answers, at: Date.now() }; const cc = courtBringCase(inc); if (cc) setTimeout(() => toast(`${p.name} is reported to the police. You will be called to court as a witness.`, 'warn'), 2800); }
-    else if (k === 'keep') { inc.status = 'excused' as any; try { staffMoodAdd(p, att === 'honest' ? 8 : 4); } catch (e) { /* ignore */ } Store.save(); }
+    else if (k === 'improve') {
+      // you take their side: they stay, without a warning, and you promise better working conditions
+      const C = R.cond || { kind: 'staff', truth: false };
+      inc.status = 'excused' as any; (inc as any).improve = { kind: C.kind, at: Date.now() };
+      try { staffMoodAdd(p, C.truth ? 12 : 6, 'You listened and promised better working conditions'); } catch (e) { /* ignore */ }
+      const role = ROLE_NAMES[personRole(p)] ? ROLE_NAMES[personRole(p)].toLowerCase() : 'staff';
+      ofRep(C.truth ? 2 : 0.5, C.truth ? `The crew hear you listened to ${p.name}. ${C.kind === 'staff' ? `Hire more ${role}s in Staff to keep your word.` : C.kind === 'hours' ? 'Give them fewer back-to-back shifts to keep your word.' : 'Fix the equipment in Maintenance to keep your word.'}` : '');
+      Store.save();
+    }
+    else if (k === 'keep') { inc.status = 'excused' as any; try { staffMoodAdd(p, att === 'honest' ? 8 : 4); } catch (e) { /* ignore */ } if (att === 'lying') ofRep(-1.5, `Word gets around that ${p.name} got away with it.`); Store.save(); }
     else if (k === 'discipline') { const ca = closeAll; (window as any).closeAll = () => { /* stay in the office */ }; try { ACTIONS.discipline(el, null); } finally { (window as any).closeAll = ca; } if (att === 'honest') { p.learned = (p.learned || 0) + 1; Store.save(); } }
     else { const ca = closeAll; (window as any).closeAll = () => { /* stay in the office */ }; try { ACTIONS['dismiss-inc'](el, null); } finally { (window as any).closeAll = ca; } }
   } catch (e) { /* decided anyway */ }
+  // how it looks to everyone else: punishing someone who was telling the truth about how they have to work hurts your
+  // standing; standing firm with someone who lied helps it
+  if (k === 'discipline' || k === 'dismiss' || k === 'court') {
+    const C = R.cond;
+    if (C && C.truth) ofRep(k === 'discipline' ? -2.5 : -4, `The crew say ${p.name} was telling the truth about ${C.kind === 'staff' ? 'being short of people' : C.kind === 'hours' ? 'the hours' : 'the equipment'}. Your standing drops.`);
+    else if (att === 'lying') ofRep(1, '');
+    else if (att === 'honest' && k !== 'discipline') ofRep(-1, `${p.name} owned up, and the crew think that was harsh.`);
+  }
+  Store.save();
   try { closeAll(); } catch (e) { /* none */ }
-  setTimeout(() => ofExit(), 2600);
   (R.root.querySelector('.ct-ctl') as HTMLElement).innerHTML = '';
 }
 function ofClick(b: HTMLElement) {
@@ -911,6 +1020,8 @@ function ofClick(b: HTMLElement) {
   else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
   else if (k === 'back') { Sound.tick(); ofVisitUi(); }
   else if (k === 'boxclose') ofBoxClose();
+  else if (k === 'boxmin') ofBoxMin();
+  else if (k === 'boxopen') ofBoxOpen();
   else if (k === 'plclose') ofPlannerClose();
   else if (k === 'tocourt') {
     // straight to the police, without talking to them first (the court will ask about that)

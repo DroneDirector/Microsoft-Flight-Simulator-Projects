@@ -33,6 +33,13 @@
   office and the courtroom are all built with `src/graphics/human.ts` (`Human.build`), from the same look the app's
   pictures use (`dressed(look, role)`). An improvement to how people look must show in every place they appear:
   the app's pictures, the cabin, the 3D views, the office and the courtroom. Never add a separate figure for one place.
+- **Talking mouths follow the voice**: every person who talks, in every place now and later (office, court, cabin, any new
+  room), gets their mouth from `humanTalk(name, text, at)` in `src/graphics/human.ts`. While their line is being got
+  ready to play the mouth stays still; from the moment the voice is heard it moves until the voice ends, and again from
+  the start each time Play is pressed (`humanVoiceBusy` stops the silent reading-mouth while a voice is coming).
+- **Your own lines are voiced too**: what you (the manager/pilot) say in a dialogue is spoken with your own voice
+  (`me|sex|mood`, chosen when you create or edit your pilot: 20 male and 20 female voices); the other person never
+  reads your lines.
 - Sign every commit as `DroneDirector <simon@dronedirector.fo>`, with no co-author or session lines.
 - Never mention in code, comments, text or commits that anything is made with AI.
 - Licences of anything used must allow commercial sale.

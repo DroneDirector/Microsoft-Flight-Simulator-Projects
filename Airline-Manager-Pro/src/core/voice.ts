@@ -19,6 +19,33 @@ const SPEAKERS: { [k: string]: Speaker } = {
 const OTHER_SPEAKERS: { [k: string]: Speaker } = { pax: { voice: 'bm_lewis', accent: 'b', speed: 1.0, pitch: 1.0, title: 'Passenger' } };
 // voices of each sex, for people with a name and a sex of their own (British first, then American)
 const VOICE_POOL: { [sex: string]: string[] } = { m: ['bm_george', 'bm_lewis', 'bm_daniel', 'am_michael', 'am_fenrir', 'am_puck'], f: ['bf_emma', 'bf_isabella', 'af_heart', 'af_bella'] };
+// Your own voice (you, the airline manager and pilot): 20 male and 20 female, chosen when you create or edit your
+// pilot. Kokoro's English voices, and some made by mixing two of them (voice pack 2). [id, name, what it sounds like]
+const MY_VOICES: { [sex: string]: [string, string, string][] } = {
+  m: [['am_michael', 'Michael', 'American, calm'], ['am_fenrir', 'Fenrir', 'American, deep'], ['am_puck', 'Puck', 'American, lively'], ['am_echo', 'Echo', 'American, soft'],
+    ['am_eric', 'Eric', 'American, crisp'], ['am_liam', 'Liam', 'American, young'], ['am_onyx', 'Onyx', 'American, low'], ['am_adam', 'Adam', 'American, plain'],
+    ['bm_george', 'George', 'British, mature'], ['bm_fable', 'Fable', 'British, storyteller'], ['bm_lewis', 'Lewis', 'British, warm'], ['bm_daniel', 'Daniel', 'British, formal'],
+    ['mx_m1', 'Atlantic', 'George and Michael mixed'], ['mx_m2', 'Northwind', 'Lewis and Fenrir mixed'], ['mx_m3', 'Basalt', 'Daniel and Onyx mixed'], ['mx_m4', 'Harbour', 'Fable and Puck mixed'],
+    ['mx_m5', 'Meridian', 'Eric and George mixed'], ['mx_m6', 'Skerry', 'Liam and Lewis mixed'], ['mx_m7', 'Fjord', 'Echo and Daniel mixed'], ['mx_m8', 'Tailwind', 'Adam and Michael mixed']],
+  f: [['af_heart', 'Heart', 'American, warm'], ['af_bella', 'Bella', 'American, bright'], ['af_nicole', 'Nicole', 'American, soft'], ['af_aoede', 'Aoede', 'American, clear'],
+    ['af_kore', 'Kore', 'American, steady'], ['af_sarah', 'Sarah', 'American, friendly'], ['af_nova', 'Nova', 'American, light'], ['af_sky', 'Sky', 'American, airy'],
+    ['af_alloy', 'Alloy', 'American, even'], ['af_jessica', 'Jessica', 'American, quick'], ['af_river', 'River', 'American, relaxed'], ['bf_emma', 'Emma', 'British, poised'],
+    ['bf_isabella', 'Isabella', 'British, firm'], ['bf_alice', 'Alice', 'British, gentle'], ['bf_lily', 'Lily', 'British, young'],
+    ['mx_f1', 'Aurora', 'Emma and Heart mixed'], ['mx_f2', 'Cirrus', 'Bella and Nicole mixed'], ['mx_f3', 'Tern', 'Isabella and Sarah mixed'], ['mx_f4', 'Lumen', 'Kore and Lily mixed'], ['mx_f5', 'Solstice', 'Aoede and Alice mixed']],
+};
+// mixed voices: the accent of their first voice
+const MY_MIX_ACCENT: { [id: string]: 'a' | 'b' } = { mx_m1: 'b', mx_m2: 'b', mx_m3: 'b', mx_m4: 'b', mx_m5: 'a', mx_m6: 'a', mx_m7: 'a', mx_m8: 'a', mx_f1: 'b', mx_f2: 'a', mx_f3: 'b', mx_f4: 'a', mx_f5: 'a' };
+const MY_DEFAULT: { [sex: string]: string } = { m: 'am_michael', f: 'af_heart' };
+/** Your pilot's sex and chosen voice. */
+function myVoiceChoice(): { sex: 'm' | 'f'; voice: string } {
+  let look: any = null; try { look = myPilot().look; } catch (e) { /* no pilot yet */ }
+  const sex: 'm' | 'f' = look && look.sex === 'f' ? 'f' : 'm', v = look && look.voice;
+  return { sex, voice: v && MY_VOICES[sex].some(x => x[0] === v) ? v : MY_DEFAULT[sex] };
+}
+/** Is this voice in the pack on this device? (The voices added in pack 2 need its small download.) */
+function voiceInstalled(v: string): boolean { return !VoicePack.files || !Object.keys(VoicePack.files).length ? false : VoicePack.files['voice-' + v + '.bin'] > 0; }
+/** What you say, in your own voice: "me" (your pilot), or "me|sex|mood|voice" to hear a voice before choosing it. */
+function myWho(mood?: string): string { const c = myVoiceChoice(); return `me|${c.sex}|${mood || ''}`; }
 // how a mood sounds: pace, pitch (cents), a wobble in the pitch, loudness, slurred words, exclamations
 const MOODS: { [m: string]: { speed: number; cents: number; wobble: number; gain: number; slur?: boolean; exclaim?: boolean } } = {
   neutral: { speed: 1, cents: 0, wobble: 0, gain: 1 },
@@ -35,8 +62,16 @@ function detectMood(text: string): string {
 /** The speaker for a line: "role", or "role|sex|mood|name" for a person with their own voice and mood. */
 function resolveSpeaker(who: string, text: string): Speaker {
   const [role, sex, mood0, name] = String(who || 'mechanic').split('|');
-  const base = SPEAKERS[role] || OTHER_SPEAKERS[role] || SPEAKERS.mechanic, sp: Speaker = Object.assign({}, base);
-  if ((sex === 'm' || sex === 'f') && sp.voice[1] !== sex) {
+  let base = SPEAKERS[role] || OTHER_SPEAKERS[role] || SPEAKERS.mechanic, sp: Speaker = Object.assign({}, base);
+  if (role === 'me') {
+    // you: your own voice (or the one being tried), the pack's same-sex voice while a new one isn't downloaded yet
+    const c = myVoiceChoice(), sx: 'm' | 'f' = sex === 'f' || sex === 'm' ? sex : c.sex;
+    let v = name && MY_VOICES[sx].some(x => x[0] === name) ? name : sx === c.sex ? c.voice : MY_DEFAULT[sx];
+    if (VoicePack.state === 'ready' && !voiceInstalled(v)) v = sx === 'f' ? 'af_heart' : 'am_michael';
+    base = { voice: v, accent: MY_MIX_ACCENT[v] || (v[0] === 'b' ? 'b' : 'a'), speed: 1, pitch: sx === 'f' ? 1.05 : 0.95, title: 'You' };
+    sp = Object.assign({}, base);
+  }
+  else if ((sex === 'm' || sex === 'f') && sp.voice[1] !== sex) {
     const pool = VOICE_POOL[sex];
     sp.voice = pool[_hashStr(name || role) % pool.length];
     sp.accent = sp.voice[0] === 'b' ? 'b' : 'a';
@@ -62,11 +97,9 @@ function moodPhonemes(ps: string, sp: Speaker): string {
 }
 
 /** The voice pack's files and sizes (its pack.json), for when the list can't be fetched. */
-const VOICE_PACK_LIST = { version: 1, files: { 'LICENSE-Kokoro-Apache-2.0.txt': 11357, 'LICENSE-kokoro-onnx-MIT.txt': 1080, 'LICENSE-misaki-Apache-2.0.txt': 11357, 'NOTICE.txt': 676,
-  'kokoro-v1.0-q8.onnx': 92361271, 'lexicon-gb.json.gz': 2893766, 'lexicon-us.json.gz': 2705901, 'voice-af_bella.bin': 522240, 'voice-af_heart.bin': 522240, 'voice-am_fenrir.bin': 522240,
-  'voice-am_michael.bin': 522240, 'voice-am_puck.bin': 522240, 'voice-bf_emma.bin': 522240, 'voice-bf_isabella.bin': 522240, 'voice-bm_daniel.bin': 522240, 'voice-bm_george.bin': 522240, 'voice-bm_lewis.bin': 522240 },
-  voices: ['bm_george', 'bm_lewis', 'bm_daniel', 'bf_emma', 'bf_isabella', 'af_heart', 'af_bella', 'am_michael', 'am_fenrir', 'am_puck'] };
-const VOICE_PACK_BASE = 'https://github.com/DroneDirector/Microsoft-Flight-Simulator-Projects/releases/download/amp-voice-pack-1/';
+const VOICE_PACK_LIST = { version: 2, files: { 'LICENSE-Kokoro-Apache-2.0.txt': 11357, 'LICENSE-kokoro-onnx-MIT.txt': 1080, 'LICENSE-misaki-Apache-2.0.txt': 11357, 'NOTICE.txt': 676, 'kokoro-v1.0-q8.onnx': 92361271, 'lexicon-gb.json.gz': 2893766, 'lexicon-us.json.gz': 2705901, 'voice-af_alloy.bin': 522240, 'voice-af_aoede.bin': 522240, 'voice-af_bella.bin': 522240, 'voice-af_heart.bin': 522240, 'voice-af_jessica.bin': 522240, 'voice-af_kore.bin': 522240, 'voice-af_nicole.bin': 522240, 'voice-af_nova.bin': 522240, 'voice-af_river.bin': 522240, 'voice-af_sarah.bin': 522240, 'voice-af_sky.bin': 522240, 'voice-am_adam.bin': 522240, 'voice-am_echo.bin': 522240, 'voice-am_eric.bin': 522240, 'voice-am_fenrir.bin': 522240, 'voice-am_liam.bin': 522240, 'voice-am_michael.bin': 522240, 'voice-am_onyx.bin': 522240, 'voice-am_puck.bin': 522240, 'voice-bf_alice.bin': 522240, 'voice-bf_emma.bin': 522240, 'voice-bf_isabella.bin': 522240, 'voice-bf_lily.bin': 522240, 'voice-bm_daniel.bin': 522240, 'voice-bm_fable.bin': 522240, 'voice-bm_george.bin': 522240, 'voice-bm_lewis.bin': 522240, 'voice-mx_f1.bin': 522240, 'voice-mx_f2.bin': 522240, 'voice-mx_f3.bin': 522240, 'voice-mx_f4.bin': 522240, 'voice-mx_f5.bin': 522240, 'voice-mx_m1.bin': 522240, 'voice-mx_m2.bin': 522240, 'voice-mx_m3.bin': 522240, 'voice-mx_m4.bin': 522240, 'voice-mx_m5.bin': 522240, 'voice-mx_m6.bin': 522240, 'voice-mx_m7.bin': 522240, 'voice-mx_m8.bin': 522240 },
+  voices: ['bm_george', 'bm_lewis', 'bm_daniel', 'bf_emma', 'bf_isabella', 'af_heart', 'af_bella', 'am_michael', 'am_fenrir', 'am_puck', 'am_echo', 'am_eric', 'am_liam', 'am_onyx', 'am_adam', 'bm_fable', 'af_nicole', 'af_aoede', 'af_kore', 'af_sarah', 'af_nova', 'af_sky', 'af_alloy', 'af_jessica', 'af_river', 'bf_alice', 'bf_lily', 'mx_m1', 'mx_m2', 'mx_m3', 'mx_m4', 'mx_m5', 'mx_m6', 'mx_m7', 'mx_m8', 'mx_f1', 'mx_f2', 'mx_f3', 'mx_f4', 'mx_f5'] };
+const VOICE_PACK_BASE = 'https://github.com/DroneDirector/Microsoft-Flight-Simulator-Projects/releases/download/amp-voice-pack-2/';
 const VOICE_MODEL = 'kokoro-v1.0-q8.onnx';
 // the model's sound numbers (its vocabulary), from the model's config
 const KOKORO_IDS: { [c: string]: number } = {";":1,":":2,",":3,".":4,"!":5,"?":6,"—":9,"…":10,"\"":11,"(":12,")":13,"“":14,"”":15," ":16,"̃":17,"ʣ":18,"ʥ":19,"ʦ":20,"ʨ":21,"ᵝ":22,"ꭧ":23,"A":24,"I":25,"O":31,"Q":33,"S":35,"T":36,"W":39,"Y":41,"ᵊ":42,"a":43,"b":44,"c":45,"d":46,"e":47,"f":48,"h":50,"i":51,"j":52,"k":53,"l":54,"m":55,"n":56,"o":57,"p":58,"q":59,"r":60,"s":61,"t":62,"u":63,"v":64,"w":65,"x":66,"y":67,"z":68,"ɑ":69,"ɐ":70,"ɒ":71,"æ":72,"β":75,"ɔ":76,"ɕ":77,"ç":78,"ɖ":80,"ð":81,"ʤ":82,"ə":83,"ɚ":85,"ɛ":86,"ɜ":87,"ɟ":90,"ɡ":92,"ɥ":99,"ɨ":101,"ɪ":102,"ʝ":103,"ɯ":110,"ɰ":111,"ŋ":112,"ɳ":113,"ɲ":114,"ɴ":115,"ø":116,"ɸ":118,"θ":119,"œ":120,"ɹ":123,"ɾ":125,"ɻ":126,"ʁ":128,"ɽ":129,"ʂ":130,"ʃ":131,"ʈ":132,"ʧ":133,"ʊ":135,"ʋ":136,"ʌ":138,"ɣ":139,"ɤ":140,"χ":142,"ʎ":143,"ʒ":147,"ʔ":148,"ˈ":156,"ˌ":157,"ː":158,"ʰ":162,"ʲ":164,"↓":169,"→":171,"↗":172,"↘":173,"ᵻ":177};
@@ -297,6 +330,9 @@ try { new MutationObserver(() => { if (document.querySelector('.voice-btn[data-s
 
 const Voice = {
   speaking: false, preparing: false, token: 0, sources: [] as AudioBufferSourceNode[], onEnd: null as () => void,
+  /** Who is speaking now ("role|sex|mood|name"), what, and from when it is heard (0 while it is being prepared):
+   *  the faces in the 3D rooms move their mouths to it (humanTalk). Pressing Play again starts it all again. */
+  who: '', text: '', audibleAt: 0,
   natural(): boolean { return (State.settings as any).voiceEngine !== 'device' && VoicePack.state === 'ready'; },
   /** The text as pieces to speak: sentences, with long ones cut at their commas and a short first piece,
    *  so the voice starts as soon as the first few words are ready. */
@@ -322,7 +358,7 @@ const Voice = {
     this.stop();
     if (State.settings.muteAll || !State.settings.mechanicVoice || !text) { if (onEnd) onEnd(); return false; }
     const sp = resolveSpeaker(who, text), tok = ++this.token;
-    this.onEnd = onEnd || null; this.speaking = true;
+    this.onEnd = onEnd || null; this.speaking = true; this.who = String(who || ''); this.text = text; this.audibleAt = 0;
     if (!this.natural()) { this.device(text, sp, tok); return true; }
     this.preparing = true; voiceUiChanged();
     let started = false;
@@ -355,6 +391,7 @@ const Voice = {
             for (let j = 0; j < 64; j++) curve[j] = (sp.cents || 0) + Math.sin(j / 63 * Math.PI * 2 * Math.max(1, dur / 1.6) + i) * sp.wobble;
             src.detune.setValueCurveAtTime(curve, at, Math.max(0.05, dur));
           } else src.detune.value = sp.cents || 0;
+          if (!this.audibleAt) this.audibleAt = Date.now() + Math.max(0, at - ctx.currentTime) * 1000;
           src.start(at); at += dur + (sp.mood === 'sorry' ? 0.3 : sp.mood === 'angry' ? 0.08 : 0.18);
           this.sources.push(src); started = true; last = src;
         }
@@ -376,7 +413,7 @@ const Voice = {
   },
   /** The phone's or PC's own voice. */
   device(text: string, sp: Speaker, tok: number) {
-    this.preparing = false; voiceUiChanged();
+    this.preparing = false; this.audibleAt = Date.now() + 250; voiceUiChanged();
     const N = VoicePack.native();
     if (N && N.speakDevice) {
       const h = N.addListener('deviceDone', () => { Promise.resolve(h).then((x: any) => x && x.remove()); if (tok === this.token) this.finish(); });
@@ -394,14 +431,14 @@ const Voice = {
     u.onend = () => { if (tok === this.token) this.finish(); };
     s.speak(u);
   },
-  finish() { this.speaking = false; this.preparing = false; this.sources = []; const f = this.onEnd; this.onEnd = null; voiceUiChanged(); if (f) f(); },
+  finish() { this.speaking = false; this.preparing = false; this.audibleAt = 0; this.sources = []; const f = this.onEnd; this.onEnd = null; voiceUiChanged(); if (f) f(); },
   stop() {
     this.token++;
     for (const s of this.sources) try { s.onended = null; s.stop(); } catch (e) { /* not started */ }
     this.sources = [];
     try { const s = (window as any).speechSynthesis; if (s) s.cancel(); } catch (e) { /* none */ }
     try { const N = VoicePack.native(); if (N && N.stopDevice) N.stopDevice(); } catch (e) { /* none */ }
-    const was = this.speaking; this.speaking = false; this.preparing = false; this.onEnd = null;
+    const was = this.speaking; this.speaking = false; this.preparing = false; this.onEnd = null; this.audibleAt = 0;
     if (was) voiceUiChanged();
   },
 };
