@@ -606,15 +606,22 @@ function v3dLoop(now: number) {
     // flights the app flies itself keep clear of high ground: never lower than about 1,000 ft over the terrain
     // under them and just ahead, except close to the airports, where they are on the runway's own path
     // (your flight in the simulator is shown exactly where the simulator has it)
-    if (!w.onGround && !(g as any).real && V3dTerrain.rings.length) {
+    if (!(g as any).real && V3dTerrain.rings.length) {
       const PT: any = P; let lift = 0;
-      try {
-        const h = w.hdg, here = [w.lon, w.lat], T0 = Math.max(v3dGround(w.lon, w.lat), ...[0.8, 1.6, 2.4].map(nm => { const a = geoDest(here, h, nm); return v3dGround(a[0], a[1]); }));
+      if (!w.onGround) try {
+        const h = w.hdg, here = [w.lon, w.lat];
         const ap = [g.from, g.to].map(k => { const a = apt(k); return a && a.pos ? gcDistanceNm(here, a.pos) : 99; }), dA = Math.min(ap[0], ap[1]);
-        const clear = 300 * clamp((dA - 1.5) / 4, 0, 1) + 60;
-        lift = Math.max(0, T0 + clear - y);
+        // away from the airports: the ground under them and up to 2.4 nm ahead; within 6 nm of an airport only the
+        // ground right under them (the hills beside and beyond the runway must not hold an aircraft up on final),
+        // and the margin fades away to nothing on final so it follows the runway's own approach path down
+        const ahead = dA < 6 ? [] : [0.8, 1.6, 2.4];
+        const T0 = Math.max(v3dGround(w.lon, w.lat), ...ahead.map(nm => { const a = geoDest(here, h, nm); return v3dGround(a[0], a[1]); }));
+        const clear = dA < 6 ? 60 * clamp((dA - 2) / 4, 0, 1) : 300 * clamp((dA - 1.5) / 4, 0, 1) + 60;
+        lift = clear > 0 ? Math.max(0, T0 + clear - y) : 0;
       } catch (e) { /* no terrain here */ }
-      PT.lift = (PT.lift || 0) + (lift - (PT.lift || 0)) * Math.min(1, (typeof dt === 'number' ? dt : 0.05) * 1.2);
+      // eased both ways: what is left at touchdown goes in a second or two, never in one step
+      PT.lift = (PT.lift || 0) + (lift - (PT.lift || 0)) * Math.min(1, (typeof dt === 'number' ? dt : 0.05) * (lift > (PT.lift || 0) ? 1.2 : 1.6));
+      if (PT.lift < 0.05) PT.lift = 0;
       y += PT.lift;
     }
     P.tgt.set(q[0], y - v3dCurve(q[0], q[1]), q[1]);
