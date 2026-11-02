@@ -494,14 +494,47 @@ How to read the tables: **Cost** is the performance cost while playing (None, Lo
 
 [↑ Contents](#contents)
 
+## 28. Our own browser engine (Electron) and native add-ons
+
+Today the PC version runs in the Microsoft Edge already installed on Windows, so the game depends on the player's Edge version and settings. With **Electron** (MIT licence) the game ships its own fixed copy of Chromium, and the PC bridge (simulator link, files, installer) runs in the same program. Small **native add-ons** (our own C++ code the game can call) open features browsers don't offer. PC only: Android keeps using the phone's WebView and gets the normal versions of the effects.
+
+| Improvement | What it does | Benefit | Cost | Tier |
+|---|---|---|---|---|
+| Own fixed Chromium (Electron) | The game brings its own browser engine | The same engine on every PC; an Edge update can't break or slow the graphics; every effect tested on exactly what players run | About +100 MB download | All (PC) |
+| Newest WebGPU, chosen by us | Update Chromium when we decide | New graphics features without waiting for the player's Edge | None | All (PC) |
+| WebGPU subgroups | Faster shader maths across groups of pixels | Ambient occlusion, clouds, particles and culling run faster | Gain | All (PC) |
+| WebGPU timestamp queries | Exact time per effect on the graphics card | Every effect tuned to a real budget; better automatic quality choice | None | Dev / All |
+| Float32 filtering and higher-precision formats | More precise textures and filtering | Cleaner HDR lighting, sky, volumetric fog and clouds, less banding | Low | High |
+| Raised WebGPU limits | Bigger textures, buffers and more bindings | Larger airports, more lights and textures at once | None | High |
+| No background throttling | Full speed when the window isn't in focus | No slowdown when another window is on top; replays and recording keep running | None | All (PC) |
+| Unlocked frame rate | Above the monitor's rate when wanted | Lowest input delay on high-refresh monitors; benchmark numbers | Varies | High |
+| Larger memory limits | More memory for 3D than a normal browser tab | Ultra textures and big scenes without reloads | None | High |
+| One program instead of bridge + Edge | Bridge and game in one process | Simpler install, faster start, fewer moving parts; data passed directly instead of over a local network port | Gain | All (PC) |
+| AMD FSR 2 / 3 upscaling and frame generation (MIT) | Native upscaler and frame generation | Ultra effects at a much higher frame rate on any graphics card | Gain | All (PC) |
+| NVIDIA DLSS (native add-on) | AI-based upscaling on RTX cards | Sharpest upscaled image on RTX cards (needs NVIDIA's licence terms checked) | Gain | High |
+| Hybrid ray tracing (DirectX 12 add-on) | Ray-traced reflections, shadows or bounced light handed to our renderer | Real ray-traced effects on RTX and Radeon RX 6000+ cards; the hardest item (images must be shared between the add-on and Chromium) | High | Ultra |
+| GPU path-traced photo mode (native) | Photo mode traced on the graphics card itself | Film-quality pictures in seconds instead of minutes | Seconds per picture | All (PC) |
+| HDR output and exclusive full screen | Direct HDR and full-screen control | Brighter lights, deeper contrast, lower input delay | None | High |
+| Full PS5 controller features (native HID) | Rumble, adaptive triggers, light bar | Feel the runway, the brakes and turbulence (not graphics, but comes with the same add-on system) | None | All (PC) |
+| Shader cache on disk | Prepared shaders kept between runs | Faster starts, no first-time stutter | None | All (PC) |
+| GPU crash recovery and logs | Restores the 3D view after a driver reset, writes an error code | Fewer lost sessions; problems reported in the error log | None | All (PC) |
+
+**Not worth it:** maintaining our own modified Chromium (open source, BSD licence). It takes tens of gigabytes and hours to build and needs constant security updates; Electron with native add-ons gives almost all of the benefit.
+
+**Costs and limits:** about 100 MB larger PC download; Electron has to be updated now and then for security; Android doesn't get these extras.
+
+**Order:** move the PC version to Electron (medium job; the PC bridge is already Node, which Electron includes), which brings the WebGPU features and removes the browser limits; then FSR; then the native ray-tracing pieces last.
+
+[↑ Contents](#contents)
+
 ## Suggested order
 
-1. **Foundations (speed first):** update three.js, WebGPU with fallback, instancing, compressed textures, culling, performance overlay. This frees the performance the later steps use.
+1. **Foundations (speed first):** move the PC version to its own Chromium (Electron), update three.js, WebGPU with fallback, instancing, compressed textures, culling, performance overlay. This frees the performance the later steps use.
 2. **The biggest visible jump:** ambient occlusion, TAA, baked lighting in the offices, court and cabin, real textures, modern tone mapping, bloom and colour grading.
 3. **The world outside:** physical sky and atmosphere, cascaded and soft shadows, terrain materials, runway detail, night lighting.
 4. **People:** skin shading, eyes, hair cards, expressions, foot and hand placement.
 5. **Weather and water:** rain, snow, fog, ocean, clouds.
-6. **Ultra and extras:** volumetric clouds and light, screen-space global illumination, photo mode with path tracing.
+6. **Ultra and extras:** volumetric clouds and light, screen-space global illumination, photo mode with path tracing, FSR upscaling and hybrid ray tracing through native add-ons (PC).
 
 Each step comes with before-and-after screenshots and frame-time measurements, and phones get the lighter versions.
 
