@@ -100,6 +100,8 @@ export async function install(pl: Payload, o: InstallOpts, report: (p: Progress)
   const say = (pct: number, step: string, file = '', done = 0) => report({ pct, step, file, done, total: pl.total, rate: done / Math.max(0.2, (Date.now() - t0) / 1000) });
   say(1, 'Getting the folder ready');
   fs.mkdirSync(dir, { recursive: true });
+  // a leftover from removing an earlier install (its program waits beside the folder until it can be deleted)
+  try { for (const n of fs.readdirSync(path.dirname(dir))) if (/^\.amp-uninstall-\d+\.exe$/i.test(n)) { try { fs.rmSync(path.join(path.dirname(dir), n), { force: true }); } catch (e) { /* in use */ } } } catch (e) { /* none */ }
   // what an older version left that this one no longer has
   try { const old = JSON.parse(fs.readFileSync(path.join(dir, MANIFEST), 'utf8')); const now = new Set(pl.files.map(f => f.p.toLowerCase()));
     for (const f of old.files || []) if (!now.has(String(f).toLowerCase())) { try { fs.unlinkSync(path.join(dir, f)); } catch (e) { /* gone */ } } } catch (e) { /* a new install */ }
@@ -226,7 +228,7 @@ export async function uninstall(o: RemoveOpts, report: (p: Progress) => void): P
   // Temp is on another drive), so the folder goes now; the moved program is deleted once it has closed
   let moved = '';
   for (const to of [path.join(os.tmpdir(), `amp-uninstall-${process.pid}.exe`), path.join(path.dirname(dir), `.amp-uninstall-${process.pid}.exe`)]) {
-    try { fs.renameSync(process.execPath, to); moved = to; break; } catch (e) { setupLog('could not move the program to ' + to + ': ' + String((e as any).code || e)); }
+    try { fs.renameSync(process.execPath, to); moved = to; if (process.platform === 'win32') execFile('attrib.exe', ['+h', to], { windowsHide: true }, () => { /* hidden */ }); break; } catch (e) { setupLog('could not move the program to ' + to + ': ' + String((e as any).code || e)); }
   }
   try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { setupLog('folder: ' + String((e as any).code || e)); }
   setupLog(`removed ${dir}: ${!fs.existsSync(dir)}, program moved to ${moved || '(not moved)'}`);
