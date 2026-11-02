@@ -83,7 +83,7 @@ function flyByArcs(p: number[][], radiusNm: (i: number) => number): { pts: numbe
     let r = R; if (t > tMax) { t = tMax; r = t / Math.tan(th / 2); }
     const p0 = geoDest(b, (h1 + 180) % 360, t), side = turn > 0 ? 1 : -1;
     const ctr = geoDest(p0, (h1 + 90 * side + 360) % 360, r);
-    const steps = Math.max(2, Math.ceil(Math.abs(turn) / 6));
+    const steps = Math.max(3, Math.ceil(Math.abs(turn) / 2.5));   // a smooth curve: a point every 2.5° of turn
     const start = (h1 - 90 * side + 360) % 360;   // from the centre to the start of the arc
     map.push(out.length + Math.floor(steps / 2));
     for (let k = 0; k <= steps; k++) out.push(geoDest(ctr, (start + turn * k / steps + 360) % 360, r));
@@ -295,11 +295,12 @@ function flightPathFor(from: string, to: string, noSim?: boolean): FlightPath {
   }
   const sid = sd ? [dep.thr, dep.end].concat(sidPts) : smoothPath([dep.thr, dep.end].concat(sidPts), 1);
   const raw = sid.concat(enroute, starPts, appPts);
-  // turns are flown as round fly-by arcs, as a real aircraft turns: a rate-one-ish turn at the speed of
-  // each part (about 1.5 nm radius in the departure and arrival, up to 4 nm at cruise), never wider than
-  // the legs allow, so it still follows the route. The runway and the final stay straight.
+  // turns are flown as round fly-by arcs, as a real aircraft turns: the radius its speed gives at the bank
+  // airliners use (about 25°): about 1.5 nm in the departure and arrival, 3.5-4 nm joining and leaving the
+  // route, about 7 nm at cruise speed; never wider than the legs allow, so it still follows the route.
+  // The runway and the final stay straight.
   const iS = sid.length - 1, iR = iS + enroute.length + 1, iA = iR + starPts.length;
-  const radius = (i: number) => i <= 1 || i >= raw.length - 2 ? 0 : i <= iS ? 1.4 : i < iR ? 4 : i < iA ? 1.8 : 1.2;
+  const radius = (i: number) => i <= 1 || i >= raw.length - 2 ? 0 : i <= iS ? 1.4 : i < iR ? (i - iS <= 1 ? 3.5 : iR - i <= 1 ? 4 : 7) : i < iA ? 1.8 : 1.2;
   const sm = flyByArcs(raw, radius), pts = sm.pts, map = sm.map;
   const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + gcDistanceNm(pts[i - 1], pts[i]));
   const idx = (k: number) => cum[Math.min(cum.length - 1, k)];

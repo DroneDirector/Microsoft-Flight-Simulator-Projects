@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.60 (2026-11-02)
+
+- flightplan + planner: plans per city pair (waypoints with level and speed, climb/descent speeds, alternate); flightPathFor routes through the waypoints, flightProfile flies their levels (step climbs/descents) and speeds with winds along the path; route view on the world map (overlay, tap and drag hooks), vertical profile, SIGMETs along the route, METAR/TAF, winds, FAA NOTAM API with the user's key (relayed by the PC app)
+- procedures: fly-by arcs at realistic radii (about 7 nm at cruise), drawn every 2.5°
+- gamepad: standard and DualSense controllers (pointer, click and drag, back, pages, scroll and zoom, 3D, walking, office, court), WebHID touchpad on the PC, rumble; Settings → Controller
+
 ## 0.9.59 (2026-11-02)
 
 - court-staff: cases you bring from serious conduct reports (offence kept on the case), two hearing days with you as witness and questioner (courtStaffAsk), statement and damages, verdict scene; court3d cast and witness-box swap for the defendant, own-question flow, reaction chains
