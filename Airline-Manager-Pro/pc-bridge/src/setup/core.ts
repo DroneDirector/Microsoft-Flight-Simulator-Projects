@@ -222,26 +222,41 @@ export async function uninstall(o: RemoveOpts, report: (p: Progress) => void): P
     for (const d of [path.join(process.env.APPDATA || '', APP_NAME), path.join(os.homedir(), 'Documents', APP_NAME)]) try { if (path.basename(d) === APP_NAME) fs.rmSync(d, { recursive: true, force: true }); } catch (e) { /* in use */ }
   }
   say(95, 'Removing the folder');
-  removeFolderAfterExit(dir);
+  // the running program can't be deleted, but it can be moved: out of the folder (to Temp, or beside the folder when
+  // Temp is on another drive), so the folder goes now; the moved program is deleted once it has closed
+  let moved = '';
+  for (const to of [path.join(os.tmpdir(), `amp-uninstall-${process.pid}.exe`), path.join(path.dirname(dir), `.amp-uninstall-${process.pid}.exe`)]) {
+    try { fs.renameSync(process.execPath, to); moved = to; break; } catch (e) { setupLog('could not move the program to ' + to + ': ' + String((e as any).code || e)); }
+  }
+  try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { setupLog('folder: ' + String((e as any).code || e)); }
+  setupLog(`removed ${dir}: ${!fs.existsSync(dir)}, program moved to ${moved || '(not moved)'}`);
+  removeFolderAfterExit(fs.existsSync(dir) ? dir : '', moved);
   say(100, 'Removed');
 }
 /** The folder (and the program still running from it) goes once this program has closed. */
-export function removeFolderAfterExit(dir: string) {
-  if (process.platform !== 'win32') { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* gone */ } return; }
-  // a hidden PowerShell: waits for this program to close, then removes the folder, trying again every second for a
-  // minute (Windows lets go of a program's own file a moment after it closes); what it did goes to amp-remove.log
+/** Notes on what Setup and removing did, in Temp\amp-setup.log (for when something goes wrong). */
+export function setupLog(m: string) { try { fs.appendFileSync(path.join(os.tmpdir(), 'amp-setup.log'), `${new Date().toISOString()} ${m}\r\n`); } catch (e) { /* no log */ } }
+/** Once this program has closed: the folder (if it is still there) and the moved program file are deleted, by a
+ *  hidden PowerShell that tries again every second for a minute; what it did goes to amp-remove.log. */
+export function removeFolderAfterExit(dir: string, file?: string) {
+  if (!dir && !file) return;
+  if (process.platform !== 'win32') { try { if (dir) fs.rmSync(dir, { recursive: true, force: true }); if (file) fs.rmSync(file, { force: true }); } catch (e) { /* gone */ } return; }
   const script = [
     "$ErrorActionPreference = 'SilentlyContinue'",
     "$log = Join-Path $env:TEMP 'amp-remove.log'",
     "Add-Content $log ((Get-Date -Format o) + ' waiting for ' + $env:AMP_PID)",
     "Wait-Process -Id ([int]$env:AMP_PID) -Timeout 120",
     "Set-Location $env:TEMP",
-    "for ($i = 0; $i -lt 60 -and (Test-Path -LiteralPath $env:AMP_DIR); $i++) { Remove-Item -LiteralPath $env:AMP_DIR -Recurse -Force; if (Test-Path -LiteralPath $env:AMP_DIR) { Start-Sleep -Seconds 1 } }",
-    "Add-Content $log ((Get-Date -Format o) + ' ' + $env:AMP_DIR + ' gone: ' + (-not (Test-Path -LiteralPath $env:AMP_DIR)) + ' after ' + $i + ' tries')",
+    "for ($i = 0; $i -lt 60; $i++) { $left = @($env:AMP_DIR, $env:AMP_FILE) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }; if (-not $left) { break }; $left | ForEach-Object { Remove-Item -LiteralPath $_ -Recurse -Force }; Start-Sleep -Seconds 1 }",
+    "Add-Content $log ((Get-Date -Format o) + ' done after ' + $i + ' tries')",
   ].join('; ');
-  const ch = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-Command', script],
-    { detached: true, stdio: 'ignore', windowsHide: true, cwd: os.tmpdir(), env: Object.assign({}, process.env, { AMP_PID: String(process.pid), AMP_DIR: dir }) });
-  ch.unref();
+  try {
+    const ch = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { detached: true, stdio: 'ignore', windowsHide: true, cwd: os.tmpdir(), env: Object.assign({}, process.env, { AMP_PID: String(process.pid), AMP_DIR: dir || '', AMP_FILE: file || '' }) });
+    ch.on('error', e => setupLog('the clean-up helper did not start: ' + String(e)));
+    setupLog('clean-up helper started, process ' + ch.pid);
+    ch.unref();
+  } catch (e) { setupLog('the clean-up helper did not start: ' + String(e)); }
 }
 
 /** Run this Setup again with administrator rights (for Program Files and other protected folders). */
