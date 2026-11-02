@@ -702,14 +702,17 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         spec.tie = tie; break; }
       default: spec = D({ len: () => 0.035, comb: p => tangentTo(back, nAt(p)), segs: 6 });
     }
-    const nG = Math.round((style === 'afro' ? 3000 : 1600) * Math.max(0.35, q)), nC = Math.round((style === 'afro' ? 40000 : (style === 'long' || style === 'wavy') ? 22000 : 18000) * q);
+    // lighter figures (the people further away, small devices) get fewer and shorter-jointed strands
+    const lite = q < 0.6 ? q / 0.6 : 1;
+    const nG = Math.round((style === 'afro' ? 3000 : 1600) * Math.max(0.35, q)), nC = Math.round((style === 'afro' ? 40000 : (style === 'long' || style === 'wavy') ? 22000 : 18000) * q * lite);
+    if (lite < 1 && spec.segs) spec.segs = Math.max(4, Math.round(spec.segs * (0.5 + 0.5 * lite)));
     spec.shell = p => { const d = p.clone().sub(C), e = Math.sqrt((d.x / (S.x / 2)) ** 2 + (d.y / (S.y / 2)) ** 2 + (d.z / (S.z / 2)) ** 2); if (p.y > C.y - S.y * 0.35 && e < 0.86 && e > 0.01) p.copy(C).addScaledVector(d, 0.86 / e); };
     spec.guides = roots(nG); spec.roots = roots(nC);
     const edgeOf = R => { const i = R.tri; return Math.min(1, Math.max(0, (B[i * 4 + 1] - hairlineAtJS(Math.atan2(B[i * 4], B[i * 4 + 2]), line)) / 0.25)); };
     for (const R of spec.guides.concat(spec.roots)) R.edge = 0.25 + 0.75 * edgeOf(R);
     const len0 = spec.len; spec.len = R => len0(R) * (0.6 + 0.4 * (R.edge || 1));
     const g = new THREE.Group();
-    g.add(strandMesh(growStrands(spec, rnd), c.hair, { per: spec.curl && q > 0.5 ? 3 : spec.curl ? 2 : 1 }));
+    g.add(strandMesh(growStrands(spec, rnd), c.hair, { per: spec.curl && q > 0.5 ? 3 : spec.curl && q >= 0.45 ? 2 : 1 }));
     const wK = 1 / Math.sqrt(Math.max(0.25, q));
     if (style === 'bun') g.add(strandMesh(coil(spec.tie, 0.04, rnd, Math.round(9000 * q)), c.hair, { rootDark: 0.7 }));
     if (style === 'ponytail') g.add(strandMesh(tail(spec.tie, rnd, Math.round(8000 * q), headCol, 0.012, 0.26), c.hair, { rootDark: 0.7 }));
