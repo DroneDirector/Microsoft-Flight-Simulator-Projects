@@ -25,7 +25,7 @@ function courtBench(c: any): string { return c.sys === 'jury' ? 'the jury' : c.s
 const LAWYER_FEE: { [k: string]: number } = { none: 0, basic: 8000, good: 25000, top: 70000 };
 const LAWYER_NAME: { [k: string]: string } = { none: 'No lawyer (a public defender)', basic: 'A standard defence lawyer', good: 'A good defence firm', top: 'A top criminal defence firm' };
 function courtVictims(c: any): boolean { return !!c.fatal || /assault|theft|withheld help|accident/i.test(c.offence); }
-function courtOffence(c: any): any { return (OFFENCES[c.role] || OFFENCES.fa).filter((x: any) => x.title === c.offence)[0] || OFFENCES.fa[0]; }
+function courtOffence(c: any): any { if (c.offDef) return c.offDef; return (OFFENCES[c.role] || OFFENCES.fa).filter((x: any) => x.title === c.offence)[0] || OFFENCES.fa[0]; }
 
 /** Set a new case up: its court system, your default choices, the investigation report for accidents. */
 function courtSetup(c: any) {
@@ -60,7 +60,7 @@ function courtDecide(c: any): { guilty: boolean; r: CourtResult } {
   let p = c.guiltyP;
   p += ({ none: 0.05, basic: 0, good: -0.08, top: -0.15 } as any)[ch.lawyer] || 0;
   if (ch.stance === 'evidence') p += 0.07;
-  if (c.role === 'airline') {
+  if (c.role === 'airline' && !(c.hear && c.hear.kind === 'perjury')) {
     if (ch.stance === 'cooperate') p -= 0.05; if (ch.acted) p -= 0.1;
     // your record as the accountable manager
     try { if (groupPayRatio(c.companyId, 'mech').ratio < 0.9) p += 0.1; } catch (e) { /* ignore */ }

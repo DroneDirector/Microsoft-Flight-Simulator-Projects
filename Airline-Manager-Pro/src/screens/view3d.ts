@@ -64,6 +64,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
       <span class="v3d-clock" title=""></span>
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
     <div class="v3d-info"></div>
+    <div class="v3d-line"></div>
     <div class="v3d-status"></div>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
     <div class="v3d-free-ui">
@@ -136,7 +137,7 @@ ACTIONS['v3d-mode'] = el => {
   V3d.mode = el.getAttribute('data-m'); Sound.tick();
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
   else { (V3d as any).fcLeaving = true; try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ } setTimeout(() => { (V3d as any).fcLeaving = false; }, 300); }
-  V3d.root.classList.toggle('v3d-free', V3d.mode === 'free'); V3d.root.classList.toggle('v3d-win', /^win/.test(V3d.mode)); V3d.root.classList.toggle('v3d-walk', V3d.mode === 'walk'); if (V3d.mode === 'walk') cabinWalkStart(); else cabinWalkStop();
+  V3d.root.classList.toggle('v3d-free', V3d.mode === 'free'); V3d.root.classList.toggle('v3d-win', /^win/.test(V3d.mode)); V3d.root.classList.toggle('v3d-walk', V3d.mode === 'walk'); V3d.root.classList.toggle('v3d-inside', V3d.mode === 'cabin' || V3d.mode === 'walk' || /^win/.test(V3d.mode)); if (V3d.mode === 'walk') cabinWalkStart(); else cabinWalkStop();
   V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' || V3d.mode === 'cabin' || V3d.mode === 'walk' || /^win/.test(V3d.mode) ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
 };
@@ -224,6 +225,19 @@ function v3dShowInfo() {
   const box = V3d.root.querySelector('.v3d-info') as HTMLElement, name = V3d.root.querySelector('.v3d-name') as HTMLElement;
   if (name) name.textContent = f ? f.callsign : '';
   if (box) box.innerHTML = f ? `<div class="sel-pop">${flightCard(f)}</div>` : '';
+  const ln = V3d.root.querySelector('.v3d-line') as HTMLElement; if (ln) ln.innerHTML = f ? v3dLineHtml(f) : '';
+}
+/** Inside the aircraft (cabin, walking, window seats): the flight in one line along the bottom instead of the
+ *  card, like the seat-back screen's flight bar: route with progress, phase, altitude, speed, distance, time left. */
+function v3dLineHtml(f: LiveFlight): string {
+  const F: any = f, A = apt(f.from), B = apt(f.to), ai = !f.real && F.depAt;
+  const left = ai ? F.leftNm : f.real ? (f.noDest ? 0 : F.leftNm != null && !f.pos ? F.leftNm : gcDistanceNm(f.pos, B ? B.pos : null)) : (A && B ? gcDistanceNm(A.pos, B.pos) : 0) * (1 - f.t);
+  const altTxt = f.alt < 50 ? 'Ground' : f.alt < 18000 ? num(Math.round(f.alt / 100) * 100) + ' ft' : 'FL' + Math.round(f.alt / 100);
+  const it = (lab: string, v: string, cls?: string) => `<span class="vl-i ${cls || ''}"><small>${lab}</small><b>${v}</b></span>`;
+  return `<span class="vl-cs">${esc(f.callsign)}</span>
+    <span class="vl-route"><b>${esc(f.from)}</b><i class="vl-track"><i class="vl-fill" style="width:${(f.t * 100).toFixed(1)}%"></i><i class="vl-plane" style="left:${(f.t * 100).toFixed(1)}%">${icon('fleet')}</i></i><b>${f.noDest ? '—' : esc(f.to)}</b></span>
+    ${it('Phase', esc(f.phase), 'vl-ph')}${it('Altitude', altTxt)}${it('Speed', f.gs ? num(f.gs) + ' kt' : '—', 'vl-opt')}${it('Remaining', f.noDest ? '—' : num(left) + ' nm', 'vl-opt')}${it('Arrives in', arrivesIn(f))}
+    <span class="vl-btns"><button class="icon-btn" data-act="pax-list" data-id="${esc(f.id)}" aria-label="Passenger list" title="Passenger list">${icon('pax')}</button><button class="icon-btn" data-act="loadsheet" data-id="${esc(f.id)}" aria-label="Loadsheet" title="Loadsheet">${icon('fuel')}</button></span>`;
 }
 
 /* ---------- positions ---------- */
@@ -747,6 +761,7 @@ function v3dLoop(now: number) {
 function v3dLonLat(x: number, z: number): number[] { const o = V3d.origin; return [o[0] + x / (111320 * Math.cos(o[1] * D2R)), o[1] - z / 110540]; }
 
 function v3dRefreshInfo(f: LiveFlight) {
+  const ln = V3d.root && V3d.root.querySelector('.v3d-line') as HTMLElement; if (ln && V3d.root.classList.contains('v3d-inside')) ln.innerHTML = v3dLineHtml(f);
   const box = V3d.root && V3d.root.querySelector('.v3d-info .sel-pop') as HTMLElement; if (!box) return;
   const card = box.querySelector('.flight-card'); if (!card) return;
   const tmp = document.createElement('div'); tmp.innerHTML = flightCard(f);

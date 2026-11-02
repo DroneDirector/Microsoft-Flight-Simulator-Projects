@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.59 (2026-11-02)
+
+- court-staff: cases you bring from serious conduct reports (offence kept on the case), two hearing days with you as witness and questioner (courtStaffAsk), statement and damages, verdict scene; court3d cast and witness-box swap for the defendant, own-question flow, reaction chains
+- office3d: conduct reports list with invite and report-to-police; "Report to the police" decision after the interview
+- cabin: centre bins for twin-aisle cabins; placards on the side or centre bin edges; view3d: one-line flight bar inside the aircraft
+
 ## 0.9.58 (2026-11-02)
 
 - cabin: seat level of detail (detailed parts in slots near the camera, light parts for all, dithered crossfade via aFade); seam/edge refinement scales with quality; arm and pad lighter below Ultra

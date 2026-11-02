@@ -21,7 +21,7 @@ interface HearQ {
   after?: { [kind: string]: string };
   decision?: boolean;
 }
-interface HearLine { who: string; text: string; ex?: { title: string; rows: [string, string][]; note?: string }; q?: HearQ; mood?: string }
+interface HearLine { who: string; text: string; ex?: { title: string; rows: [string, string][]; note?: string }; q?: HearQ; mood?: string; ask?: { id: string; opts: { t: string; kind: string }[] } }
 interface HearFacts { reg: string; model: string; from: string; to: string; pax: number; dead: number; open: number; openTitles: string[]; cond: number; payRatio: number; coverage: number; skill: number; mechs: number; need: number; fleet: number; warned: string }
 
 function courtOn(): boolean { return (State.settings as any).courtOn !== false; }
@@ -132,7 +132,7 @@ function hearingAuto(c: any, st: any, how: 'standin' | 'absent' | 'off', skip?: 
     const kind = how === 'absent' ? 'deflect' : Math.random() < si.skill ? (q.opts.some(o => o.kind === 'honest') ? 'honest' : 'deflect') : 'deflect';
     hearingScore(c, q, kind as any, true);
   }
-  if (how === 'absent') { h.absent++; h.pAdj += 0.05; hearRate(c, -2, 'Did not come to court'); }
+  if (how === 'absent') { h.absent++; h.pAdj += h.kind === 'staff' ? -0.08 : 0.05; hearRate(c, -2, 'Did not come to court'); }   // without your evidence, a case you brought is weaker
   st.done = true; st.held = how;
   st.text = how === 'standin' ? `${si.name} attended for you. ${hearingDaySummary(c, st.key)}` : how === 'absent' ? `You did not come to court. The hearing went ahead without you, and the court noted your absence. ${hearingDaySummary(c, st.key)}` : hearingDaySummary(c, st.key);
   hearingAfterDay(c, st);
@@ -143,6 +143,8 @@ function hearingAuto(c: any, st: any, how: 'standin' | 'absent' | 'off', skip?: 
 /** What happened on a day, for the case file and the papers. */
 function hearingDaySummary(c: any, key: string): string {
   const h = c.hear, f: HearFacts = h.facts;
+  if (h.kind === 'perjury') return key === 'hear1' ? `You stood trial for perjury. The court heard the transcript of your evidence and the records that contradict it.${c.ch && c.ch.plea ? ' You pleaded guilty.' : ''}` : '';
+  if (h.kind === 'staff') return key === 'hear1' ? `The court heard the airline's evidence about ${c.name}: the conduct report and the staff record.${h.lies ? ' Parts of the airline\'s evidence did not match the records.' : ''}` : key === 'hear2' ? `${c.name} took the stand and answered the airline's questions.${h.caught ? ' The answers did not always match the evidence.' : ''} Both sides closed their case.` : '';
   if (key === 'hear1') return `The prosecution presented the investigation report and the airline's maintenance records${f.open ? `, including ${f.open} unrepaired ${f.open === 1 ? 'defect' : 'defects'} on ${f.reg}` : ''}. ${h.lies ? 'Some of the airline\'s answers were contradicted by its own records.' : h.honest ? 'The airline answered the court\'s questions openly.' : 'The airline gave guarded answers.'}`;
   if (key === 'hear2') return `The court heard the airline's chief mechanic, a surviving passenger and the family of one of the victims.`;
   if (key === 'hear3') return `${c.ch && c.ch.settled ? 'The airline settled with the families. ' : 'No settlement was reached with the families. '}${c.ch && c.ch.plea ? 'The airline pleaded guilty. ' : 'The airline maintained it was not guilty. '}Both sides made their closing speeches, and the court will give its verdict.`;
@@ -169,6 +171,7 @@ function hearRate(c: any, d: number, why: string) {
 /** Weigh an answer: against the records, for the verdict and the sentence, and for your company rating.
  *  Returns what is said next (the judge's reaction) and the rating change. */
 function hearingScore(c: any, q: HearQ, kind: string, quiet?: boolean): { say: string; d: number } {
+  if (c.hear && c.hear.kind === 'staff') return hearingScoreStaff(c, q, kind, quiet);
   const h = c.hear; let d = 0, say = (q.after && q.after[kind]) || '';
   switch (kind) {
     case 'honest': h.honest++; if (q.truth) { h.pAdj += 0.02; h.sevK *= 0.93; d = 0.6; } else { h.pAdj -= 0.05; d = 0.8; } break;
@@ -190,17 +193,20 @@ function hearingScore(c: any, q: HearQ, kind: string, quiet?: boolean): { say: s
 
 /** Your lawyer's suggestion: the better the lawyer, the better the advice. */
 function hearingSuggest(c: any, q: HearQ): number {
+  if (c.hear && c.hear.kind === 'staff') return q.decision ? -1 : q.opts.findIndex(o => o.kind === 'honest');   // the prosecutor's advice: tell it as it is
   const lw = (c.ch && c.ch.lawyer) || 'basic', good = q.opts.findIndex(o => o.kind === 'honest' || o.kind === 'act' || o.kind === 'sorry' || o.kind === 'settle');
   if (lw === 'none') return -1;
   if (lw === 'basic' && !q.decision) { const df = q.opts.findIndex(o => o.kind === 'deflect'); return Math.random() < 0.5 && df >= 0 ? df : good; }
   return good;
 }
 /** Can your lawyer object to this question? */
-function hearingCanObject(c: any, q: HearQ): boolean { return q.asker === 'prosecutor' && !q.decision && c.ch && (c.ch.lawyer === 'good' || c.ch.lawyer === 'top'); }
+function hearingCanObject(c: any, q: HearQ): boolean { return !(c.hear && c.hear.kind === 'staff') && q.asker === 'prosecutor' && !q.decision && c.ch && (c.ch.lawyer === 'good' || c.ch.lawyer === 'top'); }
 function hearingObject(c: any): boolean { const p = c.ch.lawyer === 'top' ? 0.65 : 0.45; return Math.random() < p; }
 
 /* ---------- what is said in court ---------- */
 function hearingScript(c: any, key: string): HearLine[] {
+  if (c.hear && c.hear.kind === 'staff') return hearingScriptStaff(c, key);   // a case you brought against your staff
+  if (c.hear && c.hear.kind === 'perjury') return hearingScriptPerjury(c, key);   // your own trial, for lying in one
   const h = c.hear, f: HearFacts = h.facts, co = company(c.companyId), me: any = myPilot();
   const you = me ? me.name : 'the accountable manager', court = c.court.replace(/^the /, 'The ');
   const pct = (x: number) => Math.round(x * 100) + '%', when = (k: string) => { const s = c.stages.filter((x: any) => x.key === k)[0]; return s ? dateStr(new Date(s.at)) : 'the next sitting'; };
@@ -289,6 +295,8 @@ function hearingScript(c: any, key: string): HearLine[] {
 
 /** The papers after a day in court. */
 function newsHearing(c: any, st: any) {
+  if (c.hear && c.hear.kind === 'staff') { newsStaffCase(c, st.key); return; }
+  if (c.hear && c.hear.kind === 'perjury') return;   // in the papers when it came out
   const co = company(c.companyId), h = c.hear, base = apt(co.hub);
   const day = HEAR_TITLES[st.key] || 'Hearing';
   const headline = st.held === 'absent' ? `Empty chair: ${co.name} boss fails to appear in court` : st.held === 'standin' ? `${co.name} sends board member to face court` : h.lies ? `${co.name} caught out in court over safety records` : h.honest >= 2 ? `${co.name} boss admits failings in court` : `${co.name} trial: ${day.toLowerCase()}`;
@@ -299,6 +307,8 @@ function newsHearing(c: any, st: any) {
 
 /** After the verdict: an audit, closer watch by the authority and higher insurance for a while. */
 function hearingAftermath(c: any, guilty: boolean) {
+  if (c.hear && c.hear.kind === 'staff') { courtStaffAftermath(c, guilty); return; }
+  if (c.hear && c.hear.kind === 'perjury') { c.hear.verdictReady = true; try { toast('The verdict in your perjury trial is in', 'warn', { label: 'Hear it in court', act: 'court-verdict', data: c.id }); } catch (e) { /* not ready */ } return; }
   if (!c.hear || c.role !== 'airline') return;
   const co: any = company(c.companyId); if (!co) return;
   if (guilty) {

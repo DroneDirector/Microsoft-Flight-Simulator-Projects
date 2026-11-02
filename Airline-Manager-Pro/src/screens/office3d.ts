@@ -548,12 +548,41 @@ function ofVisitUi(afterInterview?: boolean) {
   const sp = R.root.querySelector('.of-spots') as HTMLElement, box = R.root.querySelector('.ct-box') as HTMLElement, pad = R.root.querySelector('.ct-pad') as HTMLElement, hint = R.root.querySelector('.ct-hint') as HTMLElement;
   if (!afterInterview) box.hidden = true;
   sp.hidden = false;
-  sp.innerHTML = [['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']].map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
+  const nRep = ofOpenReports().length;
+  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
   pad.hidden = R.seat;
   if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · drag to look · click your chair to sit · click the door to leave' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
   else hint.hidden = true;
 }
+/** The open conduct reports about people who still work for you, newest first. */
+function ofOpenReports(): any[] { return ((State as any).incidents || []).filter((x: any) => x.status === 'open' && staffById(x.staffId)); }
+/** From the office: the open conduct reports, each with who it is about, what happened and when; pick one to invite them in. */
+function ofReportsUi() {
+  const R = OfficeRoom, L = ofOpenReports();
+  ofSay('', L.length ? 'Who would you like to see?' : 'There are no open conduct reports.', 'Conduct reports');
+  const sp = R.root.querySelector('.of-spots') as HTMLElement; if (sp) sp.hidden = true;   // the list instead of the places, until you go back
+  (R.root.querySelector('.ct-ctl') as HTMLElement).innerHTML = '<button class="btn ghost" data-of="back">Back</button>';
+  (R.root.querySelector('.ct-opts') as HTMLElement).innerHTML = L.slice(0, 12).map((inc: any) => { const p = staffById(inc.staffId);
+    return `<div class="of-rep-row"><button class="of-rep" data-of="invite" data-id="${esc(inc.id)}"><b>${esc(p.name)}</b><small>${esc(inc.title)} · ${esc(inc.date || '')}${courtReportable(inc) ? ' · can go to court' : ''}</small><span>Invite in</span></button>${courtReportable(inc) ? `<button class="of-rep court" data-of="tocourt" data-id="${esc(inc.id)}"><span>Report to the police</span></button>` : ''}</div>`; }).join('');
+}
+/** The person comes up: you sit down at your desk, there is a knock, and they walk in and sit facing you. */
+function ofInviteNow(id: string) {
+  const R = OfficeRoom, inc = ofOpenReports().filter((x: any) => x.id === id)[0], p = inc && staffById(inc.staffId);
+  if (!p) { toast('This report is closed or the person no longer works for you', 'info'); return; }
+  if (R.mode === 'interview' && R.vis && !R.decided && R.vis.state !== 'gone') { toast(`Finish your conversation with ${R.p.name} first`, 'info'); return; }
+  Sound.tick();
+  // whoever was here before has left
+  if (R.vis && R.vis.pivot && R.vis.m) { try { R.A.root.remove(R.vis.pivot); R.vis.pivot.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); } catch (e) { /* gone */ } }
+  R.vis = null; R.inc = inc; R.p = p; R.mode = 'interview'; R.asked = []; R.answers = 0; R.decided = false; R.started = false; R.rescued = false; R.talkUntil = 0;
+  R.seat = true; R.view = 'sit'; R.look = { yaw: 0, pitch: -0.08 };
+  for (const sel of ['.of-spots', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
+  const top = R.root.querySelector('.ct-top b') as HTMLElement; if (top) top.textContent = `Your office: ${p.name}, ${String(inc.title).toLowerCase()}`;
+  ofSay('', `${p.name} is on the way up…`, 'Conduct report');
+  const go = () => { if (!R.on || R.p !== p) return; try { ofVisitor(); } catch (e) { R.vis = null; } ofKnock(); setTimeout(() => ofEnter(), 900); };
+  setTimeout(() => { if (Human.ready) go(); else Human.load().then(go, go); }, 1800);
+}
 function ofSpot(k: string) {
+  if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
   const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true;
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
   else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
@@ -623,6 +652,7 @@ const OF_TELL: { [att: string]: string[] } = {
   lying: ['Glances away as they answer.', 'Answers a little too quickly.', 'Touches their face, then looks back at you.'],
 };
 const OF_REACT: { [d: string]: { [att: string]: string[] } } = {
+  court: { honest: ['The police? …I understand. I\'ll tell them exactly what I told you.', 'I deserve that. I\'ll answer for it.'], defensive: ['The police? Over this? You can\'t be serious.', 'You\'re going to ruin my career over one mistake.'], dismissive: ['Fine. Let a judge decide. I\'ll see you in court.', 'Do what you want.'], lying: ['You\'ll regret this. They\'ll find I did nothing wrong.', 'Go ahead. You have no proof.'] },
   keep: { honest: ['Thank you. I won\'t let you down.', 'Thank you for hearing me out. It means a lot.'], defensive: ['Thank you. I\'m glad you see it my way.', 'Good. Thank you.'], dismissive: ['Right. Can I go now?', 'Fine.'], lying: ['Thank you. I knew you\'d see it was a mistake.', 'Good. I told you, there was nothing to it.'] },
   discipline: { honest: ['I understand. I deserved that.', 'That\'s fair. Thank you for the chance.'], defensive: ['I think that\'s unfair, but I\'ll accept it.', 'If you say so. I still think it\'s not all on me.'], dismissive: ['Whatever.', 'Fine. Write it down, then.'], lying: ['This is wrong. But fine.', 'You\'re making a mistake, but I\'ll sign it.'] },
   dismiss: { honest: ['I understand. I\'m sorry it ended like this.', 'I see. Thank you for the years.'], defensive: ['You\'re making a mistake. This place won\'t run without people like me.', 'That\'s it? After everything?'], dismissive: ['Good. I was leaving anyway.', 'Your loss.'], lying: ['You\'ll regret this.', 'I did nothing wrong, and you know it.'] },
@@ -652,7 +682,7 @@ function ofQuestions() {
   const left = OF_Q.filter(q => R.asked.indexOf(q[0]) < 0);
   (b.querySelector('.ct-opts') as HTMLElement).innerHTML = left.map(q => `<button class="ct-opt" data-of="ask" data-k="${q[0]}">${esc(ofFill(q[1]))}</button>`).join('');
   const p = R.p, strong = (p.warnings || 0) >= 1;
-  (b.querySelector('.ct-ctl') as HTMLElement).innerHTML = R.answers >= 1 ? `<span class="of-dec">Your decision:</span><button class="btn ghost" data-of="dec" data-k="keep">Keep them, no warning</button><button class="btn ghost" data-of="dec" data-k="discipline">${strong ? 'Final warning' : 'Discipline'}</button><button class="btn danger" data-of="dec" data-k="dismiss">Dismiss</button>` : '';
+  (b.querySelector('.ct-ctl') as HTMLElement).innerHTML = R.answers >= 1 ? `<span class="of-dec">Your decision:</span><button class="btn ghost" data-of="dec" data-k="keep">Keep them, no warning</button><button class="btn ghost" data-of="dec" data-k="discipline">${strong ? 'Final warning' : 'Discipline'}</button><button class="btn danger" data-of="dec" data-k="dismiss">Dismiss</button>${courtReportable(R.inc) ? '<button class="btn danger" data-of="dec" data-k="court">Report to the police</button>' : ''}` : '';
 }
 function ofAsk(k: string) {
   const R = OfficeRoom, V = R.vis, p = R.p; if (!V) return;
@@ -674,7 +704,7 @@ function ofAsk(k: string) {
 function ofDecide(k: string) {
   const R = OfficeRoom, inc = R.inc, p = R.p, V = R.vis; if (R.decided) return; R.decided = true; Voice.stop();
   const att = (V && V.attitude) || 'defensive', text = ofPick(OF_REACT[k][att]);
-  ofSay(p.name, text, k === 'keep' ? 'Kept on, no warning' : k === 'discipline' ? ((p.warnings || 0) >= 1 ? 'Final warning' : 'Disciplined') : 'Dismissed');
+  ofSay(p.name, text, k === 'keep' ? 'Kept on, no warning' : k === 'discipline' ? ((p.warnings || 0) >= 1 ? 'Final warning' : 'Disciplined') : k === 'court' ? 'Reported to the police' : 'Dismissed');
   if (V) V.say = att;
   R.talkUntil = (performance.now() - R.t0) / 1000 + 3; R.flush = k !== 'keep' && att !== 'honest';
   const voice = `pax|${p.sex === 'f' ? 'f' : 'm'}|${k === 'dismiss' && att !== 'honest' ? 'angry' : att === 'honest' ? 'sorry' : 'neutral'}|${p.name}`;
@@ -684,7 +714,8 @@ function ofDecide(k: string) {
   const el = { getAttribute: (a: string) => a === 'data-id' ? inc.id : a === 'data-strong' ? ((p.warnings || 0) >= 1 ? '1' : '0') : null } as any;
   const keepToast = toast; void keepToast;
   try {
-    if (k === 'keep') { inc.status = 'excused' as any; try { staffMoodAdd(p, att === 'honest' ? 8 : 4); } catch (e) { /* ignore */ } Store.save(); }
+    if (k === 'court') { inc.interview = inc.interview || { attitude: att, answers: R.answers, at: Date.now() }; const cc = courtBringCase(inc); if (cc) setTimeout(() => toast(`${p.name} is reported to the police. You will be called to court as a witness.`, 'warn'), 2800); }
+    else if (k === 'keep') { inc.status = 'excused' as any; try { staffMoodAdd(p, att === 'honest' ? 8 : 4); } catch (e) { /* ignore */ } Store.save(); }
     else if (k === 'discipline') { const ca = closeAll; (window as any).closeAll = () => { /* stay in the office */ }; try { ACTIONS.discipline(el, null); } finally { (window as any).closeAll = ca; } if (att === 'honest') { p.learned = (p.learned || 0) + 1; Store.save(); } }
     else { const ca = closeAll; (window as any).closeAll = () => { /* stay in the office */ }; try { ACTIONS['dismiss-inc'](el, null); } finally { (window as any).closeAll = ca; } }
   } catch (e) { /* decided anyway */ }
@@ -698,6 +729,14 @@ function ofClick(b: HTMLElement) {
   else if (k === 'ask') { Voice.stop(); ofAsk(b.getAttribute('data-k')); }
   else if (k === 'dec') ofDecide(b.getAttribute('data-k'));
   else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else ofSpot(s); }
+  else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
+  else if (k === 'back') { Sound.tick(); ofVisitUi(); }
+  else if (k === 'tocourt') {
+    // straight to the police, without talking to them first (the court will ask about that)
+    const inc = ofOpenReports().filter((x: any) => x.id === b.getAttribute('data-id'))[0]; if (!inc || !courtReportable(inc)) return;
+    const p = staffById(inc.staffId), cc = courtBringCase(inc); Sound.tick();
+    if (cc) { toast(`${p.name} is reported to the police. You will be called to court as a witness.`, 'warn'); ofReportsUi(); }
+  }
 }
 
 ACTIONS['office-open'] = () => { closeAll(); OfficeRoom.open(); };
