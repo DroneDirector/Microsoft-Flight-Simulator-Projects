@@ -19,6 +19,7 @@ function renderShell() {
           ${icon(SCREENS[k].icon)}<span>${esc(SCREENS[k].title)}</span>${k === 'maint' ? `<i class="rail-dot" data-maint-dot></i>` : ''}
         </button>`).join('')}
         <button class="rail-btn" data-act="office-open" aria-label="My office">${icon('jobs')}<span>Office</span></button>
+        <button class="rail-btn" data-act="ops-room" aria-label="The Operations office">${icon('clock')}<span>Operations</span></button>
         <button class="rail-btn" data-act="court-enter" aria-label="The courtroom">${icon('shield')}<span>Court</span><i class="rail-dot" data-court-dot hidden></i></button>
       </div>
       <button class="rail-more down" data-act="rail-scroll" data-d="1" aria-label="More in the menu below">${icon('down')}</button>
@@ -112,6 +113,7 @@ ACTIONS['rail-scroll'] = el => { const r = $('.rail-items'); if (r) r.scrollBy({
 function refresh() {
   renderTopbar();
   try { if (typeof ofScreenRefresh === 'function') ofScreenRefresh(); } catch (e) { /* the office shows it next time */ }
+  try { if (typeof opsRefresh === 'function') opsRefresh(); } catch (e) { /* Operations shows it next time */ }
   const view = $('#view');
   const st = view.scrollTop, cur = view.firstElementChild as HTMLElement, html = `<section class="screen screen-${State.screen}">${SCREENS[State.screen].render()}</section>`;
   // the same screen again: change only what changed (text, numbers, a new row), so nothing flashes or

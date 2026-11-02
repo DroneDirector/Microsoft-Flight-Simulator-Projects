@@ -7,6 +7,31 @@
 /** Body language for a figure: each arm [forward raise, sideways raise, inwards turn, elbow bend] (radians),
  *  the body's lean and bob, the head's nod, shake and tilt, and a flush of the face. mood: begging (5 ways)
  *  or angry (10 ways); otherwise standing at ease with a little natural movement. */
+/** How finely people move (Settings → Graphics → Animation): 0 Low, 1 Medium, 2 High, 3 Ultra, for walking,
+ *  speaking (mouths) and body language. Automatic follows the cabin quality: Medium on Low, Ultra on Ultra. */
+const ANIM_NAMES = ['Low', 'Medium', 'High', 'Ultra'];
+function animLevel(k: 'animWalk' | 'animSpeak' | 'animBody'): number {
+  let v: any = null; try { v = (State.settings as any)[k]; } catch (e) { /* not yet */ }
+  if (v != null && v !== 'auto' && !isNaN(+v)) return Math.max(0, Math.min(3, +v));
+  return animAuto();
+}
+function animAuto(): number { let q = 2; try { q = typeof cabinQ === 'function' ? cabinQ() : 2; } catch (e) { /* default */ } return q >= 3 ? 3 : q === 0 ? 1 : 2; }
+/** The mouth while someone says a line in a conversation, from the words themselves (about 13 letters a second):
+ *  open — wide on a, e and o, less on i and u, closed on m, b and p, closing between words and at the ends of
+ *  sentences; round — the lips pushed forward and narrowed on o, u and w, spread on e and i. Shut (0) before and
+ *  after the line, so mouths only move in dialogue. */
+function humanSpeech(text: string, startMs: number, nowMs?: number): { open: number; round: number } {
+  const shut = { open: 0, round: 0 }; if (!text) return shut;
+  const t = ((nowMs == null ? Date.now() : nowMs) - startMs) / 1000, pos = t * 13;
+  if (pos < 0 || pos >= text.length + 1.5) return shut;
+  const ch = (i: number) => (text[i] || ' ').toLowerCase();
+  const op = (c: string) => /[a]/.test(c) ? 1 : /[eo]/.test(c) ? 0.8 : /[iuy]/.test(c) ? 0.5 : /[mbp]/.test(c) ? 0 : /[fv]/.test(c) ? 0.12 : /[.,!?;:]/.test(c) ? 0 : c === ' ' ? 0.1 : 0.3;
+  const rd = (c: string) => /[ouw]/.test(c) ? 1 : /[ei]/.test(c) ? -0.7 : /[sz]/.test(c) ? -0.4 : 0;
+  const i = Math.floor(pos), f = pos - i, k = f * f * (3 - 2 * f);
+  return { open: (op(ch(i)) * (1 - k) + op(ch(i + 1)) * k) * (0.85 + 0.15 * Math.sin(t * 19)), round: rd(ch(i)) * (1 - k) + rd(ch(i + 1)) * k };
+}
+/** Only how far the mouth is open (see humanSpeech). */
+function humanTalk(text: string, startMs: number, nowMs?: number): number { return humanSpeech(text, startMs, nowMs).open; }
 function humanGesture(mood: any, t: number): any {
   const S = Math.sin, base = (L: number[], R: number[]) => ({ L, R, lean: 0, bob: 0, roll: 0, nod: 0, shake: 0, tilt: 0, flush: 0, calm: 1 });
   const ease = 0.06 + 0.02 * S(t * 0.7);   // at rest: arms hanging, the slightest swing
@@ -24,8 +49,10 @@ function humanGesture(mood: any, t: number): any {
   }
   // cabin crew at work: walking (legs and arms swinging), pushing the trolley, handing something to a seat
   // (v: −1 left, 1 right), and sitting on a jump seat
-  if (mood && mood.kind === 'walk') { const w = S(t * 2 * Math.PI * 0.9), g = base([0.02 + 0.28 * w, 0.07, 0, 0.25 + 0.1 * Math.max(0, w)], [0.02 - 0.28 * w, 0.07, 0, 0.25 + 0.1 * Math.max(0, -w)]);
-    g.legs = [-0.32 * w, 0.45 * Math.max(0, w), 0.32 * w, 0.45 * Math.max(0, -w)]; g.bob = 0.012 * Math.abs(S(t * 2 * Math.PI * 0.9)); g.roll = 0.015 * w; return g; }
+  if (mood && mood.kind === 'walk') { const L = animLevel('animWalk'), wk = [0.35, 0.7, 1, 1.1][L], w = S(t * 2 * Math.PI * 0.9) * wk, g = base([0.02 + 0.28 * w, 0.07, 0, 0.25 + 0.1 * Math.max(0, w)], [0.02 - 0.28 * w, 0.07, 0, 0.25 + 0.1 * Math.max(0, -w)]);
+    g.legs = [-0.32 * w, 0.45 * Math.max(0, w), 0.32 * w, 0.45 * Math.max(0, -w)]; g.bob = L ? 0.012 * Math.abs(S(t * 2 * Math.PI * 0.9)) * wk : 0; g.roll = L ? 0.015 * w : 0;
+    if (L >= 3) { g.nod += 0.025 * Math.abs(S(t * 2 * Math.PI * 0.9)); g.shake += 0.03 * S(t * Math.PI * 0.9); }   // Ultra: the head goes with each step
+    return g; }
   if (mood && mood.kind === 'push') { const w = S(t * 2 * Math.PI * 0.7), g = base([0.95, 0.12, 0.15, 0.9], [0.95, 0.12, 0.15, 0.9]);
     g.legs = mood.v ? [-0.22 * w, 0.35 * Math.max(0, w), 0.22 * w, 0.35 * Math.max(0, -w)] : [0, 0, 0, 0]; g.lean = 0.08; g.bob = mood.v ? 0.008 * Math.abs(w) : 0; return g; }
   if (mood && mood.kind === 'serve') { const sd = mood.v || 1, k = 0.5 + 0.5 * S(t * 1.3), reach = [1.15 + 0.15 * k, 0.55, -0.1, 0.35], rest = [0.55, 0.1, 0.4, 1.3];
@@ -189,7 +216,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       uHiVis: { value: c.hivis ? 1 : 0 }, uSkirt: { value: c.skirt ? 1 : 0 }, uFem: { value: c.female ? 1 : 0 }, uBald: { value: c.bald ? 1 : 0 },
       uBrowT: { value: c.female ? 0.0028 : 0.0038 }, uElbowS: { value: I.armLen * 0.56 }, uKneeY: { value: I.kneeY }, uCrotchY: { value: I.crotchY },
       uLegX: { value: c.legX }, uSideZ: { value: 0 }, uMech: { value: c.mech ? 1 : 0 }, uPockets: { value: c.pockets ? 1 : 0 },
-      uHeadRot: { value: new THREE.Matrix3() }, uNeckP: { value: v3(I.neckPivot) }, uBlink: { value: 0 },
+      uHeadRot: { value: new THREE.Matrix3() }, uNeckP: { value: v3(I.neckPivot) }, uBlink: { value: 0 }, uJaw: { value: 0 }, uLipR: { value: 0 }, uMouthIn: { value: 2 },
       // arms: shoulder and elbow turns (left arm at +x), for gestures and body language
       uShL: { value: v3(I.J['upperarm01.L']) }, uShR: { value: v3(I.J['upperarm01.R']) },
       uElL: { value: v3(I.J['upperarm01.L']).lerp(v3(I.J['wrist.L']), 0.56 / 0.97) }, uElR: { value: v3(I.J['upperarm01.R']).lerp(v3(I.J['wrist.R']), 0.56 / 0.97) },
@@ -202,7 +229,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     m.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, U);
       const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR,uHipL,uHipR; uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR,uLegL,uLegR,uKneeL,uKneeR; uniform float uFlush;
-        uniform float uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink;
+        uniform float uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink,uJaw,uLipR,uMouthIn;
         varying vec3 vRest; varying vec3 vF; varying vec3 vON; varying vec4 vA; varying vec4 vB; varying float vBeard;
         float hairlineAt(float az){ float a = abs(az);
           float h = mix(uHairline, uHairline - 0.12, smoothstep(0.35, 0.9, a));
@@ -229,6 +256,20 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
             if (wr > 0.0 && d.z > 0.0) { float hz = length(d.xz); float el = atan(d.y, hz);
               if (el > -0.15) { float k = smoothstep(-0.15, 0.08, el); float ne = mix(el, -0.1, uBlink * wr * k);
                 vec3 hd = normalize(vec3(d.x, 0.0, d.z)); transformed = c + hd * cos(ne) * r + vec3(0.0, sin(ne) * r, 0.0); } } }
+          // talking: the jaw turns on its hinge in front of the ears, carrying the chin, the lower lip and the lower
+          // cheeks; the upper lip lifts a little; the lips round (pushed forward, narrower) or spread (wider, flatter)
+          if (fa.w > 0.3 && (uJaw > 0.0 || uLipR != 0.0)) {
+            vec3 dm = transformed - uMouth; float ax = abs(dm.x);
+            float face = smoothstep(-0.095, -0.045, dm.z) * smoothstep(0.075, 0.04, ax);
+            float lowF = smoothstep(0.0015, -0.005, dm.y) * smoothstep(-0.105, -0.07, dm.y);
+            vec3 hp = vec3(0.0, uMouth.y + 0.032, uMouth.z - 0.088); float ang = uJaw * 0.17 * face * lowF;
+            vec3 dj = transformed - hp; float ca = cos(ang), sa = sin(ang);
+            transformed.y = hp.y + dj.y * ca - dj.z * sa; transformed.z = hp.z + dj.y * sa + dj.z * ca;
+            float upF = smoothstep(-0.0015, 0.004, dm.y) * smoothstep(0.022, 0.006, dm.y) * exp(-pow(dm.x / 0.03, 2.0)) * smoothstep(-0.03, -0.01, dm.z);
+            transformed.y += uJaw * 0.0016 * upF;
+            float lipA = exp(-pow(dm.x / 0.034, 2.0) - pow(dm.y / 0.016, 2.0)) * smoothstep(-0.04, -0.012, dm.z);
+            transformed.x *= 1.0 - 0.16 * max(0.0, uLipR) * lipA + 0.07 * max(0.0, -uLipR) * lipA;
+            transformed.z += (0.0035 * max(0.0, uLipR) - 0.0012 * max(0.0, -uLipR)) * lipA; }
           // head turn
           transformed = mix(transformed, uNeckP + uHeadRot * (transformed - uNeckP), smoothstep(0.15, 0.85, fa.w));
           // arms: the forearm turns at the elbow, then the whole arm at the shoulder
@@ -260,6 +301,13 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
           vec2 ml = (R.xy - uMouth.xy) / vec2(0.024, 0.0105);
           float lip = (headW > 0.5 && R.z > uMouth.z - 0.03) ? smoothstep(1.05, 0.8, length(ml)) : 0.0;
           col = mix(col, uLip, lip); rough = mix(rough, 0.38, lip);
+          // the inside of the mouth as it opens: the upper teeth, the dark of the mouth, the tongue below
+          if (headW > 0.5 && uJaw > 0.02 && uMouthIn > 0.5 && R.z > uMouth.z - 0.03) {
+            vec2 mq = (R.xy - uMouth.xy) / vec2(0.018 * (1.0 - 0.25 * max(0.0, uLipR)), 0.0028);
+            float mo = smoothstep(1.0, 0.6, length(mq)) * min(1.0, uJaw * 1.8), v = mq.y;
+            vec3 inner = mix(vec3(0.07, 0.02, 0.02), vec3(0.42, 0.13, 0.13), smoothstep(-0.2, -0.75, v) * step(1.5, uMouthIn));   // tongue below (Ultra)
+            inner = mix(inner, vec3(0.86, 0.83, 0.76), smoothstep(0.2, 0.5, v) * smoothstep(0.25, 0.5, uJaw) * smoothstep(0.55, 0.15, abs(mq.x)) * step(1.5, uMouthIn));   // upper teeth (Ultra)
+            col = mix(col, inner, mo); rough = mix(rough, 0.25, mo); isSkin = mix(isSkin, 0.0, mo); }
           float u = (abs(R.x) - (E.x - 0.017)) / 0.04;
           float by = E.y + 0.021 + 0.006 * sin(3.14159 * clamp(u, 0.0, 1.0)) - 0.004 * u;
           float bw = uBrowT * (1.0 - 0.6 * u) * smoothstep(-0.05, 0.15, u);
@@ -1223,8 +1271,10 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       /** Breathing, a gentle sway, head and eye movement, blinking. */
       pose(p) {
         const t = p.t;
-        root.rotation.y = p.yaw; root.rotation.z = Math.sin(t * 2 * Math.PI / 6.2) * 0.008; root.rotation.x = 0; root.position.y = 0;
-        root.scale.y = 1 + Math.sin(t * 2 * Math.PI / 4.2) * 0.0015;
+        // body language at rest (sway, breathing, the head's small movements): none on Low, half on Medium
+        const BL = animLevel('animBody'), bk = [0, 0.5, 1, 1.15][BL];
+        root.rotation.y = p.yaw; root.rotation.z = Math.sin(t * 2 * Math.PI / 6.2) * 0.008 * bk; root.rotation.x = 0; root.position.y = 0;
+        root.scale.y = 1 + Math.sin(t * 2 * Math.PI / 4.2) * 0.0015 * bk;
         // body language: the arms (a little life even at rest), the lean, the head
         const g = p.g || humanGesture(p.mood, t);   // a gesture worked out by the caller (blended between moves), or from the mood
         const arm = (a, sd) => { const m = new THREE.Matrix4().makeRotationY(sd * -a[2]).multiply(new THREE.Matrix4().makeRotationZ(sd * a[1])).multiply(new THREE.Matrix4().makeRotationX(-a[0])); return new THREE.Matrix3().setFromMatrix4(m); };
@@ -1233,10 +1283,13 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         const lg = g.legs || [0, 0, 0, 0], rx = (a) => new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(a));
         U.uLegL.value.copy(rx(lg[0])); U.uKneeL.value.copy(rx(lg[1])); U.uLegR.value.copy(rx(lg[2])); U.uKneeR.value.copy(rx(lg[3]));
         root.rotation.x = g.lean; root.position.y = g.bob; root.rotation.z += g.roll;
-        eul.set(Math.sin(t * 0.31 + 1) * 0.035 - 0.01 + g.nod, Math.sin(t * 0.43) * 0.13 * g.calm + Math.sin(t * 0.17) * 0.06 * g.calm + p.gaze[0] * 0.25 + g.shake, Math.sin(t * 0.23 + 2) * 0.02 + g.tilt);
+        eul.set(Math.sin(t * 0.31 + 1) * 0.035 * bk - 0.01 + g.nod, (Math.sin(t * 0.43) * 0.13 * g.calm + Math.sin(t * 0.17) * 0.06 * g.calm) * bk + p.gaze[0] * 0.25 + g.shake, Math.sin(t * 0.23 + 2) * 0.02 * bk + g.tilt);
         headPivot.quaternion.setFromEuler(eul); rot.copy(headPivot.quaternion);
         U.uHeadRot.value.setFromMatrix4(m4.makeRotationFromQuaternion(rot));
         U.uBlink.value = p.blink;
+        // speaking: Low still, Medium the jaw, High the jaw and the lips with the dark of the mouth, Ultra also the teeth and the tongue
+        const sp = p.talk, SL = animLevel('animSpeak'), op = typeof sp === 'number' ? sp : sp ? sp.open : 0;
+        U.uJaw.value = SL ? op * (SL === 1 ? 0.8 : 1) : 0; U.uLipR.value = SL >= 2 && sp && typeof sp === 'object' ? sp.round : 0; U.uMouthIn.value = SL >= 3 ? 2 : SL === 2 ? 1 : 0;
         for (const e of eyes) e.rotation.set(-p.gaze[1] * 0.25, p.gaze[0] * 0.3, 0);
       },
     };

@@ -203,7 +203,7 @@ function cabinHdStep(G: any, dt: number) {
     let g = cabinLerpG(humanGesture(null, tt), walk, Math.min(1, ps.w || 0));
     g = cabinLerpG(g, sit, sk);
     h.g = h.g ? cabinLerpG(h.g, g, Math.min(1, dt * 7)) : g;
-    m.pose({ t: tt, yaw: 0, gaze: [Math.sin(tt * 0.27 + h.t0) * 0.3, 0], blink: (tt % 4.3) < 0.12 ? 1 : 0, g: h.g });
+    m.pose({ t: tt, yaw: 0, gaze: [Math.sin(tt * 0.27 + h.t0) * 0.3, 0], blink: (tt % 4.3) < 0.12 ? 1 : 0, g: h.g, talk: f.p ? cabinTalkJaw('pax:' + f.p.key) : 0 });
     cabinHdFade(h, ps.a * h.mix);
   }
 }

@@ -59,6 +59,7 @@ const SETTINGS: SetSection[] = [
         <div class="v3d-scale"><span>Low</span><span>Medium</span><span>Very high</span><span>Ultra</span></div>${note}</div>`;
     } },
     { type: 'html', html: () => cabinSettingsHtml() },
+    { type: 'html', html: () => animSettingsHtml() },
     { type: 'group', title: 'Sky and water' },
     { type: 'html', html: () => {
       const S: any = State.settings, wm = v3dWaterMode();
@@ -596,6 +597,18 @@ function cabinSettingsHtml(): string {
     ${tg('v3dCabinPax', 'Passengers in the cabin', 'The passengers in their own seats from the passenger list, each looking as they do there, with pets on their owners\' laps. Off: empty seats (quicker on slower devices).')}
     ${seg('cabHd', 'Detailed passengers', 'How many of the passengers nearest to you are drawn as detailed figures, with the faces from the passenger list. The others are simpler figures; they fade from one to the other as you move.', CABIN_HD_N.map((n, i) => [String(i), n ? String(n) : 'Off'] as [string, string]), hdAuto)}
     ${seg('cabHdQ', 'Detail of each passenger', 'How finely each detailed passenger is made: faces, hair and clothes.', CABIN_HD_Q.map((n, i) => [String(i), n] as [string, string]), hdqAuto)}
+  </div>`;
+}
+/** How finely people move, everywhere they appear: walking, speaking and body language. */
+function animSettingsHtml(): string {
+  const S: any = State.settings, auto = ANIM_NAMES[animAuto()];
+  const seg = (key: string, label: string, hint: string) => { const cur = S[key] == null ? 'auto' : String(S[key]);
+    return `<div class="ch-row"><span><b>${label}</b><small>${hint}</small></span><div class="seg">${[['auto', `Automatic (${auto})`] as [string, string]].concat(ANIM_NAMES.map((n, i) => [String(i), n] as [string, string])).map(o => `<button class="${cur === o[0] ? 'on' : ''}" data-act="cab-opt" data-key="${key}" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>`; };
+  return `<div class="set-card col cab-opts">
+    <div class="sc-h">${icon('sliders')}<span><b>Animation</b><small>How finely people move in the cabin, your offices and the courtroom. Automatic follows the cabin quality. Lower is quicker on slower devices.</small></span></div>
+    ${seg('animWalk', 'Walking', 'Steps, arm swing and the bob of each stride. Ultra: the head moves with every step too.')}
+    ${seg('animSpeak', 'Speaking', 'Mouths while someone talks in a conversation. Low: still. Medium: the jaw. High: the jaw and the lips. Ultra: also the teeth and the tongue.')}
+    ${seg('animBody', 'Body language', 'The small movements at rest: breathing, swaying, the head looking about. Low: still.')}
   </div>`;
 }
 ACTIONS['cab-opt'] = el => {

@@ -83,6 +83,7 @@ function farewell() {
 
 // Android back button / back gesture: close what's open, step back, and only offer exit at the top.
 function handleBack() {
+  if (typeof placeBack === 'function' && placeBack()) return;   // an office, the courtroom or the 3D view
   if (_layers.length) { closeTop(); return; }
   if (State.screen !== 'ops') { go(SUB_PAGES[State.screen] || 'ops'); return; }
   ACTIONS.exit(null, null);

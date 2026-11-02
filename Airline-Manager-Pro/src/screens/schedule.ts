@@ -119,6 +119,7 @@ SCREENS.schedule = {
     return `
     <div class="screen-head"><div><h1>Schedule</h1><p class="sub">${_schedDay ? 'Tomorrow' : 'Today'}, ${fl.length} aircraft · delays move the legs after them; a leg more than five hours late is cancelled and flown the next day</p></div>
       <span class="seg"><button class="${!_schedDay ? 'on' : ''}" data-act="sched-day" data-d="0">Today</button><button class="${_schedDay ? 'on' : ''}" data-act="sched-day" data-d="1">Tomorrow</button></span>
+      <button class="btn ghost sched-opsroom" data-act="ops-room">${icon('clock')}Operations office</button>
       <button class="btn primary" data-act="new-route">${icon('plus')}New route</button></div>
     ${scheduleDayCard(blocks, nowMin)}
     <div class="card gantt">

@@ -431,17 +431,24 @@ OfficeRoom.close = function (quiet?: boolean) {
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* none */ }
   try { Voice.stop(); } catch (e) { /* ignore */ }
-  try { R.scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m: any) => { for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose(); m.dispose(); }); }); R.ren.dispose(); } catch (e) { /* ignore */ }
+  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null;
   R.root.remove(); R.vis = null;
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };
 function ofLeave() {
-  const R = OfficeRoom;
-  if (R.mode === 'interview' && R.vis && !R.decided && R.vis.state !== 'gone') {
-    // leaving mid-conversation: the report stays open
-    OfficeRoom.close(); toast(`${R.p.name} goes back to work. The report is still open.`, 'info'); return;
-  }
-  OfficeRoom.close();
+  const R = OfficeRoom; if (!R.on) return;
+  // leaving mid-conversation: the report stays open
+  const msg = R.mode === 'interview' && R.vis && !R.decided && R.vis.state !== 'gone' ? `${R.p.name} goes back to work. The report is still open.` : '';
+  ofExitToMain(msg);
+}
+/** Out of the office: the office's loading screen while the room is cleared from memory and the app comes back. */
+function ofExitToMain(msg?: string) {
+  if (!OfficeRoom.on) return;
+  exitSplash('office', 'Your office', [
+    { pct: 30, step: 'Closing the office…', run: () => OfficeRoom.close(true) },
+    { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
+    { pct: 85, step: 'Loading your airline…', run: () => refresh() },
+  ], () => { if (msg) toast(msg, 'info'); });
 }
 
 /* ---------- the visitor ---------- */
@@ -609,7 +616,7 @@ function ofFrame() {
     // they look at you (your eyes), unless they're avoiding them
     if (V.state === 'sitting') { const ey = R.cam.position, h = new T.Vector3(V.x, 1.25, zz); gT.nod += clamp(-(ey.y - h.y) / Math.max(0.5, Math.hypot(ey.x - h.x, ey.z - h.z)), -0.3, 0.3) * 0.6; }
     V.g = V.g ? cabinLerpG(V.g, gT, Math.min(1, dt * 6)) : gT;
-    V.m.pose({ t, yaw: 0, gaze: [0, 0.05], blink: (t % 4.1) < 0.12 ? 1 : 0, g: V.g });
+    V.m.pose({ t, yaw: 0, gaze: [0, 0.05], blink: (t % 4.1) < 0.12 ? 1 : 0, g: V.g, talk: R.sayText ? humanSpeech(R.sayText, R.sayAt) : 0 });
   }
   } catch (e) { ofRescue(e); }
   // you: in your chair (look around), or walking about
@@ -650,7 +657,7 @@ function ofAimed(e?: PointerEvent): string {
 function ofClickAt(e: PointerEvent) {
   const R = OfficeRoom; if (R.seat || R.loading) return;
   const a = ofAimed(e) || ofAimed();
-  if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); R.doorT = 1; setTimeout(() => OfficeRoom.close(), 650); }
+  if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); R.doorT = 1; setTimeout(() => ofExitToMain(), 650); }
 }
 function ofSit() { const R = OfficeRoom; R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = true; ofVisitUi(); Sound.tick(); }
 function ofPad() {
@@ -834,7 +841,8 @@ function ofBoxClose() {
 function ofInterviewStart() {
   const R = OfficeRoom, p = R.p;
   if (!R.vis) R.vis = { attitude: ofAttitude(p), state: 'sitting', pivot: { visible: false }, path: [] };
-  ofSay(p.name, R.vis.attitude === 'dismissive' ? 'You wanted to see me.' : R.vis.attitude === 'honest' ? 'Thank you for seeing me. I think I know what this is about.' : 'You wanted to see me?', `${ROLE_NAMES[personRole(p)]}, ${p.base}`);
+  const hello = R.vis.attitude === 'dismissive' ? 'You wanted to see me.' : R.vis.attitude === 'honest' ? 'Thank you for seeing me. I think I know what this is about.' : 'You wanted to see me?';
+  ofSay(p.name, hello, `${ROLE_NAMES[personRole(p)]}, ${p.base}`); R.sayText = hello; R.sayAt = Date.now();
   ofQuestions();
 }
 function ofQuestions() {
@@ -852,7 +860,7 @@ function ofAsk(k: string) {
   const att = Math.random() < stay ? base : ofPick(['honest', 'defensive', 'dismissive', 'lying'].filter(a => a !== base));
   V.say = att;
   const lines = OF_A[k][att], text = ofFill(ofPick(lines)), tell = ofPick(OF_TELL[att]);
-  ofSay(p.name, text, `${ROLE_NAMES[personRole(p)]}, ${p.base}`, tell);
+  ofSay(p.name, text, `${ROLE_NAMES[personRole(p)]}, ${p.base}`, tell); R.sayText = text; R.sayAt = Date.now();
   R.talkUntil = (performance.now() - R.t0) / 1000 + Math.max(2.5, text.split(/\s+/).length * 0.36);
   R.flush = att === 'dismissive' || (att === 'defensive' && Math.random() < 0.4);
   const voice = `pax|${p.sex === 'f' ? 'f' : 'm'}|${att === 'honest' ? 'sorry' : att === 'dismissive' ? 'angry' : 'neutral'}|${p.name}`;
@@ -865,7 +873,7 @@ function ofDecide(k: string) {
   const R = OfficeRoom, inc = R.inc, p = R.p, V = R.vis; if (R.decided) return; R.decided = true; Voice.stop();
   const att = (V && V.attitude) || 'defensive', text = ofPick(OF_REACT[k][att]);
   ofSay(p.name, text, k === 'keep' ? 'Kept on, no warning' : k === 'discipline' ? ((p.warnings || 0) >= 1 ? 'Final warning' : 'Disciplined') : k === 'court' ? 'Reported to the police' : 'Dismissed');
-  if (V) V.say = att;
+  if (V) V.say = att; R.sayText = text; R.sayAt = Date.now();
   R.talkUntil = (performance.now() - R.t0) / 1000 + 3; R.flush = k !== 'keep' && att !== 'honest';
   const voice = `pax|${p.sex === 'f' ? 'f' : 'm'}|${k === 'dismiss' && att !== 'honest' ? 'angry' : att === 'honest' ? 'sorry' : 'neutral'}|${p.name}`;
   (R.root.querySelector('.ct-say') as HTMLElement).innerHTML = voiceButton(text, voice, 'Play');

@@ -81,6 +81,7 @@ function padBack() {
   padRumble(0.15, 0.2, 40);
   const layer = document.querySelector('.layer, .modal-back, .sheet-back, .ct-modal:not([hidden])');
   if (layer) { try { closeAll(); } catch (e) { /* none */ } return; }
+  try { if (placeBack()) return; } catch (e) { /* none */ }
   if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) { try { if (OfficeRoom.overlay) ofPlannerClose(); else ofLeave(); } catch (e) { /* none */ } return; }
   if (typeof CourtRoom !== 'undefined' && CourtRoom.on) { try { ctLeaveAsk(); } catch (e) { /* none */ } return; }
   if (typeof V3d !== 'undefined' && V3d.open) { try { ACTIONS['v3d-close'](null as any, null as any); } catch (e) { /* none */ } return; }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.63 (2026-11-02)
+
+- ops3d: Operations office (curved monitor drawn from scheduleBlocks, keyboard, mouse, chair, archive stack and rack), screens over the room (ops, schedule, dispatch, planner) kept up to date from refresh; own loader
+- exit-splash: loading screen on leaving the office, Operations, the court and the 3D view (minimum 6 s); save first; renderer, scene and cabin window target freed; placeBack for the Android back button and the gamepad
+- human: jaw on its hinge, lip rounding and spreading, mouth inside (teeth, tongue) from humanSpeech; animation levels for walking, speaking and body language (Settings)
+
 ## 0.9.62 (2026-11-02)
 
 - cabin windows: the outside drawn into a small render target from the same eye (cabin hidden, wings and clouds shown) and shown in each window; shades removed

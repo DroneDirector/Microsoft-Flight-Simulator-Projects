@@ -1,0 +1,341 @@
+// The Operations office: where the flying is planned. You sit in a high-backed chair at a long desk with an
+// ultra-wide curved monitor, a keyboard and a mouse; the monitor shows your schedule as it is now (the same
+// timeline as the Schedule screen, kept up to date). Click the monitor (or a button below) and Operations, the
+// Schedule, Dispatch or the Flight planner open over the room, working exactly as in the app: it is the same data,
+// so every change shows at once on the Schedule screen, in your office and on the monitor. Back or Esc returns to
+// the desk; with nothing open, Back or Esc leaves the room (through its own loading screen).
+// Around you: archive folders stacked on the desk and a tall archive rack full of binders and boxes.
+
+const OpsRoom: any = { on: false };
+
+const OPS_EMBLEM = `<svg class="ctl-scales ops-emb" viewBox="0 0 200 200" aria-hidden="true"><defs><linearGradient id="opG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BFF2FF"/><stop offset=".55" stop-color="#3FB8E8"/><stop offset="1" stop-color="#1D5E9A"/></linearGradient></defs>
+  <circle cx="100" cy="100" r="94" fill="#0B1A2C" stroke="url(#opG)" stroke-width="4"/>
+  <g fill="none" stroke="url(#opG)" stroke-width="4" stroke-linejoin="round"><path d="M38 66 Q100 54 162 66 L162 124 Q100 112 38 124 Z"/></g>
+  <g fill="url(#opG)"><rect class="ops-b1" x="52" y="76" width="34" height="8" rx="3"/><rect class="ops-b2" x="92" y="76" width="22" height="8" rx="3"/><rect class="ops-b3" x="70" y="91" width="44" height="8" rx="3"/><rect class="ops-b1" x="120" y="91" width="26" height="8" rx="3"/><rect class="ops-b2" x="56" y="106" width="28" height="8" rx="3"/><rect class="ops-b3" x="98" y="106" width="40" height="8" rx="3"/>
+  <rect x="96" y="124" width="8" height="18" rx="2"/><rect x="74" y="140" width="52" height="6" rx="3"/></g>
+  <path class="ops-now" d="M110 70 L110 120" stroke="#F2D18A" stroke-width="2.5"/>
+  <text x="100" y="168" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="13" fill="url(#opG)" letter-spacing="4">OPERATIONS</text></svg>`;
+// the scene behind: an airport's control tower and apron at dusk
+const OPS_SCENE = `<svg class="ctl-house ops-scene" viewBox="0 0 560 260" aria-hidden="true"><rect x="0" y="236" width="560" height="24"/>
+  <path d="M250 236 L256 120 L304 120 L310 236 Z"/><path d="M236 120 L324 120 L314 92 L246 92 Z"/><rect x="252" y="80" width="56" height="12"/><rect x="276" y="56" width="4" height="24"/>
+  <rect x="40" y="200" width="160" height="36"/><rect x="360" y="190" width="180" height="46"/><path d="M60 230 l40 -6 l30 0 l10 -8 l6 0 l-4 8 l18 0 l0 4 z"/></svg>`;
+
+OpsRoom.open = function () {
+  const R = OpsRoom; if (R.on) return;
+  const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
+  try { if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) OfficeRoom.close(true); } catch (e) { /* none */ }
+  R.on = true; R.pct = 0; R.loading = true; R.overlay = null; R.keys = {}; R.last = 0; R.loadT0 = performance.now(); R.tab = 'schedule';
+  const q = typeof cabinQ === 'function' ? cabinQ() : 2, co = company();
+  const root = document.createElement('div'); root.className = 'court3d office3d ops3d'; R.root = root;
+  root.innerHTML = `<canvas></canvas>
+    <div class="ct-top"><div><small>${esc(co.name)}</small><b>Operations</b></div></div>
+    <button class="ct-leave" data-op="leave">${icon('close')}<span>Leave Operations</span><kbd>Esc</kbd></button>
+    <div class="ct-spots of-spots op-spots" hidden></div><div class="of-aim op-aim" hidden></div>
+    ${ctLoaderHtml('Operations', 'Switching on the screens…', OPS_EMBLEM, OPS_SCENE)}`;
+  document.body.appendChild(root);
+  setTimeout(() => { if (R.on && R.root === root) opsOpen2(root, q); }, 80);
+};
+
+/* ---------- the room ---------- */
+function opsBuild(scene: any, q: number) {
+  const T = THREE, A: any = { hits: [] }, co = company();
+  const M = (o: any) => new T.MeshPhysicalMaterial(Object.assign({ roughness: 0.6, envMapIntensity: 0.7 }, o));
+  const oak = ctTex(ctWood('#8A6440', '#3E2814', 7));
+  const mat = {
+    floor: M({ map: ctTex(ctNoise('#2A3340', 0.12, 14), 6, 6), roughness: 0.95 }), wall: M({ color: 0x1B2735, roughness: 0.9 }), panel: M({ map: ctTex(ctNoise('#2C3A4C', 0.1, 4), 3, 2), roughness: 0.95 }),
+    ceiling: M({ color: 0xE9ECEF, roughness: 0.9 }), oak: M({ map: oak, roughness: 0.32, clearcoat: 0.6 }), black: M({ color: 0x15171B, roughness: 0.4 }), metal: M({ color: 0x5D636B, metalness: 0.85, roughness: 0.35 }),
+    chrome: M({ color: 0xDDE2E8, metalness: 1, roughness: 0.15 }), leather: M({ map: ctTex(ctLeather('#1E1E22')), roughness: 0.45, sheen: 0.4, sheenColor: new T.Color(0x555566) }),
+    stitch: M({ color: co.color || '#2C8CFF', roughness: 0.5 }), card: M({ color: 0xB89366, roughness: 0.85 }), paper: M({ color: 0xF2EFE6, roughness: 0.9 }), steel: M({ color: 0x7D858F, metalness: 0.6, roughness: 0.45 }),
+    plant: M({ color: 0x2F6B34, roughness: 0.7, side: T.DoubleSide }), pot: M({ color: 0x30343A, roughness: 0.5 }), glow: new T.MeshBasicMaterial({ color: 0xEAF4FF }),
+  };
+  const root = new T.Group(); scene.add(root); A.root = root;
+  const add = (g: any, m: any, x: number, y: number, z: number, ry?: number, par?: any) => { const o = new T.Mesh(g, m); o.position.set(x, y, z); if (ry) o.rotation.y = ry; o.castShadow = q >= 1; o.receiveShadow = true; (par || root).add(o); return o; };
+  const bx = (w: number, h: number, d: number, m: any, x: number, y: number, z: number, ry?: number, par?: any) => add(new T.BoxGeometry(w, h, d), m, x, y, z, ry, par);
+  const slab = (w: number, d: number, h: number, r: number, m: any, x: number, yTop: number, z: number, ry?: number, par?: any) => {
+    const s = new T.Shape(), hw = w / 2 - r, hd = d / 2 - r;
+    s.moveTo(-hw, -d / 2); s.lineTo(hw, -d / 2); s.quadraticCurveTo(w / 2, -d / 2, w / 2, -hd); s.lineTo(w / 2, hd); s.quadraticCurveTo(w / 2, d / 2, hw, d / 2); s.lineTo(-hw, d / 2); s.quadraticCurveTo(-w / 2, d / 2, -w / 2, hd); s.lineTo(-w / 2, -hd); s.quadraticCurveTo(-w / 2, -d / 2, -hw, -d / 2);
+    const bv = Math.min(0.012, h * 0.3), g = new T.ExtrudeGeometry(s, { depth: h - bv * 2, bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelSegments: 3, curveSegments: 6 });
+    g.rotateX(Math.PI / 2); g.translate(0, -bv, 0);
+    return add(g, m, x, yTop, z, ry, par);
+  };
+  const plane = (w: number, h: number, m: any, x: number, y: number, z: number, ry: number) => { const o = new T.Mesh(new T.PlaneGeometry(w, h), m); o.position.set(x, y, z); o.rotation.y = ry; o.receiveShadow = true; root.add(o); return o; };
+  // the room: 5.6 m by 5.4 m, 2.9 m high; you sit at the desk facing the back wall (−z)
+  const X0 = -2.8, X1 = 2.8, Z0 = -2.9, Z1 = 2.5, HH = 2.9;
+  const fl = plane(X1 - X0, Z1 - Z0, mat.floor, 0, 0, (Z0 + Z1) / 2, 0); fl.rotation.x = -Math.PI / 2;
+  const ce = plane(X1 - X0, Z1 - Z0, mat.ceiling, 0, HH, (Z0 + Z1) / 2, 0); ce.rotation.x = Math.PI / 2;
+  plane(X1 - X0, HH, mat.wall, 0, HH / 2, Z0, 0); plane(X1 - X0, HH, mat.wall, 0, HH / 2, Z1, Math.PI); plane(Z1 - Z0, HH, mat.wall, X0, HH / 2, (Z0 + Z1) / 2, Math.PI / 2); plane(Z1 - Z0, HH, mat.wall, X1, HH / 2, (Z0 + Z1) / 2, -Math.PI / 2);
+  // acoustic panels on the back wall, a skirting all round
+  for (let i = -3; i <= 3; i++) bx(0.7, 1.3, 0.04, mat.panel, i * 0.78, 1.55, Z0 + 0.03);
+  for (const [x, z, len, ry] of [[0, Z0 + 0.02, X1 - X0, 0], [0, Z1 - 0.02, X1 - X0, Math.PI], [X0 + 0.02, (Z0 + Z1) / 2, Z1 - Z0, Math.PI / 2], [X1 - 0.02, (Z0 + Z1) / 2, Z1 - Z0, -Math.PI / 2]] as number[][]) bx(len, 0.1, 0.03, mat.black, x, 0.05, z, ry);
+  // the route network on the right wall, lit from above
+  { const g = new T.Group(); g.position.set(X1 - 0.03, 1.6, -0.6); g.rotation.y = -Math.PI / 2; root.add(g);
+    const pic = new T.Mesh(new T.PlaneGeometry(2.0, 1.12), new T.MeshBasicMaterial({ map: ctTex(ofRouteMap(co)), toneMapped: false })); pic.position.z = 0.02; g.add(pic);
+    bx(2.06, 1.18, 0.03, mat.black, 0, 0, 0, 0, g); }
+  // the clock over the desk: your hub's time
+  { const [c] = ctCanvas(512, 128); A.clockCv = c; const m = new T.Mesh(new T.PlaneGeometry(0.9, 0.225), new T.MeshBasicMaterial({ map: ctTex(c), toneMapped: false })); m.position.set(0, 2.45, Z0 + 0.06); root.add(m); A.clock = m; bx(0.96, 0.27, 0.04, mat.black, 0, 2.45, Z0 + 0.03); }
+  // the desk: an oak top on black steel legs
+  slab(2.2, 0.85, 0.045, 0.03, mat.oak, 0, 0.75, -0.25);
+  for (const sx of [-1, 1]) { bx(0.06, 0.71, 0.7, mat.black, sx * 1.0, 0.355, -0.25); bx(0.08, 0.02, 0.76, mat.black, sx * 1.0, 0.01, -0.25); }
+  bx(1.94, 0.3, 0.02, mat.black, 0, 0.55, -0.6);   // the modesty panel
+  // the ultra-wide monitor: a curved 49-inch screen on a stand
+  { const r = 1.25, wA = 1.08, hA = 0.32, L = wA / r, y0 = 1.12, zc = -0.45 + r;
+    const sg = new T.CylinderGeometry(r, r, hA, 48, 1, true, Math.PI - L / 2, L); const uv = sg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i));
+    const [c] = ctCanvas(2048, 608); A.monCv = c; const tex = ctTex(c); A.monTex = tex;
+    const scr = new T.Mesh(sg, new T.MeshBasicMaterial({ map: tex, toneMapped: false, side: T.DoubleSide })); scr.position.set(0, y0, zc); root.add(scr);
+    const sh = new T.Mesh(new T.CylinderGeometry(r + 0.012, r + 0.012, hA + 0.03, 48, 1, true, Math.PI - (L + 0.03) / 2, L + 0.03), new T.MeshPhysicalMaterial({ color: 0x0E1013, roughness: 0.35, side: T.DoubleSide })); sh.position.set(0, y0, zc + 0.0); root.add(sh);
+    const back = new T.Mesh(new T.CylinderGeometry(r + 0.045, r + 0.045, hA + 0.02, 48, 1, true, Math.PI - L / 2, L), mat.black); back.position.set(0, y0, zc); root.add(back);
+    bx(0.08, 0.28, 0.05, mat.metal, 0, 0.93, -0.52); bx(0.36, 0.012, 0.22, mat.metal, 0, 0.778, -0.5);
+    const hit = new T.Mesh(new T.BoxGeometry(1.15, 0.38, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, y0, -0.47); hit.userData.act = 'monitor'; root.add(hit); A.hits.push(hit);
+    const glow = new T.PointLight(0x9CC8FF, 0.9, 2.4, 1.6); glow.position.set(0, 1.12, -0.25); root.add(glow); }
+  // the keyboard: a full-size board with real keys and a number pad, and the mouse on its mat
+  { const kb = new T.Group(); kb.position.set(-0.05, 0.775, 0.0); root.add(kb);
+    slab(0.44, 0.14, 0.018, 0.008, mat.black, 0, 0.018, 0, 0, kb);
+    const keys: number[][] = [], u = 0.0186, gap = 0.0028;
+    const rows: number[][] = [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], [1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5], [1.8, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2.2], [2.3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2.7], [1.3, 1.3, 1.3, 6.2, 1.3, 1.3, 1.3, 1.3]];
+    rows.forEach((r, ri) => { let x = -0.205; const z = -0.05 + ri * u * 1.02; r.forEach(w => { keys.push([x + w * u / 2, z, w * u - gap, u - gap]); x += w * u; }); });
+    for (let ri = 0; ri < 5; ri++) for (let c = 0; c < 4; c++) keys.push([0.13 + c * u + u / 2, -0.05 + ri * u * 1.02, u - gap, u - gap]);   // the number pad
+    const km = new T.InstancedMesh(new T.BoxGeometry(1, 0.008, 1), new T.MeshStandardMaterial({ color: 0x24272C, roughness: 0.55 }), keys.length), m4 = new T.Matrix4();
+    keys.forEach((k, i) => { m4.makeScale(k[2], 1, k[3]); m4.setPosition(k[0], 0.022, k[1]); km.setMatrixAt(i, m4); }); km.castShadow = q >= 1; kb.add(km);
+    const pad = new T.Mesh(new T.PlaneGeometry(0.26, 0.22), new T.MeshStandardMaterial({ color: 0x1B2028, roughness: 0.95 })); pad.rotation.x = -Math.PI / 2; pad.position.set(0.42, 0.7765, 0.02); root.add(pad);
+    const mouse = new T.Mesh(new T.SphereGeometry(1, 24, 16), new T.MeshPhysicalMaterial({ color: 0x1A1C20, roughness: 0.3, clearcoat: 0.6 })); mouse.scale.set(0.032, 0.019, 0.058); mouse.position.set(0.42, 0.779, 0.03); root.add(mouse);
+    const wheel = new T.Mesh(new T.CylinderGeometry(0.006, 0.006, 0.004, 12), mat.metal); wheel.rotation.z = Math.PI / 2; wheel.position.set(0.42, 0.798, 0.0); root.add(wheel);
+    const hit = new T.Mesh(new T.BoxGeometry(0.9, 0.06, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0.1, 0.8, 0.02); hit.userData.act = 'monitor'; root.add(hit); A.hits.push(hit); }
+  // archive folders stacked on the desk (left), a coffee cup and a phone
+  { const cols = [0x2E4F7A, 0x8A2E2E, 0x2F6B4A, 0xB8862E, 0x3A3F46, 0x6B4A8A, 0x2E4F7A, 0xB8862E], r = ctRng(31);
+    let y = 0.775; for (let i = 0; i < 8; i++) { const h = 0.028 + r() * 0.02; bx(0.33, h, 0.25, M({ color: cols[i], roughness: 0.7 }), -0.82 + (r() - 0.5) * 0.03, y + h / 2, -0.32 + (r() - 0.5) * 0.03, (r() - 0.5) * 0.12); bx(0.31, 0.004, 0.23, mat.paper, -0.82 + (r() - 0.5) * 0.02, y + h + 0.002, -0.32, (r() - 0.5) * 0.08); y += h + 0.004; }
+    for (let i = 0; i < 4; i++) bx(0.06, 0.3, 0.24, M({ color: cols[(i + 3) % cols.length], roughness: 0.6 }), -0.55 + i * 0.065, 0.925, -0.52);
+    const hit = new T.Mesh(new T.BoxGeometry(0.6, 0.4, 0.4), new T.MeshBasicMaterial({ visible: false })); hit.position.set(-0.75, 0.95, -0.4); hit.userData.act = 'archives'; root.add(hit); A.hits.push(hit);
+    add(new T.CylinderGeometry(0.04, 0.034, 0.1, 20), M({ color: 0xF4F4F2, roughness: 0.3 }), 0.72, 0.825, -0.1); add(new T.CylinderGeometry(0.036, 0.036, 0.004, 20), M({ color: 0x3A2216 }), 0.72, 0.872, -0.1);
+    bx(0.075, 0.009, 0.155, mat.black, 0.82, 0.78, 0.12, 0.3); }
+  // the fancy chair: a high-backed leather chair with a headrest, stitched in the company colour, on five wheels
+  { const g = new T.Group(); g.position.set(0, 0, 0.72); g.rotation.y = Math.PI; root.add(g);
+    slab(0.56, 0.54, 0.11, 0.07, mat.leather, 0, 0.52, 0.02, 0, g);
+    const back = new T.Mesh(new T.BoxGeometry(0.54, 0.82, 0.1), mat.leather); back.position.set(0, 0.98, -0.27); back.rotation.x = -0.1; back.castShadow = q >= 1; g.add(back);
+    const head = new T.Mesh(new T.BoxGeometry(0.36, 0.17, 0.11), mat.leather); head.position.set(0, 1.5, -0.33); head.rotation.x = -0.12; g.add(head);
+    for (const sx of [-1, 1]) { const st = new T.Mesh(new T.BoxGeometry(0.008, 0.8, 0.004), mat.stitch); st.position.set(sx * 0.17, 0.98, -0.218); st.rotation.x = -0.1; g.add(st);
+      bx(0.07, 0.05, 0.4, mat.leather, sx * 0.32, 0.72, 0.0, 0, g); bx(0.04, 0.2, 0.04, mat.chrome, sx * 0.32, 0.6, 0.08, 0, g); bx(0.12, 0.18, 0.46, mat.leather, sx * 0.26, 0.98, -0.25, sx * 0.25, g); }
+    add(new T.CylinderGeometry(0.03, 0.03, 0.32, 12), mat.chrome, 0, 0.3, 0, 0, g);
+    for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; bx(0.33, 0.04, 0.05, mat.chrome, Math.cos(a) * 0.16, 0.1, Math.sin(a) * 0.16, -a, g); add(new T.SphereGeometry(0.03, 10, 8), mat.black, Math.cos(a) * 0.32, 0.03, Math.sin(a) * 0.32, 0, g); } }
+  // the archive rack: a tall steel rack against the left wall, full of binders and archive boxes
+  { const rx = X0 + 0.3, rz = -1.4, W = 1.8, D = 0.45, Hr = 2.45, g = new T.Group(); g.position.set(rx, 0, rz); g.rotation.y = Math.PI / 2; root.add(g);
+    for (const [px, pz] of [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2]]) bx(0.04, Hr, 0.04, mat.steel, px, Hr / 2, pz, 0, g);
+    const lv = [0.08, 0.5, 0.92, 1.34, 1.76, 2.18, 2.42];
+    for (const y of lv) { bx(W, 0.025, D, mat.steel, 0, y, 0, 0, g); bx(W, 0.04, 0.012, mat.steel, 0, y + 0.02, D / 2, 0, g); }
+    bx(W, Hr, 0.01, mat.steel, 0, Hr / 2, -D / 2, 0, g);
+    // binders (thin, upright, with a white label) and cardboard archive boxes, shelf by shelf
+    const r = ctRng(9), binders: number[][] = [], boxes: number[][] = [];
+    const bcol = [0x2E4F7A, 0x8A2E2E, 0x2F6B4A, 0x3A3F46, 0xB8862E, 0x1F3550, 0x5A2A4A];
+    for (let s = 0; s < 6; s++) {
+      let x = -W / 2 + 0.03; const y = lv[s] + 0.013, top = lv[s + 1] - lv[s] - 0.06;
+      while (x < W / 2 - 0.1) {
+        if (r() < 0.25) { const w = 0.32; if (x + w > W / 2 - 0.02) break; boxes.push([x + w / 2, y, 0, w, Math.min(0.26, top), 0.36]); x += w + 0.01; }
+        else { const n = 4 + Math.floor(r() * 7); for (let i = 0; i < n && x < W / 2 - 0.08; i++) { const h = Math.min(top, 0.3 + r() * 0.04); binders.push([x + 0.03, y, 0.01, 0.055, h, 0.29, bcol[Math.floor(r() * bcol.length)], (r() - 0.5) * 0.04]); x += 0.06; } x += 0.02; }
+      }
+    }
+    const bm = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), M({ roughness: 0.55 }), binders.length), lm = new T.InstancedMesh(new T.PlaneGeometry(1, 1), mat.paper, binders.length), m4 = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), S = new T.Vector3(), P = new T.Vector3();
+    binders.forEach((b, i) => { E.set(0, 0, b[7]); Q.setFromEuler(E); m4.compose(P.set(b[0], b[1] + b[4] / 2, b[2]), Q, S.set(b[3], b[4], b[5])); bm.setMatrixAt(i, m4); bm.setColorAt(i, new T.Color(b[6]));
+      m4.compose(P.set(b[0], b[1] + b[4] * 0.62, b[2] + b[5] / 2 + 0.001), Q, S.set(b[3] * 0.7, b[4] * 0.22, 1)); lm.setMatrixAt(i, m4); });
+    g.add(bm); g.add(lm);
+    const xm = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), mat.card, boxes.length);
+    boxes.forEach((b, i) => { m4.compose(P.set(b[0], b[1] + b[4] / 2, b[2]), Q.identity(), S.set(b[3], b[4], b[5])); xm.setMatrixAt(i, m4); });
+    g.add(xm);
+    const hit = new T.Mesh(new T.BoxGeometry(W, Hr, D), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, Hr / 2, 0); hit.userData.act = 'archives'; g.add(hit); A.hits.push(hit); }
+  // a plant in the corner
+  { const px = X1 - 0.4, pz = Z0 + 0.4; add(new T.CylinderGeometry(0.2, 0.16, 0.42, 24), mat.pot, px, 0.21, pz); const r = ctRng(5);
+    for (let i = 0; i < 24; i++) { const lf = new T.Mesh(new T.PlaneGeometry(0.11, 0.5), mat.plant); const a = r() * 6.3, t = 0.4 + r() * 0.7; lf.position.set(px + Math.cos(a) * 0.1, 0.42 + 0.25 + r() * 0.55, pz + Math.sin(a) * 0.1); lf.rotation.set(-t * Math.cos(a) * 0.8, a, t * 0.8 * Math.sin(a)); root.add(lf); } }
+  // the lights: linear ceiling lights, cool white
+  for (const z of [-1.6, 0.2, 1.6]) { const ln = new T.Mesh(new T.BoxGeometry(2.6, 0.02, 0.08), mat.glow); ln.position.set(0, HH - 0.012, z); root.add(ln); }
+  for (const [x, z] of [[-1.3, -1.6], [1.3, -1.6], [-1.3, 1.0], [1.3, 1.0], [0, -0.3]]) { const L = new T.SpotLight(0xF2F6FF, 4.5, 7, 0.95, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); if (q >= 2 && x === 0) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); } root.add(L); root.add(L.target); }
+  return A;
+}
+
+/** The monitor: your schedule as on the Schedule screen (the same day, the same blocks, delays and cancellations),
+ *  with the time now; drawn again every few seconds and after every change. */
+function opsMonitorDraw() {
+  const R = OpsRoom, A = R.A; if (!A || !A.monCv) return;
+  const c = A.monCv as HTMLCanvasElement, x = c.getContext('2d') as CanvasRenderingContext2D, W = c.width, H = c.height, co = company();
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0C1A2B'); g.addColorStop(1, '#081321'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  let blocks: Block[] = []; try { blocks = scheduleBlocks(); } catch (e) { /* none */ }
+  let fl: any[] = []; try { fl = fleetOf(); } catch (e) { /* none */ }
+  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+  // the header
+  x.fillStyle = '#12263D'; x.fillRect(0, 0, W, 64); x.fillStyle = co.color || '#2C8CFF'; x.fillRect(0, 62, W, 3);
+  x.fillStyle = '#EAF2FA'; x.font = '700 30px Inter, Arial, sans-serif'; x.textBaseline = 'middle'; x.fillText(`${co.name} · Operations`, 28, 33);
+  x.textAlign = 'right'; x.fillStyle = '#9FB6CC'; x.font = '600 26px Inter, Arial, sans-serif';
+  x.fillText(`${_schedDay ? 'Tomorrow' : 'Today'} · ${fl.length} aircraft · ${blocks.filter(b => b.kind === 'flight').length} legs   ${hm(nowMin)}`, W - 28, 33); x.textAlign = 'left';
+  // the timeline
+  const L = 230, Rr = W - 30, top = 108, rows = Math.max(1, fl.length), rh = Math.min(52, (H - top - 16) / rows), px = (m: number) => L + (Math.max(0, Math.min(1440, m)) / 1440) * (Rr - L);
+  x.font = '600 20px Inter, Arial, sans-serif'; x.fillStyle = '#7F98B0';
+  for (let h = 0; h <= 24; h += 3) { const X = px(h * 60); x.fillRect(X, top - 10, 1, H - top); if (h < 24) x.fillText(`${String(h).padStart(2, '0')}:00`, X + 6, top - 24); }
+  fl.forEach((a: any, i: number) => {
+    const y = top + i * rh;
+    if (i % 2) { x.fillStyle = 'rgba(255,255,255,.03)'; x.fillRect(0, y, W, rh); }
+    x.fillStyle = '#EAF2FA'; x.font = `700 ${Math.round(Math.min(24, rh * 0.48))}px Inter, Arial, sans-serif`; x.fillText(a.reg, 24, y + rh * 0.38);
+    x.fillStyle = '#7F98B0'; x.font = `500 ${Math.round(Math.min(18, rh * 0.34))}px Inter, Arial, sans-serif`; try { x.fillText(acType(a.typeId).model, 24, y + rh * 0.74); } catch (e) { /* no type */ }
+    for (const b of blocks.filter(bb => bb.reg === a.reg)) {
+      const x0 = px(b.start), x1 = Math.max(x0 + 4, px(b.end)), late = !b.cancelled && (b.delayMin || 0) >= 5;
+      x.globalAlpha = b.end < nowMin && !_schedDay ? 0.45 : 1;
+      x.fillStyle = b.kind === 'maint' ? '#C98A1E' : b.cancelled ? '#9A2E2E' : (co.color || '#2C8CFF');
+      const r = Math.min(8, rh * 0.2); x.beginPath(); (x as any).roundRect ? (x as any).roundRect(x0, y + rh * 0.14, x1 - x0, rh * 0.72, r) : x.rect(x0, y + rh * 0.14, x1 - x0, rh * 0.72); x.fill();
+      if (late) { x.strokeStyle = '#F2B544'; x.lineWidth = 3; x.stroke(); }
+      if (x1 - x0 > 90) { x.fillStyle = '#FFFFFF'; x.font = `600 ${Math.round(Math.min(19, rh * 0.36))}px Inter, Arial, sans-serif`; x.fillText(b.kind === 'maint' ? 'Maintenance' : b.cancelled ? 'Cancelled' : `${b.from}–${b.to}`, x0 + 8, y + rh * 0.52); }
+      x.globalAlpha = 1;
+    }
+  });
+  if (!fl.length) { x.fillStyle = '#9FB6CC'; x.font = '600 30px Inter, Arial, sans-serif'; x.fillText('No aircraft yet: buy or lease one to plan its flying.', L, top + 60); }
+  // now
+  if (!_schedDay) { const X = px(nowMin); x.fillStyle = '#F2B544'; x.fillRect(X - 1.5, top - 12, 3, H - top + 12); x.beginPath(); x.roundRect ? x.roundRect(X - 38, top - 44, 76, 28, 6) : x.rect(X - 38, top - 44, 76, 28); x.fill(); x.fillStyle = '#1A120A'; x.font = '700 18px Inter, Arial, sans-serif'; x.textAlign = 'center'; x.fillText(hm(nowMin), X, top - 30); x.textAlign = 'left'; }
+  A.monTex.needsUpdate = true;
+  // the wall clock: your hub's time (the device's clock, as the schedule uses)
+  if (A.clockCv) { const cc = A.clockCv as HTMLCanvasElement, y = cc.getContext('2d') as CanvasRenderingContext2D; y.fillStyle = '#05080C'; y.fillRect(0, 0, 512, 128); y.fillStyle = '#FF5A3C'; y.font = '700 84px "Courier New", monospace'; y.textAlign = 'center'; y.textBaseline = 'middle'; y.fillText(hm(nowMin), 256, 68); A.clock.material.map.needsUpdate = true; }
+}
+
+function opsOpen2(root: HTMLElement, q: number) {
+  const R = OpsRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement;
+  const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
+  ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1)); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
+  ren.shadowMap.enabled = q >= 2; ren.shadowMap.type = T.PCFSoftShadowMap;
+  const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
+  const cam = new T.PerspectiveCamera(56, 1, 0.03, 30); R.cam = cam;
+  scene.add(new T.HemisphereLight(0xEAF2FF, 0x1A222C, 0.75));
+  ctProgress(15, 'Setting up the desk…', R);
+  setTimeout(() => {
+    if (!R.on) return;
+    try {
+      const pm = new T.PMREMGenerator(ren), env = new T.Scene(); env.add(new T.Mesh(new T.BoxGeometry(6, 3, 6), new T.MeshBasicMaterial({ color: 0x26303C, side: T.BackSide })));
+      const l = new T.Mesh(new T.PlaneGeometry(3, 0.2), new T.MeshBasicMaterial({ color: 0xFFFFFF })); l.position.set(0, 1.4, 0); l.rotation.x = Math.PI / 2; env.add(l);
+      scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
+    } catch (e) { /* no reflections */ }
+    ctProgress(35, 'Filling the archive…', R);
+    R.A = opsBuild(scene, q);
+    ctProgress(65, 'Loading the schedule…', R);
+    opsMonitorDraw();
+    const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
+    fit(); R.fit = fit; window.addEventListener('resize', fit);
+    // looking around from the chair: drag, or the arrow keys
+    R.look = { yaw: 0, pitch: -0.16 };
+    let drag: any = null, moved = 0;
+    cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* none */ } });
+    cv.addEventListener('pointermove', e => { if (drag) { moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = clamp(drag.yaw - (e.clientX - drag.x) * 0.004, -2.4, 2.4); R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.1, 0.8); } else opsHover(e); });
+    cv.addEventListener('pointerup', e => { if (drag && moved < 6) opsClickAt(e); drag = null; });
+    root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-op]') as HTMLElement; if (b) opsClick(b); });
+    R.key$ = (e: KeyboardEvent) => {
+      if (!R.on) return; const k = e.key.toLowerCase();
+      if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); opsScreenClose(); } return; }   // the screens have the keys (typing)
+      if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); opsLeave(); return; }
+      if (/^arrow\w+$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
+    };
+    R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; };
+    window.addEventListener('keydown', R.key$, true); window.addEventListener('keyup', R.ku$, true);
+    ctProgress(90, 'Switching on the screens…', R);
+    setTimeout(() => {
+      if (!R.on) return;
+      try { ren.compile(scene, cam); } catch (e) { /* first frame */ }
+      R.loading = false; R.t0 = performance.now(); opsFrame();
+      ctProgress(100, 'Ready', R);
+      const wait = Math.max(300, 3000 - (performance.now() - R.loadT0));
+      setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); } opsUi(); }, wait);
+    }, 40);
+    R.iv = setInterval(() => { if (R.on && !document.hidden) opsMonitorDraw(); }, 5000);
+    const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !R.overlay) opsFrame(); };   // the room rests while a screen is open
+    R.raf = requestAnimationFrame(loop);
+  }, 30);
+}
+
+function opsFrame() {
+  const R = OpsRoom, T = THREE, now = performance.now() / 1000, dt = Math.min(0.05, now - (R.last || now)); R.last = now;
+  const k = R.keys || {};
+  if (k.arrowleft) R.look.yaw = clamp(R.look.yaw + dt * 1.4, -2.4, 2.4); if (k.arrowright) R.look.yaw = clamp(R.look.yaw - dt * 1.4, -2.4, 2.4);
+  if (k.arrowup) R.look.pitch = clamp(R.look.pitch + dt, -1.1, 0.8); if (k.arrowdown) R.look.pitch = clamp(R.look.pitch - dt, -1.1, 0.8);
+  // the view eases to where you look (a button below turns you to the monitor or the archives)
+  if (R.aim) { R.look.yaw += (R.aim.yaw - R.look.yaw) * Math.min(1, dt * 4); R.look.pitch += (R.aim.pitch - R.look.pitch) * Math.min(1, dt * 4); if (Math.abs(R.aim.yaw - R.look.yaw) < 0.005) R.aim = null; }
+  R.cam.position.set(0, 1.2, 0.76);
+  const yaw = Math.PI + R.look.yaw, p = R.look.pitch;
+  R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
+  R.ren.render(R.scene, R.cam);
+}
+function opsAimed(e: PointerEvent): string {
+  const R = OpsRoom, T = THREE, rc = new T.Raycaster(), r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect();
+  rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam);
+  const h = R.A ? rc.intersectObjects(R.A.hits, false)[0] : null; return h ? h.object.userData.act : '';
+}
+function opsHover(e: PointerEvent) {
+  const R = OpsRoom; if (R.loading || R.overlay || !DESKTOP) return;
+  const a = opsAimed(e), cv = R.root.querySelector('canvas') as HTMLElement; cv.style.cursor = a ? 'pointer' : '';
+}
+function opsClickAt(e: PointerEvent) {
+  const R = OpsRoom; if (R.loading || R.overlay) return;
+  const a = opsAimed(e);
+  if (a === 'monitor') { Sound.tick(); opsScreenOpen(R.tab || 'schedule'); }
+  else if (a === 'archives') { Sound.tick(); R.aim = { yaw: 1.3, pitch: 0.05 }; }
+}
+
+/* ---------- the buttons below, the screens over the room ---------- */
+const OPS_TABS: [string, string, string][] = [['ops', 'Operations', 'ops'], ['schedule', 'Schedule', 'clock'], ['dispatch', 'Dispatch', 'routes'], ['planner', 'Flight planner', 'routes']];
+function opsUi() {
+  const R = OpsRoom; if (!R.on) return;
+  const sp = R.root.querySelector('.op-spots') as HTMLElement; sp.hidden = false;
+  sp.innerHTML = OPS_TABS.filter(t => SCREENS[t[0]]).map(t => `<button data-op="tab" data-k="${t[0]}">${t[1]}</button>`).join('')
+    + `<button data-op="look" data-k="desk">At the desk</button><button data-op="look" data-k="archives">The archives</button>`;
+  const hint = R.root.querySelector('.op-aim') as HTMLElement; if (hint) { hint.hidden = false; hint.textContent = DESKTOP ? 'Click the monitor to work · drag to look around · Esc to leave' : 'Tap the monitor to work · drag to look around'; hint.classList.add('op-hint'); setTimeout(() => { if (hint) hint.hidden = true; }, 6000); }
+}
+function opsScreenOpen(key: string) {
+  const R = OpsRoom; if (!R.on || !SCREENS[key]) return;
+  if (R.overlay) { opsScreenSwitch(key); return; }
+  R.tab = key;
+  for (const sel of ['.op-spots', '.op-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
+  const ov = document.createElement('div'); ov.className = 'of-planner op-screen'; ov.setAttribute('data-screen', key);
+  ov.innerHTML = `<div class="of-pl-head"><div class="op-tabs">${OPS_TABS.filter(t => SCREENS[t[0]]).map(t => `<button class="${t[0] === key ? 'on' : ''}" data-op="tab" data-k="${t[0]}">${icon(t[2])}${t[1]}</button>`).join('')}</div><button class="btn ghost sm" data-op="close">${icon('close')}Back to the desk</button></div><div class="of-pl-body"></div>`;
+  R.root.appendChild(ov); R.overlay = ov; document.body.classList.add('of-over');
+  opsScreenFill(key);
+}
+function opsScreenFill(key: string) {
+  const R = OpsRoom, body = R.overlay && R.overlay.querySelector('.of-pl-body') as HTMLElement; if (!body) return;
+  R.tab = key; R.overlay.setAttribute('data-screen', key);
+  R.overlay.querySelectorAll('.op-tabs button').forEach((b: any) => b.classList.toggle('on', b.getAttribute('data-k') === key));
+  body.innerHTML = `<section class="screen screen-${key}">${SCREENS[key].render()}</section>`;
+  try { if (SCREENS[key].mount) SCREENS[key].mount(body.querySelector('.screen') as HTMLElement); } catch (e) { /* the screen shows what it can */ }
+}
+function opsScreenSwitch(key: string) { Sound.tick(); opsScreenFill(key); }
+/** Back to the desk (you stay in the Operations office); the monitor shows any change at once. */
+function opsScreenClose() {
+  const R = OpsRoom; if (!R.overlay) return;
+  R.overlay.remove(); R.overlay = null; document.body.classList.remove('of-over'); Sound.tick();
+  opsMonitorDraw(); opsUi();
+}
+/** After a change anywhere (a leg moved, a route added): the screen over the room and the monitor show it too. */
+function opsRefresh() {
+  const R = OpsRoom; if (!R.on) return;
+  try { opsMonitorDraw(); } catch (e) { /* next time */ }
+  if (!R.overlay) return;
+  const key = R.overlay.getAttribute('data-screen'); if (!key || key === 'planner' || !SCREENS[key]) return;   // the planner redraws itself
+  const sec = R.overlay.querySelector('.of-pl-body .screen') as HTMLElement; if (sec) patchHtml(sec, SCREENS[key].render());
+}
+function opsClick(b: HTMLElement) {
+  const R = OpsRoom, k = b.getAttribute('data-op');
+  if (k === 'leave') opsLeave();
+  else if (k === 'close') opsScreenClose();
+  else if (k === 'tab') { Sound.tick(); opsScreenOpen(b.getAttribute('data-k')); }
+  else if (k === 'look') { Sound.tick(); R.aim = b.getAttribute('data-k') === 'archives' ? { yaw: 1.3, pitch: 0.05 } : { yaw: 0, pitch: -0.16 }; }
+}
+
+/* ---------- leaving ---------- */
+OpsRoom.close = function (quiet?: boolean) {
+  const R = OpsRoom; if (!R.on) return; R.on = false;
+  R.overlay = null; document.body.classList.remove('of-over');
+  cancelAnimationFrame(R.raf); clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
+  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null;
+  R.root.remove();
+  if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
+};
+/** Out of Operations: its own loading screen while the room is cleared from memory and the app comes back. */
+function opsLeave() {
+  if (!OpsRoom.on || ExitSplash.on) return;
+  exitSplash('ops', 'Operations', [
+    { pct: 30, step: 'Switching off the screens…', run: () => OpsRoom.close(true) },
+    { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
+    { pct: 85, step: 'Loading your airline…', run: () => refresh() },
+  ]);
+}
+
+ACTIONS['ops-room'] = () => { closeAll(); OpsRoom.open(); };
