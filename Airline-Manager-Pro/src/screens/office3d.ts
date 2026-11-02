@@ -560,6 +560,8 @@ function ofOpenReports(): any[] { return ((State as any).incidents || []).filter
 function ofReportsUi() {
   const R = OfficeRoom, L = ofOpenReports();
   ofSay('', L.length ? 'Who would you like to see?' : 'There are no open conduct reports.', 'Conduct reports');
+  const sp = R.root.querySelector('.of-spots') as HTMLElement; if (sp) sp.hidden = true;   // the list instead of the places, until you go back
+  (R.root.querySelector('.ct-ctl') as HTMLElement).innerHTML = '<button class="btn ghost" data-of="back">Back</button>';
   (R.root.querySelector('.ct-opts') as HTMLElement).innerHTML = L.slice(0, 12).map((inc: any) => { const p = staffById(inc.staffId);
     return `<div class="of-rep-row"><button class="of-rep" data-of="invite" data-id="${esc(inc.id)}"><b>${esc(p.name)}</b><small>${esc(inc.title)} · ${esc(inc.date || '')}${courtReportable(inc) ? ' · can go to court' : ''}</small><span>Invite in</span></button>${courtReportable(inc) ? `<button class="of-rep court" data-of="tocourt" data-id="${esc(inc.id)}"><span>Report to the police</span></button>` : ''}</div>`; }).join('');
 }
@@ -728,6 +730,7 @@ function ofClick(b: HTMLElement) {
   else if (k === 'dec') ofDecide(b.getAttribute('data-k'));
   else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else ofSpot(s); }
   else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
+  else if (k === 'back') { Sound.tick(); ofVisitUi(); }
   else if (k === 'tocourt') {
     // straight to the police, without talking to them first (the court will ask about that)
     const inc = ofOpenReports().filter((x: any) => x.id === b.getAttribute('data-id'))[0]; if (!inc || !courtReportable(inc)) return;

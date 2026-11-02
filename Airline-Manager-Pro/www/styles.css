@@ -3002,3 +3002,6 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .office3d .of-rep-row .of-rep:first-child { flex: 1; }
 .office3d .of-rep.court { width: auto; display: flex; align-items: center; }
 .office3d .of-rep.court span { color: #FF8A80; grid-row: auto; }
+.office3d .ct-opts .of-rep { height: auto; min-height: 46px; white-space: normal; padding: 8px 12px; }
+.office3d .ct-opts { max-height: 46vh; overflow: auto; }
+.office3d .of-rep-row { align-items: stretch; margin-bottom: 6px; }
