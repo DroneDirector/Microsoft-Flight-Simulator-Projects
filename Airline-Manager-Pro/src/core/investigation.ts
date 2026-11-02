@@ -128,7 +128,7 @@ function invAnalyse(inv: Investigation, o: any) {
   const root = F.filter(f => f.side === 'org' || /mpay|mmood|quarrel|mechs|pmood|ppay/.test(f.key)).map(f => f.text);
   const mid = F.filter(f => /skill|defects|cond|prating|pwarn|drink/.test(f.key)).map(f => f.text);
   const last = inv.cause === 'aircraft'
-    ? `${invPart(inv)} failed in flight${inv.near ? ' on the approach' : ''}, and the crew could not save the aircraft`
+    ? `${invPart(inv)} caused a failure in flight${inv.near ? ' on the approach' : ''}, and the crew could not save the aircraft`
     : inv.cause === 'pilot' ? (F.filter(f => f.side === 'pilot' && /sink|stall|cfit|water/.test(f.key)).map(f => f.text)[0] || 'the approach was flown outside the airline\'s limits and not abandoned in time')
     : 'no fault in the aircraft or its crew has been found so far';
   inv.chain = root.concat(mid).slice(0, 5).concat([last]);
@@ -136,9 +136,9 @@ function invAnalyse(inv: Investigation, o: any) {
 /** The part that gave way, from what was damaged and what was left unrepaired. */
 function invPart(inv: Investigation): string {
   const issue = (State.issues as any[]).filter(i => i.reg === inv.reg && i.status === 'open')[0];
-  if (issue) return `the ${String(issue.title).replace(/^(a|an|the)\s+/i, '').toLowerCase()} that had been reported and not repaired`;
+  if (issue) return `the ${String(issue.title).replace(/^(a|an|the)\s+/i, '').toLowerCase()}, reported earlier and never repaired,`;
   const p = inv.parts.filter(x => /engine|gear|flap|fuel|control/i.test(x))[0];
-  return p ? `the ${p.toLowerCase()}` : 'a worn part that should have been replaced';
+  return p ? `a worn part in the ${p.toLowerCase()}` : 'a worn part that should have been replaced';
 }
 
 /** Who saw it: near an airport someone always did; far from one, maybe no one. Survivors when there are any. */

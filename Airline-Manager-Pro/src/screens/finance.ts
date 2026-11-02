@@ -50,7 +50,6 @@ SCREENS.finance = {
     <div class="screen-head"><div><h1>Finance</h1><p class="sub">${esc(c.name)}, ${sim ? 'simulated years' : 'real-world calendar'}</p></div>
       ${expButtons('tx')}<div class="seg">${['day', 'week', 'month', 'year'].map(k => `<button class="${_finPeriod === k ? 'on' : ''}" data-act="fin-period" data-p="${k}">${unit[k]}</button>`).join('')}</div></div>
     ${marketsCardHtml()}
-    ${typeof storageCardHtml === 'function' ? storageCardHtml() : ''}
     ${safCardHtml()}${soloMode() ? sharesHtml() : ''}
     <div class="fin">
       <div class="card fin-chart">

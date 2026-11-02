@@ -186,13 +186,16 @@ function partsFromStock(cid: string, base: number): number { const s = stockOf(c
 let _mktTab: MarketId = 'fuel';
 function marketsCardHtml(): string {
   marketsAdvance();
+  // food and drink has its own market tab, next to spare parts
+  const tabs = `<span class="seg">${(['fuel', 'parts', 'food'] as any[]).map(x => `<button class="${_mktTab === x ? 'on' : ''}" data-act="mkt-tab" data-k="${x}">${x === 'food' ? 'Food and drink' : MARKET_NAME[x as MarketId]}</button>`).join('')}</span>`;
+  if ((_mktTab as any) === 'food') return `<div class="card mkt mkt-card"><div class="card-h"><b>Markets</b>${tabs}</div>${typeof foodMarketHtml === 'function' ? foodMarketHtml() : ''}</div>`;
   const k = _mktTab, m = marketsState()[k], c = company(), s = stockOf(c.id), pct = Math.round((m.idx - 1) * 100);
   const warn = m.events.filter(e => e.kind === 'warn' && e.due > Date.now())[0], last = m.events.filter(e => e.kind === 'news')[0];
   const price = k === 'fuel' ? fuelPrice(c.hub) : m.idx, cap = k === 'fuel' ? fuelCapKg(c.id) : partsCap(c.id), have = k === 'fuel' ? s.fuelKg : s.parts;
   const buys = k === 'fuel' ? [50000, 200000, 500000] : [100000, 400000, 1000000];
   const trend = m.hist.slice(-60).map(h => h.v);
-  return `<div class="card mkt">
-    <div class="card-h"><b>Markets</b><span class="seg">${(['fuel', 'parts'] as MarketId[]).map(x => `<button class="${k === x ? 'on' : ''}" data-act="mkt-tab" data-k="${x}">${MARKET_NAME[x]}</button>`).join('')}</span></div>
+  return `<div class="card mkt mkt-card">
+    <div class="card-h"><b>Markets</b>${tabs}</div>
     <div class="mkt-row">
       <div class="mkt-now"><small>${k === 'fuel' ? `Today at ${esc(c.hub)}` : 'Parts prices'}</small><b>${k === 'fuel' ? '$' + price.toFixed(2) + '<small>/kg</small>' : Math.round(m.idx * 100) + '<small>% of normal</small>'}</b>
         <em class="${pct > 3 ? 'red' : pct < -3 ? 'green' : ''}">${pct > 0 ? '+' : ''}${pct}% vs normal</em></div>

@@ -52,13 +52,24 @@ function issueMinutes(i: Issue): number {
   if (!I.estMin) { const a: any = plane(i.reg); I.estMin = repairMinutes(i, (a && maintQuality(a.companyId).skill) || 0.3); }
   return I.estMin;
 }
-/** How long the hangar needs for all of an aircraft's open reports together (real minutes; 0 when repairs are instant). */
+/** Spare parts for a repair: what the jobs need (about 55% of their cost) and how much of it isn't in your stores.
+ *  Parts in stock are taken from there; missing parts are ordered at the day's price with a rush charge, and the
+ *  aircraft waits for them in the hangar. */
+function repairParts(reg: string, jobs: Issue[]): { need: number; have: number; miss: number } {
+  const a: any = plane(reg), need = Math.round(jobs.reduce((t, i: any) => t + (i.cost || 0), 0) * 0.55);
+  if (!a || !need) return { need: 0, have: 0, miss: 0 };
+  const stock = stockOf(a.companyId).parts || 0, have = Math.min(stock, need);
+  return { need, have, miss: need ? (need - have) / need : 0 };
+}
+/** How long the hangar needs for all of an aircraft's open reports together (real minutes; 0 when repairs are instant).
+ *  Waiting for parts that aren't in stock adds up to 80% more. */
 function repairPlanMin(reg: string, issues?: Issue[]): number {
   if ((State.settings as any).repairTime === 'instant') return 0;
   const jobs = issues || State.issues.filter(i => i.reg === reg && i.status === 'open');
   if (!jobs.length) return 0;
   const mins = jobs.map(issueMinutes).sort((x, y) => y - x);
-  return repairStep(Math.min(90, mins[0] + mins.slice(1).reduce((t, m) => t + Math.round(m * 0.3), 0)));
+  const kept = (jobs[0] as any).partsMiss, miss = kept != null ? kept : repairParts(reg, jobs).miss;
+  return repairStep(Math.min(120, (mins[0] + mins.slice(1).reduce((t, m) => t + Math.round(m * 0.3), 0)) * (1 + 0.8 * miss)));
 }
 /** "about 45 minutes", "1 h 20 min", or "ready at once". */
 function repairTimeText(min: number): string {

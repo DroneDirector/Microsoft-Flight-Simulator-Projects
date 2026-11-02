@@ -261,8 +261,8 @@ function mechanicPopup(issueId: string) {
           </div>`).join('')}</div>
         ${issue.status === 'open' ? `<div class="modal-actions">
           <button class="btn ghost" data-act="fix-later" data-id="${issue.id}">Fix later</button>
-          <button class="btn danger" data-act="fix-now" data-id="${issue.id}">${icon('wrench')}${repairTotal(issue.reg).n > 1 ? `Pay ${money(repairTotal(issue.reg).cost)} and fix all ${repairTotal(issue.reg).n}` : `Pay ${money(issue.cost)} and fix now`}</button>
-        </div>` : `<div class="paid-note">${icon('check')}<span><b>Paid${(issue as any).paidAt ? ' ' + esc(dateStr(new Date((issue as any).paidAt))) : ''}</b><small>${issue.status === 'fixed' ? 'Repaired' : a.status === 'flying' ? 'The repair starts when it lands' : 'Being repaired: ' + Math.max(1, Math.ceil(((issue as any).startedAt + (issue as any).durMin * 60000 - Date.now()) / 60000)) + ' min left'}</small></span>
+          <button class="btn danger" data-act="fix-now" data-id="${issue.id}">${icon('wrench')}${repairTotal(issue.reg).n > 1 ? `Pay ${money(repairTotal(issue.reg).cost)} and fix all ${repairTotal(issue.reg).n}` : `Pay ${money(repairTotal(issue.reg).cost)} and fix now`}</button>
+        </div>${repairPartsNote(issue.reg)}` : `<div class="paid-note">${icon('check')}<span><b>Paid${(issue as any).paidAt ? ' ' + esc(dateStr(new Date((issue as any).paidAt))) : ''}</b><small>${issue.status === 'fixed' ? 'Repaired' : a.status === 'flying' ? 'The repair starts when it lands' : 'Being repaired: ' + Math.max(1, Math.ceil(((issue as any).startedAt + (issue as any).durMin * 60000 - Date.now()) / 60000)) + ' min left'}</small></span>
           <button class="btn ghost" data-act="close-layer">Close</button></div>`}
         ${issue.severity === 'grounding' ? `<p class="fine-print">${icon('alert')}Grounding damage: ${esc(issue.reg)} can't be flown until this is repaired.</p>` : ''}
       </div>
@@ -288,23 +288,36 @@ ACTIONS['fix-now'] = el => {
   const i = State.issues.filter(x => x.id === el.getAttribute('data-id'))[0]; if (!i) return;
   const a = plane(i.reg), c = company(a.companyId);
   // one payment repairs everything reported on this aircraft, and it is ready to fly straight away
-  const open = State.issues.filter(x => x.reg === i.reg && x.status === 'open'), cost = open.reduce((t, x) => t + x.cost, 0);
+  const open = State.issues.filter(x => x.reg === i.reg && x.status === 'open');
   // a report is paid once: after that the repair carries on and there is nothing more to pay
   if (!open.length) { closeAll(); toast('Already paid. The mechanic is on it.', 'info'); return; }
+  // spare parts: from your stores first (already paid for); what's missing is ordered at the day's price, with a
+  // rush charge, and the aircraft waits for it
+  const P = repairParts(i.reg, open), taken = partsFromStock(a.companyId, P.need), missing = P.need - taken;
+  open.forEach(x => { (x as any).partsMiss = P.miss; });
+  const cost = Math.max(0, open.reduce((t, x) => t + x.cost, 0) - P.need + Math.round(missing * marketIdx('parts') * 1.15));
   const from = c.balance; c.balance -= cost;
   const ids: { [k: string]: boolean } = {}; open.forEach(x => { ids[x.id] = true; (x as any).paidAt = Date.now(); });
   State.notices = State.notices.filter(n => !(n.kind === 'mechanic' && ids[n.ref]));
   repairAll(i.reg);
   if (cost) State.txns.unshift({ id: uid(), companyId: a.companyId, date: dateStr(new Date()).slice(0, 10), time: new Date().toTimeString().slice(0, 5), label: `Repair: ${open.map(x => x.title).join(', ')} (${i.reg})`, amount: -cost, kind: 'maint', reg: i.reg,
-    lines: [['Labour', -Math.round(cost * 0.45)], ['Parts', -Math.round(cost * 0.55)]], note: open.map(x => x.detail).join(' '), link: { kind: 'aircraft', id: i.reg } } as any);
+    lines: [['Labour', -Math.round(open.reduce((t, x) => t + x.cost, 0) * 0.45)], taken ? [`Parts from your stores (${money(taken, { compact: true })}, already paid)`, 0] : null, missing ? ['Parts ordered, with a rush charge', -Math.round(missing * marketIdx('parts') * 1.15)] : null].filter(Boolean) as any, note: open.map(x => x.detail).join(' '), link: { kind: 'aircraft', id: i.reg } } as any);
   try { Bank.claim(i.reg, open); } catch (e) { /* ignore */ }
   Voice.stop(); closeAll(); Sound.payOut(); Haptics.pulse(30); Store.save(); refresh(); animateBalance(from, c.balance);
   toast(a.status === 'flying' ? `${i.reg} goes into the hangar when it lands` : a.status !== 'maintenance' ? `${i.reg} is repaired and ready for its next flight` : `${i.reg} is in the hangar: ${(i as any).durMin} minutes of work${open.length > 1 ? ' on ' + open.length + ' reports' : ''}`, 'ok');
 };
 /** What fixing an aircraft costs: all its open reports together. */
-function repairTotal(reg: string): { n: number; cost: number } {
-  const open = State.issues.filter(x => x.reg === reg && x.status === 'open');
-  return { n: open.length, cost: open.reduce((t, x) => t + x.cost, 0) };
+/** What fixing everything open on an aircraft costs now: labour, plus the parts not in your stores (ordered with a rush charge). */
+function repairTotal(reg: string): { n: number; cost: number; parts: { need: number; have: number; miss: number } } {
+  const open = State.issues.filter(x => x.reg === reg && x.status === 'open'), P = repairParts(reg, open);
+  const missing = P.need - P.have;
+  return { n: open.length, cost: Math.max(0, open.reduce((t, x) => t + x.cost, 0) - P.need + Math.round(missing * marketIdx('parts') * 1.15)), parts: P };
+}
+/** The mechanic's word on parts: in stock, or to be ordered (and the wait). */
+function repairPartsNote(reg: string): string {
+  const R = repairTotal(reg), P = R.parts; if (!P.need) return '';
+  return P.miss < 0.01 ? `<p class="fine-print">${icon('check')}The parts are in your stores (${money(P.need, { compact: true })}, already paid for): you pay for the work only.</p>`
+    : `<p class="fine-print">${icon('alert')}${P.have ? `Only ${money(P.have, { compact: true })} of the ${money(P.need, { compact: true })} in parts is in your stores` : 'The parts aren\'t in your stores'}: the rest is ordered at today's price with a rush charge, and the aircraft waits for it (the repair takes about ${Math.round(P.miss * 80)}% longer). Stock up on spare parts in Finance → Markets.</p>`;
 }
 ACTIONS['fix-later'] = el => {
   const i = State.issues.filter(x => x.id === el.getAttribute('data-id'))[0];
