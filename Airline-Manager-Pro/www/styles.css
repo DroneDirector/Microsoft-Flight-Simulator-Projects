@@ -3102,3 +3102,17 @@ body.of-over .toast, body.of-over .toasts { z-index: 990; }
 .exit-splash.out { opacity: 0; transition: opacity .7s ease; pointer-events: none; }
 .exit-splash .ct-loader { color: #F3ECE0; }
 @media (prefers-reduced-motion: reduce) { .ops-emb .ops-b1, .ops-emb .ops-b2, .ops-emb .ops-b3, .ops-emb .ops-now { animation: none; } }
+
+/* Operations: the screens grow out of the monitor and go back into it */
+.ops3d .op-screen.op-zoom { will-change: transform, opacity, filter; border-radius: 22px; overflow: hidden; filter: blur(5px) brightness(1.5) saturate(1.2); box-shadow: 0 0 0 1px rgba(155,231,255,.35), 0 0 60px rgba(47,180,232,.45); pointer-events: none; }
+.ops3d .op-screen.op-zoom.op-zoom-go { transition: transform .75s cubic-bezier(.22,.8,.24,1), opacity .5s ease, filter .7s ease, border-radius .75s ease, box-shadow .75s ease; filter: none; border-radius: 0; box-shadow: none; }
+.ops3d .op-screen.op-zoom.op-zoom-back { transition: transform .7s cubic-bezier(.55,.05,.4,1), opacity .55s ease .15s, filter .5s ease, border-radius .7s ease; filter: blur(4px) brightness(1.4); border-radius: 22px; }
+.ops3d .op-zoom-fx { position: absolute; z-index: 29; pointer-events: none; border-radius: 10px; background: radial-gradient(ellipse at 50% 50%, rgba(190,240,255,.85), rgba(47,180,232,.35) 45%, rgba(47,180,232,0) 75%); opacity: 0; transform: scale(1); }
+.ops3d .op-zoom-fx.go { animation: opsFlash .8s ease-out forwards; }
+@keyframes opsFlash { 0% { opacity: 0; transform: scale(.9); } 25% { opacity: .9; } 100% { opacity: 0; transform: scale(1.8); } }
+.ops3d .of-pl-body > .screen { animation: opsTab .35s ease both; }
+@keyframes opsTab { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ops3d .op-zoom-fx.go, .ops3d .of-pl-body > .screen { animation: none; } }
+
+/* inside Operations or the office, the way into Operations is not needed */
+.ops3d .sched-opsroom, .office3d .sched-opsroom { display: none; }
