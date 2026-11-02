@@ -96,6 +96,7 @@ jobs:
           if ($r.app -ne "Airline Manager Pro") { exit 1 }
 
       - name: Test Setup (install into a chosen folder, shortcut, Apps entry, then remove everything)
+        timeout-minutes: 10
         shell: pwsh
         run: |
           $v = (Get-Content ../app.config.json | ConvertFrom-Json).version
@@ -106,9 +107,12 @@ jobs:
           $desk = [Environment]::GetFolderPath('Desktop')
           # an old shortcut with another name, pointing at the app, must be replaced
           $ws = New-Object -ComObject WScript.Shell; $old = $ws.CreateShortcut((Join-Path $desk "AMP old.lnk")); $old.TargetPath = "C:\Old\AirlineManagerPro-PC.exe"; $old.Save()
-          $p = Start-Process -FilePath $setup -ArgumentList "--silent","--dir",$chosen -Wait -PassThru
+          # wait for Setup itself only (not for the helpers it starts), at most two minutes
+          function RunIt($file, $args2) { $q = Start-Process -FilePath $file -ArgumentList $args2 -PassThru; if (-not $q.WaitForExit(120000)) { Write-Output "Timed out: $file $args2"; Get-Content (Join-Path $env:TEMP "amp-setup.log") -ErrorAction SilentlyContinue; exit 1 }; return $q.ExitCode }
+          Write-Output "1. Installing into $chosen"
+          $code = RunIt $setup @("--silent","--dir",$chosen)
           Get-Content (Join-Path $env:TEMP "amp-setup.log") -ErrorAction SilentlyContinue
-          if ($p.ExitCode -ne 0) { Write-Output "Setup failed: $($p.ExitCode)"; exit 1 }
+          if ($code -ne 0) { Write-Output "Setup failed: $code"; exit 1 }
           $dir = Join-Path $chosen "Airline Manager Pro"
           foreach ($f in @("AirlineManagerPro-PC.exe", "app.ico", "install.json", "app\index.html", "lib\node_modules\node-simconnect\package.json")) { if (-not (Test-Path (Join-Path $dir $f))) { Write-Output "Missing after install: $f"; exit 1 } }
           if (-not (Test-Path (Join-Path $desk "Airline Manager Pro.lnk"))) { Write-Output "No desktop shortcut"; exit 1 }
@@ -118,10 +122,12 @@ jobs:
           $r = Get-ItemProperty $key; Write-Output ("Apps entry: " + $r.DisplayName + " " + $r.DisplayVersion + " in " + $r.InstallLocation)
           if ($r.DisplayVersion -ne $v) { exit 1 }
           # installing again over it (an update) keeps working
-          $p = Start-Process -FilePath $setup -ArgumentList "--silent" -Wait -PassThru; if ($p.ExitCode -ne 0) { Write-Output "Second install failed"; exit 1 }
+          Write-Output "2. Installing again over it"
+          $code = RunIt $setup @("--silent"); if ($code -ne 0) { Write-Output "Second install failed: $code"; exit 1 }
           # remove it: every file, the shortcut, the entry and the folder itself
-          $p = Start-Process -FilePath (Join-Path $dir "AirlineManagerPro-PC.exe") -ArgumentList "--uninstall","--silent" -Wait -PassThru
-          Start-Sleep -Seconds 8
+          Write-Output "3. Removing it"
+          $code = RunIt (Join-Path $dir "AirlineManagerPro-PC.exe") @("--uninstall","--silent"); Write-Output "Uninstall answered $code"
+          for ($i = 0; $i -lt 30 -and (Test-Path $dir); $i++) { Start-Sleep -Seconds 1 }
           if (Test-Path $dir) { Write-Output "The folder is still there:"; Get-ChildItem -Recurse $dir | Select-Object -First 10 FullName; exit 1 }
           if (Test-Path (Join-Path $desk "Airline Manager Pro.lnk")) { Write-Output "The shortcut is still there"; exit 1 }
           if (Test-Path $key) { Write-Output "The Apps entry is still there"; exit 1 }
