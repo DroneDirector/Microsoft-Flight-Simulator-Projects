@@ -227,9 +227,9 @@ function getFile(url: string, to: string, onData: (n: number) => void, stop: () 
 function json(res: http.ServerResponse, o: any) { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); }
 function readBody(req: http.IncomingMessage, cb: (b: string) => void) { const parts: Buffer[] = []; let n = 0; req.on('data', d => { n += d.length; if (n < 50e6) parts.push(d); }); req.on('end', () => cb(Buffer.concat(parts).toString('utf8'))); }
 
-/** The online services the app works with (SimBrief, weather, VATSIM, IVAO, Hoppie ACARS, Discord),
+/** The online services the app works with (SimBrief, weather, NOTAMs from the FAA, VATSIM, IVAO, Hoppie ACARS, Discord),
  *  requested by the PC app for the app window. Only these addresses, only over HTTPS. */
-const RELAY_HOSTS = ['www.simbrief.com', 'simbrief.com', 'aviationweather.gov', 'data.vatsim.net', 'api.ivao.aero', 'www.hoppie.nl', 'discord.com', 'discordapp.com'];
+const RELAY_HOSTS = ['www.simbrief.com', 'simbrief.com', 'aviationweather.gov', 'external-api.faa.gov', 'data.vatsim.net', 'api.ivao.aero', 'www.hoppie.nl', 'discord.com', 'discordapp.com'];
 function relay(req: http.IncomingMessage, res: http.ServerResponse) {
   readBody(req, b => {
     let o: any; try { o = JSON.parse(b); } catch (e) { res.writeHead(400); res.end('Bad request'); return; }
@@ -239,6 +239,8 @@ function relay(req: http.IncomingMessage, res: http.ServerResponse) {
       const method = String(o.method || 'GET').toUpperCase() === 'POST' ? 'POST' : 'GET';
       const headers: any = { 'User-Agent': 'AirlineManagerPro', Accept: '*/*' };
       if (o.headers && o.headers['Content-Type']) headers['Content-Type'] = String(o.headers['Content-Type']);
+      // the FAA's NOTAM service: your own key, passed on to it and nowhere else
+      if (url.hostname === 'external-api.faa.gov' && o.headers) for (const k of ['client_id', 'client_secret']) if (o.headers[k]) headers[k] = String(o.headers[k]);
       const r = https.request(url, { method, headers, timeout: 20000 }, up => {
         if (up.statusCode >= 300 && up.statusCode < 400 && up.headers.location && hops < 3) { up.resume(); go(new URL(up.headers.location, url).toString(), hops + 1); return; }
         const parts: Buffer[] = []; let n = 0;

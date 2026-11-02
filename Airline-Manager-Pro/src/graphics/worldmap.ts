@@ -79,7 +79,10 @@ const MAP_R_MAX = 1.6e7;
 const AIRPORT_DEG_PX = 1800;
 const MY_MAX = millerY(MAP_LAT_MAX), MY_MIN = millerY(MAP_LAT_MIN);
 
-interface MapOpts { interactive?: boolean; labels?: boolean; onSelect?: (id: string) => void; compact?: boolean; insetRight?: number; memoKey?: string }
+interface MapOpts { interactive?: boolean; labels?: boolean; onSelect?: (id: string) => void; compact?: boolean; insetRight?: number; memoKey?: string;
+  /** The Flight planner: draws its own route instead of the flights, and takes taps and drags (true: handled). */
+  overlay?: (c: CanvasRenderingContext2D, m: WorldMap) => void; onTap?: (x: number, y: number) => boolean;
+  onDown?: (x: number, y: number) => boolean; onMove?: (x: number, y: number) => void; onUp?: (x: number, y: number) => void }
 
 /** The aircraft each map is following and its zoom, kept while you visit other screens. */
 const _followMemo: { [key: string]: { id: string; z: number } } = {};
@@ -150,6 +153,14 @@ class WorldMap {
       this.ml.on('dragstart', () => { this.userMoved = true; this.followT = performance.now() + 2500; });
       this.ml.on('zoomstart', (e: any) => { if (e.originalEvent) this.userMoved = true; });
       this.ml.on('click', (e: any) => this.tapAt(e.point.x, e.point.y));
+      if (this.opts.onDown) {
+        // dragging something of the planner's (a waypoint) instead of the map
+        let own = false;
+        const dn = (e: any) => { if (e.point && this.opts.onDown(e.point.x, e.point.y)) { own = true; this.ml.dragPan.disable(); } };
+        const mv = (e: any) => { if (own && e.point) { this.opts.onMove(e.point.x, e.point.y); this.lastInput = performance.now(); } };
+        const upf = (e: any) => { if (!own) return; own = false; this.ml.dragPan.enable(); this.ownUpT = performance.now(); if (e.point) this.opts.onUp(e.point.x, e.point.y); };
+        for (const [ev, fn] of [['mousedown', dn], ['touchstart', dn], ['mousemove', mv], ['touchmove', mv], ['mouseup', upf], ['touchend', upf]] as [string, any][]) this.ml.on(ev, fn);
+      }
       // tiles failing (offline): the dotted world is drawn instead until tiles load again
       this.ml.on('error', () => { if (!this.mlFail) { this.mlFail = true; this.baseDirty = true; } });
       this.ml.on('sourcedata', (e: any) => { if (this.mlFail && e.tile && e.sourceId !== undefined) { this.mlFail = false; this.baseDirty = true; } });
@@ -286,12 +297,14 @@ class WorldMap {
     cv.style.touchAction = 'none';
     cv.addEventListener('pointerdown', e => {
       this.lastInput = performance.now();
+      if (this.opts.onDown && this.opts.onDown(e.offsetX, e.offsetY)) { this.ownPtr = e.pointerId; cv.setPointerCapture(e.pointerId); return; }
       cv.setPointerCapture(e.pointerId);
       this.ptrs[e.pointerId] = { x: e.offsetX, y: e.offsetY }; this.moved = false; this.anim = null;
       const ids = Object.keys(this.ptrs);
       if (ids.length === 2) { const a = this.ptrs[+ids[0]], b = this.ptrs[+ids[1]]; this.pinch0 = Math.hypot(a.x - b.x, a.y - b.y); this.R0 = this.R; }
     });
     cv.addEventListener('pointermove', e => {
+      if (this.ownPtr === e.pointerId) { this.lastInput = performance.now(); if (this.opts.onMove) this.opts.onMove(e.offsetX, e.offsetY); return; }
       const p = this.ptrs[e.pointerId]; if (!p) return;
       this.lastInput = performance.now();
       const ids = Object.keys(this.ptrs);
@@ -309,6 +322,7 @@ class WorldMap {
       }
     });
     const up = (e: PointerEvent) => {
+      if (this.ownPtr === e.pointerId) { this.ownPtr = -1; this.ownUpT = performance.now(); if (this.opts.onUp) this.opts.onUp(e.offsetX, e.offsetY); return; }
       if (!this.moved && Object.keys(this.ptrs).length === 1) this.tapAt(e.offsetX, e.offsetY);
       delete this.ptrs[e.pointerId];
     };
@@ -318,7 +332,9 @@ class WorldMap {
     cv.addEventListener('dblclick', e => this.zoomBy(1.8, e.offsetX, e.offsetY));
   }
 
+  ownPtr = -1; ownUpT = 0;
   tapAt(x: number, y: number) {
+    if (this.opts.onTap) { if (performance.now() - this.ownUpT < 350) return; if (this.opts.onTap(x, y)) return; }
     try { if (crashMapTap(this, x, y)) return; } catch (e) { /* not a crash mark */ }
     let best: string = null, bd = 28;
     for (const f of liveOf()) {
@@ -458,6 +474,7 @@ class WorldMap {
     c.drawImage(this.base, 0, 0);
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const degPx = this.degPx();
+    if (this.opts.overlay) { try { this.opts.overlay(c, this); } catch (e) { /* never stop the map */ } return; }   // the planner's own picture
     this.inScene = {}; this.sceneDraws = false;
     if (degPx >= AIRPORT_DEG_PX * 0.5) {
       if (now - this.scenesT > 700) { this.scenesT = now; this.pickScenes(); }
