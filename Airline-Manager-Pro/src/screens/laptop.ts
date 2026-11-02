@@ -149,7 +149,7 @@ function lapMount(root: HTMLElement) {
   lapRender();
   clearInterval(Lap.clock); Lap.clock = setInterval(() => { if (!Lap.root || !Lap.root.isConnected) { clearInterval(Lap.clock); return; } lapBar(); }, 10000);
 }
-function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; }
+function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.bankIn = false; Lap.bankBusy = false; }   // closing the laptop logs you out of the bank
 function lapRefresh() { if (Lap.root && Lap.root.isConnected) lapRender(true); }
 
 function lapRender(soft?: boolean) {
@@ -260,7 +260,24 @@ ACTIONS['lap-cal-del'] = el => { const S = lapS(); S.calendar = S.calendar.filte
 
 /* ---------- Bank ---------- */
 function lapSubs(cid: string): SubAcct[] { const S = lapS(); return S.bankSubs[cid] = S.bankSubs[cid] || []; }
+/** The bank's own sign-in page first: its name, your company as the customer, the password typed in as dots
+ *  (it's the game's bank: no real password is asked for or kept), and Log in. */
+const LAP_BANK = 'Nordlys Bank';
+function lapBankLoginHtml(): string {
+  const co: any = company();
+  return `<div class="lk-login ${Lap.bankBusy ? 'busy' : ''}"><div class="lk-lbg"></div>
+    <div class="lk-lcard"><div class="lk-logo"><span>${icon('bank')}</span><b>${LAP_BANK}</b><small>Internet bank for business</small></div>
+      <label class="lk-f"><small>Customer</small><span>${esc(co.name)}</span></label>
+      <label class="lk-f"><small>Password</small><span class="lk-dots">${'<i></i>'.repeat(9)}</span></label>
+      <button class="lk-go" data-act="lap-bank-login">${Lap.bankBusy ? '<i class="lk-spin"></i>Logging in…' : 'Log in'}</button>
+      <p>${icon('shield')}Secure connection · ${LAP_BANK}</p></div></div>`;
+}
+ACTIONS['lap-bank-login'] = () => {
+  if (Lap.bankBusy || Lap.bankIn) return; Lap.bankBusy = true; Sound.tick(); lapRender(true);
+  setTimeout(() => { Lap.bankBusy = false; Lap.bankIn = true; try { Sound.chime(); } catch (e) { /* quiet */ } if (Lap.app === 'bank') lapRender(); }, 1400);
+};
 function lapBankHtml(): string {
+  if (!Lap.bankIn) return lapBankLoginHtml();
   const co: any = company(), subs = lapSubs(co.id), tab = Lap.bankTab || 'main';
   const tx = (State.txns as any[]).filter(t => t.companyId === co.id), fil = Lap.bankFilter || 'all', list = tx.filter(t => fil === 'all' || (fil === 'in' ? t.amount > 0 : t.amount < 0)).slice(0, 150);
   const inM = tx.filter(t => t.amount > 0 && Date.now() - Date.parse(t.date) < 30 * 864e5).reduce((s, t) => s + t.amount, 0), outM = tx.filter(t => t.amount < 0 && Date.now() - Date.parse(t.date) < 30 * 864e5).reduce((s, t) => s + t.amount, 0);
@@ -277,8 +294,9 @@ function lapBankHtml(): string {
       ${move}
       <div class="lk-txh"><b>Transactions</b><span class="seg">${[['all', 'All'], ['in', 'In'], ['out', 'Out']].map(f => `<button class="${fil === f[0] ? 'on' : ''}" data-act="lap-bank-fil" data-k="${f[0]}">${f[1]}</button>`).join('')}</span></div>
       <div class="lk-tx">${list.map(t => `<div class="lk-t"><span><b>${esc(t.label)}</b><small>${esc(t.date)} ${esc(t.time || '')}</small></span><b class="${t.amount < 0 ? 'red' : 'green'}">${t.amount > 0 ? '+' : ''}${money(t.amount)}</b></div>`).join('') || '<p class="muted">No transactions yet.</p>'}</div>`;
-  return `<div class="lk"><div class="lk-h"><b>${icon('bank')}${esc(co.name)}</b><small>Internet bank · ${esc(dateStr(new Date()))}</small></div>${accts}<div class="lk-main">${main}</div></div>`;
+  return `<div class="lk lk-in"><div class="lk-h"><b>${icon('bank')}${LAP_BANK}</b><small>${esc(co.name)} · ${esc(dateStr(new Date()))}</small><span class="lw-sp"></span><button class="btn ghost sm" data-act="lap-bank-out">Log out</button></div>${accts}<div class="lk-main">${main}</div></div>`;
 }
+ACTIONS['lap-bank-out'] = () => { Lap.bankIn = false; Sound.tick(); lapRender(); };
 ACTIONS['lap-bank-tab'] = el => { Lap.bankTab = el.getAttribute('data-k'); Lap.bankKind = 'Savings'; Sound.tick(); lapRender(true); };
 ACTIONS['lap-bank-fil'] = el => { Lap.bankFilter = el.getAttribute('data-k'); Sound.tick(); lapRender(true); };
 ACTIONS['lap-bank-kind'] = el => { Lap.bankKind = el.getAttribute('data-k'); (el.parentElement as HTMLElement).querySelectorAll('button').forEach(b => b.classList.toggle('on', b === el)); Sound.tick(); };

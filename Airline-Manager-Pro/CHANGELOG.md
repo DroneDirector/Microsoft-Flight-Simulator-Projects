@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.67 (2026-11-02)
+
+- includes 0.9.66 (its build stopped on the phone browser plugin; fixed)
+- you in first person: your figure (selfBody/selfPose in human.ts, head folded away) in the office and Operations, seated and walking; humanReach arm solver
+- office: pick up the family photo (reach, lift in both hands, tilt by drag or arrows, put back)
+- footsteps by surface (Sound.step/steps): office rug and parquet, courtroom boards/marble/carpet, Operations carpet, cabin aisle and galley
+- device voices: the device's male and female voices in pitch/pace variations, one per person (by name), list to try in Settings; Android VoicePlugin.deviceVoices and voice choice
+- laptop bank sign-in page
+
 ## 0.9.66 (2026-11-02)
 
 - PC: Electron 44.9.0 host (own Chromium), Edge profile storage copied once, single instance, tray while a phone is linked, tools exe for uninstall/check/replay, link code in Settings; laptop browser via webview

@@ -1110,7 +1110,10 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     const sm = (a, b2, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b2 - a))); return t * t * (3 - 2 * t); };
     const widthAt = t => kind === 'pumps' ? 0.7 + 0.25 * sm(0, 0.6, t) - 0.75 * sm(0.75, 1, t) : 0.72 + 0.28 * sm(0, 0.68, t) - 0.62 * sm(0.8, 1, t);
     const heightAt = (t, H) => kind === 'boots' ? H * (1 - 0.35 * sm(0.3, 0.55, t) - 0.38 * sm(0.55, 1, t)) : kind === 'pumps' ? H * (0.9 - 0.55 * sm(0.2, 1, t)) : H * (1 - 0.5 * sm(0.25, 0.85, t) - 0.25 * sm(0.85, 1, t));
+    const outer = g; outer.userData.sides = {};
     for (const sd of [1, -1]) {
+      // each shoe goes with its leg (pose() moves it with the hip and the knee)
+      const g = new THREE.Group(); g.matrixAutoUpdate = false; outer.add(g); outer.userData.sides[sd] = g;
       const bb = new THREE.Box3();
       for (let i = 0; i < P.length / 3; i++) { const x = P[i * 3], y = P[i * 3 + 1]; if (y < top && Math.sign(x) === sd) bb.expandByPoint(new THREE.Vector3(x, y, P[i * 3 + 2])); }
       const c = bb.getCenter(new THREE.Vector3()), sz = bb.getSize(new THREE.Vector3());
@@ -1250,7 +1253,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     t0 = tick('facial', t0);
     if (L.glasses && L.glasses !== 'none') head.add(glasses(L.glasses, I, c.eyeR));
     if (hatKind) head.add(hat(hatKind, I, c.mech ? '#3d4a5c' : (UNIFORM_COLORS[L.uniform] || UNIFORM_COLORS[0]), accent));
-    root.add(shoes(b, I, c.shoe, L.shoes, accent));
+    const shoeG = shoes(b, I, c.shoe, L.shoes, accent); root.add(shoeG);
     const gm = gold();
     if (c.wings) { const y = I.neckY - 0.16, z = surfaceZ(body, 0.085, y); const w = badge(accent, c.wings); w.position.set(0.085, y, z + 0.004); w.rotation.y = 0.3; root.add(w); }
     if (c.buttons) for (const y of [c.vBot - 0.03, c.vBot - 0.13]) { const z = surfaceZ(body, 0.012, y); const bt = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.004, 20), gm); bt.rotation.x = Math.PI / 2; bt.position.set(0.012, y, z + 0.002); root.add(bt); }
@@ -1292,8 +1295,12 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     tick('props', t0);
     const box = new THREE.Box3().setFromObject(root);
     const U = mat.userData.U, rot = new THREE.Quaternion(), eul = new THREE.Euler(), m4 = new THREE.Matrix4();
+    // the arms' joints at rest (for reaching: humanReach)
+    const jv = (k) => new THREE.Vector3(I.J[k][0], I.J[k][1], I.J[k][2]);
+    const joints: any = {};
+    for (const sd of ['L', 'R']) { const sh = jv('upperarm01.' + sd), wr = jv('wrist.' + sd), el = sh.clone().lerp(wr, 0.56 / 0.97); joints[sd] = { s: sh, e: el, w: wr, palm: wr.clone().add(wr.clone().sub(el).normalize().multiplyScalar(0.075)) }; }
     return {
-      root, top: box.max.y, width: Math.max(box.max.x - box.min.x, 0.5), bustBottom: I.neckY - 0.3, headY: I.headC[1],
+      root, joints, headPivot, top: box.max.y, width: Math.max(box.max.x - box.min.x, 0.5), bustBottom: I.neckY - 0.3, headY: I.headC[1],
       /** Breathing, a gentle sway, head and eye movement, blinking. */
       pose(p) {
         const t = p.t;
@@ -1308,10 +1315,20 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         U.uArmL.value.copy(arm(g.L, 1)); U.uArmR.value.copy(arm(g.R, -1)); U.uElbL.value.copy(elb(g.L[3])); U.uElbR.value.copy(elb(g.R[3])); U.uFlush.value = g.flush;
         const lg = g.legs || [0, 0, 0, 0], rx = (a) => new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(a));
         U.uLegL.value.copy(rx(lg[0])); U.uKneeL.value.copy(rx(lg[1])); U.uLegR.value.copy(rx(lg[2])); U.uKneeR.value.copy(rx(lg[3]));
+        // the shoes with the feet: turned at the knee, then at the hip, as the legs are
+        for (const sd of [1, -1]) {
+          const sg = shoeG.userData.sides && shoeG.userData.sides[sd]; if (!sg) continue;
+          const hp = (sd > 0 ? U.uHipL : U.uHipR).value, kp = new THREE.Vector3(hp.x, U.uKneeY.value, hp.z), a = sd > 0 ? lg[0] : lg[2], k = sd > 0 ? lg[1] : lg[3];
+          sg.matrix.makeTranslation(hp.x, hp.y, hp.z).multiply(m4.makeRotationX(a)).multiply(new THREE.Matrix4().makeTranslation(kp.x - hp.x, kp.y - hp.y, kp.z - hp.z))
+            .multiply(new THREE.Matrix4().makeRotationX(k)).multiply(new THREE.Matrix4().makeTranslation(-kp.x, -kp.y, -kp.z));
+          sg.matrixWorldNeedsUpdate = true;
+        }
         root.rotation.x = g.lean; root.position.y = g.bob; root.rotation.z += g.roll;
         eul.set(Math.sin(t * 0.31 + 1) * 0.035 * bk - 0.01 + g.nod, (Math.sin(t * 0.43) * 0.13 * g.calm + Math.sin(t * 0.17) * 0.06 * g.calm) * bk + p.gaze[0] * 0.25 + g.shake, Math.sin(t * 0.23 + 2) * 0.02 * bk + g.tilt);
         headPivot.quaternion.setFromEuler(eul); rot.copy(headPivot.quaternion);
         U.uHeadRot.value.setFromMatrix4(m4.makeRotationFromQuaternion(rot));
+        // seen from your own eyes: the head (and all on it) folds away into the neck, so the view isn't inside it
+        if (p.noHead) { U.uHeadRot.value.multiplyScalar(0.001); headPivot.scale.setScalar(0.001); } else headPivot.scale.setScalar(1);
         U.uBlink.value = p.blink;
         // speaking: Low still, Medium the jaw, High the jaw and the lips with the dark of the mouth, Ultra also the teeth and the tongue
         const sp = p.talk, SL = animLevel('animSpeak'), op = typeof sp === 'number' ? sp : sp ? sp.open : 0;
@@ -1323,3 +1340,74 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
 
   return { load, build, get ready() { return !!DATA; }, timings: T };
 })();
+
+/** Where the hand (the palm) is, in the figure's own space, for an arm pose [forward, out, turn, elbow]. */
+function humanHandAt(m: any, sd: 'L' | 'R', a: number[], out?: any): any {
+  const T = THREE, J = m.joints[sd], k = sd === 'L' ? 1 : -1;
+  const M = new T.Matrix4().makeRotationY(k * -a[2]).multiply(new T.Matrix4().makeRotationZ(k * a[1])).multiply(new T.Matrix4().makeRotationX(-a[0]));
+  const v = J.palm.clone().sub(J.e).applyMatrix4(new T.Matrix4().makeRotationX(-a[3])).add(J.e).sub(J.s).applyMatrix4(M).add(J.s);
+  return out ? out.copy(v) : v;
+}
+/** The arm pose that puts the hand at a point (in the figure's own space): the elbow bends to the distance and
+ *  points down and out (as a real elbow does), then the arm turns there, starting from the last pose so it moves
+ *  smoothly. Out of reach, the arm stretches towards it. */
+function humanReach(m: any, sd: 'L' | 'R', target: any, prev?: number[]): number[] {
+  const J = m.joints[sd], T = THREE, k = sd === 'L' ? 1 : -1;
+  const l1 = J.e.distanceTo(J.s), l2 = J.palm.distanceTo(J.e), full = J.palm.distanceTo(J.s);
+  const to = target.clone().sub(J.s), d = Math.max(0.05, Math.min(to.length(), full * 0.998)), u = to.clone().normalize();
+  // the elbow: from the distance shoulder to hand
+  const reachAt = (b: number) => J.palm.clone().sub(J.e).applyMatrix4(new T.Matrix4().makeRotationX(-b)).add(J.e).distanceTo(J.s);
+  let lo = 0, hi = 2.6; for (let i = 0; i < 22; i++) { const mid = (lo + hi) / 2; if (reachAt(mid) > d) lo = mid; else hi = mid; }
+  const b = (lo + hi) / 2;
+  // where the elbow goes: down and a little out from the line shoulder → hand
+  const pole = new T.Vector3(k * 0.55, -1, -0.15), pp = pole.sub(u.clone().multiplyScalar(u.dot(pole))).normalize();
+  const ca = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))), al = Math.acos(ca);
+  const elbow = J.s.clone().add(u.clone().multiplyScalar(l1 * Math.cos(al))).add(pp.multiplyScalar(l1 * Math.sin(al)));
+  const handT = J.s.clone().add(u.clone().multiplyScalar(d));
+  const elbowAt = (q: number[]) => { const M = new T.Matrix4().makeRotationY(k * -q[2]).multiply(new T.Matrix4().makeRotationZ(k * q[1])).multiply(new T.Matrix4().makeRotationX(-q[0])); return J.e.clone().sub(J.s).applyMatrix4(M).add(J.s); };
+  const a = prev ? prev.slice() : [0.6, 0.15, 0.1, b]; a[3] = b;
+  const cost = (q: number[]) => humanHandAt(m, sd, q).distanceToSquared(handT) + 0.5 * elbowAt(q).distanceToSquared(elbow);
+  let c = cost(a), st = 0.3;
+  for (let it = 0; it < 90 && st > 0.0006; it++) {
+    let better = false;
+    for (const i of [0, 1, 2]) for (const s of [st, -st]) { const q = a.slice(); q[i] += s; const cq = cost(q); if (cq < c) { a[i] = q[i]; c = cq; better = true; } }
+    if (!better) st *= 0.5;
+  }
+  return a;
+}
+
+/* ---------- you, seen from your own eyes ---------- */
+// Your own figure (the same one the app's pictures use), with its head folded away: looking down you see your body,
+// legs and feet, walking you see your feet step and your arms swing, and your arms reach for what you pick up.
+// It hangs from the hips: hips → turn (yaw) → lean forward → the figure, so you lean and turn in the chair.
+function selfBody(scene: any, look: any, accent: string): any {
+  if (!Human.ready || !look) return null;
+  const T = THREE, m = Human.build(look, 'exec', accent || '#2C8CFF', av3Style(), 0.85);
+  m.root.traverse((o: any) => { o.frustumCulled = false; });
+  const g = new T.Group(), yawG = new T.Group(), leanG = new T.Group(), off = new T.Group();
+  const hipY = (m.top || 1.75) * 0.53;
+  off.position.y = -hipY; off.add(m.root); leanG.add(off); yawG.add(leanG); g.add(yawG); scene.add(g);
+  return { m, g, yawG, leanG, hipY, hh: m.headY - hipY, ef: 0.13, G: null, arms: null };
+}
+/** Where your eyes are, from the hips, turned and leant. */
+function selfEyeOff(S: any, yaw: number, lean: number): any {
+  return new THREE.Vector3(0, S.hh, S.ef).applyAxisAngle(new THREE.Vector3(1, 0, 0), lean).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+}
+/** Place and pose yourself for this frame: the hips (in the room), facing (yaw: 0 faces +z), leaning forward,
+ *  sitting (0…1), walking speed and distance; arms(m) may give the arm poses (reaching, holding). Returns the eyes. */
+function selfPose(S: any, hip: any, yaw: number, lean: number, sit: number, v: number, dist: number, t: number, dt: number, arms?: (m: any) => { L?: number[]; R?: number[] } | null): any {
+  const m = S.m;
+  S.g.position.copy(hip); S.yawG.rotation.y = yaw; S.leanG.rotation.x = lean;
+  let gT = cabinLerpG(humanGesture(null, t), humanGesture({ kind: 'walk', v: 1 }, dist / 1.25), Math.min(1, v / 0.6));
+  if (sit > 0) gT = cabinLerpG(gT, humanGesture({ kind: 'sit', v: 0 }, t), sit);
+  S.G = S.G ? cabinLerpG(S.G, gT, Math.min(1, dt * 8)) : gT;
+  const g = Object.assign({}, S.G); g.lean = 0; g.nod = 0; g.shake = 0; g.tilt = 0;
+  // sitting and leaning in: the legs stay where they were
+  if (g.legs && sit > 0) g.legs = [g.legs[0] + lean * sit, g.legs[1], g.legs[2] + lean * sit, g.legs[3]];
+  if (arms) { m.root.rotation.set(0, 0, 0); m.root.position.set(0, 0, 0); S.g.updateMatrixWorld(true); const a = arms(m); if (a) { if (a.L) g.L = a.L; if (a.R) g.R = a.R; } }
+  m.pose({ t, yaw: 0, gaze: [0, 0], blink: 0, g, noHead: true });
+  // the head bows to look down (S.pitch, the view's): the eyes go forward and down a little, so you see your feet
+  const eye = hip.clone().add(selfEyeOff(S, yaw, lean)), dn = Math.max(0, -(S.pitch || 0));
+  if (dn > 0) eye.add(new THREE.Vector3(Math.sin(yaw) * 0.16 * Math.sin(dn), -0.07 * (1 - Math.cos(dn)), Math.cos(yaw) * 0.16 * Math.sin(dn)));
+  return eye;
+}
