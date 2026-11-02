@@ -56,7 +56,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   document.body.classList.add('v3d-on');   // pop-ups and messages show above the 3D view
   V3d.open = true; V3d.target = id; (V3d as any).camBase = null; (V3d as any).lastF = null; (V3d as any).lastW = null; (V3d as any).parkedAt = 0; V3d.map = map; V3d.planes = {}; V3d.origin = null; V3d.icao = '';
   V3d.mode = id.indexOf('apt:') === 0 ? 'free' : 'chase'; V3d.yaw = 0; V3d.pitch = 0.22; V3d.dist = 0; (V3d as any).fc = null; (V3d as any).fcStart = id.indexOf('apt:') === 0;
-  const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '');
+  const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '') + ((State.settings as any).fcMini ? ' v3d-mini' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
       <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['cabin', 'Cabin'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera'], ['walk', 'Walk']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
@@ -262,7 +262,7 @@ function v3dLineHtml(f: LiveFlight): string {
   return `<span class="vl-cs">${esc(f.callsign)}</span>
     <span class="vl-route"><b>${esc(f.from)}</b><i class="vl-track"><i class="vl-fill" style="width:${(f.t * 100).toFixed(1)}%"></i><i class="vl-plane" style="left:${(f.t * 100).toFixed(1)}%">${icon('fleet')}</i></i><b>${f.noDest ? '—' : esc(f.to)}</b></span>
     ${it('Phase', esc(f.phase), 'vl-ph')}${it('Altitude', altTxt)}${it('Speed', f.gs ? num(f.gs) + ' kt' : '—', 'vl-opt')}${it('Remaining', f.noDest ? '—' : num(left) + ' nm', 'vl-opt')}${it('Arrives in', arrivesIn(f))}
-    <span class="vl-btns"><button class="icon-btn" data-act="pax-list" data-id="${esc(f.id)}" aria-label="Passenger list" title="Passenger list">${icon('pax')}</button><button class="icon-btn" data-act="loadsheet" data-id="${esc(f.id)}" aria-label="Loadsheet" title="Loadsheet">${icon('fuel')}</button></span>`;
+    <span class="vl-btns"><button class="icon-btn vl-full" data-act="fc-min" aria-label="Show all the details" title="Show all the details">${icon('down', 'flip-v')}</button><button class="icon-btn" data-act="pax-list" data-id="${esc(f.id)}" aria-label="Passenger list" title="Passenger list">${icon('pax')}</button><button class="icon-btn" data-act="loadsheet" data-id="${esc(f.id)}" aria-label="Loadsheet" title="Loadsheet">${icon('fuel')}</button></span>`;
 }
 
 /* ---------- positions ---------- */
@@ -820,7 +820,7 @@ function v3dLoop(now: number) {
 function v3dLonLat(x: number, z: number): number[] { const o = V3d.origin; return [o[0] + x / (111320 * Math.cos(o[1] * D2R)), o[1] - z / 110540]; }
 
 function v3dRefreshInfo(f: LiveFlight) {
-  const ln = V3d.root && V3d.root.querySelector('.v3d-line') as HTMLElement; if (ln && V3d.root.classList.contains('v3d-inside')) ln.innerHTML = v3dLineHtml(f);
+  const ln = V3d.root && V3d.root.querySelector('.v3d-line') as HTMLElement; if (ln && (V3d.root.classList.contains('v3d-inside') || V3d.root.classList.contains('v3d-mini'))) ln.innerHTML = v3dLineHtml(f);
   const box = V3d.root && V3d.root.querySelector('.v3d-info .sel-pop') as HTMLElement; if (!box) return;
   const card = box.querySelector('.flight-card'); if (!card) return;
   const tmp = document.createElement('div'); tmp.innerHTML = flightCard(f);
@@ -837,7 +837,7 @@ function v3dRefreshInfo(f: LiveFlight) {
   const off = (box: HTMLElement) => { const m = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(box.style.transform || ''); return m ? [+m[1], +m[2]] : [0, 0]; };
   document.addEventListener('pointerdown', e => {
     const t = e.target as HTMLElement;
-    const head = t && t.closest && t.closest('.sel-pop .fc-top, .sel-pop .fc-route') as HTMLElement;
+    const head = t && t.closest && t.closest('.sel-pop .fc-top, .sel-pop .fc-route, .sel-pop .fc-mini') as HTMLElement;
     if (!head || (t.closest('button') && !t.closest('.fc-top'))) return;
     const box = head.closest('.sel-pop').parentElement as HTMLElement; if (!box) return;
     const o = off(box);

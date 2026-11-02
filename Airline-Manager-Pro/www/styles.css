@@ -2985,7 +2985,7 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 /* inside the aircraft: the flight in one line along the bottom, instead of the card */
 .v3d-line { display: none; }
 .v3d-inside .v3d-info, .v3d-inside .v3d-status { display: none !important; }
-.v3d-inside .v3d-line { display: flex; align-items: center; gap: 18px; position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom));
+.v3d-inside .v3d-line, .v3d-mini .v3d-line { display: flex; align-items: center; gap: 18px; position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom));
   max-width: calc(100% - 24px); padding: 8px 10px 8px 18px; border-radius: 16px; background: rgba(8, 20, 36, .74); border: 1px solid rgba(255, 255, 255, .08);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 8px 28px rgba(0, 0, 0, .35); color: var(--ink); white-space: nowrap; z-index: 3; }
 .v3d-line .vl-cs { font: 700 15px var(--display); letter-spacing: .02em; }
@@ -3132,3 +3132,20 @@ body.aim-locked .office3d .of-aim { font-size: 22px; }
 .v3d.ui-off .v3d-uitog { opacity: .35; } .v3d.ui-off .v3d-uitog:hover { opacity: 1; }
 
 .court3d.ui-off .ct-top, .court3d.ui-off .ct-leave, .court3d.ui-off .ct-spots, .court3d.ui-off .ct-hint, .court3d.ui-off .ct-box { opacity: 0 !important; pointer-events: none !important; transition: opacity .35s; }
+
+/* the flight card, minimised: one low bar with the essentials (it shrinks downwards and can still be dragged) */
+.flight-card .fc-mini { display: none; }
+.flight-card .fc-top .fc-min { margin-left: auto; width: 30px; height: 30px; flex: none; }
+.flight-card.mini { padding: 6px 8px 6px 14px; }
+.flight-card.mini > :not(.fc-mini) { display: none !important; }
+.flight-card.mini .fc-mini { display: flex; align-items: center; gap: 16px; min-height: 40px; cursor: grab; touch-action: none; white-space: nowrap; }
+.flight-card.mini .fc-mini .fc-cs { font-weight: 800; font-size: 15px; }
+.flight-card.mini .fc-mini span:not(.fc-cs) { display: flex; flex-direction: column; line-height: 1.15; }
+.flight-card.mini .fc-mini small { color: var(--ink-3); font-size: 10.5px; } .flight-card.mini .fc-mini b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.flight-card.mini .fc-mini .fc-min { margin-left: 4px; width: 30px; height: 30px; }
+.sel-pop:has(.flight-card.mini) .sel-x { top: 50%; transform: translateY(-50%); right: -38px; }
+@media (max-width: 560px) { .flight-card.mini .fc-mini { gap: 10px; } .flight-card.mini .fc-mini b { font-size: 13px; } }
+/* in 3D, minimised: the slim line along the bottom (as inside the aircraft) instead of the card */
+.v3d-mini .v3d-info, .v3d-mini .v3d-status { display: none !important; }
+.v3d-mini .v3d-line { display: flex; align-items: center; gap: 18px; position: absolute; left: 50%; transform: translateX(-50%); }
+.v3d-line .vl-full { display: none; } .v3d-mini .v3d-line .vl-full { display: inline-grid; }
