@@ -3334,3 +3334,6 @@ body.aim-locked .office3d .of-aim { font-size: 22px; }
 .lk-spin { width: 18px; height: 18px; border-radius: 99px; border: 2.5px solid rgba(4,23,15,.25); border-top-color: #04170F; animation: lkSpin .7s linear infinite; }
 .lk-lcard p { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 4px 0 0; font-size: 11.5px; color: var(--ink-3); } .lk-lcard p svg { width: 13px; height: 13px; }
 .lk-in { animation: lapWin .35s cubic-bezier(.22,.8,.24,1); }
+/* the office: holding the family photo */
+.of-ph { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6; display: flex; gap: 12px; align-items: center; padding: 8px 10px 8px 16px; border-radius: 999px; background: rgba(12, 18, 26, .72); backdrop-filter: blur(8px); color: #EAF1F8; font-size: 13px; box-shadow: 0 6px 24px rgba(0,0,0,.35); animation: ofPhIn .35s ease both; white-space: nowrap; }
+@keyframes ofPhIn { from { opacity: 0; transform: translate(-50%, 8px); } }

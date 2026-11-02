@@ -884,6 +884,8 @@ function ctWalk(dt: number) {
     if (can(nx, nz)) { F.x = nx; F.z = nz; } else if (can(nx, F.z)) F.x = nx; else if (can(F.x, nz)) F.z = nz;
     F.bob += step;
   }
+  // underfoot: the boards of the dais and the boxes, parquet before the bar with a marble border, carpet behind it
+  Sound.steps(F, F.bob, F.floor ? 'wood' : F.z > 1.6 ? 'carpet' : (Math.abs(F.x) > 7.4 || F.z < -8.4) ? 'tile' : 'wood', F.v);
   const eye = 1.64 + (F.floor || 0) + Math.sin(F.bob / 0.65 * Math.PI) * 0.018 * Math.min(1, F.v / 1.2);
   R.cam.position.set(F.x, eye, F.z);
   const p = R.look.pitch, dir = new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p));

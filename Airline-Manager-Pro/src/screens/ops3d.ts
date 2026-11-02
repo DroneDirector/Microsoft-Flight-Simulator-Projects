@@ -279,9 +279,12 @@ function opsFrame() {
   // the door swings open (and shut again)
   R.doorK = (R.doorK || 0) + ((R.doorT || 0) - (R.doorK || 0)) * Math.min(1, dt * 3.5); if (R.A && R.A.door) R.A.door.rotation.y = R.doorK * 1.35;
   const zk = opsZoomK(), ze = zk * zk * (3 - 2 * zk);
-  if (!R.seat) opsWalk(dt);
+  // you: your own figure (built once the figures are loaded), seen from your eyes
+  if (!R.meTried) { R.meTried = true; const mk = () => { try { if (!R.on || !R.scene) return; const me: any = myPilot(); R.me = selfBody(R.scene, me && me.look ? Object.assign({}, me.look, { hat: 'none' }) : ctLook('me', 'm', 'public'), company().color); if (R.me) R.me.chair = new T.Vector3(0, 1.2, 0.76).sub(selfEyeOff(R.me, Math.PI, 0)); } catch (e) { R.me = null; } }; if (Human.ready) mk(); else Human.load().then(mk, () => { /* without */ }); }
+  if (!R.seat) opsWalk(dt, now);
   else {
     R.cam.position.set(0, 1.2 - 0.075 * ze, 0.76 - 0.5 * ze);
+    if (R.me) { try { const by = Math.PI + R.look.yaw * (1 - ze); const eye = selfPose(R.me, R.me.chair, by, 0.2 * ze, 1, 0, 0, now, dt); R.cam.position.lerpVectors(eye, R.cam.position, ze); } catch (e) { R.me = null; } }
     const yaw = Math.PI + R.look.yaw * (1 - ze), p = R.look.pitch * (1 - ze) + 0.0 * ze;
     R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
   }
@@ -305,14 +308,18 @@ function opsBlocked(x: number, z: number): boolean {
   for (const r of B) if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true;
   return false;
 }
-function opsWalk(dt: number) {
+function opsWalk(dt: number, now?: number) {
   const R = OpsRoom, F = R.free, K = R.keys || {}, T = THREE;
   const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], rr = (K.d || K.arrowright ? 1 : 0) - (K.a || K.arrowleft ? 1 : 0) + R.stick[0];
   const mag = Math.min(1, Math.hypot(f, rr)), vmax = K.shift ? 2.0 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
   let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!opsBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!opsBlocked(nx, F.z)) F.x = nx; else if (!opsBlocked(F.x, nz)) F.z = nz; F.bob += step; }
-  R.cam.position.set(F.x, 1.64 + Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1), F.z);
+  Sound.steps(F, F.bob, 'carpet', F.v);   // carpet tiles all over the operations room
+  const bobY = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
+  R.cam.position.set(F.x, 1.64 + bobY, F.z);
+  // your body under you: feet stepping, arms swinging; your eyes at your own height
+  if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now || 0, dt); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
   const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p))));
   // what's in front of you glows: the door (leave), the chair (sit), the monitor, the archives
   const obj = opsAimedObj(), hint = obj ? obj.userData.act : '', aim = R.root.querySelector('.op-dot') as HTMLElement;
@@ -437,7 +444,7 @@ OpsRoom.close = function (quiet?: boolean) {
   R.overlay = null; document.body.classList.remove('of-over');
   cancelAnimationFrame(R.raf); clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   document.removeEventListener('mousemove', R.mm$); aimUnlock();
-  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null; R.glow = null;
+  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null; R.glow = null; R.me = null; R.meTried = false;
   R.root.remove();
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };

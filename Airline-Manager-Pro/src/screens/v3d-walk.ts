@@ -94,6 +94,8 @@ function cabinWalkCam(P: any, G: any, body: any, up: any) {
     else if (cabinWalkable(at, W.x, ny) && !cabinWalkBumps(W.x, ny, at)) W.y = ny;
     W.dist += step;
   }
+  // the aisle carpet, or the galley's vinyl floor
+  Sound.steps(W, W.dist, W.x < at.firstX - 0.45 || W.x > at.lastX + 0.75 ? 'tile' : 'carpet', W.v);
   // the eye: standing height, with a gentle bob as you walk
   const bob = Math.sin(W.dist / 0.65 * Math.PI) * 0.018 * Math.min(1, W.v / 1.2);
   const eye = body.localToWorld(_av(W.x, W.y, at.zf + 1.64 + bob));

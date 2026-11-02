@@ -5,7 +5,7 @@
 // Each line is spoken exactly as it is written on screen. Lines are prepared in the background as soon as
 // they are known, sentence by sentence, so the first words play quickly and later ones follow on.
 
-interface Speaker { voice: string; accent: 'a' | 'b'; speed: number; pitch: number; title: string; mood?: string; cents?: number; wobble?: number; gain?: number; slur?: boolean; exclaim?: boolean }
+interface Speaker { voice: string; accent: 'a' | 'b'; speed: number; pitch: number; title: string; mood?: string; cents?: number; wobble?: number; gain?: number; slur?: boolean; exclaim?: boolean; sex?: 'm' | 'f'; key?: string; devIdx?: number }
 const SPEAKERS: { [k: string]: Speaker } = {
   mechanic: { voice: 'bm_george', accent: 'b', speed: 1.0, pitch: 0.92, title: 'Mechanic' },
   gate: { voice: 'bf_emma', accent: 'b', speed: 1.02, pitch: 1.05, title: 'Gate agent' },
@@ -78,11 +78,59 @@ function resolveSpeaker(who: string, text: string): Speaker {
     sp.pitch = sex === 'f' ? 1.05 : 0.95;
   }
   const mood = mood0 || detectMood(text), m = MOODS[mood] || MOODS.neutral;
+  // who it is, for the device's own voices: each person keeps one of them (yours follows your choice)
+  sp.sex = sex === 'm' || sex === 'f' ? sex : devSexOf(sp.voice); sp.key = role === 'me' ? 'me' : (name || role);
+  if (role === 'me') { const i = MY_VOICES[sp.sex].findIndex(x => x[0] === sp.voice); sp.devIdx = name && name.indexOf('__dev') === 0 ? +name.slice(5) : Math.max(0, i); }   // __devN: trying one in Settings
   sp.mood = mood; sp.cents = m.cents; sp.wobble = m.wobble; sp.gain = m.gain; sp.slur = m.slur; sp.exclaim = m.exclaim;
   // the pitch change also speeds playback up or down, so the model speaks at the pace that comes out right
   sp.speed = Math.round(base.speed * m.speed / Math.pow(2, m.cents / 1200) * 100) / 100;
   return sp;
 }
+/** A natural voice's sex from its name (af_… / bm_… / mx_f1). */
+function devSexOf(v: string): 'm' | 'f' { const c = String(v || '').indexOf('mx_') === 0 ? v[3] : v[1]; return c === 'f' ? 'f' : 'm'; }
+
+/* ---------- the device's own voices: male and female, each in several variations ---------- */
+// The phone's or PC's voices rarely say whether they are male or female, so they are told apart by their names
+// (Windows, Apple and Samsung voices are named after people; Google's are coded).
+const DEV_MALE = /\b(david|mark|george|james|richard|ryan|guy|christopher|eric|roger|steffan|thomas|brian|daniel|alex|fred|arthur|oliver|aaron|gordon|lee|rishi|ravi|prabhat|william|liam|connor|andrew|davis|tony|jason|ralph|albert|bruce|junior|reed|rocko|grandpa|evan|nathan|tom|paul|sean|michael|male|man)\b|smtm\d|-x-(iol|iom|tpd|gbb|gbd|rjs|aub|aud|end|ene)-/i;
+const DEV_FEMALE = /\b(zira|hazel|susan|linda|heera|catherine|jenny|aria|libby|sonia|natasha|clara|emma|samantha|karen|moira|tessa|fiona|victoria|allison|ava|serena|kate|martha|nicky|zoe|veena|isha|neerja|emily|sara|sarah|amy|joanna|kimberly|ivy|salli|olivia|kathy|shelley|sandy|flo|grandma|female|woman)\b|smtf\d|-x-(iob|iog|sfg|tpc|tpf|gba|gbc|gbg|aua|auc|ena|enc)-/i;
+// each voice in a few variations: [pitch, pace] against its own
+const DEV_VARS: [number, number][] = [[1, 1], [0.9, 0.96], [1.09, 1.04], [0.83, 0.93], [1.15, 1.06], [0.95, 1.08], [1.04, 0.92], [0.88, 1.03]];
+const DeviceVoices = {
+  list: [] as { name: string; lang: string; sex: 'm' | 'f' | '' }[], loaded: false, loading: null as Promise<void> | null,
+  load(): Promise<void> {
+    if (this.loaded) return Promise.resolve(); if (this.loading) return this.loading;
+    const sexOf = (n: string): 'm' | 'f' | '' => DEV_FEMALE.test(n) ? 'f' : DEV_MALE.test(n) ? 'm' : '';
+    const N: any = VoicePack.native();
+    this.loading = (async () => {
+      let raw: { name: string; lang: string }[] = [];
+      try {
+        if (N && N.deviceVoices) raw = ((await N.deviceVoices()) || {}).voices || [];
+        else {
+          const S = (window as any).speechSynthesis; if (S) {
+            let v = S.getVoices(); if (!v.length) v = await new Promise<any[]>(res => { const t = setTimeout(() => res(S.getVoices()), 1500); S.addEventListener('voiceschanged', () => { clearTimeout(t); res(S.getVoices()); }, { once: true }); });
+            raw = v.map((x: SpeechSynthesisVoice) => ({ name: x.name, lang: x.lang }));
+          }
+        }
+      } catch (e) { /* none listed */ }
+      this.list = raw.filter(x => /^en/i.test(String(x.lang).replace('_', '-'))).map(x => ({ name: x.name, lang: String(x.lang).replace('_', '-'), sex: sexOf(x.name) }));
+      this.loaded = true; this.loading = null;
+    })();
+    return this.loading;
+  },
+  /** The variations for one sex: the device's voices of that sex, each in a few pitches and paces (up to 20). */
+  variants(sex: 'm' | 'f'): { name: string; lang: string; pitch: number; rate: number }[] {
+    let pool = this.list.filter(x => x.sex === sex), base = 1;
+    if (!pool.length) { pool = this.list.filter(x => !x.sex); if (!pool.length) pool = this.list.slice(0, 1); base = sex === 'f' ? 1.22 : 0.78; }   // no voice of that sex: made deeper or higher
+    if (!pool.length) pool = [{ name: '', lang: '', sex: '' }];
+    const n = Math.min(20, Math.max(DEV_VARS.length, pool.length * 3)), out = [];
+    for (let i = 0; i < n; i++) { const v = pool[i % pool.length], d = DEV_VARS[Math.floor(i / pool.length) % DEV_VARS.length]; out.push({ name: v.name, lang: v.lang, pitch: base * d[0], rate: d[1] }); }
+    return out;
+  },
+  /** The variation a speaker has: theirs by name (the same each time you meet them), yours by your choice. */
+  pick(sp: Speaker) { const V = this.variants(sp.sex || 'm'); return V[(sp.devIdx !== undefined ? sp.devIdx : _hashStr(sp.key || '') ) % V.length]; },
+};
+
 /** The words in a mood: slurred and with pauses when drunk, exclamations when angry. */
 function moodPhonemes(ps: string, sp: Speaker): string {
   let out = ps;
@@ -414,10 +462,12 @@ const Voice = {
   /** The phone's or PC's own voice. */
   device(text: string, sp: Speaker, tok: number) {
     this.preparing = false; this.audibleAt = Date.now() + 250; voiceUiChanged();
+    if (!DeviceVoices.loaded) { DeviceVoices.load().then(() => { if (tok === this.token) this.device(text, sp, tok); }); return; }
+    const dv = DeviceVoices.pick(sp), k0 = Math.pow(2, (sp.cents || 0) / 1200);
     const N = VoicePack.native();
     if (N && N.speakDevice) {
       const h = N.addListener('deviceDone', () => { Promise.resolve(h).then((x: any) => x && x.remove()); if (tok === this.token) this.finish(); });
-      N.speakDevice({ text, pitch: sp.pitch * Math.pow(2, (sp.cents || 0) / 1200), rate: sp.speed * Math.pow(2, (sp.cents || 0) / 1200), lang: sp.accent === 'b' ? 'en-GB' : 'en-US' }).catch(() => { if (tok === this.token) this.finish(); });
+      N.speakDevice({ text, pitch: dv.pitch * k0, rate: dv.rate * sp.speed * k0, lang: dv.lang || (sp.accent === 'b' ? 'en-GB' : 'en-US'), voice: dv.name }).catch(() => { if (tok === this.token) this.finish(); });
       return;
     }
     const s = (window as any).speechSynthesis;
@@ -425,9 +475,9 @@ const Voice = {
     s.cancel();
     const u = new SpeechSynthesisUtterance(text);
     const k = Math.pow(2, (sp.cents || 0) / 1200);
-    u.rate = sp.speed * k; u.pitch = sp.pitch * k; u.lang = sp.accent === 'b' ? 'en-GB' : 'en-US';
-    const v = s.getVoices().filter((x: SpeechSynthesisVoice) => x.lang.replace('_', '-').indexOf(u.lang) === 0);
-    if (v.length) u.voice = v[0];
+    u.rate = dv.rate * sp.speed * k; u.pitch = Math.max(0.1, Math.min(2, dv.pitch * k)); u.lang = dv.lang || (sp.accent === 'b' ? 'en-GB' : 'en-US');
+    const all = s.getVoices(), v = all.find((x: SpeechSynthesisVoice) => x.name === dv.name) || all.find((x: SpeechSynthesisVoice) => x.lang.replace('_', '-').indexOf(u.lang) === 0);
+    if (v) u.voice = v;
     u.onend = () => { if (tok === this.token) this.finish(); };
     s.speak(u);
   },

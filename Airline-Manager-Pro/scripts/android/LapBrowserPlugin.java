@@ -36,9 +36,9 @@ public class LapBrowserPlugin extends Plugin {
 
     private void place(PluginCall call) {
         if (web == null) return;
-        float k = (float) call.getDouble("dpr", (double) getContext().getResources().getDisplayMetrics().density);
-        int x = Math.round((float) call.getDouble("x", 0.0) * k), y = Math.round((float) call.getDouble("y", 0.0) * k);
-        int w = Math.max(1, Math.round((float) call.getDouble("w", 300.0) * k)), h = Math.max(1, Math.round((float) call.getDouble("h", 200.0) * k));
+        float k = call.getDouble("dpr", (double) getContext().getResources().getDisplayMetrics().density).floatValue();
+        int x = Math.round(call.getDouble("x", 0.0).floatValue() * k), y = Math.round(call.getDouble("y", 0.0).floatValue() * k);
+        int w = Math.max(1, Math.round(call.getDouble("w", 300.0).floatValue() * k)), h = Math.max(1, Math.round(call.getDouble("h", 200.0).floatValue() * k));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w, h);
         lp.leftMargin = x; lp.topMargin = y;
         web.setLayoutParams(lp);

@@ -184,6 +184,7 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'mechanicVoice', label: 'People speak their messages', hint: 'The mechanic, the gate agent, passengers and the head of operations read their messages aloud, word for word, with a play button to hear them again: women with women\'s voices, men with men\'s, angry people sound angry, apologies sound sorry. Everything runs on this device.' },
     { type: 'choice', key: 'voiceEngine', label: 'Voice', hint: 'Natural voices sound like real people. Until they are downloaded, the device\'s own voice reads the messages.', options: [['neural', 'Natural voices'], ['device', 'Device voice']], when: () => State.settings.mechanicVoice },
     { type: 'html', html: () => State.settings.mechanicVoice && (State.settings as any).voiceEngine !== 'device' ? voicePackCard() : '' },
+    { type: 'html', html: () => State.settings.mechanicVoice && (State.settings as any).voiceEngine === 'device' ? deviceVoicesCard() : '' },
     { type: 'toggle', key: 'autoVoice', label: 'Read messages aloud automatically', hint: 'Off: messages from your staff and from ATC stay quiet until you press their play button. On: they start speaking as soon as they open.', when: () => State.settings.mechanicVoice },
     { type: 'html', html: () => State.settings.mechanicVoice ? `<div class="btn-row">${VOICE_TESTS.map(t => `<button class="btn ghost sm" data-act="voice-test" data-k="${t[0]}">${icon('play')}${esc(t[1])}</button>`).join('')}</div>` : '' },
   ] },
@@ -647,3 +648,17 @@ ACTIONS['cab-opt'] = el => {
 // how likely lies in court come out: kept when let go
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('court-truth')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.tr-h'); if (h) h.textContent = 'Lies in court come out: ' + COURT_TRUTH_NAMES[+el.value]; });
 document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('court-truth')) return; (State.settings as any).courtTruth = +el.value; Store.save(); });
+
+/** Settings → Voices with the device's own voice: its male and female voices, each in variations, to listen to.
+ *  Everyone you meet keeps one of them (the same each time); yours follows the voice you chose for your pilot. */
+function deviceVoicesCard(): string {
+  if (!DeviceVoices.loaded) { DeviceVoices.load().then(() => { try { refresh(); } catch (e) { /* later */ } }); return `<div class="card dev-voices"><p class="muted">Looking for this device's voices…</p></div>`; }
+  const row = (sx: 'm' | 'f') => { const V = DeviceVoices.variants(sx); return `<div class="le-group"><b>${sx === 'm' ? 'Male' : 'Female'} voices (${V.length})</b><div class="le-voices">${V.map((v, i) => `<button class="le-voice" data-act="dev-voice-try" data-s="${sx}" data-i="${i}"><span class="lv-ic">${icon('volume')}</span><span><b>${sx === 'm' ? 'Male' : 'Female'} ${i + 1}</b><small>${esc((v.name || 'Device voice').replace(/^Microsoft /, '').replace(/ - English.*$/, '').slice(0, 28))}${v.pitch < 0.97 ? ', deeper' : v.pitch > 1.03 ? ', higher' : ''}</small></span></button>`).join('')}</div></div>`; };
+  const n = DeviceVoices.list.length, nm = DeviceVoices.list.filter(x => x.sex === 'm').length, nf = DeviceVoices.list.filter(x => x.sex === 'f').length;
+  return `<div class="card dev-voices"><p class="muted">${n ? `This device has ${n} English voice${n === 1 ? '' : 's'} (${nm} male, ${nf} female${n - nm - nf ? `, ${n - nm - nf} other` : ''}). Each is used in several pitches and paces, so the people you meet sound different, and each keeps the same voice every time.` : 'This device lists no voices of its own, so its default voice is made deeper or higher for each person.'} More voices can be added in the device's own speech settings.</p>${row('m')}${row('f')}</div>`;
+}
+ACTIONS['dev-voice-try'] = el => {
+  const sx = el.getAttribute('data-s') === 'f' ? 'f' : 'm', i = +(el.getAttribute('data-i') || 0);
+  $all('.dev-voices .le-voice').forEach(b => b.classList.toggle('on', b === el));
+  try { Voice.stop(); Voice.speak(`Hello. This is ${sx === 'm' ? 'male' : 'female'} voice ${i + 1}. Shall we get the aircraft ready?`, undefined, `me|${sx}|neutral|__dev${i}`); } catch (e) { /* no voice */ }
+};

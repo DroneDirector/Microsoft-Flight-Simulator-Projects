@@ -7,6 +7,7 @@ package __PACKAGE__;
 
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.speech.tts.Voice;
 import android.util.Base64;
 
 import com.getcapacitor.JSArray;
@@ -205,9 +206,13 @@ public class VoicePlugin extends Plugin {
     public void speakDevice(PluginCall call) {
         final String text = call.getString("text", "");
         final float pitch = call.getFloat("pitch", 1f), rate = call.getFloat("rate", 1f);
-        final String lang = call.getString("lang", "en-GB");
+        final String lang = call.getString("lang", "en-GB"), name = call.getString("voice", "");
         Runnable go = () -> {
             tts.setLanguage(Locale.forLanguageTag(lang));
+            // a chosen voice of the phone's (each person keeps theirs), if it is still there
+            if (name != null && !name.isEmpty()) {
+                try { for (Voice v : tts.getVoices()) if (name.equals(v.getName())) { tts.setVoice(v); break; } } catch (Exception e) { /* the language's voice */ }
+            }
             tts.setPitch(pitch); tts.setSpeechRate(rate);
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override public void onStart(String id) { }
@@ -222,6 +227,25 @@ public class VoicePlugin extends Plugin {
             ttsReady = st == TextToSpeech.SUCCESS;
             if (ttsReady) go.run(); else call.reject("The phone has no voice for speech");
         });
+    }
+
+    /** The phone's own English voices (installed ones, that work without the internet). */
+    @PluginMethod
+    public void deviceVoices(PluginCall call) {
+        Runnable go = () -> {
+            JSArray a = new JSArray();
+            try {
+                for (Voice v : tts.getVoices()) {
+                    Locale l = v.getLocale();
+                    if (l == null || !"en".equals(l.getLanguage()) || v.isNetworkConnectionRequired()) continue;
+                    if (v.getFeatures() != null && v.getFeatures().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED)) continue;
+                    JSObject o = new JSObject(); o.put("name", v.getName()); o.put("lang", l.toLanguageTag()); o.put("q", v.getQuality()); a.put(o);
+                }
+            } catch (Exception e) { /* none listed */ }
+            JSObject r = new JSObject(); r.put("voices", a); call.resolve(r);
+        };
+        if (tts != null && ttsReady) { go.run(); return; }
+        tts = new TextToSpeech(getContext(), st -> { ttsReady = st == TextToSpeech.SUCCESS; if (ttsReady) go.run(); else { JSObject r = new JSObject(); r.put("voices", new JSArray()); call.resolve(r); } });
     }
 
     @PluginMethod

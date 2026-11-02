@@ -385,17 +385,19 @@ function ofOpen2(root: HTMLElement, q: number) {
   cv.addEventListener('pointerdown', e => {
     // walking on the PC: the view takes the mouse (no pointer, turn as far as you like); a click then uses what glows
     if (!R.seat && DESKTOP && e.pointerType === 'mouse') { drag = null; if (!aimLocked(cv)) { justLocked = true; aimLock(cv); } return; }
-    drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; cv.setPointerCapture(e.pointerId); });
+    drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch, pw: R.ph && R.ph.st === 'hold' ? R.ph.want.slice() : null }; moved = 0; cv.setPointerCapture(e.pointerId); });
   R.mm$ = (e: MouseEvent) => { if (R.on && !R.seat && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
   document.addEventListener('mousemove', R.mm$);
   cv.addEventListener('pointermove', e => {
-    if (!drag && R.seat && !R.overlay && !R.loading) { const o = ofAimedObj(e), on = !!(o && o.userData.act === 'laptop'); R.lapHover = on; cv.style.cursor = on ? 'pointer' : ''; if (on && R.glow) R.glow.showObj(o); }
-    if (!drag) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); });
+    if (!drag && R.seat && !R.overlay && !R.loading) { const o = ofAimedObj(e), on = !!(o && (o.userData.act === 'laptop' || o.userData.act === 'photo') && !(R.ph && R.ph.st !== 'idle')); R.lapHover = on; cv.style.cursor = on ? 'pointer' : ''; if (on && R.glow) R.glow.showObj(o); }
+    if (!drag) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+    if (drag.pw && R.ph && R.ph.st === 'hold') { R.ph.want = [clamp(drag.pw[0] + (e.clientX - drag.x) * 0.004, -0.5, 0.5), clamp(drag.pw[1] + (e.clientY - drag.y) * 0.003, -0.4, 0.4)]; return; }   /* holding the photo: tilt it */ R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); });
   cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else ofClickAt(); return; } justLocked = false; if (drag && moved < 6) ofClickAt(e); drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); });
   R.key$ = (e: KeyboardEvent) => {
     if (!R.on) return; const k = e.key.toLowerCase();
     if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay.classList.contains('lap-screen')) ofLaptopClose(); else ofPlannerClose(); } return; }   // the planner has the keys (typing)
+    if (k === 'escape' && R.ph && R.ph.st === 'hold') { e.preventDefault(); e.stopImmediatePropagation(); ofPhotoPut(); return; }
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; ofLeave(); return; }   // the first Esc only gives the mouse back
     if (k === 'h' && !R.seat) { e.preventDefault(); R.root.classList.toggle('ui-off'); return; }   // walking: hide or show the controls
     if (/^(w|a|s|d|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
@@ -416,6 +418,13 @@ function ofOpen2(root: HTMLElement, q: number) {
     const bk = new T2.Mesh(new T2.BoxGeometry(0.2, 0.155, 0.012), new T2.MeshPhysicalMaterial({ color: 0xC9A04E, metalness: 1, roughness: 0.25 })); bk.position.set(0, 0.09, 0); bk.rotation.x = -0.15; fr.add(bk);
     const ph = new T2.Mesh(new T2.PlaneGeometry(0.18, 0.135), new T2.MeshStandardMaterial({ map: tex, roughness: 0.35 })); ph.position.set(0, 0.09, 0.0065); ph.rotation.x = -0.15; fr.add(ph);
     const st = new T2.Mesh(new T2.BoxGeometry(0.03, 0.12, 0.008), new T2.MeshPhysicalMaterial({ color: 0x8A6A2A, metalness: 1, roughness: 0.3 })); st.position.set(0, 0.06, -0.04); st.rotation.x = 0.4; fr.add(st);
+    const hb = new T2.Mesh(new T2.BoxGeometry(0.24, 0.2, 0.12), new T2.MeshBasicMaterial({ visible: false })); hb.position.set(0, 0.09, 0); hb.userData.act = 'photo'; fr.add(hb); A.hits.push(hb);
+    // you: your own figure, seen from your eyes
+    try {
+      const me: any = myPilot(); R.me = selfBody(scene, me && me.look ? Object.assign({}, me.look, { hat: 'none' }) : ctLook('me', 'm', 'public'), company().color);
+      if (R.me) R.me.chair = new T2.Vector3(0, 1.2, 1.02).sub(selfEyeOff(R.me, Math.PI, 0));
+    } catch (e) { R.me = null; }
+    R.ph = null;
     next();
   });
   if (Human.ready) setTimeout(photo, 30); else Human.load().then(() => setTimeout(photo, 30), () => next());
@@ -444,7 +453,7 @@ OfficeRoom.close = function (quiet?: boolean) {
   document.removeEventListener('mousemove', R.mm$); aimUnlock(); R.glow = null;
   try { Voice.stop(); } catch (e) { /* ignore */ }
   exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null;
-  R.root.remove(); R.vis = null;
+  R.root.remove(); R.vis = null; R.me = null; R.ph = null;
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };
 function ofLeave() {
@@ -641,16 +650,25 @@ function ofFrame() {
     const e = lk * lk * (3 - 2 * lk), S = R.A.lapScr, c = new T.Vector3(), n = new T.Vector3(0, 0, 1);
     S.getWorldPosition(c); n.applyQuaternion(S.getWorldQuaternion(new T.Quaternion()));
     const to = c.clone().add(n.multiplyScalar(0.42)), from = new T.Vector3(0, 1.2, 1.02);
+    if (R.me) { try { selfPose(R.me, R.me.chair, Math.PI, 0.22 * e, 1, 0, 0, now, dt); } catch (x) { R.me = null; } }
     R.cam.position.copy(from.lerp(to, e));
     const yaw = Math.PI + R.look.yaw, p = R.look.pitch, ahead = R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)));
     R.cam.lookAt(ahead.lerp(c, e));
     if (S.material) S.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, lk * 1.4)));   // the screen lights up as it opens
   } else if (R.seat) {
-    R.cam.position.set(0, 1.2, 1.02);
+    // you in your chair: your body (leaning in and turning to reach for the photo), your eyes where your head is
+    const P = ofPhotoStep(dt, now), ph = R.ph, S = R.me;
+    let eye = new T.Vector3(0, 1.2, 1.02);
+    if (S) { try { eye = selfPose(S, S.chair, Math.PI + P.turn + clamp(R.look.yaw * 0.3, -0.4, 0.4) * (1 - P.lookK), P.lean, 1, 0, 0, now, dt, P.arms); } catch (e) { R.me = null; } }
+    R.cam.position.copy(eye);
     const yaw = Math.PI + R.look.yaw;   // facing −z
-    const k = R.keys || {}; if (k.arrowleft) R.look.yaw = clamp(R.look.yaw + dt * 1.4, -2.6, 2.6); if (k.arrowright) R.look.yaw = clamp(R.look.yaw - dt * 1.4, -2.6, 2.6); if (k.arrowup) R.look.pitch = clamp(R.look.pitch + dt, -1.25, 0.9); if (k.arrowdown) R.look.pitch = clamp(R.look.pitch - dt, -1.25, 0.9);
-    const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
-  } else ofWalk(dt);
+    const k = R.keys || {};
+    if (ph && ph.st === 'hold') { if (k.arrowleft) ph.want[0] = clamp(ph.want[0] - dt * 0.6, -0.5, 0.5); if (k.arrowright) ph.want[0] = clamp(ph.want[0] + dt * 0.6, -0.5, 0.5); if (k.arrowup) ph.want[1] = clamp(ph.want[1] - dt * 0.5, -0.4, 0.4); if (k.arrowdown) ph.want[1] = clamp(ph.want[1] + dt * 0.5, -0.4, 0.4); }
+    else if (k.arrowleft) R.look.yaw = clamp(R.look.yaw + dt * 1.4, -2.6, 2.6); if (k.arrowright) R.look.yaw = clamp(R.look.yaw - dt * 1.4, -2.6, 2.6); if (k.arrowup) R.look.pitch = clamp(R.look.pitch + dt, -1.25, 0.9); if (k.arrowdown) R.look.pitch = clamp(R.look.pitch - dt, -1.25, 0.9);
+    const p = R.look.pitch, ahead = R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)));
+    if (P.at && P.lookK > 0) ahead.lerp(P.at, P.lookK);   // your eyes follow the photo
+    R.cam.lookAt(ahead);
+  } else ofWalk(dt, now);
   if (R.glow) { if ((R.seat && !R.lapHover) || R.overlay || R.lapZ) R.glow.hide(); R.glow.step(dt); }
   R.ren.render(R.scene, R.cam);
 }
@@ -660,14 +678,18 @@ function ofBlocked(x: number, z: number): boolean {
   for (const r of B) if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true;
   return false;
 }
-function ofWalk(dt: number) {
+function ofWalk(dt: number, now?: number) {
   const R = OfficeRoom, F = R.free, K = R.keys || {}, T = THREE;
   const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], r = (K.d || K.arrowright ? 1 : 0) - (K.a || K.arrowleft ? 1 : 0) + R.stick[0];
   const mag = Math.min(1, Math.hypot(f, r)), vmax = K.shift ? 2.0 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
   let mx = fx * f + rx * r, mz = fz * f + rz * r; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!ofBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!ofBlocked(nx, F.z)) F.x = nx; else if (!ofBlocked(F.x, nz)) F.z = nz; F.bob += step; }
-  R.cam.position.set(F.x, 1.64 + Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1), F.z);
+  Sound.steps(F, F.bob, Math.abs(F.x) < 1.8 && Math.abs(F.z) < 1.5 ? 'carpet' : 'wood', F.v);   // the rug, or the parquet around it
+  const bobY = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
+  R.cam.position.set(F.x, 1.64 + bobY, F.z);
+  // your body under you: feet stepping, arms swinging; your eyes at your own height
+  if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now || 0, dt); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
   const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p))));
   // what's in front of you: the chair (sit) or the door (leave)
   const aim = R.root.querySelector('.of-aim') as HTMLElement, obj = ofAimedObj(), hint = obj ? obj.userData.act : '';
@@ -685,7 +707,9 @@ function ofAimedObj(e?: PointerEvent): any {
 }
 function ofClickAt(e?: PointerEvent) {
   const R = OfficeRoom; if (R.loading || R.overlay) return;
+  if (R.ph && R.ph.st !== 'idle') { if (R.ph.st === 'hold') ofPhotoPut(); return; }   // holding the photo: a click puts it back
   const a = ofAimed(e) || (R.seat ? '' : ofAimed());
+  if (a === 'photo' && R.seat) { ofPhotoPick(); return; }
   if (a === 'laptop') { ofLaptopOpen(); return; }
   if (R.seat) return;
   if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); R.doorT = 1; setTimeout(() => ofExitToMain(), 650); }
@@ -822,7 +846,7 @@ function ofSpot(k: string) {
   if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
   if (k === 'laptop') { ofLaptopOpen(); return; }
   if (k === 'planner' || k === 'schedule') { Sound.tick(); ofScreenOpen(k); return; }
-  const R = OfficeRoom; Sound.tick(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true; ofTopState();
+  const R = OfficeRoom; Sound.tick(); ofPhotoReset(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true; ofTopState();
   if (k !== 'free') aimUnlock();
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
   else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
@@ -830,6 +854,69 @@ function ofSpot(k: string) {
   else { R.seat = false; const S: any = { paint: [-1.4, 0.4, Math.PI / 2 - 0.05, 0.05], window: [1.6, -0.4, -Math.PI / 2, -0.04], map: [0, -2.1, 0, 0.08] }[k]; R.free = { x: S[0], z: S[1], v: 0, bob: 0 }; R.look = { yaw: S[2], pitch: S[3] }; }
   ofVisitUi(true);
   const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = R.seat;
+}
+
+/* ---------- the family photo: picked up, looked at, put back ---------- */
+const OF_PH_D = { reach: 0.85, lift: 1.15, lower: 1.15, release: 0.75 };
+function ofPhotoPick() {
+  const R = OfficeRoom, A = R.A; if (!A || !A.photoAt || (R.ph && R.ph.st !== 'idle') || ofLapK() > 0) return;
+  R.ph = { st: 'reach', t: 0, P0: A.photoAt.position.clone(), q0: A.photoAt.quaternion.clone(), tilt: [0, 0], want: [0, 0], a: {} };
+  if (R.glow) R.glow.hide(); R.lapHover = false; ofPhotoUi(); Sound.tick();
+}
+function ofPhotoPut() { const ph = OfficeRoom.ph; if (!ph || ph.st !== 'hold') return; ph.st = 'lower'; ph.t = 0; ofPhotoUi(); }
+/** Back on the desk at once (leaving the chair, another view). */
+function ofPhotoReset() {
+  const R = OfficeRoom, ph = R.ph; if (!ph) return;
+  if (R.A && R.A.photoAt) { R.A.photoAt.position.copy(ph.P0); R.A.photoAt.quaternion.copy(ph.q0); }
+  R.ph = null; ofPhotoUi();
+}
+function ofPhotoUi() {
+  const R = OfficeRoom, ph = R.ph, on = !!(ph && ph.st === 'hold');
+  let b = R.root && R.root.querySelector('.of-ph') as HTMLElement;
+  if (!on) { if (b) b.remove(); return; }
+  if (b) return;
+  b = document.createElement('div'); b.className = 'of-ph';
+  b.innerHTML = `<span>${DESKTOP ? 'Drag or use the arrow keys' : 'Drag'} to tilt the photo</span><button class="btn sm" data-of="ph-put">Put it back</button>`;
+  b.addEventListener('pointerdown', e => e.stopPropagation());
+  b.querySelector('button')!.addEventListener('click', e => { e.stopPropagation(); ofPhotoPut(); });
+  R.root.appendChild(b);
+}
+/** Each frame in the chair: where the photo is, your hands on it, how far you lean in and turn, where you look. */
+function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; lookK: number; at: any; arms: any } {
+  const R = OfficeRoom, ph = R.ph, A = R.A, T = THREE, out = { lean: 0, turn: 0, lookK: 0, at: null as any, arms: null as any };
+  if (!ph || !A || !A.photoAt) return out;
+  const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, D = OF_PH_D;
+  ph.t += dt;
+  let wL = 0, wR = 0, mv = 0;   // the hands on it (0 at rest, 1 holding), the photo from the desk (0) to your hands (1)
+  if (ph.st === 'reach') { wL = E(ph.t / D.reach); if (ph.t >= D.reach) { ph.st = 'lift'; ph.t = 0; } }
+  else if (ph.st === 'lift') { wL = 1; mv = E(ph.t / D.lift); wR = E((ph.t - 0.45) / 0.6); if (ph.t >= D.lift) { ph.st = 'hold'; ph.t = 0; ofPhotoUi(); } }
+  else if (ph.st === 'hold') { wL = wR = 1; mv = 1; }
+  else if (ph.st === 'lower') { wL = 1; mv = 1 - E(ph.t / D.lower); wR = 1 - E(ph.t / 0.5); if (ph.t >= D.lower) { ph.st = 'release'; ph.t = 0; Sound.tick(); } }
+  else if (ph.st === 'release') { wL = 1 - E(ph.t / D.release); if (ph.t >= D.release) { R.ph = null; ofPhotoUi(); return out; } }
+  // leaning in and turning to the desk while it is down there, upright again as it comes up
+  const down = ph.st === 'reach' || ph.st === 'release' ? wL : 1 - mv;
+  out.lean = 0.34 * down; out.turn = 0.34 * down;
+  // in your hands: a little in front of your eyes, tilted as you like, never quite still
+  ph.tilt[0] += (ph.want[0] - ph.tilt[0]) * Math.min(1, dt * 5); ph.tilt[1] += (ph.want[1] - ph.tilt[1]) * Math.min(1, dt * 5);
+  const hold = new T.Vector3(0.0, 1.01, 0.63), S = Math.sin;
+  hold.x += 0.002 * S(t * 1.1) + 0.001 * S(t * 2.9); hold.y += 0.0025 * S(t * 0.8 + 1) + 0.001 * S(t * 3.3);
+  const qh = new T.Quaternion().setFromEuler(new T.Euler(0.12 + ph.tilt[1] + 0.008 * S(t * 1.3), ph.tilt[0] + 0.012 * S(t * 0.9 + 2), 0.007 * S(t * 0.7), 'YXZ'));
+  const pos = ph.P0.clone().lerp(hold, mv); pos.y += 0.09 * Math.sin(Math.PI * mv);   // up off the desk in an arc
+  A.photoAt.position.copy(pos); A.photoAt.quaternion.copy(ph.q0).slerp(qh, mv); A.photoAt.updateMatrixWorld(true);
+  out.at = A.photoAt.localToWorld(new T.Vector3(0, 0.09, 0));
+  out.lookK = Math.max(mv, 0.55 * down * (ph.st === 'reach' || ph.st === 'release' ? wL : 1));
+  // the hands: the left reaches for it, the right joins it once it is up (each from where it rested)
+  const grip: any = { L: A.photoAt.localToWorld(new T.Vector3(-0.112, 0.07, -0.004)), R: A.photoAt.localToWorld(new T.Vector3(0.112, 0.07, -0.004)) }, w: any = { L: wL, R: wR };
+  out.arms = (m: any) => {
+    const res: any = {}, rest = humanGesture({ kind: 'sit', v: 0 }, t);
+    for (const sd of ['L', 'R'] as ('L' | 'R')[]) {
+      if (w[sd] < 0.002) { ph.a[sd] = null; continue; }
+      const from = m.root.localToWorld(humanHandAt(m, sd, sd === 'L' ? rest.L : rest.R)), to = from.lerp(grip[sd], w[sd]);
+      ph.a[sd] = humanReach(m, sd, m.root.worldToLocal(to), ph.a[sd] || (sd === 'L' ? rest.L : rest.R)); res[sd] = ph.a[sd];
+    }
+    return res;
+  };
+  return out;
 }
 
 /* ---------- the interview ---------- */
