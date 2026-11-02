@@ -19,6 +19,23 @@ interface AirportLayout {
   gen?: boolean;                                         // taxiways laid out from the runways (not mapped)
 }
 
+/** Does a layout belong to the airport it is for? Its middle and its runways must be at that airport (within
+ *  12 km). If not, it is another airport's (a mix-up in reading it): error APT-01 in Settings > Updates and errors. */
+function layoutFits(icao: string, l: AirportLayout, from: string): boolean {
+  const a: any = apt(icao); if (!a || !l) return true;
+  const far = (lat: number, lon: number) => lat || lon ? gcDistanceNm([lon, lat], a.pos) * 1.852 : 0;
+  const dMid = far(l.lat, l.lon), dRw = Math.max(0, ...(l.runways || []).map(r => far(r.lat, r.lon)));
+  if (dMid <= 12 && dRw <= 12) return true;
+  try {
+    ErrorLog.add('3d', `APT-01 · ${a.name || icao}: another airport's layout`,
+      `The layout ${from === 'sim' ? 'Flight Simulator gave' : 'kept on this device'} for ${icao} lies ${Math.round(Math.max(dMid, dRw))} km from ${a.name || icao}${l.name ? ` (it says "${l.name}")` : ''}. It was not used: the right one is read again.`,
+      [`Code: APT-01 (layout belongs to another place)`, `Airport: ${icao} ${a.name || ''} at ${a.pos[1].toFixed(4)}, ${a.pos[0].toFixed(4)}`,
+        `Layout: source ${l.source}, from ${from}, name "${l.name || ''}", centre ${(+l.lat || 0).toFixed(4)}, ${(+l.lon || 0).toFixed(4)} (${dMid.toFixed(1)} km away), ${(l.runways || []).length} runways (farthest ${dRw.toFixed(1)} km away)`,
+        `Runways: ${(l.runways || []).map(r => `${r.a}/${r.b}`).join(', ')}`, `App ${APP.version}, linked: ${Link.status}`].join('\n'));
+  } catch (e) { /* no log */ }
+  return false;
+}
+
 const AirportLayouts = {
   cache: {} as { [icao: string]: AirportLayout },
   waiting: {} as { [icao: string]: { ok: (l: AirportLayout) => void; timer: any }[] },
@@ -28,9 +45,16 @@ const AirportLayouts = {
    *  or with null when there is nothing better to come. */
   get(icao: string, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     icao = String(icao || '').toUpperCase();
-    const c0 = this.cache[icao] || this.kept(icao);
+    let c0 = this.cache[icao] || this.kept(icao);
+    if (c0 && !layoutFits(icao, c0, 'kept')) { c0 = null; this.forget(icao); }
     if (c0) return this.getWith(icao, c0, better);
-    return LayoutDb.get(icao).then(l => { if (l) this.cache[icao] = l; return this.getWith(icao, l, better); });
+    return LayoutDb.get(icao).then(l => { if (l && !layoutFits(icao, l, 'kept')) { l = null; this.forget(icao); } if (l) this.cache[icao] = l; return this.getWith(icao, l, better); });
+  },
+  /** A kept layout that turned out to be another airport's: gone, so the right one is read again. */
+  forget(icao: string) {
+    delete this.cache[icao];
+    for (const k of ['amp-sim:' + icao, 'amp-osm:' + icao]) try { localStorage.removeItem(k); } catch (e) { /* none */ }
+    try { LayoutDb.del(icao); } catch (e) { /* none */ }
   },
   getWith(icao: string, c: AirportLayout, better?: (l: AirportLayout) => void): Promise<AirportLayout> {
     const linked = Link.status === 'connected';
@@ -40,7 +64,7 @@ const AirportLayouts = {
       const upgrade = (l: AirportLayout) => { if (better) better(l && l !== first && l.source !== 'runways' ? l : null); };
       const viaOsm = () => (c && c.source === 'osm' ? Promise.resolve(c) : this.fromOsm(icao)).then(l => upgrade(l && (!c || c.source !== 'osm') ? l : null)).catch(() => upgrade(null));
       if (linked && linkSend({ type: 'layout', icao })) {
-        const w = { ok: (l: AirportLayout) => { if (l && l.source === 'sim') upgrade(l); else viaOsm(); }, timer: setTimeout(() => this.received(icao, null, 'timeout'), 8000) };
+        const w = { ok: (l: AirportLayout) => { if (l && l.source === 'sim') upgrade(l); else viaOsm(); }, timer: setTimeout(() => this.received(icao, null, 'timeout'), 20000) };   // the PC app gives the simulator 15 s
         (this.waiting[icao] = this.waiting[icao] || []).push(w);
       } else viaOsm();
     });
@@ -62,8 +86,14 @@ const AirportLayouts = {
     const ws = this.waiting[icao] || []; delete this.waiting[icao];
     ws.forEach(w => clearTimeout(w.timer));
     let l: AirportLayout = null;
-    if (layout && (layout.runways || []).length) { l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const }); this.cache[icao] = l; LayoutDb.put(icao, l); }
+    if (layout && (layout.runways || []).length) {
+      l = Object.assign({ points: [], parks: [], paths: [], names: [] }, layout, { icao, source: 'sim' as const });
+      if (!layoutFits(icao, l, 'sim')) l = null;   // another airport's layout: not used, and noted in the error log
+      else { this.cache[icao] = l; LayoutDb.put(icao, l); }
+    }
     ws.forEach(w => w.ok(l));
+    // it came after the app had stopped waiting, for the airport in the 3D view: drawn now (not only next time)
+    if (!ws.length && l) { try { const VP: any = V3d; if (V3d.open && V3d.icao === icao && (!VP.lastL || VP.lastL.source !== 'sim')) { V3d.elev = l.alt || 0; v3dBuildAirport(l); } } catch (e) { /* not open */ } }
   },
 
   /** A layout with the airport's real runways (world airport data), when the simulator can't give one. */
@@ -398,6 +428,7 @@ const LayoutDb = {
   get(icao: string): Promise<AirportLayout> {
     return this.db().then(d => new Promise<AirportLayout>(ok => { const r = d.transaction('l').objectStore('l').get(icao); r.onsuccess = () => ok(r.result ? r.result.l : null); r.onerror = () => ok(null); })).catch(() => null);
   },
+  del(icao: string) { this.db().then(d => { d.transaction('l', 'readwrite').objectStore('l').delete(icao); }).catch(() => { /* none */ }); },
   put(icao: string, l: AirportLayout) {
     this.db().then(d => { const t = d.transaction('l', 'readwrite'); t.objectStore('l').put({ k: icao, at: Date.now(), src: l.source, l }); }).catch(() => { /* not available: kept for this session */ });
   },

@@ -357,7 +357,8 @@ function v3dBuildingTextures(): any {
 
 function v3dBuildAirport(L: AirportLayout) {
   const T = THREE, g = new T.Group(), e = L.alt || 0;
-  (V3d as any).lastL = L;
+  v3dNoteSwitch(L);
+  (V3d as any).lastL = L; (V3d as any).lastLAt = Date.now();
   const loc = (x: number, y: number) => { const ll = [L.lon + x / (111320 * Math.cos(L.lat * D2R)), L.lat + y / 110540]; return v3dXY(ll[0], ll[1]); };
   // the ground's height where it is known (the terrain may still be loading: then the airport's elevation)
   const gy = (x: number, z: number) => { if (!V3dTerrain.rings.length) return e; const ll = v3dLonLat(x, z); return V3dTerrain.ground(ll[0], ll[1]) - v3dCurve(x, z); };
@@ -490,6 +491,23 @@ function airportSheet(L: AirportLayout, loc: (x: number, y: number) => number[],
   const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: T.DoubleSide }));
   m.renderOrder = 3;
   return m;
+}
+
+/** The airport you are looking at was drawn again from a different layout (a better one arrived, or it was
+ *  wrong): APT-02 in Settings > Updates and errors, with what was shown before and after, ready to copy. */
+function v3dNoteSwitch(L: AirportLayout) {
+  const VP: any = V3d, P: AirportLayout = VP.lastL;
+  if (!P || !L || P === L || String(P.icao) !== String(L.icao) || !V3d.airport) return;
+  const shownS = (Date.now() - (VP.lastLAt || Date.now())) / 1000;
+  if (shownS < 2) return;   // replaced before it was really seen
+  const sig = (x: AirportLayout) => `${x.source}${x.gen ? ' (taxiways laid out from the runways)' : ''}, "${x.name || ''}", ${(x.runways || []).length} runways (${(x.runways || []).map(r => `${r.a}/${r.b}`).join(', ')}), ${(x.parks || []).length} stands, ${(x.areas || []).filter(a => a.k === 'terminal').length} terminal buildings`;
+  const a: any = apt(L.icao), f: any = (() => { try { return v3dAptOnly() || v3dTargetFlight(); } catch (e) { return null; } })();
+  let where = ''; try { const w = f ? v3dWhere(f) : null; if (w && a) where = `${(gcDistanceNm([w.lon, w.lat], a.pos)).toFixed(1)} nm from the airport, ${Math.round(w.altM * 3.281)} ft, ${w.onGround ? 'on the ground' : 'flying'} (${w.phase || ''})`; } catch (e) { /* unknown */ }
+  try {
+    ErrorLog.add('3d', `APT-02 · ${a ? a.name : L.icao}: the airport changed while in view`,
+      `${L.icao} was shown for ${Math.round(shownS)} s with ${P.source === 'runways' ? 'a layout made from its runways only' : P.source === 'osm' ? 'the OpenStreetMap layout' : 'Flight Simulator\'s layout'}, then drawn again with ${L.source === 'sim' ? 'Flight Simulator\'s layout' : L.source === 'osm' ? 'the OpenStreetMap layout' : 'its runways only'}.`,
+      [`Code: APT-02 (airport layout replaced while shown)`, `Airport: ${L.icao}`, `Before: ${sig(P)}`, `After: ${sig(L)}`, `Shown for: ${shownS.toFixed(1)} s`, f ? `Flight: ${f.code || f.id} ${f.from}-${f.to}, ${where}` : '', `View: ${V3d.mode}`, `App ${APP.version}, linked: ${Link.status}`].filter(Boolean).join('\n'));
+  } catch (e) { /* no log */ }
 }
 
 /** Centre the view on an airport (its layout, its aircraft on the ground) or on open country. */

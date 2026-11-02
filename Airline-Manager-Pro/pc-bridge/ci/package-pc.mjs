@@ -3,7 +3,7 @@
 // Then the Setup program: the whole app folder packed inside one more single executable with its own window
 // (src/setup), the app's compass-star icon on both .exe files and on the shortcuts Setup makes.
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, existsSync, cpSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync, existsSync, cpSync, readdirSync, statSync, lstatSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
@@ -51,6 +51,8 @@ const dep = JSON.parse(readFileSync(join(here, 'package.json'), 'utf8')).depende
 writeFileSync(join(lib, 'package.json'), JSON.stringify({ private: true, dependencies: { 'node-simconnect': dep } }));
 run(`npm install --omit=dev --no-audit --no-fund --prefix "${lib}"`);
 if (!existsSync(join(lib, 'node_modules', 'node-simconnect'))) throw new Error('node-simconnect missing');
+// npm can leave a link back to this project in lib/node_modules: not part of the app (and it loops)
+for (const n of readdirSync(join(lib, 'node_modules'))) { const p = join(lib, 'node_modules', n); try { if (lstatSync(p).isSymbolicLink()) rmSync(p, { recursive: true, force: true }); } catch (e) { /* gone */ } }
 
 writeFileSync(join(pkg, 'README.txt'), [
   `Airline Manager Pro PC app ${app.version}`, '',
@@ -104,7 +106,7 @@ console.log('Packaged', pkg);
 // every file of the app folder, deflated one by one, after a header listing them (src/setup/core.ts reads it)
 const files = [], parts = [];
 let off = 0, total = 0;
-const walk = d => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p); else {
+const walk = d => { for (const n of readdirSync(d)) { const p = join(d, n), st = lstatSync(p); if (st.isSymbolicLink()) continue; if (st.isDirectory()) walk(p); else {
   const raw = readFileSync(p), z = deflateRawSync(raw, { level: 9 }), rel = p.slice(pkg.length + 1);
   files.push({ p: rel, size: raw.length, csize: z.length, off }); parts.push(z); off += z.length; total += raw.length; } } };
 walk(pkg);

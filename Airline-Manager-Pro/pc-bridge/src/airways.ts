@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
+import { nextRequestId } from './reqid';
 
 export interface AwyNode { k: string; id: string; reg: string; t: string; lat: number; lon: number; r: AwyEdge[] }
 export interface AwyEdge { awy: string; cls: number; k: string; id: string; lat: number; lon: number }   // cls: 1 low, 2 high, 3 both
@@ -21,7 +22,7 @@ function str(v: any): string { return String(v || '').replace(/\0.*$/, '').trim(
 const typeChar = (n: number) => n > 31 && n < 127 ? String.fromCharCode(n) : 'W';
 
 export class AirwayReader extends EventEmitter {
-  private defined = false; private nextReq = 20000;
+  private defined = false;
   private pending: { [req: number]: { node: AwyNode; done: (n: AwyNode | null) => void; timer: any } } = {};
   private nodes: { [k: string]: AwyNode } = {};
   private file = ''; private dirty = false; private saveT: any = null;
@@ -56,7 +57,7 @@ export class AirwayReader extends EventEmitter {
     if (this.nodes[k]) return Promise.resolve(this.nodes[k]);
     return new Promise(resolve => {
       try { this.define(); } catch (e) { return resolve(null); }
-      const req = this.nextReq++, node: AwyNode = { k, id, reg, t, lat: 0, lon: 0, r: [] };
+      const req = nextRequestId(), node: AwyNode = { k, id, reg, t, lat: 0, lon: 0, r: [] };
       const done = (n: AwyNode | null) => { const p = this.pending[req]; if (p) clearTimeout(p.timer); delete this.pending[req]; if (n && (n.lat || n.lon)) { this.nodes[k] = n; this.save(); } resolve(n && (n.lat || n.lon) ? n : null); };
       this.pending[req] = { node, done, timer: setTimeout(() => done(null), 6000) };
       // waypoints carry the airways; a VOR or an NDB on an airway also exists as a waypoint of the same name
