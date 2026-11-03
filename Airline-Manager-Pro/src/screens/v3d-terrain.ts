@@ -280,7 +280,8 @@ const V3dTerrain = {
       // outer rings sit a little lower so the finer ring always shows where they meet
       if (aptLL && !s.wet) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); y = aElev + (y - aElev) * k; }
       mh[o] = h - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0);   // the surface (the sea's at sea), for what stands or floats on it
-      pos[o * 3] = p[0]; pos[o * 3 + 1] = (s.wet ? y : mh[o]) - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
+      // land never dips under the sea's surface (the small offsets above are for where rings and the airport meet)
+      pos[o * 3] = p[0]; pos[o * 3 + 1] = (s.wet ? y : wl >= 0 ? mh[o] : Math.max(Math.min(h, 0.5), mh[o])) - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
       uv[o * 2] = i / G; uv[o * 2 + 1] = 1 - j / G;
     }
     // where the finer ring lies: this ring's ground there sinks well below it (out of sight), so the two never
@@ -290,7 +291,7 @@ const V3dTerrain = {
     const inside = (lon: number, lat: number, shrink: number) => { const B = innerBox; if (!B) return false; const px = (B[1] - B[0]) * shrink, py = (B[3] - B[2]) * shrink; return lon > B[0] + px && lon < B[1] - px && lat > B[2] + py && lat < B[3] - py; };
     if (innerBox) for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
       if (!inside(lonOf(i / G * size), latOf(j / G * size), 0)) continue;
-      const o = j * (G + 1) + i; pos[o * 3 + 1] -= 3;
+      const o = j * (G + 1) + i; const cv = v3dCurve(pos[o * 3], pos[o * 3 + 2]), y0 = pos[o * 3 + 1] + cv; if (y0 > 4) pos[o * 3 + 1] -= 3;
     }
     for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
       if (r.inner && inside(lonOf((i + 0.5) / G * size), latOf((j + 0.5) / G * size), 0.04)) continue;

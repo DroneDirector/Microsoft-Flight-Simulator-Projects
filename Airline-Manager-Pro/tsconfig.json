@@ -181,6 +181,7 @@
     "src/core/loyalty.ts",
     "src/core/goals.ts",
     "src/core/alliances.ts",
+    "src/core/crew-start.ts",
     "src/core/career-rides.ts",
     "src/core/ops-decisions.ts",
     "src/main.ts"
