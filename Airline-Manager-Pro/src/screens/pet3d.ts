@@ -6,7 +6,13 @@
 // back, turns round in its bed and lies down to sleep again. Tap it and it wakes for a moment and looks at you.
 
 type PetKind = 'dog' | 'cat' | 'none';
-interface Pet { kind: PetKind; name: string; coat: number; white: boolean; size: 's' | 'm' | 'l'; ears: 'floppy' | 'pointy'; bed: number }
+interface Pet { kind: PetKind; name: string; coat: number; white: boolean; size: 's' | 'm' | 'l'; ears: 'floppy' | 'pointy'; bed: number; coatHex?: string; lightHex?: string }
+/** The colours you can give the light parts (the chest, muzzle, paws and blaze). */
+const PET_LIGHTS: [string, string][] = [['#F3EFE6', 'White'], ['#EADBC0', 'Cream'], ['#D9B48A', 'Tan'], ['#CFCAC2', 'Silver'], ['#8E8A86', 'Grey'], ['#6B4A34', 'Brown'], ['#2A2420', 'Black'], ['#E9C46A', 'Gold']];
+/** The main colour of the coat: one of the coats, or your own. */
+function petCoatHex(P: Pet): string { return P.coatHex || (PET_COATS[P.kind === 'cat' ? 'cat' : 'dog'][P.coat] || PET_COATS.dog[0])[0]; }
+/** The colour of the light parts: white (or the colour you chose), or a shade of the coat when it is all one colour. */
+function petLightHex(P: Pet): string | null { return P.white ? (P.lightHex || '#F3EFE6') : null; }
 
 const PET_COATS: { [k: string]: [string, string][] } = {
   dog: [['#C8913E', 'Golden'], ['#2A2420', 'Black'], ['#6B4226', 'Brown'], ['#E6D3AE', 'Cream'], ['#F2EFE8', 'White'], ['#8A8783', 'Grey'], ['#A0522D', 'Red'], ['#4A3B30', 'Dark brown']],
@@ -37,6 +43,8 @@ function petPlace(T: any, root: any, A: any, pos: number[], yaw: number, walk?: 
   rim.rotation.x = Math.PI / 2; rim.position.y = cat ? 0.07 : 0.075; rim.castShadow = true; rim.receiveShadow = true; g.add(rim);
   // asleep, curled up on the cushion
   const curl = petBody(T, P, s, 'curl'); curl.grp.position.y = 0.06; g.add(curl.grp);
+  // its bowls beside the bed, side by side: water, and food in a bowl with its name on
+  petBowls(T, g, P, bedR);
   // tap it: it wakes for a moment
   const hit = new T.Mesh(new T.CylinderGeometry(bedR + 0.05, bedR + 0.05, 0.4, 16), new T.MeshBasicMaterial({ visible: false })); hit.position.y = 0.2; hit.userData.act = 'pet'; g.add(hit); A.hits = A.hits || []; A.hits.push(hit);
   const home = new T.Vector3(pos[0], 0, pos[1]);
@@ -46,7 +54,7 @@ function petPlace(T: any, root: any, A: any, pos: number[], yaw: number, walk?: 
 
 /** A pet's body in one pose: the sculpted mesh, its fur, and its face (nose, eyes, a cat's whiskers). */
 function petBody(T: any, P: Pet, s: number, pose: 'curl' | 'stand'): any {
-  const cat = P.kind === 'cat', sc = petSculpt(T, P, s, pose), coat = new T.Color((PET_COATS[cat ? 'cat' : 'dog'][P.coat] || PET_COATS.dog[0])[0]);
+  const cat = P.kind === 'cat', sc = petSculpt(T, P, s, pose), coat = new T.Color(petCoatHex(P));
   const U: any = { uBreath: { value: 0 }, uHead: { value: 0 }, uEarL: { value: 0 }, uEarR: { value: 0 }, uTail: { value: 0 }, uTailY: { value: 0 }, uPaw: { value: 0 }, uVis: { value: 1 }, uLegA: { value: new T.Vector4() },
     uNeck: { value: sc.neck }, uEarPL: { value: sc.earL }, uEarPR: { value: sc.earR }, uTailP: { value: sc.tailBase }, uLeg0: { value: sc.legs[0] }, uLeg1: { value: sc.legs[1] }, uLeg2: { value: sc.legs[2] }, uLeg3: { value: sc.legs[3] } };
   const grp = new T.Group();
@@ -198,17 +206,86 @@ function petFurMat(T: any, U: any, coat: any, strands: boolean): any {
 function petEditorHtml(p: Pet): string {
   const k = p.kind === 'none' ? 'dog' : p.kind, coats = PET_COATS[k];
   const opt = (key: string, v: string, lab: string, cur: any) => `<button class="le-opt ${String(cur) === v ? 'on' : ''}" data-act="pet-set" data-k="${key}" data-v="${v}">${lab}</button>`;
-  return `<div class="le-group"><b>Your pet</b><p class="muted">Asleep in its bed by the bookshelf in your office.</p><div class="le-opts">${opt('kind', 'dog', 'A dog', p.kind)}${opt('kind', 'cat', 'A cat', p.kind)}${opt('kind', 'none', 'No pet', p.kind)}</div></div>
+  return `<div class="le-group"><b>Your pet</b><p class="muted">Asleep in its bed by the bookshelf in your office.</p>${p.kind === 'none' ? '' : '<canvas class="pet-prev" data-pet-prev width="560" height="340" aria-label="Your pet"></canvas>'}<div class="le-opts">${opt('kind', 'dog', 'A dog', p.kind)}${opt('kind', 'cat', 'A cat', p.kind)}${opt('kind', 'none', 'No pet', p.kind)}</div></div>
     ${p.kind === 'none' ? '' : `
     <div class="le-group"><b>Name</b><input class="le-in" data-pet-name value="${esc(p.name || '')}" maxlength="24" autocomplete="off" placeholder="${p.kind === 'cat' ? 'Mittens' : 'Buddy'}"></div>
-    <div class="le-group"><b>Coat</b><div class="le-sw">${coats.map((c, i) => `<button class="sw ${p.coat === i ? 'on' : ''}" style="--c:${c[0]}" data-act="pet-set" data-k="coat" data-v="${i}" aria-label="${c[1]}" title="${c[1]}"></button>`).join('')}</div></div>
-    <div class="le-group"><b>Markings</b><div class="le-opts">${opt('white', '1', 'White chest and paws', p.white ? '1' : '0')}${opt('white', '0', 'All one colour', p.white ? '1' : '0')}</div></div>
+    <div class="le-group"><b>Coat colour</b><div class="le-sw">${coats.map((c, i) => `<button class="sw ${!p.coatHex && p.coat === i ? 'on' : ''}" style="--c:${c[0]}" data-act="pet-set" data-k="coat" data-v="${i}" aria-label="${c[1]}" title="${c[1]}"></button>`).join('')}<label class="sw custom ${p.coatHex ? 'on' : ''}" title="Your own colour" aria-label="Your own coat colour"><input type="color" class="pet-color" data-k="coatHex" value="${esc(petCoatHex(p))}"></label></div></div>
+    <div class="le-group"><b>Markings</b><div class="le-opts">${opt('white', '1', p.kind === 'cat' ? 'Chest and paws' : 'Chest, muzzle and paws', p.white ? '1' : '0')}${opt('white', '0', 'All one colour', p.white ? '1' : '0')}</div>
+      ${p.white ? `<div class="le-sw" style="margin-top:8px">${PET_LIGHTS.map(c => `<button class="sw ${(p.lightHex || '#F3EFE6').toLowerCase() === c[0].toLowerCase() ? 'on' : ''}" style="--c:${c[0]}" data-act="pet-set" data-k="lightHex" data-v="${c[0]}" aria-label="${c[1]} markings" title="${c[1]}"></button>`).join('')}<label class="sw custom ${p.lightHex && !PET_LIGHTS.some(c => c[0].toLowerCase() === p.lightHex.toLowerCase()) ? 'on' : ''}" title="Your own colour" aria-label="Your own markings colour"><input type="color" class="pet-color" data-k="lightHex" value="${esc(p.lightHex || '#F3EFE6')}"></label></div>` : ''}</div>
     ${p.kind === 'dog' ? `<div class="le-group"><b>Size</b><div class="le-opts">${opt('size', 's', 'Small', p.size)}${opt('size', 'm', 'Medium', p.size)}${opt('size', 'l', 'Large', p.size)}</div></div>
     <div class="le-group"><b>Ears</b><div class="le-opts">${opt('ears', 'floppy', 'Floppy', p.ears)}${opt('ears', 'pointy', 'Pointed', p.ears)}</div></div>` : ''}
     <div class="le-group"><b>Bed</b><div class="le-sw">${PET_BEDS.map((c, i) => `<button class="sw ${p.bed === i ? 'on' : ''}" style="--c:${c[0]}" data-act="pet-set" data-k="bed" data-v="${i}" aria-label="${c[1]} bed" title="${c[1]}"></button>`).join('')}</div></div>
     <p class="fine-print">${icon('info')}Your ${p.kind} is there the next time you go into your office.</p>`}`;
 }
 
+
+/* ---------- the bowls ---------- */
+/** Two bowls side by side next to the bed: a glazed one of water, and one of food with your pet's name painted round it. */
+function petBowls(T: any, g: any, P: Pet, bedR: number) {
+  const cat = P.kind === 'cat', r = cat ? 0.068 : 0.088, hgt = cat ? 0.042 : 0.052, x = bedR + r + 0.07, gap = r + 0.012;
+  const bc = new T.Color((PET_BEDS[P.bed] || PET_BEDS[0])[0]);
+  for (const side of [-1, 1]) {
+    const food = side > 0, b = new T.Group(); b.position.set(x, 0, side * gap); g.add(b);
+    // the bowl: a heavy glazed bowl, wider at the foot, with a rolled rim and a hollow inside
+    const pts = [[0, 0], [r * 1.0, 0], [r * 1.04, 0.006], [r * 0.98, hgt * 0.92], [r * 0.95, hgt], [r * 0.9, hgt * 0.99], [r * 0.82, hgt * 0.35], [r * 0.6, hgt * 0.22], [0, hgt * 0.2]].map(p => new T.Vector2(p[0], p[1]));
+    const glaze = new T.MeshPhysicalMaterial({ color: food ? bc.clone().offsetHSL(0, -0.05, 0.08) : 0xF1EEE8, roughness: 0.18, clearcoat: 0.8, clearcoatRoughness: 0.08 });
+    const bowl = new T.Mesh(new T.LatheGeometry(pts, 48), glaze); bowl.castShadow = true; bowl.receiveShadow = true; b.add(bowl);
+    // inside: a white glaze
+    const inner = new T.Mesh(new T.CircleGeometry(r * 0.6, 32), new T.MeshPhysicalMaterial({ color: 0xF6F3EE, roughness: 0.15, clearcoat: 0.8 })); inner.rotation.x = -Math.PI / 2; inner.position.y = hgt * 0.205; b.add(inner);
+    // the name (food) or WATER, painted big on the side facing the room, with a paw print either side
+    const lab = food ? (P.name || (cat ? 'Kitty' : 'Buddy')).toUpperCase() : 'WATER', base = food ? bc.clone().offsetHSL(0, -0.05, 0.08) : new T.Color(0xF1EEE8);
+    const ink = food ? (base.r * 0.3 + base.g * 0.59 + base.b * 0.11 > 0.45 ? '#2A2420' : '#FFFFFF') : bc.getStyle();
+    const c = document.createElement('canvas'); c.width = 2048; c.height = 96; const x2 = c.getContext('2d') as CanvasRenderingContext2D;
+    x2.fillStyle = ink; x2.textAlign = 'center'; x2.textBaseline = 'middle';
+    let fs = 72; x2.font = `800 ${fs}px "Inter", "Segoe UI", Arial, sans-serif`;
+    while (x2.measureText(lab).width > 560 && fs > 30) { fs -= 2; x2.font = `800 ${fs}px "Inter", "Segoe UI", Arial, sans-serif`; }
+    x2.fillText(lab, 1024, 52);
+    const tw2 = x2.measureText(lab).width;
+    for (const px of [1024 - tw2 / 2 - 50, 1024 + tw2 / 2 + 50]) {
+      const py = 50; x2.beginPath(); x2.ellipse(px, py + 9, 15, 12, 0, 0, Math.PI * 2); x2.fill();
+      for (const [dx, dy] of [[-17, -10], [-6, -22], [6, -22], [17, -10]]) { x2.beginPath(); x2.ellipse(px + dx, py + dy, 5.5, 7, 0, 0, Math.PI * 2); x2.fill(); }
+    }
+    b.rotation.y = Math.PI;   // the name faces the room (+z of the bed)
+    const tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
+    const band = new T.Mesh(new T.CylinderGeometry(r * 0.987, r * 1.025, hgt * 0.5, 64, 1, true), new T.MeshPhysicalMaterial({ map: tex, transparent: true, roughness: 0.2, clearcoat: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    band.position.y = hgt * 0.47; b.add(band);
+    if (food) {   // a heap of kibble (a cat's is smaller)
+      const n = cat ? 140 : 110, kg = new T.DodecahedronGeometry(cat ? 0.0042 : 0.0062, 0), km = new T.MeshStandardMaterial({ roughness: 0.75 }), im = new T.InstancedMesh(kg, km, n), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), col = new T.Color();
+      let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * r * 0.74, y = hgt * 0.24 + (1 - rr / (r * 0.74)) * hgt * 0.55 * rnd() + rnd() * 0.006;
+        e.set(rnd() * 6, rnd() * 6, rnd() * 6); q.setFromEuler(e); const sc = 0.8 + rnd() * 0.5;
+        m4.compose(new T.Vector3(Math.cos(a) * rr, y, Math.sin(a) * rr), q, new T.Vector3(sc, sc * 0.7, sc)); im.setMatrixAt(i, m4);
+        col.setHSL(0.07 + rnd() * 0.03, 0.55, 0.22 + rnd() * 0.12); im.setColorAt(i, col);
+      }
+      im.castShadow = true; b.add(im);
+    } else {   // still water, with a soft glint
+      const w = new T.Mesh(new T.CircleGeometry(r * 0.86, 40), new T.MeshPhysicalMaterial({ color: 0x9CC4D6, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.55, clearcoat: 1 }));
+      w.rotation.x = -Math.PI / 2; w.position.y = hgt * 0.72; b.add(w);
+    }
+  }
+}
+
+/* ---------- a picture of your pet in the editor ---------- */
+let _petPrevR: any = null;
+/** Draw your pet as it is now (asleep in its bed, with its bowls) into the editor's picture. */
+function petPreviewDraw(P: Pet) {
+  const cv = document.querySelector('[data-pet-prev]') as HTMLCanvasElement; if (!cv || !P || P.kind === 'none' || typeof THREE === 'undefined') return;
+  try {
+    const T = THREE, W = cv.width, H = cv.height;
+    if (!_petPrevR) { _petPrevR = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); _petPrevR.toneMapping = T.ACESFilmicToneMapping; _petPrevR.outputColorSpace = T.SRGBColorSpace; _petPrevR.shadowMap.enabled = true; }
+    const ren = _petPrevR; ren.setPixelRatio(1); ren.setSize(W, H, false);
+    const sc = new T.Scene(); sc.add(new T.HemisphereLight(0xfff3e2, 0x3a2a1a, 1.3)); const dl = new T.DirectionalLight(0xfff0dc, 2.2); dl.position.set(1, 2.5, 1.5); dl.castShadow = true; dl.shadow.mapSize.set(1024, 1024); sc.add(dl);
+    const fl = new T.Mesh(new T.CircleGeometry(1.2, 48), new T.MeshStandardMaterial({ color: 0x5a3b26, roughness: 0.8 })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; sc.add(fl);
+    const S: any = State, keep = S.pet; S.pet = P; const A: any = {};
+    try { petPlace(T, sc, A, [0, 0], 0); } finally { S.pet = keep; }
+    if (A.pet) { A.pet.curl.U.uBreath.value = 0; }
+    const cam = new T.PerspectiveCamera(32, W / H, 0.01, 20); cam.position.set(0.55, 0.62, 1.05); cam.lookAt(0.2, 0.05, 0.02);
+    ren.render(sc, cam);
+    const x = cv.getContext('2d') as CanvasRenderingContext2D; x.clearRect(0, 0, W, H); x.drawImage(ren.domElement, 0, 0, W, H);
+    sc.traverse((o: any) => { if (o.material && o.geometry && !o.geometry.userData.keep && o.geometry !== (A.pet && A.pet.curl.sc.geo) && o.geometry !== (A.pet && A.pet.curl.sc.strands)) o.geometry.dispose(); });
+  } catch (e) { /* no picture */ }
+}
 
 /* ---------- the sculpted body: shapes melted into one smooth surface, and its fur ---------- */
 type PetPrim = { k: 'e' | 'c'; a: number[]; b?: number[]; r: number[]; part?: string; light?: number; dark?: number; paint?: boolean };
@@ -257,7 +334,7 @@ function petStand(P: Pet, s: number): PetShapes {
 
 /** The pet as one mesh in a pose, with its strands of fur (built once for each look and pose, then kept). */
 function petSculpt(T: any, P: Pet, s: number, pose: 'curl' | 'stand'): any {
-  const key = JSON.stringify([P.kind, P.coat, P.white, P.size, P.ears, s, pose]); if (_petCache[key]) return _petCache[key];
+  const key = JSON.stringify([P.kind, petCoatHex(P), petLightHex(P), P.size, P.ears, s, pose]); if (_petCache[key]) return _petCache[key];
   const cat = P.kind === 'cat', D = pose === 'stand' ? petStand(P, s) : petCurl(P, s), prims = D.prims.slice();
   for (let i = 0; i < D.tail.length - 1; i++) { const f0 = i / (D.tail.length - 1), f1 = (i + 1) / (D.tail.length - 1); prims.push({ k: 'c', a: D.tail[i], b: D.tail[i + 1], r: [D.tailR[0] + (D.tailR[1] - D.tailR[0]) * f0, D.tailR[0] + (D.tailR[1] - D.tailR[0]) * f1], part: 't' + i }); }
   const K = 0.03 * s;
@@ -291,7 +368,7 @@ function petSculpt(T: any, P: Pet, s: number, pose: 'curl' | 'stand'): any {
   }
   // normals from the field; weights (head, ears, paws, tail, legs) and colours from the shapes nearest each point
   const nV = pos.length / 3, nor = new Float32Array(nV * 3), col = new Float32Array(nV * 3), pw = new Float32Array(nV * 4), lw = new Float32Array(nV * 4), tw = new Float32Array(nV), len = new Float32Array(nV);
-  const coat = new T.Color((PET_COATS[cat ? 'cat' : 'dog'][P.coat] || PET_COATS.dog[0])[0]), light = P.white ? new T.Color('#F3EFE6') : coat.clone().offsetHSL(0, -0.04, 0.07), dark = coat.clone().multiplyScalar(0.72), pink = new T.Color('#E7A3A0'), tmp = new T.Color();
+  const coat = new T.Color(petCoatHex(P)), lh = petLightHex(P), light = lh ? new T.Color(lh) : coat.clone().offsetHSL(0, -0.04, 0.07), dark = coat.clone().multiplyScalar(0.72), pink = new T.Color('#E7A3A0'), tmp = new T.Color();
   const e = 0.0015 * s, nTail = D.tail.length - 1, fw = D.fwd || [1, 0, 0];
   for (let v = 0; v < nV; v++) {
     const p = [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];

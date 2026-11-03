@@ -104,6 +104,7 @@ function leRefresh(body?: boolean) {
     else fig.innerHTML = html;
   }
   if (body) { const b = $('[data-le-body]'); if (b) b.innerHTML = lookEditorBody(); }
+  if (_le && _le.tab === 'pet' && _le.pet) { const P = _le.pet; setTimeout(() => petPreviewDraw(P), 30); }
 }
 function leReadIdentity() {
   if (_le && _le.pet) { const pn = $('[data-pet-name]') as HTMLInputElement; if (pn) _le.pet.name = pn.value.trim().slice(0, 24); }
@@ -179,10 +180,15 @@ function confirmChange(title: string, body: string, yes: string, no: string, onY
 ACTIONS['confirm-yes'] = () => { const f = (window as any).__confirmYes; (window as any).__confirmYes = (window as any).__confirmNo = null; if (f) f(); };
 ACTIONS['confirm-no'] = () => { const f = (window as any).__confirmNo; (window as any).__confirmYes = (window as any).__confirmNo = null; if (f) f(); else closeTop(); };
 
+// your own colour for the coat or the markings: the swatch follows as you pick, the pet is redrawn when you let go
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('pet-color') || !_le || !_le.pet) return; (_le.pet as any)[el.getAttribute('data-k')] = el.value; const lb = el.parentElement as HTMLElement; if (lb) { lb.style.background = el.value; lb.classList.add('on'); } });
+// the name on the food bowl follows as you type it
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.hasAttribute || !el.hasAttribute('data-pet-name') || !_le || !_le.pet) return; _le.pet.name = el.value.trim().slice(0, 24); clearTimeout((window as any).__petNameT); const P = _le.pet; (window as any).__petNameT = setTimeout(() => petPreviewDraw(P), 400); });
+document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('pet-color') || !_le || !_le.pet) return; leReadIdentity(); (_le.pet as any)[el.getAttribute('data-k')] = el.value; leRefresh(true); });
 ACTIONS['pet-set'] = el => {
   if (!_le || !_le.pet) return; leReadIdentity();
   const P: any = _le.pet, k = el.getAttribute('data-k') || '', v = el.getAttribute('data-v') || '';
-  if (k === 'coat' || k === 'bed') P[k] = +v; else if (k === 'white') P.white = v === '1';
+  if (k === 'coat' || k === 'bed') { P[k] = +v; if (k === 'coat') delete P.coatHex; } else if (k === 'white') P.white = v === '1'; else if (k === 'lightHex') P.lightHex = v;
   else { P[k] = v; if (k === 'kind' && v !== 'none' && (!P.name || P.name === 'Buddy' || P.name === 'Mittens')) P.name = v === 'cat' ? 'Mittens' : 'Buddy'; if (k === 'kind' && v === 'cat') P.coat = Math.min(P.coat, PET_COATS.cat.length - 1); }
   Sound.tick(); leRefresh(true);
 };
