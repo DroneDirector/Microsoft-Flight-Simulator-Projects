@@ -192,6 +192,7 @@ const SETTINGS: SetSection[] = [
   { id: 'sound', title: 'Sound and feel', icon: 'volume', items: [
     { type: 'group', title: 'App' },
     { type: 'toggle', key: 'muteAll', label: 'Mute all sounds', hint: 'Silences every sound in the app, voices too.' },
+    { type: 'toggle', key: 'titleMusic', label: 'Start screen music', hint: 'The soundtrack of the start screen, when the app opens. Off: the film plays without sound.' },
     { type: 'toggle', key: 'mechanicVoice', label: 'Voices in dialogues', hint: 'The mechanic, the gate agent, passengers and the head of operations speak their messages. Off: no voices and no play buttons, the messages are only written.', when: () => !State.settings.muteAll },
     { type: 'toggle', key: 'onlyVoices', label: 'Only the voices', hint: 'Every other sound is off (purchases, payments, taps, chimes), but the people in the dialogues still speak. Switch off to have all sounds again.', when: () => !State.settings.muteAll },
     { type: 'toggle', key: 'purchaseSound', label: 'Purchase sound', hint: 'Plays when you buy an aircraft.', when: () => !State.settings.muteAll && !(State.settings as any).onlyVoices },
@@ -408,6 +409,7 @@ ACTIONS.toggle = el => {
   if (key === 'mk-installed') { _mkInstalled = on; refresh(); return; }
   if (key === 'reduceMotion') document.documentElement.classList.toggle('calm', on);
   if (key === 'muteAll') { if (on) Voice.stop(); renderTopbar(); }
+  if (key === 'muteAll' || key === 'titleMusic') { (State.settings as any)[key] = on; Store.save(); try { titleMusicSync(); } catch (e) { /* no start screen */ } }
   if (key === 'mechanicVoice' && !on) Voice.stop();
   if (key === 'conduct') setConduct(on);
   if (key in State.settings) { Store.save(); setTimeout(() => rerenderSettingsBody(), 180); }

@@ -58,7 +58,10 @@ const Backup = {
   restore(text: string) {
     const d = this.parse(text); if (!d) { toast('That file isn\'t an Airline Manager Pro backup', 'warn'); return; }
     try { localStorage.setItem(STORE_KEY, text); } catch (e) { toast('The backup couldn\'t be stored on this phone', 'warn'); return; }
+    // nothing may save over it now, before the app starts again from it
+    try { (Mode as any).switching = true; clearTimeout((Store as any)._nativeTimer); (Store as any)._native = ''; } catch (e) { /* ignore */ }
     const T = this.tools(); if (T && T.backupWrite) T.backupWrite({ data: text }).catch(() => { /* the web copy is there */ });
+    try { if (!sessionStorage.getItem('amp-title-next')) sessionStorage.setItem('amp-title-next', 'game'); } catch (e) { /* ignore */ }
     toast('Backup restored', 'ok');
     setTimeout(() => location.reload(), 600);
   },

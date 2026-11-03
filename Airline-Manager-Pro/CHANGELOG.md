@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.90 (2026-11-03)
+
+- start screen (ui/title.ts) after the start-up screen: a canvas film timed to the soundtrack (101.63 bpm, envelope in assets/title/env.json), wide shots and close-up light-sweep reveals, flight deck split into inside and outside layers for the pushback, the aircraft cut out from the clouds in flight, light leaks, flares, grain, cut flashes and glitches, letterbox; menu on the left (Continue → office, New game → pilot then airline, Save game / Load game with 20 slots (GameSaves: phone files game-N.json, PC saves\\game-N.json, browser IndexedDB), Options themed, Quit); music toggle there and in Sound and feel (titleMusic); a loaded save moves every clock in it to now; Backup.restore stops saving until the reload; images made by tools/title/make_title.py; Audiowide (OFL) and Yellowtail (Apache 2.0) fonts
+
 ## 0.9.89 (2026-11-03)
 
 - pets: your own coat and markings colours (coatHex, lightHex; PET_LIGHTS presets and colour pickers in the Pet tab), a picture of the pet in the editor (petPreviewDraw, one shared renderer); water and food bowls beside the bed (petBowls: glazed lathe bowls, the name and paw prints painted on the food bowl facing the room, kibble, water); the office keeps clear of them
