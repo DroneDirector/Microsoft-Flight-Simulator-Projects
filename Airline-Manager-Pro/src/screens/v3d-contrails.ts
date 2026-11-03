@@ -15,13 +15,17 @@ function v3dContrailMat(): any {
     vertexShader: `attribute float aBirth; attribute float aSide; attribute float aLife; attribute vec3 aDir; uniform float uNow; varying float vA; varying float vS;
       void main() {
         float age = max(0.0, uNow - aBirth), k = clamp(age / max(1.0, aLife), 0.0, 1.0);
-        vA = aBirth <= 0.0 ? 0.0 : smoothstep(0.0, 1.2, age) * (1.0 - k) * (1.0 - k) * 0.7;
+        // faint just behind the engines, full a little further back, then fading gently towards the far end
+        vA = aBirth <= 0.0 ? 0.0 : smoothstep(0.0, 2.5, age) * pow(1.0 - k, 1.6) * 0.6;
         vS = aSide;
-        vec3 c = position + vec3(0.0, -age * 0.12, 0.0);
+        vec3 c = position + vec3(0.0, -age * 0.08, 0.0);
         vec4 mv = modelViewMatrix * vec4(c, 1.0);
-        vec3 d = normalize((modelViewMatrix * vec4(aDir, 0.0)).xyz + vec3(0.0001));
-        vec3 side = normalize(cross(d, normalize(mv.xyz)));
-        float wdt = 3.0 + age * (aLife > 60.0 ? 1.1 : 0.5);   // half width in metres: it spreads as it ages
+        // across the trail as seen from here; looking along it (where that has no direction) it lies flat across the view
+        vec3 v = normalize(mv.xyz), d = normalize((modelViewMatrix * vec4(aDir, 0.0)).xyz + vec3(0.0001));
+        vec3 sd = cross(d, v); float L = length(sd);
+        vec3 flat0 = normalize(cross(v, vec3(0.0, 1.0, 0.0)) + vec3(0.0001));
+        vec3 side = normalize(mix(flat0, sd / max(L, 0.0001), smoothstep(0.05, 0.3, L)));
+        float wdt = 1.3 + age * (aLife > 50.0 ? 0.2 : 0.09);   // half width in metres: thin at first, spreading as it ages
         mv.xyz += side * aSide * wdt;
         gl_Position = projectionMatrix * mv;
       }`,
@@ -57,15 +61,18 @@ function v3dContrailStep(P: any, g: any, w: any, now: number) {
   const T = THREE, t = now / 1000, M = v3dContrailMat(); M.uniforms.uNow.value = t;
   // lit like the sky around it: white by day, warm at sunset, dim at night
   try { const fc = V3d.scene.fog && V3d.scene.fog.color; if (fc) { const l = Math.max(0.6, Math.min(1, 0.4 + (fc.r + fc.g + fc.b) / 1.2)); M.uniforms.uCol.value.setRGB(0.97, 0.98, 1).lerp(fc.clone().multiplyScalar(2.2), 0.25).multiplyScalar(l); } } catch (e) { /* white */ }
-  const on = !w.onGround && v3dContrailCold(w.altM, w.lat) && (g.gs || 0) > 200;
+  // on while it is cold enough up there, and kept on through short changes (no flicker on and off)
+  const want = !w.onGround && v3dContrailCold(w.altM, w.lat) && (g.gs || 0) > 200, PC: any = P;
+  if (want) PC.ctLast = t;
+  const on = want || (PC.ctLast != null && t - PC.ctLast < 20 && !w.onGround);
   if (!on && !P.ct) return;
-  const body = P.model.userData.body; body.updateMatrixWorld();
+  const body = P.model.userData.body; P.model.updateMatrixWorld(true);
   const E: any[] = (body.userData.engPts || []).filter((e: any) => e.exh);
   const src = E.length ? E.map(e => e.exh) : [new T.Vector3(shapeOf(P.type).L * 0.6, 0, 0)];
   if (!P.ct) {
     // damp or dry air up there: the same for a while for each aircraft
     const damp = (_hashStr(String(g.id) + Math.floor(Date.now() / 3600e3)) % 100) < 55;
-    P.ct = { rb: src.map(() => { const mesh = v3dContrailRibbon(CT_N()); V3d.scene.add(mesh); return { mesh, n: 0 }; }), at: 0, life: damp ? (hiQ() ? 75 : 60) : 8 + (_hashStr(String(g.id)) % 8) };
+    P.ct = { rb: src.map(() => { const mesh = v3dContrailRibbon(CT_N()); V3d.scene.add(mesh); return { mesh, n: 0 }; }), at: 0, life: damp ? (hiQ() ? 75 : 60) : 22 + (_hashStr(String(g.id)) % 10) };
   }
   const C = P.ct, N = CT_N(), add = on && t - C.at >= CT_DT();
   if (add) C.at = t;
@@ -73,6 +80,15 @@ function v3dContrailStep(P: any, g: any, w: any, now: number) {
     const R = C.rb[k]; if (!R) return;
     const geo = R.mesh.geometry, pos = geo.attributes.position.array as Float32Array, dir = geo.attributes.aDir.array as Float32Array, bi = geo.attributes.aBirth.array as Float32Array, li = geo.attributes.aLife.array as Float32Array;
     const p = body.localToWorld(lp.clone());
+    // the view moved its centre (a long way flown): the whole trail moves with the world, so it stays behind the engines
+    if (R.n > 1) {
+      const jx = p.x - pos[0], jy = p.y - pos[1], jz = p.z - pos[2], lv = R.lv || [0, 0, 0];
+      if (Math.abs(jx - lv[0]) + Math.abs(jy - lv[1]) + Math.abs(jz - lv[2]) > 1500) {
+        const ox = jx - lv[0], oy = jy - lv[1], oz = jz - lv[2];
+        for (let i = 0; i < R.n * 2; i++) { pos[i * 3] += ox; pos[i * 3 + 1] += oy; pos[i * 3 + 2] += oz; }
+      }
+      R.lv = [p.x - pos[0], p.y - pos[1], p.z - pos[2]];
+    }
     if (add || !R.n) {
       // a new sample at the front: everything else moves one place back
       pos.copyWithin(6, 0, (N - 1) * 6); dir.copyWithin(6, 0, (N - 1) * 6); bi.copyWithin(2, 0, (N - 1) * 2); li.copyWithin(2, 0, (N - 1) * 2);

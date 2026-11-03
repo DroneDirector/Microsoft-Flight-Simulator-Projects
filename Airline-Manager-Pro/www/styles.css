@@ -4172,3 +4172,11 @@ html.calm .dclock b em { animation: none; }
 .hg-go { margin: 6px 0 14px; }
 .screen-hangars .back-btn { margin-bottom: 6px; }
 .hg-ac > span { text-align: left; align-items: flex-start; }
+/* the door of a room: where to next */
+.room-exit { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(4,8,14,.45); }
+.room-exit-box { display: flex; flex-direction: column; gap: 6px; width: min(360px, calc(100% - 32px)); padding: 16px; border-radius: 16px; background: rgba(12,18,28,.95); border: 1px solid rgba(255,255,255,.16); color: #EAF2FA; }
+.room-exit-box > b { font: 700 17px Inter, sans-serif; margin-bottom: 4px; }
+.room-exit-box button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); color: inherit; font: 600 14px Inter, sans-serif; text-align: left; cursor: pointer; }
+.room-exit-box button span { flex: 1; } .room-exit-box button svg { width: 18px; height: 18px; }
+.room-exit-box button:hover { background: rgba(47,180,232,.18); border-color: rgba(47,180,232,.5); }
+.room-exit-box button.stay { justify-content: center; background: none; color: #9FB6CC; }
