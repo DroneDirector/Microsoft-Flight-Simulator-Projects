@@ -176,7 +176,8 @@ const SaveSlots = {
   },
   html(): string {
     const m = this.meta(), rows = m.at.map((at, i) => ({ at, i: i + 1 })).filter(r => r.at).sort((a, b) => b.at - a.at);
-    return `<div class="set-card col"><div class="sc-h">${icon('shield')}<span><b>Backup saves on this device</b><small>Everything is saved the moment it changes. Five backup saves are kept besides, taken in turn (one a minute while you play, and when you leave the app), so you can go back to an earlier moment.</small></span></div>
+    return `<div class="set-card"><span class="pc-ic">${icon('check')}</span><span><b>Save now</b><small>Everything is saved by itself the moment anything changes, also the markets, prices, money in and out and messages. Save now writes the save and a backup save straight away${DESKTOP ? ' (or press Ctrl+S)' : ''}.</small></span><button class="btn primary sm" data-act="save-now">${icon('check')}Save now</button></div>
+      <div class="set-card col"><div class="sc-h">${icon('shield')}<span><b>Backup saves on this device</b><small>Everything is saved the moment it changes. Five backup saves are kept besides, taken in turn (one a minute while you play, and when you leave the app), so you can go back to an earlier moment.</small></span></div>
       ${rows.length ? rows.map(r => `<div class="ch-row"><span><b>Backup ${r.i}</b><small>${esc(dateStr(new Date(r.at)))} ${esc(new Date(r.at).toTimeString().slice(0, 5))}</small></span><button class="btn ghost sm" data-act="slot-restore" data-i="${r.i}">${icon('sync')}Restore</button></div>`).join('') : '<small class="muted">The first backup save is made a minute from now.</small>'}</div>`;
   },
 };
@@ -186,3 +187,47 @@ ACTIONS['slot-restore'] = el => {
   SaveSlots.read(i).then(t => { if (!t) { toast('That backup save could not be read', 'warn'); return; } Backup.restore(t); }).catch(() => toast('That backup save could not be read', 'warn'));
 };
 document.addEventListener('change', () => { try { Store.soon(); } catch (e) { /* not ready */ } }, true);
+
+/* ---------- saved as things happen on their own, and saved when you say so ---------- */
+// Besides what you do, the airline changes by itself: the markets and prices move, money comes in and goes out,
+// flights land, people write, the court and the authority get in touch. Every couple of seconds a quick summary
+// of the airline is compared with the last one, and when anything has changed it is saved.
+const SaveWatch = {
+  last: '', timer: 0 as any, at: 0, owe: false,
+  BIG: ['companies', 'mkt', 'bank', 'stock', 'settings', 'unions', 'jobs'],
+  sig(): string {
+    const S: any = State, out: string[] = [];
+    for (const k of SAVED_KEYS) {
+      const v = S[k];
+      if (v == null || typeof v !== 'object') { out.push(String(v)); continue; }
+      if (this.BIG.indexOf(k) >= 0) { let j = ''; try { j = JSON.stringify(v); } catch (e) { /* cyclic */ } out.push(j.length + ':' + saveHash(j)); continue; }
+      if (Array.isArray(v)) { const a = v[0], z = v[v.length - 1]; let e = ''; try { e = JSON.stringify(a || '').slice(0, 300) + JSON.stringify(z || '').slice(0, 300); } catch (x) { /* odd */ } out.push(v.length + ':' + saveHash(e)); continue; }
+      out.push(String(Object.keys(v).length));
+    }
+    try { const M: any = (State as any).mail; if (Array.isArray(M)) out.push('m' + M.length + (M[0] && M[0].id)); } catch (e) { /* none */ }
+    return out.join('|');
+  },
+  start() {
+    if (this.timer) return;
+    this.timer = setInterval(() => {
+      if (document.hidden) return;
+      let s = ''; try { s = this.sig(); } catch (e) { return; }
+      // saved at once, but not more than every 8 seconds from changes that keep running (aircraft moving), so phones stay smooth
+      if (this.last && s !== this.last) { const now = Date.now(); if (now - this.at >= 8000) { this.at = now; try { Store.soon(); } catch (e) { /* not ready */ } } else this.owe = true; }
+      else if (this.owe && Date.now() - this.at >= 8000) { this.owe = false; this.at = Date.now(); try { Store.soon(); } catch (e) { /* not ready */ } }
+      this.last = s;
+    }, 2500);
+  },
+};
+function saveHash(s: string): number { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+setTimeout(() => { try { SaveWatch.start(); } catch (e) { /* later */ } }, 4000);
+
+/** Save now: the main save, the phone's own file and a backup save, all at once. */
+function saveNow(quiet?: boolean) {
+  try { Store.save(); Store.flushNative(); } catch (e) { /* storage */ }
+  try { SaveSlots._json = SaveSlots._json || (localStorage.getItem(Mode.key()) || ''); SaveSlots.write(); } catch (e) { /* none */ }
+  try { if (Backup.folder && Backup.folder.set) Backup.writeFolder(); } catch (e) { /* none */ }
+  if (!quiet) { try { Sound.tick(); toast('Saved', 'ok'); } catch (e) { /* no ui */ } }
+}
+ACTIONS['save-now'] = () => saveNow();
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); saveNow(); } });

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.83 (2026-11-03)
+
+- SaveWatch: a summary of the saved state every 2.5 s; any change by itself (markets, prices, money in and out, flights, messages, the court) saves, at most every 8 s while changes keep running
+- Save now (Settings > Backup and restore, Ctrl+S on the PC): the save, the phone's file, a backup save and the backup folder at once
+
 ## 0.9.82 (2026-11-03)
 
 - saving: every action (ACTIONS proxy) and every changed field saves; the phone's file copy is written 1.2 s after each save; five rotating backup saves (SaveSlots: app files save-1…5 on Android, Documents\\Airline Manager Pro\\backups on the PC, web storage in a browser), with Restore in Settings
