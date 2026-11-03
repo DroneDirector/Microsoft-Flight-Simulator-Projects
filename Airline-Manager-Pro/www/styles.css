@@ -3718,3 +3718,7 @@ body.ts-on .set-tab:hover { background: rgba(255, 255, 255, .06); }
 body.ts-on .btn.primary { background: linear-gradient(90deg, #FF3FB8, #8A4BFF); color: #fff; box-shadow: 0 0 16px rgba(255, 63, 184, .45); }
 body.ts-on .seg button.on { background: linear-gradient(90deg, rgba(255, 63, 184, .55), rgba(120, 60, 255, .4)); color: #fff; }
 body.ts-on .toast { z-index: 80; }
+button.rail-brand { width: 100%; border-radius: 12px; transition: background .2s, color .2s, transform .2s var(--spring); }
+button.rail-brand:hover, button.rail-brand:focus-visible { background: var(--panel-3); color: #fff; outline: none; }
+button.rail-brand:active { transform: scale(.94); }
+.ts-sel { margin: 8px 0 4px; border-color: var(--neo1); box-shadow: 0 0 16px rgba(255, 63, 184, .3); }

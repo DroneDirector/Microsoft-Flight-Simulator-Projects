@@ -3,7 +3,7 @@
 
 interface LookEditOpts {
   title: string; role: CrewRole; look: Look; identity?: { name: string; dob: string; nat: string };
-  sexOnly?: boolean; confirmName?: string; onAccept: (look: Look, identity?: { name: string; dob: string; nat: string }) => void;
+  sexOnly?: boolean; confirmName?: string; difficulty?: boolean; onAccept: (look: Look, identity?: { name: string; dob: string; nat: string }) => void;
 }
 
 let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string; pet?: Pet } = null;
@@ -44,6 +44,7 @@ function lookEditorBody(): string {
       <div class="le-group"><button class="btn ghost" data-act="le-shuffle">${icon('sync')}Another person</button></div>`;
   }
   if (t === 'person') return `
+    ${_le.o.difficulty ? `<div class="le-group"><b>Difficulty</b><p class="muted">How hard the game is: prices, earnings, costs and loans. You can change it later in Settings.</p>${difficultyPickHtml(_fsDiff, 'ng-diff')}</div>` : ''}
     ${id ? `<div class="le-group"><b>Name</b><input class="le-in" data-le-name value="${esc(id.name)}" maxlength="40" autocomplete="off"></div>
     <div class="le-row2">
       <div class="le-group"><b>Date of birth</b><input class="le-in" type="date" data-le-dob value="${esc(id.dob)}" min="1940-01-01" max="2008-12-31"></div>
@@ -185,6 +186,7 @@ document.addEventListener('input', e => { const el = e.target as HTMLInputElemen
 // the name on the food bowl follows as you type it
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.hasAttribute || !el.hasAttribute('data-pet-name') || !_le || !_le.pet) return; _le.pet.name = el.value.trim().slice(0, 24); clearTimeout((window as any).__petNameT); const P = _le.pet; (window as any).__petNameT = setTimeout(() => petPreviewDraw(P), 400); });
 document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('pet-color') || !_le || !_le.pet) return; leReadIdentity(); (_le.pet as any)[el.getAttribute('data-k')] = el.value; leRefresh(true); });
+ACTIONS['ng-diff'] = el => { _fsDiff = el.getAttribute('data-d') as Difficulty; document.querySelectorAll('.look-pop .diff-opt').forEach(b => b.classList.toggle('on', b === el)); Sound.tick(); };
 ACTIONS['pet-set'] = el => {
   if (!_le || !_le.pet) return; leReadIdentity();
   const P: any = _le.pet, k = el.getAttribute('data-k') || '', v = el.getAttribute('data-v') || '';

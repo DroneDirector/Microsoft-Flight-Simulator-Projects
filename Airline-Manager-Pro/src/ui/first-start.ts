@@ -48,29 +48,38 @@ ACTIONS['fs-wipe'] = () => {
   wipeToScratch({ kind: _fsKind, name, icao, callsign: (v('.fs-call') || name.split(' ')[0]).toUpperCase(), hub, pilot: v('.fs-pilot') });
 };
 
-/** Remove everything but the settings and your own pilot, and found one new airline. */
+/** A new game: everything is erased and begins from nothing (companies, pilots, aircraft, staff, routes, flights,
+ *  money, loans, logbook, news, markets, history, your pet) except your settings and the app's registration, and one
+ *  new airline is founded with your pilot (as created on the start screen, or the one you had). */
 function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: string; hub: string; pilot: string }) {
   if (Mode.coop()) { try { localStorage.setItem('amp-coop-new', '1'); } catch (e) { /* ignore */ } }
   try { localStorage.setItem('amp-news-first', Mode.coop() ? 'coop' : 'first'); } catch (e) { /* ignore */ }
-  const S: any = State, me: any = State.pilots.filter((p: any) => p.id === 'you')[0] || myPilot();
-  const keep = ['settings', 'staffCandidates', 'candidates', 'seenVersion', 'wnClosed', 'licence', 'knownAirports', 'simInstalled', 'linkPc', 'favs'];
-  const fresh: any = {};
-  Object.keys(S).forEach(k => {
-    if (keep.indexOf(k) >= 0 || typeof S[k] === 'function') return;
-    if (Array.isArray(S[k])) fresh[k] = [];
-  });
-  Object.assign(S, fresh);
+  const S: any = State, old: any = State.pilots.filter((p: any) => p.id === 'you')[0] || myPilot() || {}, np: any = (window as any).__ngPilot;
+  // kept: your settings, the registration, and things about this device and the world (airports, the simulator)
+  const KEEP = ['settings', 'licence', 'knownAirports', 'simInstalled', 'linkPc', 'linkedOnce', 'seenVersion', 'wnClosed', 'simDate', 'ratingDay', 'mktReal', 'candidates', 'staffCandidates', 'salaryV2', 'payV3', 'groundV1', 'newsWatchV1'];
+  const st: any = {};
+  for (const k of SAVED_KEYS) {
+    const v = S[k];
+    if (KEEP.indexOf(k) >= 0) { st[k] = v; continue; }
+    st[k] = Array.isArray(v) ? [] : typeof v === 'number' ? 0 : typeof v === 'boolean' ? false : typeof v === 'string' ? '' : v && typeof v === 'object' ? {} : null;
+  }
   const id = 'co-' + uid();
-  S.companies = [{ id, profileId: 'p1', name: o.name, icao: o.icao, callsign: o.callsign, hub: o.hub, color: '#2C8CFF', color2: '#0B2A55',
+  st.companies = [{ id, profileId: 'p1', name: o.name, icao: o.icao, callsign: o.callsign, hub: o.hub, color: '#2C8CFF', color2: '#0B2A55',
     balance: Math.round((o.kind === 'bush' ? 1500000 : o.kind === 'regional' ? 12000000 : 25000000) * DIFFICULTY[_fsDiff].start / 100000) * 100000, reputation: 50, founded: dateStr(new Date()).slice(0, 10), kind: o.kind, divisions: [] }];
-  S.profiles = [{ id: 'p1', pilotId: 'you', label: 'Main profile' }];
-  S.pilots = [Object.assign(me, { id: 'you', name: o.pilot || me.name, hoursMin: 0, landings: 0, base: o.hub, profileId: 'p1', status: 'standby', types: [], rating: 4, xp: 0 })];
-  S.companyId = id; S.divisionId = 'all'; S.myReg = {}; S.coPilot = { [id]: { sex: 'f', id: '' } };
-  S.badges = {}; S.progress = {}; S.myLoad = Object.assign({}, S.myLoad, { pax: 0, cargoKg: 0, mailKg: 0, bagsKg: 0 });
-  ['bank', 'jobs', 'coop', 'ofp', 'acars', 'usedMarket', 'cases', 'landRecs', 'groundedUntil', 'ratingDay', 'popLog'].forEach(k => { if (S[k] && !Array.isArray(S[k]) && typeof S[k] === 'object') delete S[k]; });
-  ['aiNext', 'aiDay', 'payNext', 'poolNext', 'condTick', 'lastTouchdown'].forEach(k => { if (S[k] && !Array.isArray(S[k]) && typeof S[k] === 'object') S[k] = {}; else if (typeof S[k] === 'number') S[k] = 0; });
-  S.scratch = true; S.difficulty = _fsDiff; S.mkt = null; S.stock = {};
-  Store.save(); Store.flushNative();
+  st.profiles = [{ id: 'p1', pilotId: 'you', label: 'Main profile' }];
+  const look = (np && np.look) || old.look;
+  st.pilots = [{ id: 'you', name: (np && np.name) || o.pilot || old.name || 'Capt. New Pilot', rank: 'Captain', hoursMin: 0, landings: 0, base: o.hub, you: true, profileId: 'p1', status: 'standby', types: [], rating: 4, xp: 0,
+    sex: (np && np.sex) || old.sex || 'm', look, dob: (np && np.dob) || old.dob, nat: (np && np.nat) || old.nat, lookAccepted: true, voice: old.voice }];
+  st.companyId = id; st.divisionId = 'all'; st.myReg = {}; st.coPilot = { [id]: { sex: 'f', id: '' } }; st.screen = 'ops';
+  st.myLoad = Object.assign({}, S.myLoad, { pax: 0, cargoKg: 0, mailKg: 0, bagsKg: 0 });
+  st.bank = { loans: [], insurance: {}, insNext: {}, campaigns: [], rentNext: {} };
+  st.mkt = null; st.coop = null; st.usedMarket = null; st.pet = null; st.stock = {}; st.difficulty = _fsDiff;
+  st.salaryV2 = true; st.payV3 = true; st.groundV1 = true;
+  const json = JSON.stringify({ v: SAVE_VERSION, app: APP.version, savedAt: Date.now(), state: st });
+  // nothing from the old game may be saved over it before the app starts again
+  try { (Mode as any).switching = true; clearTimeout((Store as any)._nativeTimer); (Store as any)._native = ''; } catch (e) { /* ignore */ }
+  try { localStorage.setItem(Mode.key(), json); } catch (e) { toast('The new game couldn\'t be stored', 'warn'); return; }
+  const T = Store.native(); if (T && T.backupWrite && !Mode.coop()) T.backupWrite({ data: json }).catch(() => { /* the web copy is there */ });
   try { sessionStorage.setItem('amp-title-next', 'game'); } catch (e) { /* ignore */ }
   try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: 'ops' })); localStorage.setItem('amp-tour', '1'); localStorage.removeItem('amp-ui'); } catch (e) { /* ignore */ }
   location.reload();
