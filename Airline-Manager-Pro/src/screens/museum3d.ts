@@ -32,7 +32,7 @@ function museumOpen() {
   document.body.appendChild(host);
   const cv = host.querySelector('canvas') as HTMLCanvasElement;
   let R: any; try { R = new T.WebGLRenderer({ canvas: cv, antialias: true }); } catch (e) { host.remove(); toast('3D is not available on this device', 'warn'); return; }
-  R.setPixelRatio(Math.min(1.6, window.devicePixelRatio || 1)); R.outputColorSpace = T.SRGBColorSpace; R.toneMapping = T.ACESFilmicToneMapping; R.toneMappingExposure = 1.05; R.shadowMap.enabled = true;
+  R.setPixelRatio(Math.min(hiQ() ? 2 : 1.6, window.devicePixelRatio || 1)); if (hiQ()) R.shadowMap.type = T.PCFSoftShadowMap; R.outputColorSpace = T.SRGBColorSpace; R.toneMapping = T.ACESFilmicToneMapping; R.toneMappingExposure = 1.05; R.shadowMap.enabled = true;
   const sc = new T.Scene(); sc.background = new T.Color(0x0C0F14); sc.fog = new T.Fog(0x0C0F14, 18, 60);
   v3vStudio(T, R, sc, true);
   // the hall: a polished dark floor, walls in a soft grey, a ceiling with light strips
@@ -51,7 +51,7 @@ function museumOpen() {
   const [gc, gx] = v3vCanvas(128, 128); const grd = gx.createRadialGradient(64, 64, 4, 64, 64, 64); grd.addColorStop(0, 'rgba(255,236,200,.55)'); grd.addColorStop(1, 'rgba(255,236,200,0)'); gx.fillStyle = grd; gx.fillRect(0, 0, 128, 128);
   const poolM = new T.MeshBasicMaterial({ map: v3vTex(T, gc), transparent: true, depthWrite: false, blending: T.AdditiveBlending });
   // the light in the hall: soft all round, and two lamps that cast the shadows
-  const k1 = new T.DirectionalLight(0xFFF1DA, 1.6); k1.position.set(4, 12, 6); k1.castShadow = true; k1.shadow.mapSize.set(1024, 1024); Object.assign(k1.shadow.camera, { left: -W / 2, right: W / 2, top: D / 2, bottom: -D / 2, near: 1, far: 40 }); sc.add(k1);
+  const k1 = new T.DirectionalLight(0xFFF1DA, 1.6); k1.position.set(4, 12, 6); k1.castShadow = true; k1.shadow.mapSize.set(hiQ() ? 4096 : 1024, hiQ() ? 4096 : 1024); Object.assign(k1.shadow.camera, { left: -W / 2, right: W / 2, top: D / 2, bottom: -D / 2, near: 1, far: 40 }); sc.add(k1);
   const k2 = new T.DirectionalLight(0xCFE0FF, 0.6); k2.position.set(-6, 8, -4); sc.add(k2);
   const pick: any[] = [], plinthM = new T.MeshStandardMaterial({ color: 0xE8E4DC, roughness: 0.5 }), capM = new T.MeshStandardMaterial({ color: 0x14171B, roughness: 0.3, metalness: 0.4 });
   items.forEach((it, i) => {
@@ -69,8 +69,15 @@ function museumOpen() {
     px.font = '700 40px Georgia, serif'; let t = it.title; while (px.measureText(t).width > 480 && t.length > 6) t = t.slice(0, -2); px.fillText(t, 256, 56); px.font = '500 28px Georgia, serif'; px.fillText(it.sub.slice(0, 34), 256, 100);
     const plate = new T.Mesh(new T.PlaneGeometry(1.1, 0.27), new T.MeshStandardMaterial({ map: v3vTex(T, pc), metalness: 1, roughness: 0.3 })); plate.position.set(cx, 0.75, cz + 0.76); sc.add(plate);
     // a beam of light from the ceiling (drawn, not a real light: cheap on a phone), and its pool on the floor
-    const beam = new T.Mesh(new T.ConeGeometry(1.3, 5.6, 24, 1, true), beamM); beam.position.set(cx, 4.1, cz); sc.add(beam);
-    const pool = new T.Mesh(new T.CircleGeometry(1.6, 32), poolM); pool.rotation.x = -Math.PI / 2; pool.position.set(cx, 0.012, cz); sc.add(pool);
+    const beam = new T.Mesh(new T.ConeGeometry(1.3, 5.6, hiQ() ? 64 : 24, 1, true), beamM); beam.position.set(cx, 4.1, cz); sc.add(beam);
+    if (hiQ()) {
+      // on the PC: a real spotlight for every piece (the first eight with their own soft shadows), as in a gallery
+      const sp = new T.SpotLight(0xFFF1DA, 160, 12, 0.42, 0.5, 1.2); sp.position.set(cx, 6.6, cz + 0.9); sp.target.position.set(cx, 1.3, cz);
+      if (i < 8) { sp.castShadow = true; sp.shadow.mapSize.set(1024, 1024); sp.shadow.bias = -0.0005; sp.shadow.radius = 4; }
+      sc.add(sp); sc.add(sp.target);
+    } else {
+      const pool = new T.Mesh(new T.CircleGeometry(1.6, 32), poolM); pool.rotation.x = -Math.PI / 2; pool.position.set(cx, 0.012, cz); sc.add(pool);
+    }
     pick.push(pl);
   });
   const cam = new T.PerspectiveCamera(58, 1, 0.1, 120);

@@ -47,6 +47,9 @@
 - Always build and release the phone app and the PC app together.
 - Work goes to branch `amp-0.5.1-work`; merging to `main` releases (the build runs on `Airline-Manager-Pro/**` changes on main).
 - Never put registration keys or reactivation codes in this (public) repository: only their fingerprints.
+- **The PC gets extra quality** (`hiQ()` in `src/core/util.ts`, true in the PC app): real lights and shadows instead of
+  drawn ones, bigger shadow maps, a higher pixel ratio, sharper pictures and finer detail. Anything made lighter for
+  phones and tablets stays full quality on the PC. Applies to everything from the seven batches of 0.9.105–0.9.111 on.
 
 ## Before the final release (1.0)
 Remind the owner of this when the app is made final (version 1.0 or the release called final), before publishing:

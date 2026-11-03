@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.112 (2026-11-03)
+
+- hiQ() (util.ts): full quality on the PC: museum real spotlights with shadows, 4096 shadow map, pixel ratio 2; photo mode 3840 px; award renders larger
+
 ## 0.9.111 (2026-11-03)
 
 - Museum (museum3d.ts): walkable 3D hall with every gift, award and best badges on plinths; opens the 3D viewer per piece; keys, touch pad, controller

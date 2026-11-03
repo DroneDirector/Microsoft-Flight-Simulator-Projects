@@ -40,6 +40,8 @@ function $all(sel: string, root?: ParentNode): HTMLElement[] {
 
 /** Running as the Windows app (served by the PC app on this PC) rather than on the phone. */
 const DESKTOP = /^https?:$/.test(location.protocol) && /^(127\.0\.0\.1|localhost)$/.test(location.hostname) && location.port === '47610';
+/** Extra quality on the PC (real lights and shadows, sharper pictures, finer detail); phones and tablets keep the lighter versions. */
+function hiQ(): boolean { return DESKTOP; }
 /** How much the interface is scaled up on big screens (1 on the phone). */
 function uiScale(): number { return (window as any).__uiZoom || 1; }
 
