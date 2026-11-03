@@ -440,6 +440,10 @@ function v3dBuildAirport(L: AirportLayout) {
   // generic airport buildings: glass and steel terminal fronts (large buildings) or office windows (smaller
   // ones), a light roof with plant on it; the windows lit at night
   let bTex: any = null; try { bTex = v3dBuildingTextures(); } catch (e) { /* plain buildings */ }
+  // all the buildings are joined into three pieces (roofs, terminal fronts, office walls), so the phone handles three
+  // things to draw instead of two for every building (BufferGeometryUtils; each building on its own if that fails)
+  const joinB: { roof: any[]; terminal: any[]; office: any[] } = { roof: [], terminal: [], office: [] }, BGU: any = (window as any).BufferGeometryUtils;
+  const part = (geo: any, gr: any) => { const o = new T.BufferGeometry(); for (const k of ['position', 'normal', 'uv']) { const at = geo.attributes[k]; if (!at) continue; o.setAttribute(k, new T.BufferAttribute(at.array.slice(gr.start * at.itemSize, (gr.start + gr.count) * at.itemSize), at.itemSize)); } return o; };
   for (const a of L.areas || []) {
     if (a.k === 'apron' || a.pts.length < 3) continue;
     try {   // one odd building outline never stops the rest of the airport
@@ -448,8 +452,16 @@ function v3dBuildAirport(L: AirportLayout) {
     let area = 0; for (let i = 0, n = a.pts.length; i < n; i++) { const p = a.pts[i], q = a.pts[(i + 1) % n]; area += p[0] * q[1] - q[0] * p[1]; } area = Math.abs(area) / 2;
     const big = area > 6000, hgt = big ? 16 : area > 1500 ? 12 : 9;
     const geo = new T.ExtrudeGeometry(sh, { depth: hgt, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, gy(c[0], c[1]) - 0.5, 0);
-    const bm = new T.Mesh(geo, bTex ? [bTex.roof, big ? bTex.terminal : bTex.office] : new T.MeshLambertMaterial({ color: 0xC9CDD2 })); bm.renderOrder = 9; g.add(bm);
+    if (bTex && BGU && BGU.mergeGeometries && !geo.index && geo.groups.length >= 2) {
+      for (const gr of geo.groups) (gr.materialIndex === 0 ? joinB.roof : big ? joinB.terminal : joinB.office).push(part(geo, gr));
+      geo.dispose();
+    } else { const bm = new T.Mesh(geo, bTex ? [bTex.roof, big ? bTex.terminal : bTex.office] : new T.MeshLambertMaterial({ color: 0xC9CDD2 })); bm.renderOrder = 9; g.add(bm); }
     } catch (e) { /* skip this building */ }
+  }
+  for (const k of ['roof', 'terminal', 'office'] as ('roof' | 'terminal' | 'office')[]) {
+    const list = joinB[k]; if (!list.length) continue;
+    try { const m = new T.Mesh(BGU.mergeGeometries(list, false), bTex[k]); m.renderOrder = 9; g.add(m); for (const geo of list) geo.dispose(); }
+    catch (e) { for (const geo of list) { const m = new T.Mesh(geo, bTex[k]); m.renderOrder = 9; g.add(m); } }
   }
   // the airport's ground paint, drawn from its own layout into one picture and laid over the terrain like a sheet
   try { const lt = v3dAirportLights(L, loc, gy); if (lt) g.add(lt); } catch (e) { /* no lights */ }
