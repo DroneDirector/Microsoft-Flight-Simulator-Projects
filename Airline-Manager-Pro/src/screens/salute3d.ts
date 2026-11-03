@@ -33,6 +33,7 @@ function firstVisitCheck(cid: string, to: string, reg: string, at?: number) {
   if ((at || Date.now()) < Date.now() - 12 * 3600e3) return;
   const a: any = plane(reg), c: any = company(cid), A: any = apt(to); if (!a || !c) return;
   const t = acType(a.typeId), city = A.city || A.name, mine = cid === State.companyId;
+  let gx: GiftEx = null; try { gx = giftsExchange(cid, to, reg, at || Date.now()); } catch (e) { gx = null; }
   try {
     const paper = newsPaper(A.country || ''), boss = (() => { try { return makePerson('dir-' + to, 'fa', '', to).name; } catch (e) { return 'The airport director'; } })();
     newsPublish({
@@ -43,7 +44,7 @@ function firstVisitCheck(cid: string, to: string, reg: string, at?: number) {
         `${A.name} (${to}) welcomed a new airline today. When ${a.reg} turned off the runway, two of the airport's fire trucks were waiting on either side of the taxiway. Their roof cannons sent up two jets of water that met high above the taxiway, and the aircraft taxied through the arch to its stand.`,
         `The water salute is an aviation tradition for a first flight, a new route or a new aircraft. It is ${c.name}'s first visit to ${city}.`,
         `Passengers watched from the windows as the water ran down the cabin windows. Staff from the airport and the ground handling company lined the apron to greet the crew.`,
-      ],
+      ].concat(gx ? [`At the stand, ${c.name} presented the airport with ${gx.given.map(g => g.name.charAt(0).toLowerCase() + g.name.slice(1)).join(' and ')}. In return, the airport gave the airline ${gx.received[0].name.charAt(0).toLowerCase() + gx.received[0].name.slice(1)} and a commemorative plaque.`] : []),
       quote: [`We're delighted to welcome ${c.name} to ${city}. We hope this is the first of many flights.`, `${boss}, ${A.name}`],
       art: { kind: 'salute', typeId: a.typeId, color: c.color, color2: c.color2, reg: a.reg, icao: to, cid } as any,
       companyId: cid,

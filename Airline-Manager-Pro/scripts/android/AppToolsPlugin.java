@@ -222,7 +222,7 @@ public class AppToolsPlugin extends Plugin {
     @PluginMethod
     public void backupWrite(PluginCall call) {
         String data = call.getString("data", ""), name = call.getString("name", BACKUP_FILE);
-        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json") && !name.matches("game-([1-9]|1[0-9]|20)\\.json")) { call.reject("Not a backup name"); return; }
+        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json") && !name.matches("game-([1-9]|1[0-9]|2[01])\\.json")) { call.reject("Not a backup name"); return; }
         File dir = getContext().getFilesDir(), tmp = new File(dir, name + ".tmp"), dst = new File(dir, name);
         try (OutputStream out = new FileOutputStream(tmp)) {
             out.write(data.getBytes(StandardCharsets.UTF_8));
@@ -235,7 +235,7 @@ public class AppToolsPlugin extends Plugin {
     public void backupRead(PluginCall call) {
         JSObject r = new JSObject();
         String name = call.getString("name", BACKUP_FILE);
-        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json") && !name.matches("game-([1-9]|1[0-9]|20)\\.json")) name = BACKUP_FILE;
+        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json") && !name.matches("game-([1-9]|1[0-9]|2[01])\\.json")) name = BACKUP_FILE;
         File f = new File(getContext().getFilesDir(), name);
         if (f.exists()) {
             try (InputStream in = new FileInputStream(f)) {

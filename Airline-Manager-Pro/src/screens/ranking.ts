@@ -2,7 +2,7 @@
 // as you earn them (badges not yet earned stay hidden). Badges are yours only; hired pilots and crew level up without badges.
 
 let _rkGroup = 'all', _rkShowAll = false, _rkWho = 'you', _rkJob = 'all', _rkAllCos = false;
-const RK_TABS: [string, string][] = [['you', 'You'], ['airlines', 'Airline league'], ['pilots', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground crew'], ['pax', 'Passengers']];
+const RK_TABS: [string, string][] = [['you', 'You'], ['airlines', 'Airline league'], ['pilots', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground crew'], ['pax', 'Passengers'], ['gifts', 'Gifts']];
 
 SCREENS.ranking = {
   title: 'Ranking', icon: 'trophy',
@@ -11,6 +11,7 @@ SCREENS.ranking = {
     const tabs = `<div class="filter-row rk-who">${RK_TABS.concat(soloMode() ? [['scen', 'Scenarios'] as [string, string]] : []).map(t => `<button class="fchip ${_rkWho === t[0] ? 'on' : ''}" data-act="rk-who" data-w="${t[0]}">${t[1]}</button>`).join('')}</div>`;
     if (_rkWho === 'scen') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Challenges with goals and medals</p></div></div>${tabs}${scenariosHtml()}`;
     if (_rkWho === 'airlines') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your airline against the others</p></div></div>${tabs}${leagueHtml()}`;
+    if (_rkWho === 'gifts') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Gifts and commemorative plaques: tap one to turn it round in 3D</p></div></div>${tabs}${giftsHtml()}`;
     if (_rkWho === 'pax') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">What your passengers think</p></div></div>${tabs}${reviewsHtml()}`;
     if (_rkWho !== 'you') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your staff by level and experience</p></div></div>${tabs}${staffRankHtml()}`;
     return this.renderYou(tabs);
@@ -49,7 +50,7 @@ SCREENS.ranking = {
         ${list.length > 120 ? `<button class="text-btn" data-act="rk-all">${_rkShowAll ? 'Show the newest' : 'Show all ' + num(list.length)}</button>` : ''}</div>
       <div class="bdg-grid">${shown.map((b, i) => {
         const have = earned[b.id];
-        return `<div class="bdg t${b.tier} have" style="--i:${Math.min(i, 30)}" title="${esc(b.desc)}" data-act="badge-open" data-id="${esc(b.id)}" role="button" tabindex="0">
+        return `<div class="bdg t${b.tier} have" style="--i:${Math.min(i, 30)}" title="${esc(b.desc)}" data-act="badge-3d" data-id="${esc(b.id)}" role="button" tabindex="0" aria-label="${esc(b.title)}: open in 3D">
           <span class="bdg-ic">${icon(b.icon)}</span><span class="bdg-t"><b>${esc(b.title)}</b><small>${esc(b.desc)}</small>
           <em>${TIER_NAMES[b.tier]} · earned ${esc(dateStr(new Date(have)).slice(0, 10))}</em></span></div>`;
       }).join('') || `<p class="fine-print rk-empty">${icon('trophy')}No badges yet. They appear here as you earn them by flying yourself.</p>`}</div>

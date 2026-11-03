@@ -114,8 +114,46 @@ function schedRepaintDay() {
 function schedLateNote(b: Block, hm: (m: number) => string): string {
   if (b.cancelled) return `<em class="dl-late cxl">Planned ${hm(b.start)}. ${esc(b.why || 'Cancelled')}. Flown the next day at the same time.</em>`;
   if ((b.delayMin || 0) < 5) return '';
-  return `<em class="dl-late">${b.delayMin} min late${b.sched != null ? `, planned ${hm(b.sched)}` : ''}${b.why ? '. ' + esc(b.why) : ''}</em>`;
+  return `<em class="dl-late">${b.delayMin} min late${b.sched != null ? `, planned ${hm(b.sched)}` : ''}${b.why ? '. ' + esc(b.why) : ''}</em>${forceDepHtml(b.reg, b.from, b.to)}`;
 }
+
+/* ---------- forcing a delayed departure at your home hub, once what held it up is fixed ---------- */
+/** The leg waiting to leave (a delayed departure that hasn't gone yet). */
+function forceDepLeg(reg: string, from: string, to: string): any {
+  return (((State as any).aiNext || []) as any[]).filter(n => n.reg === reg && n.from === from && n.to === to && n.why && n.depAt > Date.now())[0] || null;
+}
+/** Whether what held the leg up is fixed now: the repair is done, there is a pilot and cabin crew, ground crew,
+ *  a stand... Things you can't change (the weather, a curfew, a strike, a court order) never count as fixed. */
+function forceDepCheck(n: any): { ok: boolean; why: string } {
+  const a: any = plane(n.reg), p: any = pilot(n.pilotId), now = Date.now();
+  if (!a) return { ok: false, why: 'The aircraft is no longer in the fleet' };
+  if ((State.issues as any[]).some(i => i.reg === a.reg && (i.status === 'scheduled' || (i.severity === 'grounding' && i.status !== 'fixed' && i.status !== 'done')))) return { ok: false, why: 'The technical fault isn\'t fixed yet' };
+  if (a.status === 'grounded' || a.status === 'maintenance') return { ok: false, why: `${a.reg} is ${a.status === 'grounded' ? 'grounded' : 'in maintenance'}` };
+  if (!p || (p.status === 'off' && !(isSick(p) && p.coverAgency > now))) return { ok: false, why: 'No pilot assigned' };
+  if (p.status === 'training') return { ok: false, why: 'The pilot is away on a course' };
+  if (a.noBase) return { ok: false, why: 'No free stand at its base' };
+  try { const sk = sickBlock(n, a); if (sk) return { ok: false, why: sk }; } catch (e) { /* none */ }
+  try { const gb = groundBlock(a.companyId, n.from, a.typeId); if (gb.why) return { ok: false, why: gb.why }; } catch (e) { /* none */ }
+  try { const sb = strikeBlock(a.companyId, a.typeId, n.from); if (sb) return { ok: false, why: sb + ' (can\'t be overridden)' }; } catch (e) { /* none */ }
+  const gu = ((State as any).groundedUntil || {})[a.companyId]; if (gu && gu > now) return { ok: false, why: 'Operating certificate suspended (can\'t be overridden)' };
+  try { const wv = wxDepartureBlock(n, a); if (!wv.ok) return { ok: false, why: wv.why + ' (can\'t be overridden)' }; } catch (e) { /* none */ }
+  try { if (curfewAt(n.from, now)) return { ok: false, why: `Night curfew at ${n.from} (can't be overridden)` }; } catch (e) { /* none */ }
+  return { ok: true, why: '' };
+}
+function forceDepHtml(reg: string, from: string, to: string): string {
+  const n = forceDepLeg(reg, from, to), a: any = n && plane(reg), c: any = a && company(a.companyId);
+  if (!n || !c || c.hub !== from || _schedDay) return '';
+  const ck = forceDepCheck(n);
+  return `<span class="force-dep ${ck.ok ? 'ok' : ''}"><button class="btn sm ${ck.ok ? 'primary' : 'ghost'}" data-act="force-dep" data-reg="${esc(reg)}" data-from="${esc(from)}" data-to="${esc(to)}" ${ck.ok ? '' : 'disabled'}>${icon('play')}Force departure</button><small>${ck.ok ? 'Fixed: it can leave now' : esc(ck.why)}</small></span>`;
+}
+ACTIONS['force-dep'] = el => {
+  const n = forceDepLeg(el.getAttribute('data-reg'), el.getAttribute('data-from'), el.getAttribute('data-to')); if (!n) { refresh(); return; }
+  const ck = forceDepCheck(n); if (!ck.ok) { toast(ck.why, 'warn'); refresh(); return; }
+  n.depAt = Date.now(); n.why = ''; Sound.tick(); Haptics.success();
+  try { aiAdvance(); } catch (e) { /* the next tick */ }
+  toast(`${n.callsign || n.reg} cleared to depart ${n.from} → ${n.to}`, 'ok');
+  Store.soon(); schedRefreshAll ? schedRefreshAll() : refresh();
+};
 ACTIONS['sched-day'] = el => { _schedDay = +el.getAttribute('data-d') || 0; Sound.tick(); refresh(); };
 ACTIONS['sched-pick'] = el => {
   const reg = el.getAttribute('data-reg'); if (!reg) return;
