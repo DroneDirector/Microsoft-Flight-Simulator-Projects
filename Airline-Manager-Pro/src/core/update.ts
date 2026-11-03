@@ -31,7 +31,8 @@ const Updater = {
     try {
       // GitHub doesn't list releases newest first (0.9.100 comes after 0.9.69), so every page is read and the
       // highest version wins
-      const page = (n: number) => fetch(`https://api.github.com/repos/${APP.updates.repo}/releases?per_page=100&page=${n}`, { headers: { Accept: 'application/vnd.github+json' } });
+      // never an answer kept from an earlier check (the phone's web view may keep one): always asked fresh
+      const page = (n: number) => fetch(`https://api.github.com/repos/${APP.updates.repo}/releases?per_page=100&page=${n}&t=${Date.now()}`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
       const r = await page(1);
       if (!r.ok) throw new Error(`The update server answered ${r.status} ${r.statusText}`);
       let list: any[] = await r.json();
@@ -42,7 +43,7 @@ const Updater = {
       const v = rel ? rel.tag_name.slice(APP.updates.tagPrefix.length) : '';
       // the phone takes the Android app; the PC its own Windows download
       const apk = rel && (rel.assets || []).filter((a: any) => DESKTOP ? /^AirlineManagerPro-PC-.*\.zip$/i.test(a.name) : /\.apk$/i.test(a.name))[0];
-      if (!rel || !apk || cmpVersion(v, APP.version) <= 0) { this.state = 'latest'; this.info = null; updateChanged(); if (!quiet) toast(`You have the latest version, ${APP.version}`, 'ok'); return; }
+      if (!rel || !apk || cmpVersion(v, APP.version) <= 0) { this.state = 'latest'; this.info = null; updateChanged(); if (!quiet) toast(rel && !apk ? `Version ${v} is published, but its ${DESKTOP ? 'PC' : 'Android'} download isn't there yet. Try again in a few minutes.` : `You have the latest version, ${APP.version}`, rel && !apk ? 'info' : 'ok'); return; }
       this.info = { version: v, url: apk.browser_download_url, notes: rel.body || '', size: apk.size, page: rel.html_url };
       this.state = 'available'; updateChanged();
       if (quiet) toast(`Version ${v} is ready to install`, 'info', { label: 'Update', act: 'update-open' });

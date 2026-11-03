@@ -574,7 +574,7 @@ function hgVendBuild(A: any, x: number, z: number) {
     // the price tag under each: a code and the name
     const [tc, tx] = ctCanvas(256, 64); tx.fillStyle = '#F4F4F0'; tx.fillRect(0, 0, 256, 64); tx.fillStyle = '#1B232C'; tx.font = '700 26px Inter, Arial, sans-serif'; tx.fillText(`${'ABC'[r]}${c + 1}`, 10, 40); tx.font = '600 20px Inter, Arial, sans-serif'; tx.fillText(p.name, 60, 40);
     const tag = new T.Mesh(new T.PlaneGeometry(cw - 0.02, 0.025), new T.MeshBasicMaterial({ map: ctTex(tc) })); tag.position.set(sx, sy - 0.022, Dm / 2 - 0.08); g.add(tag);
-    slots.push({ k: p.k, code: `${'ABC'[r]}${c + 1}`, x: sx, y: sy, coil, items });
+    slots.push({ k: p.k, code: `${'ABC'[r]}${c + 1}`, x: sx, y: sy, z0: 0.24, gap: 0.14, coil, items });
   });
   // the glass front
   const gl = new T.Mesh(new T.PlaneGeometry(gx1 - gx0, Hm - 0.62), new T.MeshPhysicalMaterial({ color: 0xDDEEFF, roughness: 0.04, transmission: 0, transparent: true, opacity: 0.16, depthWrite: false, metalness: 0.1 })); gl.position.set((gx0 + gx1) / 2, 0.52 + (Hm - 0.62) / 2, Dm / 2 - 0.035); gl.renderOrder = 4; g.add(gl);
@@ -590,12 +590,50 @@ function hgVendBuild(A: any, x: number, z: number) {
   const hit = new T.Mesh(new T.BoxGeometry(Wm, Hm - 0.5, 0.4), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, 0.5 + (Hm - 0.5) / 2, Dm / 2 - 0.1); hit.userData.act = 'vend'; g.add(hit); A.hits.push(hit);
   const fhit = new T.Mesh(new T.BoxGeometry(gx1 - gx0, 0.3, 0.3), new T.MeshBasicMaterial({ visible: false })); fhit.position.set((gx0 + gx1) / 2, 0.28, Dm / 2 - 0.05); fhit.userData.act = 'flap'; g.add(fhit); A.hits.push(fhit);
   // a model file for the machine, if there is one
-  try { Models.swap(g, 'items/vending-machine.glb', false); } catch (e) { /* own model */ }
   g.updateMatrixWorld(true);
   A.vend = { g, slots, flapH, flap, tray: new T.Vector3((gx0 + gx1) / 2, 0.14, Dm / 2 - 0.2), Dm };
+  hgVendFile(A);
   hgVendDisplay('Choose a product');
   HangarRoom.blockVend = [x - Wm / 2 - 0.2, z - Dm / 2 - 0.2, x + Wm / 2 + 0.2, z + Dm / 2 + 0.25];
   A.blocks.push(HangarRoom.blockVend);
+}
+/** The vending machine from a model file (items/vending-machine.glb), with its working parts found by name:
+ *   slot-A1 … slot-C3   where each product stands at the front of its shelf (empty nodes; A is the top row, 1 the left)
+ *   coil-A1 … coil-C3   the spiral behind each product: turns once round its own Z axis when that product is chosen
+ *   flap                the tray's flap: its origin on the hinge (the top edge); it swings in round its X axis
+ *   tray                where a product lands (an empty node on the tray's floor)
+ *   display             a flat mesh facing the front: the machine's green text is drawn on it
+ *   anything else       the cabinet, glass, keypad … shown as it is
+ *  The products themselves stay the app's own (or their own files in items/). Missing parts keep the app's own. */
+function hgVendFile(A: any) {
+  const path = 'items/vending-machine.glb'; if (!Models.has(path)) return;
+  const go = () => {
+    const R = HangarRoom, T = THREE, V = A.vend; if (!R.on || R.A !== A && R.Abuild !== A && R.A) return;
+    const g = V.g, o = Models.copy(path); if (!o || g.userData.__swapped) return;
+    const isProduct = (m: any) => { let x = m; while (x && x !== g) { if (x.userData.kind) return true; x = x.parent; } return false; };
+    const own: any[] = []; g.traverse((m: any) => { if (m.isMesh && !m.userData.act && !isProduct(m)) own.push(m); });
+    g.updateMatrixWorld(true);
+    const box = new T.Box3(); for (const m of own) box.expandByObject(m); box.applyMatrix4(new T.Matrix4().copy(g.matrixWorld).invert());
+    const fitted = Models.fit(o, box, false); fitted.userData.fromFile = path; g.add(fitted); g.updateMatrixWorld(true);
+    const parts: any = {}; fitted.traverse((x: any) => { const n = String(x.name || '').toLowerCase().replace(/[\s_]+/g, '-'); if (n && !parts[n]) parts[n] = x; });
+    const at = (x: any) => g.worldToLocal(x.getWorldPosition(new T.Vector3()));
+    const hide = (o2: any) => { if (o2) o2.traverse((m: any) => { if (m.isMesh) m.layers.set(31); }); };
+    // the shelves: the products move to each slot, the file's coil turns
+    for (const s of V.slots) {
+      const sl = parts['slot-' + s.code.toLowerCase()], co = parts['coil-' + s.code.toLowerCase()];
+      if (sl) { const p = at(sl), dx = p.x - s.x, dy = p.y - s.y, dz = p.z - s.z0; s.x = p.x; s.y = p.y; s.z0 = p.z; for (const it of s.items) { it.position.x += dx; it.position.y += dy; it.position.z += dz; } }
+      if (co) { hide(s.coil); s.coil = co; co.userData.rz0 = co.rotation.z; }
+    }
+    // the flap and the tray
+    if (parts.flap) { hide(V.flapH); V.flapH = parts.flap; parts.flap.userData.rx0 = parts.flap.rotation.x; }
+    if (parts.tray) V.tray = at(parts.tray);
+    // the display: our text on its screen
+    const d = parts.display; if (d) d.traverse((m: any) => { if (m.isMesh) m.material = new T.MeshBasicMaterial({ map: A.vendTex, toneMapped: false }); });
+    // the rest of our own machine goes (the products stay)
+    for (const m of own) m.layers.set(31);
+    g.userData.__swapped = path;
+  };
+  if (Models.ready[path]) go(); else Models.load(path).then((x: any) => { if (x) go(); });
 }
 function hgVendDisplay(text: string) {
   const A = HangarRoom.A || HangarRoom.Abuild, c = A && A.vendCv; if (!c) return;
@@ -938,7 +976,7 @@ function hgVendPick(k: string) {
   hgPanelClose(); hgVendDisplay(`${s.code} ${hgProd(k).name}`);
   hgSnd('beep');
   // the one in front comes out of the coil; the others move up, and one more goes in at the back
-  const it = s.items.shift(), back = hgItemMesh(k, 0, 1); back.position.copy(s.items[s.items.length - 1].position); back.position.z -= 0.14; back.visible = true; V.g.add(back); s.items.push(back);
+  const it = s.items.shift(), back = hgItemMesh(k, 0, 1); back.position.copy(s.items[s.items.length - 1].position); back.position.z -= s.gap; back.visible = true; V.g.add(back); s.items.push(back);
   R.vend = { st: 'turn', t: 0, s, it, z0: it.position.z, y0: it.position.y };
   setTimeout(() => hgSnd('motor'), 120);
 }
@@ -947,19 +985,20 @@ function hgVendStep(dt: number) {
   const A = R.A, M = A.vend; V.t += dt;
   if (V.st === 'turn') {
     const k = Math.min(1, V.t / 1.6);
-    V.s.coil.rotation.z = -k * Math.PI * 2;
-    V.it.position.z = V.z0 + 0.13 * k;
-    V.s.items.forEach((o: any, i: number) => { o.position.z = 0.24 - i * 0.14 + 0.14 * (1 - k) - 0.14 * 0 + (k - 1) * 0.14 + 0.14; });
-    if (k >= 1) { V.s.coil.rotation.z = 0; V.st = 'fall'; V.t = 0; V.vy = 0; V.s.items.forEach((o: any, i: number) => { o.position.z = 0.24 - i * 0.14; }); V.tilt = 0; }
+    const S = V.s, rz0 = S.coil.userData.rz0 || 0;
+    S.coil.rotation.z = rz0 - k * Math.PI * 2;
+    V.it.position.z = V.z0 + S.gap * 0.93 * k;
+    S.items.forEach((o: any, i: number) => { o.position.z = S.z0 - (i + 1) * S.gap + S.gap * k; });
+    if (k >= 1) { S.coil.rotation.z = rz0; V.st = 'fall'; V.t = 0; V.vy = 0; S.items.forEach((o: any, i: number) => { o.position.z = S.z0 - i * S.gap; }); V.tilt = 0; }
   } else if (V.st === 'fall') {
     // it tips off the front of the shelf and drops to the tray, bouncing once
-    V.vy -= 9.81 * dt; V.it.position.y += V.vy * dt; V.it.position.z = Math.min(M.Dm / 2 - 0.12, V.it.position.z + dt * 0.25); V.tilt = Math.min(Math.PI / 2, V.tilt + dt * 5); V.it.rotation.x = V.tilt;
+    V.vy -= 9.81 * dt; V.it.position.y += V.vy * dt; V.it.position.z += (M.tray.z - V.it.position.z) * Math.min(1, dt * 5); V.it.position.x += (M.tray.x - V.it.position.x) * Math.min(1, dt * 3); V.tilt = Math.min(Math.PI / 2, V.tilt + dt * 5); V.it.rotation.x = V.tilt;
     const p = hgProd(V.s.k), floorY = M.tray.y + (p.type === 'can' ? HG_CAN.r : HG_BAR.t / 2) + 0.004;
     if (V.it.position.y <= floorY) { V.it.position.y = floorY; if (V.vy < -0.8) { V.vy = -V.vy * 0.25; hgSnd('thunk'); } else { V.vy = 0; V.st = 'ready'; V.t = 0; hgVendDisplay('Take your item'); R.glow && R.glow.showObj(R.A.hits.filter((h: any) => h.userData.act === 'flap')[0]); } }
   }
   hgFlapStep(dt);
 }
-function hgFlapStep(dt: number) { const R = HangarRoom, M = R.A && R.A.vend; if (!M) return; R.flapK = (R.flapK || 0) + ((R.flapT || 0) - (R.flapK || 0)) * Math.min(1, dt * 7); M.flapH.rotation.x = -R.flapK * 1.2; }
+function hgFlapStep(dt: number) { const R = HangarRoom, M = R.A && R.A.vend; if (!M) return; R.flapK = (R.flapK || 0) + ((R.flapT || 0) - (R.flapK || 0)) * Math.min(1, dt * 7); M.flapH.rotation.x = (M.flapH.userData.rx0 || 0) - R.flapK * 1.2; }
 /** Open the flap, take it: it comes up into your hand. */
 function hgTake() {
   const R = HangarRoom, V = R.vend; if (!V || V.st !== 'ready') return;
