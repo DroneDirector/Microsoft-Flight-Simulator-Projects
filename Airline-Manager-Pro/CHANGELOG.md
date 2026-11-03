@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.77 (2026-11-03)
+
+- figures: wrist turn (uWr), finger curl at knuckles and middle joints (uC1/uC2), thumb turn (uTh); hand basis from the mesh (joints F/N/T); humanHandAim; humanReach/humanHandAt can reach with the wrist
+- phone: phoneGrip (desk grip from above, hold with the fingers round the left edge and the thumb on the glass), frames blended as turns
+- Game Booster: memory chart in GB, used of total
+
 ## 0.9.76 (2026-11-03)
 
 - phone-apps.ts: dock (Messages, Phone, Store) centred at the bottom of the phone home screen; Messages with threads, typing and replies (State.phoneMsgs) and notifications; Phone with favourites, recents, contacts, keypad and a call screen (calls not connected yet); Store
