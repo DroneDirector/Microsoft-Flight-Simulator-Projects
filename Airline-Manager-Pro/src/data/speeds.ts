@@ -46,6 +46,22 @@ const SPEEDS: { [typeId: string]: SpeedSpec } = {
   'b787-8': { to: [145, 168], app: [135, 148], mtow: 227.93, mlw: 172.365, oew: 119.95, doc: '787-8' },
   'b787-9': { to: [150, 172], app: [140, 152], mtow: 254.692, mlw: 192.776, oew: 128.85, doc: '787-9' },
   'b777-9': { to: [155, 180], app: [140, 155], mtow: 351.534, mlw: 266.258, oew: 185.0, doc: '777-9' },
+  'h125': { to: [35, 55], app: [50, 60], mtow: 2.25, mlw: 2.25, oew: 1.28, doc: 'H125' },
+  'h130': { to: [35, 55], app: [50, 60], mtow: 2.5, mlw: 2.5, oew: 1.46, doc: 'H130' },
+  'h135': { to: [35, 55], app: [55, 65], mtow: 2.98, mlw: 2.98, oew: 1.55, doc: 'H135' },
+  'h145': { to: [35, 55], app: [60, 70], mtow: 3.8, mlw: 3.8, oew: 1.9, doc: 'H145' },
+  'h160': { to: [35, 55], app: [60, 70], mtow: 6.05, mlw: 6.05, oew: 3.98, doc: 'H160' },
+  'h175': { to: [35, 55], app: [65, 75], mtow: 7.8, mlw: 7.8, oew: 4.72, doc: 'H175' },
+  'bell407': { to: [35, 55], app: [50, 60], mtow: 2.27, mlw: 2.27, oew: 1.22, doc: 'Bell 407GXi' },
+  'bell429': { to: [35, 55], app: [55, 65], mtow: 3.17, mlw: 3.17, oew: 2.02, doc: 'Bell 429' },
+  'bell505': { to: [35, 55], app: [50, 60], mtow: 1.67, mlw: 1.67, oew: 0.99, doc: 'Bell 505' },
+  'bell525': { to: [35, 55], app: [65, 75], mtow: 9.3, mlw: 9.3, oew: 5.6, doc: 'Bell 525 Relentless' },
+  'aw109': { to: [35, 55], app: [55, 65], mtow: 3.17, mlw: 3.17, oew: 1.7, doc: 'AW109 Trekker' },
+  'aw139': { to: [35, 55], app: [60, 70], mtow: 6.4, mlw: 6.4, oew: 3.9, doc: 'AW139' },
+  'aw169': { to: [35, 55], app: [60, 70], mtow: 4.8, mlw: 4.8, oew: 2.9, doc: 'AW169' },
+  'aw189': { to: [35, 55], app: [65, 75], mtow: 8.3, mlw: 8.3, oew: 5.0, doc: 'AW189' },
+  's76d': { to: [35, 55], app: [60, 70], mtow: 5.39, mlw: 5.39, oew: 3.92, doc: 'S-76D' },
+  's92': { to: [35, 55], app: [65, 75], mtow: 12.56, mlw: 12.56, oew: 7.1, doc: 'S-92A' },
 };
 
 /** The speeds for a type; types not in the table (aircraft detected in the simulator) use their size class. */

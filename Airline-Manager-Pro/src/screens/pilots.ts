@@ -170,14 +170,14 @@ function typeRatingsHtml(p: any): string {
   const c = company(), types = State.fleet.filter(a => a.companyId === c.id).map(a => a.typeId).filter((t, i, arr) => arr.indexOf(t) === i);
   const rows = types.map(id => {
     const t = acType(id), has = Ratings.rated(p, id), now = p.status === 'training' && p.training && p.training.typeId === id, failed = p.failedType === id;
-    return `<div class="tr-row"><span><b>${esc(t.maker)} ${esc(t.model)}</b><small>${has ? 'Rated' : now ? `On the course until ${esc(dateStr(new Date(p.training.until)).slice(0, 16))}` : failed ? 'Check ride not passed yet' : `${Ratings.days(id)} day${Ratings.days(id) > 1 ? 's' : ''} of training and a check ride`}</small></span>
-      ${has ? `<span class="chip ok">${icon('check')}Rated</span>` : now ? '<span class="chip">On the course</span>' : `<button class="btn ${failed ? 'primary' : 'ghost'} sm" data-act="tr-train" data-id="${esc(p.id)}" data-t="${id}" ${p.status === 'training' ? 'disabled' : ''}>${failed ? 'Check ride again' : 'Train'} ${money(Math.round(Ratings.cost(id) * (failed ? 0.34 : 1)), { compact: true })}</button>`}</div>`;
+    return `<div class="tr-row"><span><b>${esc(t.maker)} ${esc(t.model)}</b><small>${has ? 'Rated' : now ? `On the course until ${esc(dateStr(new Date(p.training.until)).slice(0, 16))}` : failed ? 'Check ride not passed yet' : `${Ratings.days(id, p)} day${Ratings.days(id) > 1 ? 's' : ''} of training and a check ride`}</small></span>
+      ${has ? `<span class="chip ok">${icon('check')}Rated</span>` : now ? '<span class="chip">On the course</span>' : `<button class="btn ${failed ? 'primary' : 'ghost'} sm" data-act="tr-train" data-id="${esc(p.id)}" data-t="${id}" ${p.status === 'training' ? 'disabled' : ''}>${failed ? 'Check ride again' : 'Train'} ${money(Math.round(Ratings.cost(id, p) * (failed ? 0.34 : 1)), { compact: true })}</button>`}</div>`;
   }).join('');
   return `<h3>Type ratings</h3><p class="fine-print">${icon('info')}Pilots fly only the types on their licence. A course is ground school and simulator training ending with a check ride; it runs on the real clock (faster with a faster virtual pilot speed), and the pilot doesn't fly meanwhile.</p><div class="tr-list">${rows}</div>`;
 }
 ACTIONS['tr-train'] = el => {
   const p: any = pilot(el.getAttribute('data-id')), id = el.getAttribute('data-t'); if (!p) return;
-  const retake = p.failedType === id, cost = Math.round(Ratings.cost(id) * (retake ? 0.34 : 1));
+  const retake = p.failedType === id, cost = Math.round(Ratings.cost(id, p) * (retake ? 0.34 : 1));
   if (company().balance < cost) { toast('Not enough money for the course', 'warn'); return; }
   if (State.live.some(f => f.pilotId === p.id)) { toast(`${p.name} is flying. The course starts after landing: try again then.`, 'warn'); return; }
   if (Ratings.train(p, id, retake)) { if (retake) delete p.failedType; Store.save(); Sound.payOut(); closeAll(); refresh(); toast(`${p.name} is on the ${acType(id).model} ${retake ? 'check ride' : 'course'}`, 'ok'); }

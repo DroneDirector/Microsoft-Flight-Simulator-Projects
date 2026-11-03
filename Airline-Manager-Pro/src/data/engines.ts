@@ -69,6 +69,22 @@ const ENGINES: { [typeId: string]: EngineOpt[] } = {
     { id: 'rolls-royce-trent-1000-t', name: 'Rolls-Royce Trent 1000 (TEN)', maker: 'Rolls-Royce', burn: 1.005, mx: 1.12, rel: 1.3, price: 1.0, note: 'Fuel burn on par after the TEN upgrade, but well-known IP compressor/turbine blade durability problems (2016-2020) caused ETOPS restrictions, frequent inspections and groundings.' }],
   'b777-9': [
     { id: 'ge9x-105b1a', name: 'GE9X-105B1A', maker: 'GE Aerospace', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Sole engine (105,000 lbf class, largest fan in service). 2019 HPC stator durability issue delayed flight test; 2024 thrust-link crack paused testing.' }],
+  'h125': [{ id: 'arriel-2d', name: 'Arriel 2D', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '1 × 710 kW' }],
+  'h130': [{ id: 'arriel-2d', name: 'Arriel 2D', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '1 × 710 kW' }],
+  'h135': [{ id: 'arrius-2b2-or-pw206b3', name: 'Arrius 2B2 (or PW206B3)', maker: 'Safran Helicopter Engines / Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 528 kW' }],
+  'h145': [{ id: 'arriel-2e', name: 'Arriel 2E', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 667 kW' }],
+  'h160': [{ id: 'arrano-1a', name: 'Arrano 1A', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 955 kW' }],
+  'h175': [{ id: 'pt6c-67e', name: 'PT6C-67E', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1324 kW' }],
+  'bell407': [{ id: 'm250-c47e-4', name: 'M250-C47E/4', maker: 'Rolls-Royce', burn: 1, mx: 1, rel: 1, price: 1, note: '1 × 503 kW' }],
+  'bell429': [{ id: 'pw207d1', name: 'PW207D1', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 466 kW' }],
+  'bell505': [{ id: 'arrius-2r', name: 'Arrius 2R', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '1 × 376 kW' }],
+  'bell525': [{ id: 'ct7-2f1', name: 'CT7-2F1', maker: 'GE Aerospace', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1342 kW' }],
+  'aw109': [{ id: 'pw207c', name: 'PW207C', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 548 kW' }],
+  'aw139': [{ id: 'pt6c-67c', name: 'PT6C-67C', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1142 kW' }],
+  'aw169': [{ id: 'pw210a', name: 'PW210A', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 746 kW' }],
+  'aw189': [{ id: 'ct7-2e1', name: 'CT7-2E1', maker: 'GE Aerospace', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1490 kW' }],
+  's76d': [{ id: 'pw210s', name: 'PW210S', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 800 kW' }],
+  's92': [{ id: 'ct7-8a6', name: 'CT7-8A6', maker: 'GE Aerospace', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1005 kW' }],
 };
 function engineOptions(typeId: string): EngineOpt[] { return ENGINES[typeId] || []; }
 /** The engine an aircraft has (the type's first option when not set). */

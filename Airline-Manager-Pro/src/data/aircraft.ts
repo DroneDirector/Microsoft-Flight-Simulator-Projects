@@ -20,7 +20,8 @@ interface AircraftType {
   id: string; maker: string; model: string; variant: string;
   dev: string; devKind: 'default' | 'add-on';
   seats: number; rangeNm: number; cruiseKt: number; price: number; costPerHr: number;
-  cls: 'airliner' | 'widebody' | 'regional' | 'turboprop' | 'bush' | 'ga';
+  cls: 'airliner' | 'widebody' | 'regional' | 'turboprop' | 'bush' | 'ga' | 'helicopter';
+  roles?: string[];      // helicopters: passenger, vip, sightseeing, hems, sar, offshore, cargo
   installed: boolean;    // demo: detected in the user's sim
   art: ArtSpec;
 }
@@ -90,6 +91,39 @@ const AIRCRAFT: AircraftType[] = [
     art: { len: 0.45, h: 15, nose: 'ga', eng: 'prop1', wing: 'low', tail: 'T', win: 5 } },
   { id: 'c172', maker: 'Cessna', model: '172 Skyhawk', variant: '172S Skyhawk', dev: 'Microsoft / Asobo', devKind: 'default', seats: 3, rangeNm: 640, cruiseKt: 124, price: 430000, costPerHr: 160, cls: 'ga', installed: true,
     art: { len: 0.36, h: 12, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 2, fixedGear: true, strut: true } },
+  // helicopters (docs/reference/helicopters.txt)
+  { id: 'h125', maker: 'Airbus Helicopters', model: 'H125', variant: 'H125 (AS350 B3e)', dev: 'Microsoft / Asobo', devKind: 'default', seats: 6, rangeNm: 340, cruiseKt: 125, price: 3500000, costPerHr: 1240, cls: 'helicopter', installed: true, roles: ["passenger", "sightseeing", "cargo", "vip", "hems"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'h130', maker: 'Airbus Helicopters', model: 'H130', variant: 'H130 (EC130 T2)', dev: 'No simulator model yet', devKind: 'add-on', seats: 7, rangeNm: 332, cruiseKt: 120, price: 3900000, costPerHr: 1380, cls: 'helicopter', installed: false, roles: ["sightseeing", "passenger", "vip", "hems"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'h135', maker: 'Airbus Helicopters', model: 'H135', variant: 'H135 Helionix (T3H/P3H)', dev: 'No simulator model yet', devKind: 'add-on', seats: 7, rangeNm: 342, cruiseKt: 125, price: 6000000, costPerHr: 1640, cls: 'helicopter', installed: false, roles: ["hems", "passenger", "vip", "sar", "cargo"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'h145', maker: 'Airbus Helicopters', model: 'H145', variant: 'H145 D3 (BK117 D-3), five-blade', dev: 'Microsoft / Asobo', devKind: 'default', seats: 10, rangeNm: 351, cruiseKt: 130, price: 10500000, costPerHr: 2090, cls: 'helicopter', installed: true, roles: ["hems", "sar", "passenger", "vip", "offshore", "cargo"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'h160', maker: 'Airbus Helicopters', model: 'H160', variant: 'H160', dev: 'No simulator model yet', devKind: 'add-on', seats: 12, rangeNm: 467, cruiseKt: 145, price: 18000000, costPerHr: 3330, cls: 'helicopter', installed: false, roles: ["passenger", "vip", "offshore", "hems", "sar"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'h175', maker: 'Airbus Helicopters', model: 'H175', variant: 'H175 (7.8 t)', dev: 'No simulator model yet', devKind: 'add-on', seats: 18, rangeNm: 626, cruiseKt: 144, price: 18000000, costPerHr: 4290, cls: 'helicopter', installed: false, roles: ["offshore", "sar", "vip", "passenger"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'bell407', maker: 'Bell', model: 'Bell 407GXi', variant: '407GXi', dev: 'No simulator model yet', devKind: 'add-on', seats: 6, rangeNm: 350, cruiseKt: 120, price: 3300000, costPerHr: 1250, cls: 'helicopter', installed: false, roles: ["passenger", "sightseeing", "vip", "hems", "cargo"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'bell429', maker: 'Bell', model: 'Bell 429', variant: '429 GlobalRanger', dev: 'No simulator model yet', devKind: 'add-on', seats: 7, rangeNm: 411, cruiseKt: 140, price: 7500000, costPerHr: 1750, cls: 'helicopter', installed: false, roles: ["hems", "vip", "passenger", "cargo"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'bell505', maker: 'Bell', model: 'Bell 505', variant: '505 Jet Ranger X', dev: 'No simulator model yet', devKind: 'add-on', seats: 4, rangeNm: 306, cruiseKt: 115, price: 1400000, costPerHr: 920, cls: 'helicopter', installed: false, roles: ["passenger", "sightseeing", "vip"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'bell525', maker: 'Bell', model: 'Bell 525 Relentless', variant: '525 Relentless (fly-by-wire; FAA certification pending as of', dev: 'No simulator model yet', devKind: 'add-on', seats: 20, rangeNm: 560, cruiseKt: 155, price: 15000000, costPerHr: 5120, cls: 'helicopter', installed: false, roles: ["offshore", "vip", "sar", "passenger", "hems"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'aw109', maker: 'Leonardo', model: 'AW109 Trekker', variant: 'AW109 Trekker (skid)', dev: 'No simulator model yet', devKind: 'add-on', seats: 7, rangeNm: 366, cruiseKt: 140, price: 6500000, costPerHr: 1750, cls: 'helicopter', installed: false, roles: ["hems", "passenger", "vip", "cargo", "sar"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'aw139', maker: 'Leonardo', model: 'AW139', variant: 'AW139 (6,400 kg; 6,800/7,000 kg kits)', dev: 'No simulator model yet', devKind: 'add-on', seats: 15, rangeNm: 570, cruiseKt: 150, price: 14000000, costPerHr: 3520, cls: 'helicopter', installed: false, roles: ["offshore", "sar", "hems", "vip", "passenger", "cargo"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'aw169', maker: 'Leonardo', model: 'AW169', variant: 'AW169 (wheeled)', dev: 'No simulator model yet', devKind: 'add-on', seats: 10, rangeNm: 424, cruiseKt: 135, price: 10000000, costPerHr: 2640, cls: 'helicopter', installed: false, roles: ["hems", "vip", "passenger", "offshore", "sar"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 'aw189', maker: 'Leonardo', model: 'AW189', variant: 'AW189 (8.3 t)', dev: 'No simulator model yet', devKind: 'add-on', seats: 19, rangeNm: 600, cruiseKt: 145, price: 17000000, costPerHr: 4560, cls: 'helicopter', installed: false, roles: ["offshore", "sar", "vip", "passenger"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 's76d', maker: 'Sikorsky', model: 'S-76D', variant: 'S-76D', dev: 'No simulator model yet', devKind: 'add-on', seats: 12, rangeNm: 400, cruiseKt: 145, price: 13000000, costPerHr: 2960, cls: 'helicopter', installed: false, roles: ["offshore", "vip", "sar", "hems", "passenger"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
+  { id: 's92', maker: 'Sikorsky', model: 'S-92A', variant: 'S-92A (S-92A+ upgrades available)', dev: 'No simulator model yet', devKind: 'add-on', seats: 19, rangeNm: 547, cruiseKt: 136, price: 30000000, costPerHr: 6910, cls: 'helicopter', installed: false, roles: ["offshore", "sar", "vip", "passenger", "cargo"],
+    art: { len: 0.45, h: 18, nose: 'ga', eng: 'prop1', wing: 'high', tail: 'conv', win: 4 } },
 ];
 
 function acType(id: string): AircraftType { for (const a of AIRCRAFT) if (a.id === id) return a; return null; }

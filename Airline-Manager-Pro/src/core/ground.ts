@@ -7,7 +7,7 @@
 // Your own ramp team on one turnaround, by aircraft class (docs/reference/ground-handling.txt): loaders for bags
 // and cargo, the push-back driver and a ramp lead. Fuel and catering come from the airport's companies.
 // A small aircraft's pilot handles it alone.
-const GROUND_NEED: { [cls: string]: number } = { ga: 0, bush: 1, turboprop: 3, regional: 4, airliner: 6, widebody: 10 };
+const GROUND_NEED: { [cls: string]: number } = { ga: 0, bush: 1, turboprop: 3, regional: 4, airliner: 6, widebody: 10, helicopter: 1 };
 // Ground staff a base supports for each aircraft based there (two shifts a day, days off and leave):
 // about two ramp teams per based aircraft.
 const GROUND_PER_BASED: { [cls: string]: number } = { ga: 1, bush: 2, turboprop: 6, regional: 8, airliner: 12, widebody: 22 };

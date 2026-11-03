@@ -1,0 +1,118 @@
+HELICOPTERS
+Reference guide | Prepared 3 November 2026
+
+For every helicopter in Airline Manager Pro: what it is used for, seats, crew, weights, speeds, range, dimensions,
+engines and weather limits. Broad, approximate educational figures for the app's simulation, not operational data.
+Never use this guide to operate an aircraft. (C) after a section = some figures in it worked out, not published.
+
+Airbus Helicopters H125   (app type h125)
+  Roles: passenger, sightseeing, cargo, vip, hems. Seats 5 typical / 6 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 2250 kg, empty 1277 kg (C). Cruise 125 kt, VNE 155 kt, range 340 nm (C). List price $3,500,000 (C)
+  Length 12.94 m (rotors turning), rotor 10.69 m, 3 blades, height 3.34 m (C). Engines: Arriel 2D × 1
+  Weather: IFR no, known icing no. Rescue hoist: yes
+  Sources: Airbus Helicopters civil range brochure (technical data) <https://mediaassets.airbus.com/pm_38_379_379543-7neugrgrhp.pdf>
+
+Airbus Helicopters H130   (app type h130)
+  Roles: sightseeing, passenger, vip, hems. Seats 6 typical / 7 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 2500 kg, empty 1461 kg (C). Cruise 120 kt, VNE 155 kt, range 332 nm (C). List price $3,900,000 (C)
+  Length 12.64 m (rotors turning), rotor 10.69 m, 3 blades, height 3.61 m (C). Engines: Arriel 2D × 1
+  Weather: IFR no, known icing no. Rescue hoist: no
+  Sources: Airbus Helicopters civil range brochure (technical data) <https://mediaassets.airbus.com/pm_38_379_379543-7neugrgrhp.pdf>
+
+Airbus Helicopters H135   (app type h135)
+  Roles: hems, passenger, vip, sar, cargo. Seats 6 typical / 7 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 2980 kg, empty 1555 kg (C). Cruise 125 kt, VNE 155 kt, range 342 nm (C). List price $6,000,000 (C)
+  Length 12.16 m (rotors turning), rotor 10.2 m, 4 blades, height 3.51 m (C). Engines: Arrius 2B2 (or PW206B3) × 2
+  Weather: IFR yes, known icing no. Rescue hoist: yes
+  Sources: Airbus Helicopters civil range brochure (technical data) <https://mediaassets.airbus.com/pm_38_379_379543-7neugrgrhp.pdf>
+
+Airbus Helicopters H145   (app type h145)
+  Roles: hems, sar, passenger, vip, offshore, cargo. Seats 8 typical / 10 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 3800 kg, empty 1895 kg. Cruise 130 kt, VNE 150 kt, range 351 nm (C). List price $10,500,000 (C)
+  Length 13.64 m (rotors turning), rotor 10.8 m, 5 blades, height 3.95 m (C). Engines: Arriel 2E × 2
+  Weather: IFR yes, known icing no. Rescue hoist: yes
+  Sources: Airbus H145 technical information <https://airbus.com/en/products-services/helicopters/civil-helicopters/h145/h145-technical-information>; Airbus H145 brochure (PDF) <https://mediaassets.airbus.com/pm_38_379_379465-e8uwgvvqky.pdf>; Airbus Helicopters civil range brochure (technical data) <https://mediaassets.airbus.com/pm_38_379_379543-7neugrgrhp.pdf>; FlightGlobal: certification of first five-bladed H145 <https://www.flightglobal.com/helicopters/certification-paves-way-for-september-delivery-of-first-five-bladed-h145-helicopter/138959.article>
+
+Airbus Helicopters H160   (app type h160)
+  Roles: passenger, vip, offshore, hems, sar. Seats 12 typical / 12 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 6050 kg, empty 3985 kg (C). Cruise 145 kt, VNE 175 kt, range 467 nm (C). List price $18,000,000 (C)
+  Length 15.7 m (rotors turning), rotor 13.4 m, 5 blades, height 4.9 m (C). Engines: Arrano 1A × 2
+  Weather: IFR yes, known icing no. Rescue hoist: yes
+  Sources: Airbus H160 technical information <https://airbus.com/en/products-services/helicopters/civil-helicopters/h160/h160-technical-information>; Airbus Helicopters civil range brochure (technical data) <https://mediaassets.airbus.com/pm_38_379_379543-7neugrgrhp.pdf>; AIN: Airbus H160 gets EASA nod <https://backend.ainonline.com/aviation-news/general-aviation/2020-07-02/airbus-h160-gets-easa-nod>
+
+Airbus Helicopters H175   (app type h175)
+  Roles: offshore, sar, vip, passenger. Seats 16 typical / 18 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 7800 kg, empty 4717 kg (C). Cruise 144 kt, VNE 175 kt, range 626 nm (C). List price $18,000,000 (C)
+  Length 18.06 m (rotors turning), rotor 14.8 m, 5 blades, height 5.34 m (C). Engines: PT6C-67E × 2
+  Weather: IFR yes, known icing no. Rescue hoist: yes
+  Sources: Airbus H175 technical information <https://airbus.com/en/products-services/helicopters/civil-helicopters/h175/h175-technical-information>; Airbus Helicopters civil range brochure (technical data) <https://mediaassets.airbus.com/pm_38_379_379543-7neugrgrhp.pdf>; Airbus H175 performance (PDF) <https://www.airbus.com/sites/g/files/jlcbta136/files/705915aa1b0bba70c5523ae81ad9eca7_2017-03-07_H175_performance_.pdf>
+
+Bell Bell 407GXi   (app type bell407)
+  Roles: passenger, sightseeing, vip, hems, cargo. Seats 5 typical / 6 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 2268 kg, empty 1224 kg (C). Cruise 120 kt, VNE 140 kt, range 350 nm (C). List price $3,300,000 (C)
+  Length 12.7 m (rotors turning), rotor 10.67 m, 4 blades, height 3.56 m (C). Engines: M250-C47E/4 × 1
+  Weather: IFR no, known icing no. Rescue hoist: yes
+  Sources: Bell 407GXi product specifications (PDF) <https://www.bellflight.com/-/media/site-specific/bell-flight/documents/products/407-gxi/bell-407gxi-product-specifications.pdf>; AOPA aircraft guide: Bell 407 <https://www.aopa.org/go-fly/aircraft-and-ownership/aircraft-guide/aircraft/bell-407>
+
+Bell Bell 429   (app type bell429)
+  Roles: hems, vip, passenger, cargo. Seats 6 typical / 7 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 3175 kg, empty 2025 kg (C). Cruise 140 kt, VNE 155 kt, range 411 nm (C). List price $7,500,000 (C)
+  Length 13.11 m (rotors turning), rotor 10.98 m, 4 blades, height 4.04 m (C). Engines: PW207D1 × 2
+  Weather: IFR yes, known icing no. Rescue hoist: yes
+  Sources: Bell 429 data brochure (AeroExpo) <https://pdf.aeroexpo.online/pdf/bell-helicopter/bell-429/169420-8713.html>
+
+Bell Bell 505   (app type bell505)
+  Roles: passenger, sightseeing, vip. Seats 4 typical / 4 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 1669 kg, empty 989 kg (C). Cruise 115 kt, VNE 125 kt, range 306 nm (C). List price $1,400,000 (C)
+  Length 12.95 m (rotors turning), rotor 11.28 m, 2 blades, height 3.3 m (C). Engines: Arrius 2R × 1
+  Weather: IFR no, known icing no. Rescue hoist: no
+  Sources: Bell 505 Jet Ranger X brochure (AeroExpo) <https://pdf.aeroexpo.online/pdf/bell-helicopter/bell-505-jet-ranger-x/169420-6563.html>; Bell 505 brochure 2015 (PDF) <https://africair.com/wp-content/uploads/2018/02/505_Brochure_English_2015.pdf>
+
+Bell Bell 525 Relentless   (app type bell525)
+  Roles: offshore, vip, sar, passenger, hems. Seats 16 typical / 20 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 9300 kg, empty 5600 kg (C). Cruise 155 kt, VNE 170 kt, range 560 nm (C). List price $15,000,000 (C)
+  Length 19.9 m (rotors turning), rotor 16.61 m, 5 blades, height 5.0 m (C). Engines: CT7-2F1 × 2
+  Weather: IFR yes, known icing no. Rescue hoist: yes
+  Sources: Wikipedia: Bell 525 Relentless <https://en.wikipedia.org/wiki/Bell_525_Relentless>; AIN (Mar 2026): Bell relentlessly pursuing FAA certification of 525 <https://www.ainonline.com/aviation-news/business-aviation/2026-03-09/bell-relentlessly-pursuing-faa-certification-525>; Bell 525 brochure 2015 (PDF) <https://africair.com/wp-content/uploads/2018/02/525_Brochure_English_2015.pdf>
+
+Leonardo AW109 Trekker   (app type aw109)
+  Roles: hems, passenger, vip, cargo, sar. Seats 6 typical / 7 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 3175 kg, empty 1700 kg (C). Cruise 140 kt, VNE 168 kt, range 366 nm (C). List price $6,500,000 (C)
+  Length 12.96 m (rotors turning), rotor 10.83 m, 4 blades, height 3.6 m (C). Engines: PW207C × 2
+  Weather: IFR yes, known icing no. Rescue hoist: yes
+  Sources: Leonardo AW109 Trekker product page <https://helicopters.leonardo.com/products/aw109-trekker>; AW109 Trekker brochure (Sloane Helicopters PDF) <https://www.sloanehelicopters.com/_/uploads/body_BROCHURE_AW109Trekker.pdf>
+
+Leonardo AW139   (app type aw139)
+  Roles: offshore, sar, hems, vip, passenger, cargo. Seats 12 typical / 15 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 6400 kg, empty 3900 kg (C). Cruise 150 kt, VNE 167 kt, range 570 nm (C). List price $14,000,000 (C)
+  Length 16.66 m (rotors turning), rotor 13.8 m, 5 blades, height 4.98 m (C). Engines: PT6C-67C × 2
+  Weather: IFR yes, known icing yes. Rescue hoist: yes
+  Sources: Aviation Week: Aircraft overview Leonardo AW139 <https://AviationWeek.com/business-aviation/aircraft-overview/aircraft-overview-leonardo-aw139>; Blue Sky Rotor AW139 datasheet <https://blueskyrotor.com/performance/datasheet/AgustaWestland/AW139-AW139>
+
+Leonardo AW169   (app type aw169)
+  Roles: hems, vip, passenger, offshore, sar. Seats 8 typical / 10 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 4800 kg, empty 2900 kg (C). Cruise 135 kt, VNE 165 kt, range 424 nm (C). List price $10,000,000 (C)
+  Length 14.65 m (rotors turning), rotor 12.12 m, 5 blades, height 4.5 m (C). Engines: PW210A × 2
+  Weather: IFR yes, known icing no. Rescue hoist: yes
+  Sources: Aviation Week: Aircraft overview Leonardo AW169 <https://aviationweek.com/business-aviation/aircraft-overview/aircraft-overview-leonardo-aw169>; IKAR: Leonardo AW169 presentation (PDF) <https://www.alpine-rescue.org/system/production/article/documents/file/003/010/d85e7be64230cba3cd131286574b1d0d132b4f83cbf7a413445669c4dae6ce7f/20191011-0800-AIR%2013%20Leonardo%20AW169.pdf>
+
+Leonardo AW189   (app type aw189)
+  Roles: offshore, sar, vip, passenger. Seats 16 typical / 19 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 8300 kg, empty 5000 kg (C). Cruise 145 kt, VNE 169 kt, range 600 nm (C). List price $17,000,000 (C)
+  Length 17.6 m (rotors turning), rotor 14.6 m, 5 blades, height 5.1 m (C). Engines: CT7-2E1 × 2
+  Weather: IFR yes, known icing yes. Rescue hoist: yes
+  Sources: Omni Brasil fleet: Leonardo AW189 <https://omnibrasil.com.br/en/aeronaves/aw189/>; GlobalAir: Agusta AW189 <https://www.globalair.com/aircraft-for-sale/agusta-aw189>
+
+Sikorsky S-76D   (app type s76d)
+  Roles: offshore, vip, sar, hems, passenger. Seats 12 typical / 12 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 5386 kg, empty 3916 kg (C). Cruise 145 kt, VNE 155 kt, range 400 nm (C). List price $13,000,000 (C)
+  Length 16.0 m (rotors turning), rotor 13.41 m, 4 blades, height 4.42 m (C). Engines: PW210S × 2
+  Weather: IFR yes, known icing yes. Rescue hoist: yes
+  Sources: Sikorsky S-76D spec sheet (Lockheed Martin PDF) <https://www.lockheedmartin.com/content/dam/lockheed-martin/rms/documents/s-76/8557_S-76D_D19_2020_READ.pdf>; Bristow fleet: Sikorsky S-76C++/D <https://www.bristowgroup.com/fleet/medium-twins/sikorsky-s-76c-d>; BJT: Sikorsky S-76D <https://www.bjtonline.com/aircraft/sikorsky-s-76d>
+
+Sikorsky S-92A   (app type s92)
+  Roles: offshore, sar, vip, passenger, cargo. Seats 16 typical / 19 max. Crew: two pilots in the app; three with a winch operator for search and rescue and hoist work.
+  MTOW 12564 kg, empty 7104 kg (C). Cruise 136 kt, VNE 165 kt, range 547 nm (C). List price $30,000,000 (C)
+  Length 20.88 m (rotors turning), rotor 17.17 m, 4 blades, height 5.47 m (C). Engines: CT7-8A6 × 2
+  Weather: IFR yes, known icing yes. Rescue hoist: yes
+  Sources: Sikorsky S-92A+ Technical Information, Offshore 2023 (PDF) <https://sustainability.lockheedmartin.com/content/dam/lockheed-martin/rms/documents/s-92/9106_S-92A+_TI_OffShore_2023.pdf>; Sikorsky S-92 VIP brochure 2024 (PDF) <https://sustainability.lockheedmartin.com/content/dam/lockheed-martin/rms/documents/s-92/9244-24_S92-VIP_Brochure_2024_1.pdf>

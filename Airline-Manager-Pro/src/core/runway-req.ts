@@ -41,6 +41,23 @@ const FIELD: { [typeId: string]: FieldSpec } = {
   'b787-8': { to: 2600, ld: 1700, wid: 45 },
   'b787-9': { to: 2800, ld: 1800, wid: 45 },
   'b777-9': { to: 3050, ld: 2000, wid: 45 },
+  // helicopters: the take-off and landing area they need (1.5 × D, the largest dimension, rotors turning)
+  'h125': { to: 19, ld: 19, wid: 13, rough: true },
+  'h130': { to: 19, ld: 19, wid: 13, rough: true },
+  'h135': { to: 18, ld: 18, wid: 12, rough: true },
+  'h145': { to: 20, ld: 20, wid: 14, rough: true },
+  'h160': { to: 24, ld: 24, wid: 16, rough: true },
+  'h175': { to: 27, ld: 27, wid: 18, rough: true },
+  'bell407': { to: 19, ld: 19, wid: 13, rough: true },
+  'bell429': { to: 20, ld: 20, wid: 13, rough: true },
+  'bell505': { to: 19, ld: 19, wid: 13, rough: true },
+  'bell525': { to: 30, ld: 30, wid: 20, rough: true },
+  'aw109': { to: 19, ld: 19, wid: 13, rough: true },
+  'aw139': { to: 25, ld: 25, wid: 17, rough: true },
+  'aw169': { to: 22, ld: 22, wid: 15, rough: true },
+  'aw189': { to: 26, ld: 26, wid: 18, rough: true },
+  's76d': { to: 24, ld: 24, wid: 16, rough: true },
+  's92': { to: 31, ld: 31, wid: 21, rough: true },
 };
 
 function fieldSpec(typeId: string): FieldSpec {
@@ -62,9 +79,10 @@ function usableRunway(typeId: string, icao: string): { name: string; len: number
   let best: any = null;
   for (const r of rows) {
     const len = (r[2] || 0) * 0.3048, wid = (r[3] || 0) * 0.3048, surf = String(r[4] || '');
-    if (/^H/.test(String(r[0] || '')) || len < 100) continue;          // helipads
+    const heli = typeof isHeli === 'function' && isHeli(typeId);
+    if (!heli && (/^H/.test(String(r[0] || '')) || len < 100)) continue;          // helipads (helicopters use them, and any runway)
     if (!PAVED.test(surf) && !F.rough && surf) continue;              // grass and gravel: light aircraft only
-    if (wid && wid < F.wid - 1.5) continue;            // runway widths are listed in whole feet: allow for rounding
+    if (!heli && wid && wid < F.wid - 1.5) continue;            // runway widths are listed in whole feet: allow for rounding
     if (!best || len > best.len) best = { name: `${r[0]}/${r[1]}`, len, wid, surf };
   }
   const all = Math.max(0, ...rows.map(r => (r[2] || 0) * 0.3048));

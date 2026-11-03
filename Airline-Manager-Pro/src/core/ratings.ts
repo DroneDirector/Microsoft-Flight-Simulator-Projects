@@ -11,8 +11,14 @@
 
 interface LandRec { who: string; name: string; fpm: number; g: number; at: number; from: string; to: string; typeId: string; kind: 'you' | 'ai' | 'coop' }
 
-const TRAINING_COST: { [cls: string]: number } = { widebody: 38000, airliner: 26000, regional: 19000, turboprop: 13000, bush: 5500, ga: 2500 };
-const TRAINING_DAYS: { [cls: string]: number } = { widebody: 4, airliner: 3, regional: 3, turboprop: 2, bush: 1, ga: 1 };
+const TRAINING_COST: { [cls: string]: number } = { widebody: 38000, airliner: 26000, regional: 19000, turboprop: 13000, bush: 5500, ga: 2500, helicopter: 22000 };
+const TRAINING_DAYS: { [cls: string]: number } = { widebody: 4, airliner: 3, regional: 3, turboprop: 2, bush: 1, ga: 1, helicopter: 3 };
+/** Helicopters and aeroplanes are separate licences: a pilot with only one kind needs a full conversion (a commercial
+ *  licence for the other kind: far longer and dearer than a type course) before their first type of the other kind. */
+function ratingConversion(p: any, typeId: string): boolean {
+  const t = acType(typeId); if (!t || !p || p.you) return false; const heli = t.cls === 'helicopter', have = (p.types || []).map((k: string) => acType(k)).filter(Boolean);
+  return have.length > 0 && !have.some((x: any) => (x.cls === 'helicopter') === heli);
+}
 
 const Ratings = {
   rated(p: any, typeId: string): boolean {
@@ -20,19 +26,19 @@ const Ratings = {
     if (p.you || String(p.id).indexOf('coop') === 0 || (p.companyId && String(p.companyId).indexOf('coop:') === 0)) return true;
     return (p.types || []).indexOf(typeId) >= 0;
   },
-  cost(typeId: string): number { const t = acType(typeId); return TRAINING_COST[t ? t.cls : 'airliner'] || 20000; },
-  days(typeId: string): number { const t = acType(typeId); return TRAINING_DAYS[t ? t.cls : 'airliner'] || 3; },
+  cost(typeId: string, p?: any): number { const t = acType(typeId); return (TRAINING_COST[t ? t.cls : 'airliner'] || 20000) * (ratingConversion(p, typeId) ? 4 : 1); },
+  days(typeId: string, p?: any): number { const t = acType(typeId); return (TRAINING_DAYS[t ? t.cls : 'airliner'] || 3) * (ratingConversion(p, typeId) ? 5 : 1); },
 
   /** Send a hired pilot on a type rating course. The course runs on the real clock (faster with a faster
    *  virtual pilot speed), and the pilot doesn't fly meanwhile. */
   train(p: any, typeId: string, retake?: boolean): boolean {
     if (!p || p.you || p.status === 'training' || this.rated(p, typeId)) return false;
-    const t = acType(typeId), cost = Math.round(this.cost(typeId) * (retake ? 0.34 : 1));
+    const t = acType(typeId), cost = Math.round(this.cost(typeId, p) * (retake ? 0.34 : 1)), conv = ratingConversion(p, typeId);
     const c = company(p.companyId && State.companies.some(x => x.id === p.companyId) ? p.companyId : State.companyId);
     const before = c.balance;
-    payTxn(c.id, `${retake ? 'Check ride again' : 'Type rating course'}: ${p.name}, ${t.maker} ${t.model}`, -cost, 'training',
+    payTxn(c.id, `${retake ? 'Check ride again' : conv ? (t.cls === 'helicopter' ? 'Helicopter licence conversion' : 'Aeroplane licence conversion') : 'Type rating course'}: ${p.name}, ${t.maker} ${t.model}`, -cost, 'training',
       retake ? [['Simulator session and examiner', -cost]] : [['Ground school', -Math.round(cost * 0.3)], ['Full flight simulator', -Math.round(cost * 0.55)], ['Check ride with an examiner', -(cost - Math.round(cost * 0.3) - Math.round(cost * 0.55))]]);
-    const dur = (retake ? 0.5 : this.days(typeId)) * 864e5 / Math.max(1, Math.min(10, aiSpeed()));
+    const dur = (retake ? 0.5 : this.days(typeId, p)) * 864e5 / Math.max(1, Math.min(10, aiSpeed()));
     p.prevStatus = p.status === 'flying' ? 'standby' : p.status; p.status = 'training'; p.training = { typeId, until: Date.now() + dur, retake: !!retake }; p.trainingUntil = Date.now() + dur;
     try { animateBalance(before, c.balance); } catch (e) { /* ignore */ }
     return true;

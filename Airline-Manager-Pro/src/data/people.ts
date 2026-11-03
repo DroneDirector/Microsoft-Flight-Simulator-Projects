@@ -183,7 +183,7 @@ function ensureCoPilot(cid: string) {
   return p;
 }
 
-function multiCrew(t: AircraftType): boolean { return t.cls === 'airliner' || t.cls === 'widebody' || t.cls === 'regional' || t.cls === 'turboprop'; }
+function multiCrew(t: AircraftType): boolean { return t.cls === 'airliner' || t.cls === 'widebody' || t.cls === 'regional' || t.cls === 'turboprop' || t.cls === 'helicopter'; }   // helicopters: two pilots
 
 /** Age from date of birth, on the company's calendar (real or simulated). */
 function companyDate(): Date {
@@ -221,7 +221,7 @@ function planeCabinCrew(reg: string): Staff[] {
   return mine.map(byId).filter(Boolean);
 }
 // Line-maintenance staffing per aircraft, by class (airline staffing ratios; no single law sets these).
-const MECH_RATIO: { [cls: string]: number } = { ga: 1 / 3, bush: 1 / 3, turboprop: 2, regional: 2, airliner: 3, widebody: 5 };
+const MECH_RATIO: { [cls: string]: number } = { ga: 1 / 3, bush: 1 / 3, turboprop: 2, regional: 2, airliner: 3, widebody: 5, helicopter: 1.5 };
 // Pilots on a leg: two-pilot aircraft need 2; long legs need augmented crews.
 function pilotsNeeded(t: AircraftType, blockMin: number): number {
   if (!multiCrew(t)) return 1;

@@ -82,7 +82,9 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   // slots in src/graphics/models.ts), written on every build so a new aircraft type appears in it straight away
   const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const acSrc = readFileSync(join(root, 'src/data/aircraft.ts'), 'utf8'), ac = [], seen = {};
-  for (const m of acSrc.matchAll(/\{ id: '([^']+)', maker: '([^']+)', model: '([^']+)'/g)) {
+  const helis = [];
+  for (const m of acSrc.matchAll(/\{ id: '([^']+)', maker: '([^']+)', model: '([^']+)'[^\n]*/g)) {
+    if (/cls: 'helicopter'/.test(m[0])) { { const hm = slug(m[2].replace(/ Helicopters?$/i, '')), hd = slug(m[3]); helis.push([`helicopter-${hd.startsWith(hm + '-') ? hd : hm + '-' + hd}.glb`, `${m[2]} ${m[3]}`]); } continue; }
     const mk = slug(m[2]), md = slug(m[3]), f = (md.startsWith(mk + '-') ? md : mk + '-' + md) + '.glb';
     if (seen[f]) { seen[f].push(m[1]); continue; } seen[f] = [m[1]]; ac.push([f, `${m[2]} ${m[3]}`]);
   }
@@ -102,6 +104,11 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     '- Licences of bought models must allow commercial sale (see CLAUDE.md).', '',
     '## Aircraft (`aircraft/`)', '', '| File | Aircraft |', '|---|---|',
     ...ac.map(([f, n]) => `| \`aircraft/${f}\`${have('aircraft/' + f)} | ${n} |`), '',
+    '## Helicopters (`helicopters/`)', '',
+    'Each helicopter type, named so it is clear it is a helicopter and which one. Metres, +Y up, the nose towards +Z; the',
+    'rotor is shown as it is in the file (the app\'s own model turns its rotors).', '',
+    '| File | Helicopter |', '|---|---|',
+    ...helis.map(([f, n]) => `| \`helicopters/${f}\`${have('helicopters/' + f)} | ${n} |`), '',
     '## Ground vehicles (`vehicles/`)', '', '| File | Vehicle |', '|---|---|',
     ...veh.map(([f, n]) => `| \`vehicles/${f}.glb\`${have('vehicles/' + f + '.glb')} | ${n} |`), '',
     '## Jet bridges (`jetways/`)', '', '| File | What |', '|---|---|',

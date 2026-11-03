@@ -317,6 +317,7 @@ SHAPES['b777-9'] = shapeStretch(SHAPES['b77w-pmdg'], {L: 76.73, fwd: 1.5, span: 
  *  its nose wheel (on the taxiway line, on the stand's stop mark), as pilots steer it. */
 function noseWheelAhead(typeId: string): number { const S = shapeOf(typeId); return S && S.gear && S.gear.nose < S.L / 2 ? S.L / 2 - S.gear.nose : 0; }
 function shapeOf(typeId: string): ShapeSpec {
+  if (typeof isHeli === 'function' && isHeli(typeId)) return heliShape(typeId);
   if (SHAPES[typeId]) return SHAPES[typeId];
   const t = acType(typeId) || AIRCRAFT[0];
   const by: { [c: string]: string } = { widebody: 'b78x', airliner: 'a320neo', regional: 'crj9-aero', turboprop: 'atr72', bush: 'c208', ga: 'c172' };

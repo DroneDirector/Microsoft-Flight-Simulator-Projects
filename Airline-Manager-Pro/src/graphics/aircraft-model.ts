@@ -319,6 +319,7 @@ function wingFlex(m: any): any {
 
 /** Build the model of a type in a livery. userData.set({ flaps: 0..1, gear: 0..1, prop: angle }) moves its parts. */
 function buildAircraftModel(typeId: string, lv: Livery): any {
+  if (typeof isHeli === 'function' && isHeli(typeId)) return buildHelicopterModel(typeId, lv);   // helicopters have their own builder
   const s = shapeOf(typeId), T = THREE;
   const root = new T.Group(); root.name = typeId;
   const tex = new T.CanvasTexture(paintFuselage(s, lv)); tex.flipY = false; tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;

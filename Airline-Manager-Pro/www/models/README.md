@@ -48,6 +48,30 @@ water salute, the museum. Remove the file and the app's own model comes back. Th
 | `aircraft/pilatus-pc-12.glb` | Pilatus PC-12 |
 | `aircraft/cessna-172-skyhawk.glb` | Cessna 172 Skyhawk |
 
+## Helicopters (`helicopters/`)
+
+Each helicopter type, named so it is clear it is a helicopter and which one. Metres, +Y up, the nose towards +Z; the
+rotor is shown as it is in the file (the app's own model turns its rotors).
+
+| File | Helicopter |
+|---|---|
+| `helicopters/helicopter-airbus-h125.glb` | Airbus Helicopters H125 |
+| `helicopters/helicopter-airbus-h130.glb` | Airbus Helicopters H130 |
+| `helicopters/helicopter-airbus-h135.glb` | Airbus Helicopters H135 |
+| `helicopters/helicopter-airbus-h145.glb` | Airbus Helicopters H145 |
+| `helicopters/helicopter-airbus-h160.glb` | Airbus Helicopters H160 |
+| `helicopters/helicopter-airbus-h175.glb` | Airbus Helicopters H175 |
+| `helicopters/helicopter-bell-407gxi.glb` | Bell Bell 407GXi |
+| `helicopters/helicopter-bell-429.glb` | Bell Bell 429 |
+| `helicopters/helicopter-bell-505.glb` | Bell Bell 505 |
+| `helicopters/helicopter-bell-525-relentless.glb` | Bell Bell 525 Relentless |
+| `helicopters/helicopter-leonardo-aw109-trekker.glb` | Leonardo AW109 Trekker |
+| `helicopters/helicopter-leonardo-aw139.glb` | Leonardo AW139 |
+| `helicopters/helicopter-leonardo-aw169.glb` | Leonardo AW169 |
+| `helicopters/helicopter-leonardo-aw189.glb` | Leonardo AW189 |
+| `helicopters/helicopter-sikorsky-s-76d.glb` | Sikorsky S-76D |
+| `helicopters/helicopter-sikorsky-s-92a.glb` | Sikorsky S-92A |
+
 ## Ground vehicles (`vehicles/`)
 
 | File | Vehicle |

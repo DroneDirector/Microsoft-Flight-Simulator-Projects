@@ -99,6 +99,23 @@ const FLIGHT_CONFIGS: { [typeId: string]: ConfigSpec } = {
     gear: { vloExt: 270, vloRet: 270, vle: 270 }, steps: [{ n: '1', at: 220 }, { n: '5', at: 200 }, { n: '15', at: 180 }, { n: '20', at: 170 }, { n: '25', at: 160 }, { n: '30', at: 150 }], clean: 230, vmo: 350, mmo: 0.9, climbIas: 310, climbMach: 0.85, descIas: 290, descMach: 0.85 },
   'b777-9': { flaps: [{ n: '1', vfe: 255 }, { n: '5', vfe: 235 }, { n: '15', vfe: 215 }, { n: '20', vfe: 195 }, { n: '25', vfe: 185 }, { n: '30', vfe: 170 }], to: ['5', '15', '20'], land: ['25', '30'],
     gear: { vloExt: 270, vloRet: 270, vle: 270 }, steps: [{ n: '1', at: 230 }, { n: '5', at: 210 }, { n: '15', at: 190 }, { n: '20', at: 180 }, { n: '25', at: 170 }, { n: '30', at: 155 }], clean: 240, vmo: 330, mmo: 0.89, climbIas: 310, climbMach: 0.84, descIas: 290, descMach: 0.84 },
+  // helicopters: no flaps; VNE, approach and cruise speeds (docs/reference/helicopters.txt)
+  'h125': { flaps: [{ n: '0', vfe: 155 }], to: ['0'], land: ['0'], gear: 'fixed', steps: [], clean: 60, vne: 155, climbIas: 110, descIas: 120, cruiseIas: 125 },
+  'h130': { flaps: [{ n: '0', vfe: 155 }], to: ['0'], land: ['0'], gear: 'fixed', steps: [], clean: 60, vne: 155, climbIas: 110, descIas: 120, cruiseIas: 120 },
+  'h135': { flaps: [{ n: '0', vfe: 155 }], to: ['0'], land: ['0'], gear: 'fixed', steps: [], clean: 65, vne: 155, climbIas: 110, descIas: 120, cruiseIas: 125 },
+  'h145': { flaps: [{ n: '0', vfe: 150 }], to: ['0'], land: ['0'], gear: 'fixed', steps: [], clean: 70, vne: 150, climbIas: 110, descIas: 120, cruiseIas: 130 },
+  'h160': { flaps: [{ n: '0', vfe: 175 }], to: ['0'], land: ['0'], gear: { vloExt: 140, vloRet: 140, vle: 150 }, steps: [], clean: 70, vne: 175, climbIas: 110, descIas: 120, cruiseIas: 145 },
+  'h175': { flaps: [{ n: '0', vfe: 175 }], to: ['0'], land: ['0'], gear: { vloExt: 140, vloRet: 140, vle: 150 }, steps: [], clean: 75, vne: 175, climbIas: 110, descIas: 120, cruiseIas: 144 },
+  'bell407': { flaps: [{ n: '0', vfe: 140 }], to: ['0'], land: ['0'], gear: 'fixed', steps: [], clean: 60, vne: 140, climbIas: 110, descIas: 115, cruiseIas: 120 },
+  'bell429': { flaps: [{ n: '0', vfe: 155 }], to: ['0'], land: ['0'], gear: 'fixed', steps: [], clean: 65, vne: 155, climbIas: 110, descIas: 120, cruiseIas: 140 },
+  'bell505': { flaps: [{ n: '0', vfe: 125 }], to: ['0'], land: ['0'], gear: 'fixed', steps: [], clean: 60, vne: 125, climbIas: 95, descIas: 100, cruiseIas: 115 },
+  'bell525': { flaps: [{ n: '0', vfe: 170 }], to: ['0'], land: ['0'], gear: { vloExt: 140, vloRet: 140, vle: 150 }, steps: [], clean: 75, vne: 170, climbIas: 110, descIas: 120, cruiseIas: 155 },
+  'aw109': { flaps: [{ n: '0', vfe: 168 }], to: ['0'], land: ['0'], gear: 'fixed', steps: [], clean: 65, vne: 168, climbIas: 110, descIas: 120, cruiseIas: 140 },
+  'aw139': { flaps: [{ n: '0', vfe: 167 }], to: ['0'], land: ['0'], gear: { vloExt: 140, vloRet: 140, vle: 150 }, steps: [], clean: 70, vne: 167, climbIas: 110, descIas: 120, cruiseIas: 150 },
+  'aw169': { flaps: [{ n: '0', vfe: 165 }], to: ['0'], land: ['0'], gear: { vloExt: 140, vloRet: 140, vle: 150 }, steps: [], clean: 70, vne: 165, climbIas: 110, descIas: 120, cruiseIas: 135 },
+  'aw189': { flaps: [{ n: '0', vfe: 169 }], to: ['0'], land: ['0'], gear: { vloExt: 140, vloRet: 140, vle: 150 }, steps: [], clean: 75, vne: 169, climbIas: 110, descIas: 120, cruiseIas: 145 },
+  's76d': { flaps: [{ n: '0', vfe: 155 }], to: ['0'], land: ['0'], gear: { vloExt: 140, vloRet: 140, vle: 150 }, steps: [], clean: 70, vne: 155, climbIas: 110, descIas: 120, cruiseIas: 145 },
+  's92': { flaps: [{ n: '0', vfe: 165 }], to: ['0'], land: ['0'], gear: { vloExt: 140, vloRet: 140, vle: 150 }, steps: [], clean: 75, vne: 165, climbIas: 110, descIas: 120, cruiseIas: 136 },
 };
 
 /** The config data for a type: its own, or the nearest type of its class. */

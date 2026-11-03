@@ -40,6 +40,22 @@ const CAPACITY: { [typeId: string]: Capacity } = {
   'b787-8': { typ: 242, cls: '2 classes', one: 359, max: 381 },
   'b787-9': { typ: 290, cls: '2 classes', one: 406, max: 420 },
   'b777-9': { typ: 426, cls: '2 classes', one: 450, max: 460 },
+  'h125': { typ: 5, cls: '1 class', one: 6, max: 6 },
+  'h130': { typ: 6, cls: '1 class', one: 7, max: 7 },
+  'h135': { typ: 6, cls: '1 class', one: 7, max: 7 },
+  'h145': { typ: 8, cls: '1 class', one: 10, max: 10 },
+  'h160': { typ: 12, cls: '1 class', one: 12, max: 12 },
+  'h175': { typ: 16, cls: '1 class', one: 18, max: 18 },
+  'bell407': { typ: 5, cls: '1 class', one: 6, max: 6 },
+  'bell429': { typ: 6, cls: '1 class', one: 7, max: 7 },
+  'bell505': { typ: 4, cls: '1 class', one: 4, max: 4 },
+  'bell525': { typ: 16, cls: '1 class', one: 20, max: 20 },
+  'aw109': { typ: 6, cls: '1 class', one: 7, max: 7 },
+  'aw139': { typ: 12, cls: '1 class', one: 15, max: 15 },
+  'aw169': { typ: 8, cls: '1 class', one: 10, max: 10 },
+  'aw189': { typ: 16, cls: '1 class', one: 19, max: 19 },
+  's76d': { typ: 12, cls: '1 class', one: 12, max: 12 },
+  's92': { typ: 16, cls: '1 class', one: 19, max: 19 },
 };
 
 /** The capacity of a type (types without an entry: their seats as the typical figure). */
