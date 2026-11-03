@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.118 (2026-11-03)
+
+- Rail: Hangars between Operations and Court (own highlight); hangar list progress bar (hgProgress)
+
 ## 0.9.117 (2026-11-03)
 
 - Contrails: trail shifted with the view's origin (no jump in front), side vector falls back across the view when looking along the trail, half width 1.3 m + slow spread, fade 2.5 s in / pow(1-k, 1.6) out, dry air 22–31 s, 20 s hold against flicker

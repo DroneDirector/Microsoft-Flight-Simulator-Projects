@@ -83,6 +83,8 @@ function hgHangars(): HgHangar[] {
 }
 function hgName(h: { sz: HgSize; n: number }, many: boolean): string { return `${h.sz.name}${many ? ' ' + h.n : ''}`; }
 function hgFixList(reg: string): any[] { return ((State.issues || []) as any[]).filter(i => i.reg === reg && (i.status === 'open' || i.status === 'scheduled')); }
+/** How far the work on an aircraft has come (0…1), from its booked jobs. */
+function hgProgress(reg: string): number { const s: any = ((State.issues || []) as any[]).filter(i => i.reg === reg && i.status === 'scheduled' && i.startedAt && i.durMin)[0]; return s ? clamp((Date.now() - s.startedAt) / (s.durMin * 60000), 0, 1) : 0; }
 function hgLeftMin(reg: string): number { const s: any = ((State.issues || []) as any[]).filter(i => i.reg === reg && i.status === 'scheduled' && i.startedAt && i.durMin)[0]; return s ? Math.max(1, Math.round((s.startedAt + s.durMin * 60000 - Date.now()) / 60000)) : 0; }
 /** The list in Maintenance: every base's hangars, which aircraft is in each, what is being fixed and by whom. */
 function hgListHtml(): string {
@@ -96,6 +98,7 @@ function hgListHtml(): string {
       const a = plane(h.reg), t = acType(a.typeId), fx = hgFixList(h.reg), crew = hgCrewFor(h.reg), left = hgLeftMin(h.reg);
       return `<div class="hg-ac"><span><b>${esc(hgName(h, many))} · ${esc(h.reg)}</b><small>${esc(t.model)} · ${Math.round(a.condition)}%${left ? ` · ready in ${left > 90 ? Math.round(left / 60) + ' h' : left + ' min'}` : ''}</small>
         <em class="bad">${fx.length ? esc(fx.map(i => i.title).slice(0, 3).join(', ')) + (fx.length > 3 ? '…' : '') : 'General check'}</em>
+        <span class="hg-prog" title="${Math.round(hgProgress(h.reg) * 100)}% done"><i style="width:${(hgProgress(h.reg) * 100).toFixed(1)}%"></i></span><small class="hg-pct">${Math.round(hgProgress(h.reg) * 100)}% done</small>
         <em class="${crew.length ? 'ok' : 'bad'}">${crew.length ? 'Mechanics: ' + esc(crew.map((p: any) => p.name).join(', ')) : `No mechanics free at ${esc(b)}`}</em></span>
         <button class="btn sm primary" data-act="hangar-visit" data-reg="${esc(h.reg)}">${icon('wrench')}Walk in</button></div>`; }).join('')}</div>`; }).join('')}</div>`;
 }

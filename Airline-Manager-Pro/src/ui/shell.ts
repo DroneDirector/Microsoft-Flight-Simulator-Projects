@@ -9,7 +9,7 @@ const ACTIONS: { [k: string]: (el: HTMLElement, ev: Event) => void } = new Proxy
 
 const NAV_ORDER = ['ops', 'fleet', 'routes', 'jobs', 'schedule', 'dispatch', 'planner', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'career', 'news', 'coop'];
 // Pages opened from inside other pages, shown under their parent in the rail
-const SUB_PAGES: { [k: string]: string } = { map: 'ops', market: 'fleet', hangars: 'ops' };
+const SUB_PAGES: { [k: string]: string } = { map: 'ops', market: 'fleet' };
 
 function renderShell() {
   const app = $('#app');
@@ -23,6 +23,7 @@ function renderShell() {
         </button>`).join('')}
         <button class="rail-btn" data-act="office-open" aria-label="My office">${icon('jobs')}<span>Office</span></button>
         <button class="rail-btn" data-act="ops-room" aria-label="The Operations office">${icon('clock')}<span>Operations</span></button>
+        <button class="rail-btn" data-act="go" data-screen="hangars" aria-label="Hangars">${icon('wrench')}<span>Hangars</span></button>
         <button class="rail-btn" data-act="court-enter" aria-label="The courtroom">${icon('shield')}<span>Court</span><i class="rail-dot" data-court-dot hidden></i></button>
       </div>
       <button class="rail-more down" data-act="rail-scroll" data-d="1" aria-label="More in the menu below">${icon('down')}</button>
