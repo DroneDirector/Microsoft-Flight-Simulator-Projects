@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.82 (2026-11-03)
+
+- saving: every action (ACTIONS proxy) and every changed field saves; the phone's file copy is written 1.2 s after each save; five rotating backup saves (SaveSlots: app files save-1…5 on Android, Documents\\Airline Manager Pro\\backups on the PC, web storage in a browser), with Restore in Settings
+- held phone: wider grip search with a clearance round the phone, a greedy refinement, then a few millimetres' nudge of the phone itself (A.phoneIn) so no skin touches it
+
 ## 0.9.81 (2026-11-03)
 
 - the phone lies on the desk in the office (in front of the laptop) and in Operations (right of the keyboard), no longer past the desk edge

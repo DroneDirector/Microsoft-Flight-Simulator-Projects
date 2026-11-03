@@ -73,6 +73,7 @@ export class Desktop {
     // a newer copy of the PC app starting up asks this one to make way: close the window, then quit
     if (url === '/api/quit' && req.method === 'POST') { json(res, { ok: true }); this.closeWindow(); setTimeout(() => process.exit(0), 1500); return true; }
     if (url === '/api/backup') return this.backup(req, res), true;
+    if (url === '/api/saves') return this.saves(req, res), true;
     // Game Booster: readings for the charts, the programs you can pick to close, and the app saying it is open
     if (url === '/api/boost') { this.booster.touch(); json(res, this.booster.status()); return true; }
     if (url === '/api/boost/alive') { this.booster.alive(); json(res, { ok: true, watching: this.booster.watching() }); return true; }
@@ -113,6 +114,19 @@ export class Desktop {
     const f = path.join(this.dataDir, 'registration.json');
     if (req.method === 'PUT') return readBody(req, b => { try { const l = JSON.parse(b); if (l && l.fp) fs.writeFileSync(f, JSON.stringify(l)); json(res, { ok: true }); } catch (e) { res.writeHead(400); res.end(); } });
     try { json(res, JSON.parse(fs.readFileSync(f, 'utf8'))); } catch (e) { json(res, {}); }
+  }
+
+  /** The five backup saves, taken in turn: Documents\\Airline Manager Pro\\backups\\save-1 … save-5.json. */
+  private saves(req: http.IncomingMessage, res: http.ServerResponse) {
+    const q = new URL(req.url || '', 'http://x').searchParams, n = +(q.get('slot') || 0);
+    if (!(n >= 1 && n <= 5)) { res.writeHead(400); res.end('slot'); return; }
+    const dir = path.join(this.backupDir(), 'backups'), f = path.join(dir, `save-${n}.json`);
+    if (req.method === 'PUT') return readBody(req, b => {
+      try { JSON.parse(b); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(f + '.tmp', b); fs.renameSync(f + '.tmp', f); json(res, { ok: true, at: Date.now() }); }
+      catch (e) { res.writeHead(500); res.end(String(e)); }
+    });
+    if (!fs.existsSync(f)) return json(res, { data: '' });
+    json(res, { data: fs.readFileSync(f, 'utf8'), at: fs.statSync(f).mtimeMs });
   }
 
   private backup(req: http.IncomingMessage, res: http.ServerResponse) {

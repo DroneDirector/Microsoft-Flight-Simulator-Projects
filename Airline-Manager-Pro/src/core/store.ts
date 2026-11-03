@@ -84,8 +84,9 @@ const Store = {
     // (at most every few seconds, and straight away when the app goes to the background)
     this._native = json;
     if (typeof Backup !== 'undefined') Backup.afterSave(json, document.hidden);
+    if (typeof SaveSlots !== 'undefined') SaveSlots.after(json, document.hidden);
     if (document.hidden) this.flushNative();
-    else if (!this._nativeTimer) this._nativeTimer = setTimeout(() => this.flushNative(), 5000);
+    else if (!this._nativeTimer) this._nativeTimer = setTimeout(() => this.flushNative(), 1200);
   },
   _native: '' as string,
   _nativeTimer: 0 as any,

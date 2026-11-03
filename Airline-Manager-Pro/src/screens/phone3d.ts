@@ -1,34 +1,35 @@
 /** The phone on a desk (pos, turned by yaw), screen up and on; its parts in A (phoneAt, phoneScr, its hit for clicks). */
 function phoneMesh(T: any, root: any, A: any, pos: number[], yaw: number) {
   { const g = new T.Group(); g.position.set(pos[0], pos[1], pos[2]); g.rotation.set(-Math.PI / 2, 0, yaw); root.add(g); A.phoneAt = g; A.hits = A.hits || [];
+    const gi = new T.Group(); g.add(gi); A.phoneIn = gi;   // the phone's parts (nudged a few millimetres clear of your fingers while held)
     const W = 0.072, H = 0.152, r = 0.009, sh = new T.Shape(); sh.moveTo(-W / 2 + r, -H / 2); sh.lineTo(W / 2 - r, -H / 2); sh.quadraticCurveTo(W / 2, -H / 2, W / 2, -H / 2 + r); sh.lineTo(W / 2, H / 2 - r); sh.quadraticCurveTo(W / 2, H / 2, W / 2 - r, H / 2); sh.lineTo(-W / 2 + r, H / 2); sh.quadraticCurveTo(-W / 2, H / 2, -W / 2, H / 2 - r); sh.lineTo(-W / 2, -H / 2 + r); sh.quadraticCurveTo(-W / 2, -H / 2, -W / 2 + r, -H / 2);
     // a titanium frame with rounded edges, a matte grey back with a camera island and a small engraved emblem,
     // the side buttons, and black glass on the front with the screen behind it
     const frameM = new T.MeshPhysicalMaterial({ color: 0xb8b4ab, metalness: 0.92, roughness: 0.28, clearcoat: 0.3 });
     const bodyM = new T.Mesh(new T.ExtrudeGeometry(sh, { depth: 0.0058, bevelEnabled: true, bevelThickness: 0.0014, bevelSize: 0.0014, bevelSegments: 4, curveSegments: 12 }), frameM);
-    bodyM.position.z = -0.0072; bodyM.castShadow = true; g.add(bodyM);
+    bodyM.position.z = -0.0072; bodyM.castShadow = true; gi.add(bodyM);
     const inset = (w: number, h: number, rr: number) => { const q = new T.Shape(); q.moveTo(-w / 2 + rr, -h / 2); q.lineTo(w / 2 - rr, -h / 2); q.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + rr); q.lineTo(w / 2, h / 2 - rr); q.quadraticCurveTo(w / 2, h / 2, w / 2 - rr, h / 2); q.lineTo(-w / 2 + rr, h / 2); q.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - rr); q.lineTo(-w / 2, -h / 2 + rr); q.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + rr, -h / 2); return new T.ShapeGeometry(q, 10); };
-    const back = new T.Mesh(inset(W - 0.002, H - 0.002, r * 0.9), new T.MeshPhysicalMaterial({ color: 0x86837d, metalness: 0.15, roughness: 0.62, sheen: 0.2 })); back.position.z = -0.0087; back.rotation.y = Math.PI; g.add(back);
+    const back = new T.Mesh(inset(W - 0.002, H - 0.002, r * 0.9), new T.MeshPhysicalMaterial({ color: 0x86837d, metalness: 0.15, roughness: 0.62, sheen: 0.2 })); back.position.z = -0.0087; back.rotation.y = Math.PI; gi.add(back);
     // the camera island: three lenses in a row and a flash
     const isl = new T.Mesh(new T.ExtrudeGeometry((() => { const q = new T.Shape(), w = W * 0.74, h = 0.022, rr = 0.011; q.moveTo(-w / 2 + rr, -h / 2); q.lineTo(w / 2 - rr, -h / 2); q.absarc(w / 2 - rr, 0, rr, -Math.PI / 2, Math.PI / 2, false); q.lineTo(-w / 2 + rr, h / 2); q.absarc(-w / 2 + rr, 0, rr, Math.PI / 2, Math.PI * 1.5, false); return q; })(), { depth: 0.0018, bevelEnabled: true, bevelThickness: 0.0005, bevelSize: 0.0005, bevelSegments: 2 }), new T.MeshPhysicalMaterial({ color: 0x15171b, metalness: 0.3, roughness: 0.18, clearcoat: 1 }));
-    isl.position.set(0, H / 2 - 0.022, -0.0087); isl.rotation.y = Math.PI; g.add(isl);
+    isl.position.set(0, H / 2 - 0.022, -0.0087); isl.rotation.y = Math.PI; gi.add(isl);
     for (let i = 0; i < 3; i++) {
-      const lx = -W * 0.22 + i * W * 0.17, ring = new T.Mesh(new T.CylinderGeometry(0.0062, 0.0062, 0.0012, 28), frameM); ring.rotation.x = Math.PI / 2; ring.position.set(lx, H / 2 - 0.022, -0.0112); g.add(ring);
-      const lens = new T.Mesh(new T.CylinderGeometry(0.0046, 0.0046, 0.0014, 28), new T.MeshPhysicalMaterial({ color: 0x050608, metalness: 0.1, roughness: 0.05, clearcoat: 1, iridescence: 0.6 })); lens.rotation.x = Math.PI / 2; lens.position.set(lx, H / 2 - 0.022, -0.0114); g.add(lens);
+      const lx = -W * 0.22 + i * W * 0.17, ring = new T.Mesh(new T.CylinderGeometry(0.0062, 0.0062, 0.0012, 28), frameM); ring.rotation.x = Math.PI / 2; ring.position.set(lx, H / 2 - 0.022, -0.0112); gi.add(ring);
+      const lens = new T.Mesh(new T.CylinderGeometry(0.0046, 0.0046, 0.0014, 28), new T.MeshPhysicalMaterial({ color: 0x050608, metalness: 0.1, roughness: 0.05, clearcoat: 1, iridescence: 0.6 })); lens.rotation.x = Math.PI / 2; lens.position.set(lx, H / 2 - 0.022, -0.0114); gi.add(lens);
     }
-    const flash = new T.Mesh(new T.CylinderGeometry(0.0018, 0.0018, 0.0008, 16), new T.MeshStandardMaterial({ color: 0xf2e8d0, roughness: 0.3, emissive: 0x332a18 })); flash.rotation.x = Math.PI / 2; flash.position.set(W * 0.29, H / 2 - 0.022, -0.0108); g.add(flash);
-    { const em = new T.Mesh(new T.RingGeometry(0.0045, 0.0052, 4, 1), new T.MeshStandardMaterial({ color: 0x9a978f, metalness: 0.6, roughness: 0.35, side: T.DoubleSide })); em.position.set(0, -0.005, -0.0089); em.rotation.set(0, Math.PI, Math.PI / 4); g.add(em); }
+    const flash = new T.Mesh(new T.CylinderGeometry(0.0018, 0.0018, 0.0008, 16), new T.MeshStandardMaterial({ color: 0xf2e8d0, roughness: 0.3, emissive: 0x332a18 })); flash.rotation.x = Math.PI / 2; flash.position.set(W * 0.29, H / 2 - 0.022, -0.0108); gi.add(flash);
+    { const em = new T.Mesh(new T.RingGeometry(0.0045, 0.0052, 4, 1), new T.MeshStandardMaterial({ color: 0x9a978f, metalness: 0.6, roughness: 0.35, side: T.DoubleSide })); em.position.set(0, -0.005, -0.0089); em.rotation.set(0, Math.PI, Math.PI / 4); gi.add(em); }
     // the side buttons (volume up and down, and the power key) on the right edge
-    for (const [by, bl] of [[0.03, 0.016], [0.012, 0.016], [-0.016, 0.012]] as number[][]) { const bt = new T.Mesh(new T.BoxGeometry(0.0012, bl, 0.0028), frameM); bt.position.set(W / 2 + 0.0019, by, -0.0042); g.add(bt); }
+    for (const [by, bl] of [[0.03, 0.016], [0.012, 0.016], [-0.016, 0.012]] as number[][]) { const bt = new T.Mesh(new T.BoxGeometry(0.0012, bl, 0.0028), frameM); bt.position.set(W / 2 + 0.0019, by, -0.0042); gi.add(bt); }
     // the front glass: black bezel round the screen
-    const glassBlack = new T.Mesh(inset(W - 0.0006, H - 0.0006, r * 0.95), new T.MeshPhysicalMaterial({ color: 0x050607, metalness: 0, roughness: 0.08, clearcoat: 1 })); glassBlack.position.z = -0.00005; g.add(glassBlack);
+    const glassBlack = new T.Mesh(inset(W - 0.0006, H - 0.0006, r * 0.95), new T.MeshPhysicalMaterial({ color: 0x050607, metalness: 0, roughness: 0.08, clearcoat: 1 })); glassBlack.position.z = -0.00005; gi.add(glassBlack);
     const cv = document.createElement('canvas'); cv.width = 216; cv.height = 456; const tx = new T.CanvasTexture(cv); tx.colorSpace = T.SRGBColorSpace; A.phoneCv = cv; A.phoneTex = tx;
-    const scr = new T.Mesh(new T.PlaneGeometry(W - 0.005, H - 0.005), new T.MeshBasicMaterial({ map: tx, toneMapped: false })); scr.position.z = 0.0001; g.add(scr); A.phoneScr = scr; scr.userData.size = [W - 0.005, H - 0.005];
+    const scr = new T.Mesh(new T.PlaneGeometry(W - 0.005, H - 0.005), new T.MeshBasicMaterial({ map: tx, toneMapped: false })); scr.position.z = 0.0001; gi.add(scr); A.phoneScr = scr; scr.userData.size = [W - 0.005, H - 0.005];
     // the glass over the screen: it catches the room's light, so a soft glare slides over it as the phone moves
     const glass = new T.Mesh(inset(W - 0.0008, H - 0.0008, r * 0.95), new T.MeshPhysicalMaterial({ color: 0x000000, metalness: 0, roughness: 0.03, transparent: true, opacity: 0.22, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.6, depthWrite: false }));
-    glass.position.z = 0.0003; g.add(glass);
-    const cam = new T.Mesh(new T.CircleGeometry(0.0022, 20), new T.MeshBasicMaterial({ color: 0x020203 })); cam.position.set(0, H / 2 - 0.0095, 0.00025); g.add(cam);
-    const hit = new T.Mesh(new T.BoxGeometry(W + 0.03, H + 0.03, 0.04), new T.MeshBasicMaterial({ visible: false })); hit.userData.act = 'phone'; g.add(hit); A.hits.push(hit);
+    glass.position.z = 0.0003; gi.add(glass);
+    const cam = new T.Mesh(new T.CircleGeometry(0.0022, 20), new T.MeshBasicMaterial({ color: 0x020203 })); cam.position.set(0, H / 2 - 0.0095, 0.00025); gi.add(cam);
+    const hit = new T.Mesh(new T.BoxGeometry(W + 0.03, H + 0.03, 0.04), new T.MeshBasicMaterial({ visible: false })); hit.userData.act = 'phone'; gi.add(hit); A.hits.push(hit);
     phoneLock(A); }
 }
 // Your phone, in your office and in Operations: lying on the desk with its screen on; click it and your hand picks
@@ -59,7 +60,7 @@ function phonePut(R: any) { const pk = R.pk; if (!pk || pk.st !== 'hold') return
 function phoneReset(R: any) {
   const pk = R.pk; if (!pk) return;
   if (R.overlay && R.overlay.classList.contains('ph-screen')) { try { lapUnmount(); } catch (e) { /* closed */ } R.overlay.remove(); R.overlay = null; document.body.classList.remove('of-over'); }
-  if (R.A && R.A.phoneAt) { R.A.phoneAt.position.copy(pk.P0); R.A.phoneAt.quaternion.copy(pk.q0); }
+  if (R.A && R.A.phoneAt) { R.A.phoneAt.position.copy(pk.P0); R.A.phoneAt.quaternion.copy(pk.q0); if (R.A.phoneIn) R.A.phoneIn.position.set(0, 0, 0); }
   R.pk = null; phoneUi(R);
 }
 function phoneUi(R: any) {
@@ -111,6 +112,7 @@ function phoneStep(R: any, dt: number, t: number): { lean: number; turn: number;
   // the right hand: from above while it lies on the desk, then holding it from behind, fingers round its left edge
   const gk = pk.st === 'reach' ? 0 : pk.st === 'lift' ? E(pk.t / D.lift * 1.6) : pk.st === 'lower' ? 1 - E((pk.t / D.lower - 0.4) / 0.6) : pk.st === 'release' ? 0 : 1;
   const settled = Math.abs(tu.y - tc.y) + Math.abs(tu.p - tc.p) < 0.01;
+  if (A.phoneIn) { const cl = gk > 0.5 && pk.fit && pk.fit.done && pk.fit.clear ? pk.fit.clear : [0, 0, 0], kc = 1 - Math.exp(-dt * 6); A.phoneIn.position.x += (cl[0] - A.phoneIn.position.x) * kc; A.phoneIn.position.y += (cl[1] - A.phoneIn.position.y) * kc; A.phoneIn.position.z += (cl[2] - A.phoneIn.position.z) * kc; }
   out.arms = (m: any) => {
     const rest = humanGesture({ kind: 'sit', v: 0 }, out.t != null ? out.t : t);
     if (w < 0.002) { pk.a.R = null; return {}; }
@@ -138,23 +140,50 @@ const PH_FIT0 = { dx: 0, dz: 0, th: 0, cs: 1 };
  *  back, as close to the usual grip as possible. */
 function phoneFit(m: any, ph: any, pk: any, restR: number[]) {
   const T = THREE;
-  if (!pk.fit) { const C: any[] = []; for (const dx of [0, -0.004, 0.006, 0.012]) for (const dz of [0, -0.005, -0.01, 0.003]) for (const th of [0, -0.3, -0.6, 0.25]) for (const cs of [1, 0.85]) C.push({ dx, dz, th, cs }); pk.fit = { C, i: 0, best: null, bs: 1e9, done: false }; }
+  if (!pk.fit) { const C: any[] = []; for (const dx of [0, -0.004, 0.006, 0.012, 0.02]) for (const dz of [0, -0.005, -0.01, -0.016, 0.003]) for (const th of [0, -0.3, -0.6, -0.9, 0.25]) for (const cs of [1, 0.85]) C.push({ dx, dz, th, cs }); pk.fit = { C, i: 0, best: null, bs: 1e9, done: false }; }
   const F = pk.fit; if (F.done) return;
   ph.updateMatrixWorld(true); m.root.updateMatrixWorld(true);
   const toPh = new T.Matrix4().copy(ph.matrixWorld).invert().multiply(m.root.matrixWorld);
-  const X = 0.0375, Y = 0.0775, Z0 = -0.0122, Z1 = 0.0014;
-  for (let n = 0; n < 8 && F.i < F.C.length; n++) {
-    const c = F.C[F.i++], g = phoneGrip(m, ph, 1, 1, restR, pk.a.R, c), pts = humanHandPts(m, 'R', g.R, g.hand.R);
-    let pen = 0, inside = 0, back = 0;
+  const X = 0.0415, Y = 0.0805, Z0 = -0.0145, Z1 = 0.0045;
+  const test = (c: any) => {
+    const g = phoneGrip(m, ph, 1, 1, restR, pk.a.R, c), pts = humanHandPts(m, 'R', g.R, g.hand.R);
+    let pen = 0, inside = 0, back = 0, sx = 0, sz = 0;
     for (const p of pts) {
       const q = p.applyMatrix4(toPh), ax = Math.abs(q.x), ay = Math.abs(q.y);
-      if (ax < X && ay < Y && q.z > Z0 && q.z < Z1) { inside++; pen += Math.min(X - ax, Y - ay, q.z - Z0, Z1 - q.z); }
+      if (ax < X && ay < Y && q.z > Z0 && q.z < Z1) { inside++; pen += Math.min(X - ax, Y - ay, q.z - Z0, Z1 - q.z); sx += q.x; sz += q.z; }
       else if (ax < X && ay < Y && q.z <= Z0 && q.z > Z0 - 0.008) back++;
     }
-    const sc = pen * 4000 + inside * 0.4 + Math.max(0, 40 - back) * 0.03 + (Math.abs(c.dx) + Math.abs(c.dz)) * 20 + Math.abs(c.th) * 0.6 + (1 - c.cs) * 2;
-    if (sc < F.bs) { F.bs = sc; F.best = c; }
+    return { inside, sc: pen * 4000 + inside * 0.4 + Math.max(0, 40 - back) * 0.03 + (Math.abs(c.dx) + Math.abs(c.dz)) * 20 + Math.abs(c.th) * 0.6 + (1 - c.cs) * 2, sx: inside ? sx / inside : 0, sz: inside ? sz / inside : 0 };
+  };
+  if (F.i < F.C.length) {
+    for (let n = 0; n < 10 && F.i < F.C.length; n++) { const c = F.C[F.i++], r = test(c); if (r.sc < F.bs) { F.bs = r.sc; F.best = c; F.bin = r; } }
+    return;
   }
-  if (F.i >= F.C.length) F.done = true;
+  // then, while any skin is still too close, the hand moves away from where it touches, a few millimetres a step
+  F.steps = (F.steps || 0) + 1;
+  const r = F.bin || test(F.best);
+  if (!r.inside || F.steps > 14) { F.done = true; F.clear = phoneClear(m, ph, pk, restR, toPh, X, Y, Z0, Z1); return; }
+  // try a small move each way (behind, right, left, the thumb in or out) and keep the one that touches least
+  let bc: any = null, br: any = null;
+  for (const d of [{ dz: -0.003 }, { dx: 0.003 }, { dx: -0.003 }, { th: -0.12 }, { th: 0.12 }, { dz: 0.002, dx: 0.003 }]) {
+    const c = Object.assign({}, F.best); for (const k of Object.keys(d)) c[k] += (d as any)[k];
+    if (Math.abs(c.dz) > 0.024 || Math.abs(c.dx) > 0.03 || c.th < -1.4 || c.th > 0.5) continue;
+    const t = test(c), v = t.inside * 1000 + t.sc; if (!br || v < br.v) { bc = c; br = Object.assign(t, { v }); }
+  }
+  if (!bc || br.inside >= r.inside && br.sc >= r.sc) { F.done = true; F.clear = phoneClear(m, ph, pk, restR, toPh, X, Y, Z0, Z1); return; }
+  F.best = bc; F.bin = br;
+}
+/** Whatever skin is still within a hair of the phone after the fit: the smallest move of the phone itself (left,
+ *  right, forward or back, up to 8 mm) that takes it clear. */
+function phoneClear(m: any, ph: any, pk: any, restR: number[], toPh: any, X: number, Y: number, Z0: number, Z1: number): number[] {
+  const g = phoneGrip(m, ph, 1, 1, restR, pk.a.R, pk.fit.best), pts = humanHandPts(m, 'R', g.R, g.hand.R).map((p: any) => p.applyMatrix4(toPh)).filter((q: any) => Math.abs(q.x) < X && Math.abs(q.y) < Y && q.z > Z0 && q.z < Z1);
+  if (!pts.length) return [0, 0, 0];
+  // each way the phone could move, and how far it must go for every point to be outside it
+  const c: [number, number[]][] = [
+    [Math.max(...pts.map((q: any) => X - q.x)), [-1, 0, 0]], [Math.max(...pts.map((q: any) => X + q.x)), [1, 0, 0]],
+    [Math.max(...pts.map((q: any) => q.z - Z0)), [0, 0, 1]], [Math.max(...pts.map((q: any) => Z1 - q.z)), [0, 0, -1]]];
+  c.sort((a, b) => a[0] - b[0]);
+  const a = Math.min(0.008, c[0][0] + 0.0005); return c[0][1].map(v => v * a);
 }
 /** The right arm and hand on the phone: k 0 the desk grip … 1 the hold, w how far the hand has come (0 at rest);
  *  fo: the held grip's changes for this hand (phoneFit). */

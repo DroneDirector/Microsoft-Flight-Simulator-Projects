@@ -2,7 +2,10 @@
 
 interface AppScreen { title: string; icon: string; render: () => string; mount?: (root: HTMLElement) => void; nav?: boolean }
 const SCREENS: { [k: string]: AppScreen } = {};
-const ACTIONS: { [k: string]: (el: HTMLElement, ev: Event) => void } = {};
+const ACTIONS: { [k: string]: (el: HTMLElement, ev: Event) => void } = new Proxy({} as any, {
+  // every action (a click, a key, the controller, a step in a conversation) is saved straight after it runs
+  get(t: any, k: any) { const f = t[k]; if (typeof f !== 'function') return f; return function (this: any, ...a: any[]) { try { return f.apply(this, a); } finally { try { Store.soon(); } catch (e) { /* not ready */ } } }; },
+});
 
 const NAV_ORDER = ['ops', 'fleet', 'routes', 'jobs', 'schedule', 'dispatch', 'planner', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'career', 'news', 'coop'];
 // Pages opened from inside other pages, shown under their parent in the rail

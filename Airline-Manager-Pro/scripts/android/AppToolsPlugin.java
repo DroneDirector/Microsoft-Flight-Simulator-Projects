@@ -215,8 +215,9 @@ public class AppToolsPlugin extends Plugin {
 
     @PluginMethod
     public void backupWrite(PluginCall call) {
-        String data = call.getString("data", "");
-        File dir = getContext().getFilesDir(), tmp = new File(dir, BACKUP_FILE + ".tmp"), dst = new File(dir, BACKUP_FILE);
+        String data = call.getString("data", ""), name = call.getString("name", BACKUP_FILE);
+        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json")) { call.reject("Not a backup name"); return; }
+        File dir = getContext().getFilesDir(), tmp = new File(dir, name + ".tmp"), dst = new File(dir, name);
         try (OutputStream out = new FileOutputStream(tmp)) {
             out.write(data.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) { call.reject("Backup could not be written: " + describe(e)); return; }
@@ -227,7 +228,9 @@ public class AppToolsPlugin extends Plugin {
     @PluginMethod
     public void backupRead(PluginCall call) {
         JSObject r = new JSObject();
-        File f = new File(getContext().getFilesDir(), BACKUP_FILE);
+        String name = call.getString("name", BACKUP_FILE);
+        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json")) name = BACKUP_FILE;
+        File f = new File(getContext().getFilesDir(), name);
         if (f.exists()) {
             try (InputStream in = new FileInputStream(f)) {
                 java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();

@@ -237,6 +237,7 @@ const SETTINGS: SetSection[] = [
         ${DESKTOP ? '' : `<button class="btn ${f && f.set ? 'ghost' : 'primary'} sm" data-act="backup-folder">${f && f.set ? 'Change' : 'Choose folder'}</button>`}</div>`
         + (f && f.set ? `<div class="btn-row"><button class="btn ghost sm" data-act="backup-now">${icon('check')}Back up now</button></div>` : '');
     } },
+    { type: 'html', html: () => SaveSlots.html() },
     { type: 'html', html: () => `<div class="btn-row"><button class="btn ghost sm" data-act="backup-export">${icon('download')}Save a backup file</button><button class="btn ghost sm" data-act="backup-import">${icon('sync')}Restore from a backup</button></div>` },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Android's own backup (Settings → Google → Backup on the phone) also carries the app's data to a new phone.</p>` },
     { type: 'html', html: () => `<div class="ch-row"><span><b>Start from scratch</b><small>Wipe every airline, aircraft, staff member, route, flight and log, and found a new airline. Settings are kept. Make a backup first if you may want it back.</small></span><button class="btn danger sm" data-act="fs-scratch">${icon('trash')}Start over</button></div>` },
