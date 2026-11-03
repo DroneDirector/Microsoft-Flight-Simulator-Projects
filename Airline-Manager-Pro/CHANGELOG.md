@@ -7,6 +7,9 @@
 - Terrain: coarser ring sinks under finer ring, ring skirts, cliffs shaded as rock, coast paint on low shores
 - models.ts: replaceable .glb models (aircraft, vehicles, jet bridge, people), GLTFLoader vendored (tools/vendor/make-gltf.py)
 - Office and courtroom lights cast shadows on the PC
+- Sea as a level surface (v3dSeaPlane), coast heights from a distance field (v3dCoastDist)
+- crew-start.ts: crew needs by category, free first crew on a new career
+- Gate vehicles, light aircraft models in the distance (v3d-lod.ts), joined airport buildings, heat haze on the PC
 
 ## 0.9.113 (2026-11-03)
 
