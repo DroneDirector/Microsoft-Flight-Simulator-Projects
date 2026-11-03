@@ -11,7 +11,7 @@ const V3V: any = { on: false };
 let V3V_ROT = Math.PI / 2;   // the medal's face lettering upright on the disc
 
 /** The studio: soft light all round, a key light, a rim light and a reflection map for metal and glass. */
-function v3vStudio(T: any, R: any, sc: any) {
+function v3vStudio(T: any, R: any, sc: any, bare?: boolean) {
   sc.add(new T.HemisphereLight(0xF4F7FF, 0x30343C, 0.9));
   const key = new T.DirectionalLight(0xFFF4E6, 2.4); key.position.set(3, 5, 4); key.castShadow = true; key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 20 }); key.shadow.bias = -0.0006; sc.add(key);
@@ -26,6 +26,7 @@ function v3vStudio(T: any, R: any, sc: any) {
     const pm = new T.PMREMGenerator(R); sc.environment = pm.fromEquirectangular(tex).texture; pm.dispose(); tex.dispose();
   } catch (e) { /* no reflections */ }
   // a dark round plinth with a soft shadow on it
+  if (bare) return { key };
   const pl = new T.Mesh(new T.CylinderGeometry(1.6, 1.7, 0.12, 64), new T.MeshStandardMaterial({ color: 0x15181D, roughness: 0.55, metalness: 0.3 }));
   pl.position.y = -0.06; pl.receiveShadow = true; sc.add(pl);
   return { key };
@@ -195,14 +196,14 @@ ACTIONS['v3v-close'] = () => viewer3dClose();
 /** A still of an object for a list, rendered once with the viewer's lighting (kept for the session). */
 const _v3vThumbs: { [k: string]: string } = {};
 let _v3vThumbR: any = null;
-function viewerThumb(key: string, build: (T: any) => any, size?: number): string {
+function viewerThumb(key: string, build: (T: any) => any, size?: number, bare?: boolean): string {
   if (_v3vThumbs[key] !== undefined) return _v3vThumbs[key];
   const T = typeof THREE !== 'undefined' ? THREE : null; if (!T) return (_v3vThumbs[key] = '');
   try {
     const S = size || 320;
     if (!_v3vThumbR) { const c = document.createElement('canvas'); _v3vThumbR = new T.WebGLRenderer({ canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: true }); _v3vThumbR.outputColorSpace = T.SRGBColorSpace; _v3vThumbR.toneMapping = T.ACESFilmicToneMapping; _v3vThumbR.toneMappingExposure = 1.1; _v3vThumbR.shadowMap.enabled = true; _v3vThumbR.setClearColor(0x000000, 0); }
     const R = _v3vThumbR; R.setPixelRatio(1); R.setSize(S, S, false);
-    const sc = new T.Scene(); v3vStudio(T, R, sc);
+    const sc = new T.Scene(); v3vStudio(T, R, sc, bare);
     const obj = build(T); obj.traverse((m: any) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     const hgt = v3vFit(T, obj); obj.rotation.y = -0.5; sc.add(obj);
     const cam = new T.PerspectiveCamera(32, 1, 0.05, 100), d = 5.6; cam.position.set(0, hgt * 0.45 + Math.sin(0.2) * d, Math.cos(0.2) * d); cam.lookAt(0, hgt * 0.45, 0);

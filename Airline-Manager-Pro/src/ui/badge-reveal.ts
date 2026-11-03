@@ -63,7 +63,7 @@ function badgeRevealNext() {
   _revealing = true;
   const S: any = State, t = clamp(b.tier, 0, TIER_LOOK.length - 1), L = TIER_LOOK[t], at = (S.badges || {})[b.id];
   const calm = State.settings.reduceMotion, dur = calm ? 300 : 2600 + t * 450;   // the reveal takes longer for rarer badges
-  const el = document.createElement('div'); el.className = `bdr t${t}${calm ? ' calm' : ''}`;
+  const el = document.createElement('div'); el.className = `bdr t${t}${calm ? ' calm' : ''}${(b as any).gift ? ' gift' : ''}`;
   el.style.setProperty('--c', L[0]); el.style.setProperty('--d', L[1]); el.style.setProperty('--g', L[2]); el.style.setProperty('--T', dur + 'ms');
   el.innerHTML = `<div class="bdr-dim"></div>
     <div class="bdr-beams">${Array.from({ length: 7 + t * 2 }, (_, i) => `<i style="--k:${i};--r:${(i - (7 + t * 2) / 2) * (12 - t)}deg"></i>`).join('')}</div>
