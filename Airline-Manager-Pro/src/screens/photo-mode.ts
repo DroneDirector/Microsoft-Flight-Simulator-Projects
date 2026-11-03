@@ -7,11 +7,13 @@ const PHOTO_LOOKS: [string, string, string][] = [
   ['none', 'Natural', ''], ['warm', 'Warm', 'sepia(.22) saturate(1.15) brightness(1.04)'], ['cine', 'Cinematic', 'contrast(1.18) saturate(.82) brightness(.96) hue-rotate(-6deg)'],
   ['bw', 'Black and white', 'grayscale(1) contrast(1.22)'], ['vivid', 'Vivid', 'saturate(1.45) contrast(1.08)'], ['vintage', 'Vintage', 'sepia(.55) contrast(.9) brightness(1.06) saturate(.8)'],
 ];
-const Photo: any = { on: false, look: 'none', bars: false, cap: '' };
+const Photo: any = { on: false, look: 'none', bars: false, cap: '', dof: 0 };
+const PHOTO_DOF = ['Depth of field: off', 'Depth of field: soft', 'Depth of field: strong'];
 function photoFilter(): string { return (PHOTO_LOOKS.filter(l => l[0] === Photo.look)[0] || PHOTO_LOOKS[0])[2]; }
 function photoBarHtml(): string {
   return `<div class="ph-bar">${PHOTO_LOOKS.map(l => `<button class="ph-look ${Photo.look === l[0] ? 'on' : ''}" data-act="photo-look" data-l="${l[0]}">${esc(l[1])}</button>`).join('')}
     <button class="ph-look ${Photo.bars ? 'on' : ''}" data-act="photo-bars">${icon('sliders')}Wide frame</button>
+    <button class="ph-look ${Photo.dof ? 'on' : ''}" data-act="photo-dof" title="The aircraft (or the middle of the picture) stays sharp; what is nearer or further away blurs by its distance">${icon('focus')}${PHOTO_DOF[Photo.dof]}</button>
     <input class="ph-cap" placeholder="Caption (optional)" value="${esc(Photo.cap)}" maxlength="80" aria-label="Caption">
     <button class="ph-shoot" data-act="photo-shoot" aria-label="Take the picture">${icon('camera')}</button>
     <button class="ph-exit" data-act="photo-mode" aria-label="Leave photo mode">${icon('close')}</button></div>`;
@@ -29,10 +31,12 @@ function photoApply() {
 ACTIONS['photo-mode'] = () => { if (!V3d.open) return; Photo.on = !Photo.on; Sound.tick(); photoApply(); };
 ACTIONS['photo-look'] = el => { Photo.look = el.getAttribute('data-l'); photoApply(); };
 ACTIONS['photo-bars'] = () => { Photo.bars = !Photo.bars; photoApply(); };
+ACTIONS['photo-dof'] = () => { Photo.dof = (Photo.dof + 1) % 3; photoApply(); };
 ACTIONS['photo-shoot'] = () => {
   if (!V3d.open || !V3d.r || !V3d.cv) return;
   try {
     V3d.r.render(V3d.scene, V3d.cam);
+    if (Photo.dof) { try { photoDof(Photo.dof); } catch (e) { V3d.r.render(V3d.scene, V3d.cam); } }
     const src = V3d.cv, k = Math.min(1, Gfx.pic([2560, 3840, 7680]) / Math.max(src.width, src.height)), W = Math.round(src.width * k), H0 = Math.round(src.height * k);
     const bars = Photo.bars ? Math.round(Math.max(0, H0 - W / 2.39) / 2) : 0, H = H0 - bars * 2;
     const big = document.createElement('canvas'); big.width = W; big.height = H; const g = big.getContext('2d') as CanvasRenderingContext2D;
@@ -57,3 +61,50 @@ ACTIONS['photo-news'] = () => {
   try { newsPublish({ paper: newsPaper((apt(c.hub) as any || {}).country || ''), section: 'Photo of the day', place: (apt(c.hub) as any || {}).city || '', headline: L.cap || `${c.name} in pictures`, standfirst: `A reader's photograph${L.reg ? ` of ${L.reg}` : ''}${L.from ? `, ${L.from} to ${L.to}` : ''}.`, body: ['Sent in by ' + ((myPilot() as any).name || 'a reader') + '.'], art: { kind: 'photo', data: L.data } as any, companyId: c.id } as any); } catch (e) { /* no paper */ }
 };
 document.addEventListener('keydown', (e: KeyboardEvent) => { if (V3d && V3d.open && (e.key === 'h' || e.key === 'H') && !(e.target as HTMLElement).closest('input, textarea')) ACTIONS['photo-mode'](null as any, null as any); });
+
+/** Depth of field for the photo: the scene drawn once more with its depth; what is in focus (the aircraft you
+ *  follow, or what is in the middle of the picture) stays sharp, and everything nearer or further blurs by how far
+ *  it is from that distance, like a camera's lens. Drawn straight onto the 3D view's canvas for the picture. */
+let _dof: any = null;
+function photoDof(level: number) {
+  const T = THREE, R = V3d.r, cam = V3d.cam, sz = R.getDrawingBufferSize(new T.Vector2());
+  if (!_dof) {
+    const rt = new T.WebGLRenderTarget(4, 4, { type: T.HalfFloatType }); rt.depthTexture = new T.DepthTexture(4, 4); rt.depthTexture.type = T.UnsignedIntType;
+    const mat = new T.ShaderMaterial({
+      uniforms: { tCol: { value: rt.texture }, tDep: { value: rt.depthTexture }, uFar: { value: 1 }, uLog: { value: 0 }, uP22: { value: -1 }, uP32: { value: -0.2 }, uNear: { value: 0.1 }, uFocus: { value: 100 }, uAmt: { value: 1 }, uPx: { value: new T.Vector2() } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `uniform sampler2D tCol; uniform sampler2D tDep; uniform float uFar, uLog, uP22, uP32, uNear, uFocus, uAmt; uniform vec2 uPx; varying vec2 vUv;
+        float dist(vec2 uv) { float d = texture2D(tDep, uv).x; if (d >= 0.999999) return 1e7;
+          if (uLog > 0.5) return exp2(d * log2(uFar + 1.0)) - 1.0;
+          float z = d * 2.0 - 1.0; return uP32 / (z + uP22); }
+        float coc(float z) { return clamp((abs(z - uFocus) / max(1.0, z) - 0.12) * uAmt, 0.0, 1.0) * 12.0; }
+        void main() {
+          float c0 = coc(dist(vUv)); vec4 sum = texture2D(tCol, vUv); float n = 1.0;
+          for (int i = 0; i < 32; i++) {
+            float a = float(i) * 2.39996, r = sqrt(float(i) + 0.5) / sqrt(32.0);
+            vec2 o = vec2(cos(a), sin(a)) * r * c0 * uPx;
+            vec2 uv = vUv + o; float cs = coc(dist(uv));
+            float w = smoothstep(0.0, 1.0, cs / max(0.5, c0 * r));   // sharp things in front never smear over the blur behind
+            sum += texture2D(tCol, uv) * w; n += w;
+          }
+          gl_FragColor = sum / n;   // the finished picture, blurred: no second tone mapping
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    const scene = new T.Scene(), oc = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1), q = new T.Mesh(new T.PlaneGeometry(2, 2), mat); q.frustumCulled = false; scene.add(q);
+    _dof = { rt, mat, scene, oc };
+  }
+  const D = _dof, U = D.mat.uniforms;
+  // the picture as it is on the screen now (the blur works on it, so its colours stay exactly as they are)
+  const snap = document.createElement('canvas'); snap.width = sz.x; snap.height = sz.y; (snap.getContext('2d') as CanvasRenderingContext2D).drawImage(R.domElement, 0, 0);
+  const tex = new T.CanvasTexture(snap); tex.flipY = true; U.tCol.value = tex;
+  if (D.rt.width !== sz.x || D.rt.height !== sz.y) D.rt.setSize(sz.x, sz.y);
+  // what is in focus: the aircraft you follow, otherwise about 300 m ahead
+  let focus = 300; const P = V3d.planes && V3d.planes[V3d.target]; if (P && P.model) focus = Math.max(5, cam.position.distanceTo(P.model.position));
+  cam.updateMatrixWorld();
+  R.setRenderTarget(D.rt); R.render(V3d.scene, cam); R.setRenderTarget(null);
+  U.uFar.value = cam.far; U.uNear.value = cam.near; U.uLog.value = R.capabilities && R.capabilities.logarithmicDepthBuffer ? 1 : 0;
+  U.uP22.value = cam.projectionMatrix.elements[10]; U.uP32.value = cam.projectionMatrix.elements[14];
+  U.uFocus.value = focus; U.uAmt.value = level === 2 ? 2.4 : 1.1; U.uPx.value.set(1 / sz.x * (sz.y / 900), 1 / sz.y * (sz.y / 900));
+  R.render(D.scene, D.oc); tex.dispose();
+}

@@ -554,6 +554,8 @@ function v3dSkyStep(now: number) {
 }
 
 /* ---------- airport lights ---------- */
+/** Glow around lights at night (Settings → Graphics: on by default on the PC, off on phones and tablets). */
+function v3dHalo(): number { const v = (State.settings as any).v3dGlow; return (v == null ? hiQ() : !!v) ? 1 : 0; }
 function v3dLightPoints(pos: number[], col: number[], size: number[], kind?: number[], dir?: number[], phase?: number[]): any {
   const T = THREE, U = v3dSkyUniforms(), geo = new T.BufferGeometry(), n = size.length;
   geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new T.Float32BufferAttribute(col, 3));
@@ -562,12 +564,12 @@ function v3dLightPoints(pos: number[], col: number[], size: number[], kind?: num
   geo.setAttribute('aDir', new T.Float32BufferAttribute(dir || new Array(n * 3).fill(0), 3));
   geo.setAttribute('aPhase', new T.Float32BufferAttribute(phase || new Array(n).fill(0), 1));
   const mat = new T.ShaderMaterial({
-    uniforms: { uOn: U.uLightsOn, uScale: U.uPxScale, uTime: U.uTime, uGlow: U.uGlow, uFlags: { value: new T.Vector4(1, 1, 1, 0) }, uFlags2: { value: new T.Vector4(0, 0, 0, 0) }, uAlways: { value: 0 } },
+    uniforms: { uOn: U.uLightsOn, uScale: U.uPxScale, uTime: U.uTime, uGlow: U.uGlow, uFlags: { value: new T.Vector4(1, 1, 1, 0) }, uFlags2: { value: new T.Vector4(0, 0, 0, 0) }, uAlways: { value: 0 }, uHalo: { value: v3dHalo() } },
     transparent: true, depthWrite: false, blending: T.AdditiveBlending, vertexColors: true, fog: false,
     vertexShader: `#include <common>
 #include <logdepthbuf_pars_vertex>
 attribute float aSize; attribute float aKind; attribute vec3 aDir; attribute float aPhase;
-uniform float uScale; uniform float uTime; uniform vec4 uFlags; uniform vec4 uFlags2; varying vec3 vCol; varying float vOn; varying float vDay;
+uniform float uScale; uniform float uHalo; uniform float uTime; uniform vec4 uFlags; uniform vec4 uFlags2; varying vec3 vCol; varying float vOn; varying float vDay;
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   float on = uFlags.x;
@@ -589,17 +591,17 @@ void main() {
   }
   vOn = on;
   vec4 mv = viewMatrix * wp;
-  gl_PointSize = clamp(aSize * (aKind > 2.5 && aKind < 4.5 ? 1.0 + on : 1.0) * uScale / max(1.0, -mv.z), 1.6, 34.0);
+  gl_PointSize = clamp(aSize * (aKind > 2.5 && aKind < 4.5 ? 1.0 + on : 1.0) * (1.0 + uHalo * 1.6) * uScale / max(1.0, -mv.z), 1.6, 34.0 * (1.0 + uHalo * 1.6));
   gl_Position = projectionMatrix * mv;
   #include <logdepthbuf_vertex>
 }`,
     fragmentShader: `#include <common>
 #include <logdepthbuf_pars_fragment>
-uniform float uOn; uniform float uGlow; uniform float uAlways; varying vec3 vCol; varying float vOn; varying float vDay;
+uniform float uOn; uniform float uGlow; uniform float uAlways; uniform float uHalo; varying vec3 vCol; varying float vOn; varying float vDay;
 void main() {
   #include <logdepthbuf_fragment>
-  float d = length(gl_PointCoord - 0.5) * 2.0;
-  float a = (exp(-d * d * 5.0) + 0.6 * exp(-d * d * 40.0)) * vOn * max(max(uOn, uAlways), vDay) * max(uGlow, vDay * 0.9);
+  float d = length(gl_PointCoord - 0.5) * 2.0 * (1.0 + uHalo * 1.6);
+  float a = (exp(-d * d * 5.0) + 0.6 * exp(-d * d * 40.0) + uHalo * 0.22 * exp(-d * d * 0.8)) * vOn * max(max(uOn, uAlways), vDay) * max(uGlow, vDay * 0.9);
   gl_FragColor = vec4(vCol * 1.4, clamp(a, 0.0, 1.0));
 }` });
   const pts = new T.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 20;
