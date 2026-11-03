@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.103 (2026-11-03)
+
+- Flight pop-ups (flight-pops.ts: fpWatch, fpShow; phone notifications fnSchedule/fnNow; Settings → Flight pop-ups, all and per step, app and phone)
+- Schedule: who is missing for crew delays (crewShortHtml)
+- 3D viewer: moving shine on metal materials only (v3vShine)
+
 ## 0.9.102 (2026-11-03)
 
 - Gift reveal without the card (.bdr.gift; viewerThumb bare render without the plinth)
