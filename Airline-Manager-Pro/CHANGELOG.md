@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.78 (2026-11-03)
+
+- 3D view: going into the cabin (Cabin, Walk, the window views) shows a Loading cabin screen (cabinLoadShow) while the cabin is built; v3dModeSet
+- cabin on touch screens: the walking stick in the Cabin view as well (cabinTouchPad); pushing it gets you up and walking; shown on PCs with a touch screen too
+
 ## 0.9.77 (2026-11-03)
 
 - figures: wrist turn (uWr), finger curl at knuckles and middle joints (uC1/uC2), thumb turn (uTh); hand basis from the mesh (joints F/N/T); humanHandAim; humanReach/humanHandAt can reach with the wrist

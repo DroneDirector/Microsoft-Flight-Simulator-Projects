@@ -183,7 +183,13 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   e.preventDefault(); ACTIONS['v3d-shot'](null, null);
 });
 ACTIONS['v3d-mode'] = el => {
-  V3d.mode = el.getAttribute('data-m'); Sound.tick();
+  const m = el.getAttribute('data-m') || 'chase', inside = (k: string) => /^(cabin|walk|winL|winR)$/.test(k);
+  // going into the cabin: its loading screen first, then the cabin is built behind it
+  if (inside(m) && !inside(V3d.mode) && V3d.loaded && V3d.root) { cabinLoadShow(() => v3dModeSet(m)); Sound.tick(); return; }
+  v3dModeSet(m); Sound.tick();
+};
+function v3dModeSet(m: string) {
+  V3d.mode = m;
   if (V3d.root) { V3d.root.setAttribute('data-m', V3d.mode); if (!/^(walk|free)$/.test(V3d.mode)) v3dUi(true); }
   if (/^(tower|fwd|cabin|winL|winR)$/.test(V3d.mode)) { V3d.yaw = 0; V3d.pitch = 0; }   // these start looking the natural way
   if (V3d.mode === 'free') { v3dFreeStart(); v3dFreeUiBind(); }
@@ -191,7 +197,8 @@ ACTIONS['v3d-mode'] = el => {
   V3d.root.classList.toggle('v3d-free', V3d.mode === 'free'); V3d.root.classList.toggle('v3d-win', /^win/.test(V3d.mode)); V3d.root.classList.toggle('v3d-walk', V3d.mode === 'walk'); V3d.root.classList.toggle('v3d-inside', V3d.mode === 'cabin' || V3d.mode === 'walk' || /^win/.test(V3d.mode)); if (V3d.mode === 'walk') cabinWalkStart(); else cabinWalkStop();
   V3d.yaw = V3d.mode === 'side' ? 1.2 : 0; V3d.pitch = V3d.mode === 'side' ? 0.15 : V3d.mode === 'fwd' || V3d.mode === 'cabin' || V3d.mode === 'walk' || /^win/.test(V3d.mode) ? 0 : 0.22; V3d.dist = 0; (V3d as any).panX = 0; (V3d as any).panY = 0;
   V3d.root.querySelectorAll('[data-act=v3d-mode]').forEach((b: Element) => b.classList.toggle('on', b.getAttribute('data-m') === V3d.mode));
-};
+  cabinTouchPad();
+}
 ACTIONS['v3d-next'] = el => {
   const list = liveOf(), i = list.findIndex(f => f.id === V3d.target), d = +el.getAttribute('data-d');
   if (!list.length) return;
