@@ -380,7 +380,7 @@ const Voice = {
   speaking: false, preparing: false, token: 0, sources: [] as AudioBufferSourceNode[], onEnd: null as () => void,
   /** Who is speaking now ("role|sex|mood|name"), what, and from when it is heard (0 while it is being prepared):
    *  the faces in the 3D rooms move their mouths to it (humanTalk). Pressing Play again starts it all again. */
-  who: '', text: '', audibleAt: 0,
+  who: '', text: '', audibleAt: 0, track: [] as { t0: number; dur: number; ph: string }[], an: null as AnalyserNode, lvBuf: null as Float32Array,
   natural(): boolean { return (State.settings as any).voiceEngine !== 'device' && VoicePack.state === 'ready'; },
   /** The text as pieces to speak: sentences, with long ones cut at their commas and a short first piece,
    *  so the voice starts as soon as the first few words are ready. */
@@ -406,7 +406,7 @@ const Voice = {
     this.stop();
     if (State.settings.muteAll || !State.settings.mechanicVoice || !text) { if (onEnd) onEnd(); return false; }
     const sp = resolveSpeaker(who, text), tok = ++this.token;
-    this.onEnd = onEnd || null; this.speaking = true; this.who = String(who || ''); this.text = text; this.audibleAt = 0;
+    this.onEnd = onEnd || null; this.speaking = true; this.who = String(who || ''); this.text = text; this.audibleAt = 0; this.track = [];
     if (!this.natural()) { this.device(text, sp, tok); return true; }
     this.preparing = true; voiceUiChanged();
     let started = false;
@@ -417,7 +417,10 @@ const Voice = {
         await Promise.race([VoiceEngine.ready(), new Promise((ok, bad) => setTimeout(() => bad(new Error('the voice model took too long to load')), 25000))]);
         ctx = audio(true); if (!ctx) { this.finish(); return; } if (ctx.state !== 'running') await ctx.resume();
         // each sentence is made after the one before, so each gets its own time: 30 s for the first, then 25 s more per sentence
-        const parts = this.sentences(text, sp).map((s, i) => {
+        const sents = this.sentences(text, sp);
+        // a meter on the voice, for the mouths (how loud it is right now)
+        if (!this.an || (this.an as any).context !== ctx) { try { this.an = ctx.createAnalyser(); this.an.fftSize = 512; this.an.connect(ctx.destination); } catch (e) { this.an = null; } }
+        const parts = sents.map((s, i) => {
           const p = Promise.race([voiceSentence(s, sp, true), new Promise<Float32Array>((ok, bad) => setTimeout(() => bad(new Error('the voice took too long')), 30000 + i * 25000))]);
           p.catch(() => { /* handled where it is played; never an unhandled error */ });
           return p;
@@ -430,7 +433,7 @@ const Voice = {
           if (!pcm.length) continue;
           const buf = ctx.createBuffer(1, pcm.length, 24000); buf.copyToChannel(pcm as any, 0);
           const src = ctx.createBufferSource(); src.buffer = buf;
-          const g = ctx.createGain(); g.gain.value = 1.15 * (sp.gain || 1); src.connect(g); g.connect(ctx.destination);
+          const g = ctx.createGain(); g.gain.value = 1.15 * (sp.gain || 1); src.connect(g); g.connect(this.an || ctx.destination);
           at = Math.max(at, ctx.currentTime + 0.02);
           const rate = Math.pow(2, (sp.cents || 0) / 1200), dur = buf.duration / rate;
           if (sp.wobble) {
@@ -440,6 +443,7 @@ const Voice = {
             src.detune.setValueCurveAtTime(curve, at, Math.max(0.05, dur));
           } else src.detune.value = sp.cents || 0;
           if (!this.audibleAt) this.audibleAt = Date.now() + Math.max(0, at - ctx.currentTime) * 1000;
+          this.track.push({ t0: Date.now() + Math.max(0, at - ctx.currentTime) * 1000, dur: dur * 1000, ph: sents[i] || '' });   // when each sentence is heard, with its sounds
           src.start(at); at += dur + (sp.mood === 'sorry' ? 0.3 : sp.mood === 'angry' ? 0.08 : 0.18);
           this.sources.push(src); started = true; last = src;
         }
@@ -480,6 +484,13 @@ const Voice = {
     if (v) u.voice = v;
     u.onend = () => { if (tok === this.token) this.finish(); };
     s.speak(u);
+  },
+  /** How loud the voice is right now (0 silent … about 0.5 loud), or -1 with no meter. */
+  level(): number {
+    const a = this.an; if (!a) return -1;
+    const d = this.lvBuf && this.lvBuf.length === a.fftSize ? this.lvBuf : (this.lvBuf = new Float32Array(a.fftSize));
+    a.getFloatTimeDomainData(d); let s = 0; for (let i = 0; i < d.length; i++) s += d[i] * d[i];
+    return Math.sqrt(s / d.length);
   },
   finish() { this.speaking = false; this.preparing = false; this.audibleAt = 0; this.sources = []; const f = this.onEnd; this.onEnd = null; voiceUiChanged(); if (f) f(); },
   stop() {

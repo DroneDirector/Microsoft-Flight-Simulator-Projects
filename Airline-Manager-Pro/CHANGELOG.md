@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.70 (2026-11-03)
+
+- mouths: visemes (HUMAN_VIS, humanViseme, humanSounds) with lips pressed, lower lip tucked and upper lip lifted in the face shader (uPress, uLipLow, uLipUp); natural voice drives them from its phonemes per sentence (Voice.track) with loudness from an analyser (Voice.level)
+- docs: custom-models-and-animation (PDF)
+
 ## 0.9.69 (2026-11-03)
 
 - Perf (graphics/perf.ts): dynamic resolution and a 30 fps cap from Android thermal status and battery saver (AppTools.boostStats powerSave), in the 3D view, office, Operations and court; setting in Graphics
