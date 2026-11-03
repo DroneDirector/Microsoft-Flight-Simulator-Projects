@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.74 (2026-11-03)
+
+- phone (phone3d.ts, shared by the office and Operations): model with lock screen and glass, pick-up with the right hand (selfPose arms), screen brought up in its frame (FLIP from the held phone), laptop OS in phone mode (lapMount(root, true)), glare; mail one column at a time on the phone
+
 ## 0.9.73 (2026-11-03)
 
 - faceSculpt: nose and mouth widths fitted to the face photograph's proportions (head space moves with them, so the projection stays put)

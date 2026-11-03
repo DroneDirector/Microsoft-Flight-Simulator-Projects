@@ -180,6 +180,8 @@ function ofBuild(scene: any, q: number) {
   const lampL = new T.PointLight(0xFFD7A0, 1.6, 3, 1.6); lampL.position.set(-0.72, 1.05, -0.12); root.add(lampL);
   // the family photo, the phone, notes, coffee, pens
   A.photoAt = new T.Group(); A.photoAt.position.set(-0.42, 0.775, 0.3); A.photoAt.rotation.y = 0.5; root.add(A.photoAt);   // turned towards you
+  // your phone, lying on the desk to your right, screen up
+  phoneMesh(T, root, A, [0.34, 0.777, 0.56], -0.35);
   bx(0.24, 0.015, 0.17, mat.white, 0.0, 0.783, 0.33, 0.1);   // a notepad
   add(new T.CylinderGeometry(0.006, 0.006, 0.15, 8), mat.black, 0.06, 0.79, 0.3).rotation.set(Math.PI / 2, 0, 0.6);
   add(new T.CylinderGeometry(0.04, 0.035, 0.09, 20), mat.white, 0.78, 0.82, 0.32); add(new T.TorusGeometry(0.025, 0.007, 8, 16), mat.white, 0.82, 0.82, 0.32).rotation.y = 0;
@@ -381,6 +383,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   fit(); R.fit = fit; window.addEventListener('resize', fit);
   // looking: drag (or the mouse once the view has it on the PC), the arrow keys in the chair
   R.look = { yaw: 0, pitch: -0.08 }; R.seat = true; R.free = { x: 0, z: 0.98, v: 0, bob: 0 };
+  R.phoneAfter = () => ofVisitUi();
   let drag: any = null, moved = 0, justLocked = false;
   cv.addEventListener('pointerdown', e => {
     // walking on the PC: the view takes the mouse (no pointer, turn as far as you like); a click then uses what glows
@@ -389,15 +392,16 @@ function ofOpen2(root: HTMLElement, q: number) {
   R.mm$ = (e: MouseEvent) => { if (R.on && !R.seat && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
   document.addEventListener('mousemove', R.mm$);
   cv.addEventListener('pointermove', e => {
-    if (!drag && R.seat && !R.overlay && !R.loading) { const o = ofAimedObj(e), on = !!(o && (o.userData.act === 'laptop' || o.userData.act === 'photo') && !(R.ph && R.ph.st !== 'idle')); R.lapHover = on; cv.style.cursor = on ? 'pointer' : ''; if (on && R.glow) R.glow.showObj(o); }
+    if (!drag && R.seat && !R.overlay && !R.loading) { const o = ofAimedObj(e), on = !!(o && (o.userData.act === 'laptop' || o.userData.act === 'photo' || o.userData.act === 'phone') && !(R.ph && R.ph.st !== 'idle') && !(R.pk && R.pk.st !== 'idle')); R.lapHover = on; cv.style.cursor = on ? 'pointer' : ''; if (on && R.glow) R.glow.showObj(o); }
     if (!drag) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
     if (drag.pw && R.ph && R.ph.st === 'hold') { R.ph.want = [clamp(drag.pw[0] + (e.clientX - drag.x) * 0.004, -0.5, 0.5), clamp(drag.pw[1] + (e.clientY - drag.y) * 0.003, -0.4, 0.4)]; return; }   /* holding the photo: tilt it */ R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); });
   cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else ofClickAt(); return; } justLocked = false; if (drag && moved < 6) ofClickAt(e); drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); });
   R.key$ = (e: KeyboardEvent) => {
     if (!R.on) return; const k = e.key.toLowerCase();
-    if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay.classList.contains('lap-screen')) ofLaptopClose(); else ofPlannerClose(); } return; }   // the planner has the keys (typing)
+    if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay.classList.contains('lap-screen')) ofLaptopClose(); else if (R.overlay.classList.contains('ph-screen')) ofPhoneClose(); else ofPlannerClose(); } return; }   // the planner has the keys (typing)
     if (k === 'escape' && R.ph && R.ph.st === 'hold') { e.preventDefault(); e.stopImmediatePropagation(); ofPhotoPut(); return; }
+    if (k === 'escape' && R.pk && R.pk.st === 'hold') { e.preventDefault(); e.stopImmediatePropagation(); ofPhonePut(); return; }
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; ofLeave(); return; }   // the first Esc only gives the mouse back
     if (k === 'h' && !R.seat) { e.preventDefault(); R.root.classList.toggle('ui-off'); return; }   // walking: hide or show the controls
     if (/^(w|a|s|d|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
@@ -454,7 +458,7 @@ OfficeRoom.close = function (quiet?: boolean) {
   document.removeEventListener('mousemove', R.mm$); aimUnlock(); R.glow = null;
   try { Voice.stop(); } catch (e) { /* ignore */ }
   FrameGen.dispose(R.perf); exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null;
-  R.root.remove(); R.vis = null; R.me = null; R.ph = null;
+  R.root.remove(); R.vis = null; R.me = null; R.ph = null; R.pk = null;
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };
 function ofLeave() {
@@ -658,7 +662,7 @@ function ofFrame() {
     if (S.material) S.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, lk * 1.4)));   // the screen lights up as it opens
   } else if (R.seat) {
     // you in your chair: your body (leaning in and turning to reach for the photo), your eyes where your head is
-    const P = ofPhotoStep(dt, now), ph = R.ph, S = R.me;
+    const P = R.pk ? ofPhoneStep(dt, now) : ofPhotoStep(dt, now), ph = R.ph, S = R.me;
     let eye = new T.Vector3(0, 1.2, 1.02);
     if (S) { try { S.pitch = R.look.pitch * (1 - P.lookK); eye = selfPose(S, P.slide ? S.chair.clone().add(new T.Vector3(0, 0, -P.slide)) : S.chair, Math.PI + P.turn + clamp(R.look.yaw * 0.3, -0.4, 0.4) * (1 - P.lookK), P.lean, 1, 0, 0, now, dt, P.arms); } catch (e) { R.me = null; } }
     R.cam.position.copy(eye);
@@ -709,8 +713,10 @@ function ofAimedObj(e?: PointerEvent): any {
 function ofClickAt(e?: PointerEvent) {
   const R = OfficeRoom; if (R.loading || R.overlay) return;
   if (R.ph && R.ph.st !== 'idle') { if (R.ph.st === 'hold') ofPhotoPut(); return; }   // holding the photo: a click puts it back
+  if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') ofPhoneOpen(); return; }   // the phone in your hand: a tap brings its screen up
   const a = ofAimed(e) || (R.seat ? '' : ofAimed());
   if (a === 'photo' && R.seat) { ofPhotoPick(); return; }
+  if (a === 'phone' && R.seat) { ofPhonePick(); return; }
   if (a === 'laptop') { ofLaptopOpen(); return; }
   if (R.seat) return;
   if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); R.doorT = 1; setTimeout(() => ofExitToMain(), 650); }
@@ -777,7 +783,7 @@ function ofLapRect(): { x: number; y: number; w: number; h: number } {
   return { x: x0, y: y0, w: Math.max(40, x1 - x0), h: Math.max(30, y1 - y0) };
 }
 function ofLaptopOpen() {
-  const R = OfficeRoom; if (!R.on || R.overlay || R.lapZ || !R.A || !R.A.lapScr) return;
+  const R = OfficeRoom; if (!R.on || R.overlay || R.lapZ || !R.A || !R.A.lapScr || (R.pk && R.pk.st !== 'idle')) return;
   Sound.tick(); aimUnlock();
   if (!R.seat) { R.seat = true; R.view = 'sit'; }
   R.look = { yaw: R.look.yaw, pitch: R.look.pitch };
@@ -847,7 +853,7 @@ function ofSpot(k: string) {
   if (k === 'reports') { Sound.tick(); ofReportsUi(); return; }
   if (k === 'laptop') { ofLaptopOpen(); return; }
   if (k === 'planner' || k === 'schedule') { Sound.tick(); ofScreenOpen(k); return; }
-  const R = OfficeRoom; Sound.tick(); ofPhotoReset(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true; ofTopState();
+  const R = OfficeRoom; Sound.tick(); ofPhotoReset(); ofPhoneReset(); R.view = k; const box = R.root.querySelector('.ct-box') as HTMLElement; box.hidden = true; ofTopState();
   if (k !== 'free') aimUnlock();
   if (k === 'sit') { R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; }
   else if (k === 'photo') { R.seat = true; R.look = { yaw: 0.53, pitch: -0.38 }; }
@@ -860,7 +866,7 @@ function ofSpot(k: string) {
 /* ---------- the family photo: picked up, looked at, put back ---------- */
 const OF_PH_D = { reach: 0.85, lift: 1.15, lower: 1.15, release: 0.75 };
 function ofPhotoPick() {
-  const R = OfficeRoom, A = R.A; if (!A || !A.photoAt || (R.ph && R.ph.st !== 'idle') || ofLapK() > 0) return;
+  const R = OfficeRoom, A = R.A; if (!A || !A.photoAt || (R.ph && R.ph.st !== 'idle') || (R.pk && R.pk.st !== 'idle') || ofLapK() > 0) return;
   R.ph = { st: 'reach', t: 0, P0: A.photoAt.position.clone(), q0: A.photoAt.quaternion.clone(), tilt: [0, 0], want: [0, 0], a: {} };
   if (R.glow) R.glow.hide(); R.lapHover = false; ofPhotoUi(); Sound.tick();
 }
@@ -919,6 +925,14 @@ function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; slide
   };
   return out;
 }
+
+/* ---------- your phone (shared with Operations: phone3d.ts) ---------- */
+function ofPhonePick() { const R = OfficeRoom; if ((R.ph && R.ph.st !== 'idle') || ofLapK() > 0) return; phonePick(R); }
+function ofPhonePut() { phonePut(OfficeRoom); }
+function ofPhoneReset() { phoneReset(OfficeRoom); }
+function ofPhoneStep(dt: number, t: number) { return phoneStep(OfficeRoom, dt, t); }
+function ofPhoneOpen() { phoneOpen(OfficeRoom); }
+function ofPhoneClose() { phoneClose(OfficeRoom); }
 
 /* ---------- the interview ---------- */
 const OF_Q: [string, string][] = [['what', 'Tell me, in your own words, what happened.'], ['claim', 'The report says: {did} Is that true?'], ['why', 'Why did it happen?'], ['again', 'How do I know it won\'t happen again?'], ['keep', 'Give me one good reason to keep you.']];

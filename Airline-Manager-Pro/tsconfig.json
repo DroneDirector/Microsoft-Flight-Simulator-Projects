@@ -146,6 +146,7 @@
     "src/screens/office3d.ts",
     "src/screens/laptop.ts",
     "src/screens/ops3d.ts",
+    "src/screens/phone3d.ts",
     "src/data/stars.ts",
     "src/screens/v3d-sky.ts",
     "src/ui/qol.ts",

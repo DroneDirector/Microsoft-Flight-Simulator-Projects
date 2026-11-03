@@ -3365,3 +3365,69 @@ body.aim-locked .office3d .of-aim { font-size: 22px; }
 .police-btn:active { transform: scale(.97); }
 html.calm .police-btn, html.calm .police-btn::before, html.calm .police-btn .pl-l, html.calm .police-btn .pl-r, html.calm .police-btn::after { animation: none; }
 html.calm .police-btn .pl-l, html.calm .police-btn .pl-r { opacity: .5; }
+/* ---------- your phone in the office: the screen brought up in its frame ---------- */
+.ph-screen { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(4,6,10,0); transition: background .55s ease; }
+.ph-screen.in { background: rgba(4,6,10,.55); backdrop-filter: blur(2px); }
+.ph-screen.out { background: rgba(4,6,10,0); pointer-events: none; }
+.ph-frame { position: relative; height: min(92%, 860px); aspect-ratio: 9 / 19.3; max-width: 92vw; border-radius: 46px; padding: 11px; box-sizing: border-box;
+  background: linear-gradient(145deg, #2a2e35, #0d0f12 40%, #1b1e23); box-shadow: 0 0 0 1.5px #3a3f47 inset, 0 0 0 2px #050608, 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.05);
+  transition: transform .55s cubic-bezier(.2,.75,.2,1); }
+.ph-screen.out .ph-frame { transition: transform .5s cubic-bezier(.5,0,.75,.4); }
+.ph-glass { position: relative; width: 100%; height: 100%; border-radius: 36px; overflow: hidden; background: #000; }
+.ph-cam { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 92px; height: 26px; border-radius: 14px; background: #000; z-index: 5; box-shadow: inset 30px 0 0 -26px #0a1424; pointer-events: none; }
+.ph-side { position: absolute; right: -4px; top: 22%; width: 4px; height: 70px; border: 0; border-radius: 0 3px 3px 0; background: linear-gradient(90deg, #15181c, #3a3f46); cursor: pointer; padding: 0; }
+.ph-side::after { content: ''; position: absolute; right: 0; top: 90px; width: 4px; height: 44px; border-radius: 0 3px 3px 0; background: inherit; }
+/* the phone's own layout of the laptop's apps */
+.ph-os { font-size: 14px; }
+.ph-os .ph-status { order: 0; height: 46px; flex: 0 0 auto; display: flex; align-items: center; padding: 8px 26px 0; gap: 8px; background: transparent; border: 0; position: relative; z-index: 4; color: #fff; }
+.ph-os .ph-time { font: 600 15px Inter, sans-serif; letter-spacing: .01em; }
+.ph-os .ph-notch { flex: 1; }
+.ph-os .ph-ind { display: flex; align-items: center; gap: 6px; }
+.ph-os .ph-ind svg { width: 17px; height: 11px; fill: #fff; }
+.ph-os .ph-dot svg { width: 14px; height: 14px; color: #fff; }
+.ph-os .ph-bat { width: 24px; height: 11px; border: 1.5px solid rgba(255,255,255,.85); border-radius: 3px; position: relative; padding: 1px; box-sizing: border-box; }
+.ph-os .ph-bat::after { content: ''; position: absolute; right: -4px; top: 3px; width: 2px; height: 4px; border-radius: 0 1px 1px 0; background: rgba(255,255,255,.85); }
+.ph-os .ph-bat i { display: block; height: 100%; background: #fff; border-radius: 1px; }
+.ph-os .lap-area { flex: 1; min-height: 0; position: relative; }
+.ph-os .lap-desk { position: absolute; inset: 0; overflow: auto; padding: 4px 16px 28px; display: flex; flex-direction: column; gap: 18px; }
+.ph-os .ld-wall { position: absolute; inset: -46px 0 0; z-index: 0; border-radius: 0; }
+.ph-os .ld-brand { display: none; }
+.ph-os .ld-widget { position: relative; z-index: 1; order: -1; margin: 6px 0 0; width: auto; max-width: none; }
+.ph-os .ld-icons { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 8px; padding: 0; width: auto; }
+.ph-os .ld-ic { width: auto; }
+.ph-os .ld-ic span { width: 56px; height: 56px; border-radius: 15px; margin: 0 auto; }
+.ph-os .ld-ic b { font-size: 11px; }
+.ph-os .lap-win { position: absolute; inset: 0; border-radius: 0; margin: 0; width: auto; height: auto; max-width: none; z-index: 3; border: 0; box-shadow: none; }
+.ph-os .lap-win-h { height: 46px; padding: 0 10px 0 14px; }
+.ph-os .lap-win-b { overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.ph-os .ph-home { position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%); width: 140px; height: 22px; border: 0; background: none; padding: 0; cursor: pointer; z-index: 6; display: grid; place-items: center; }
+.ph-os .ph-home i { width: 128px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.85); box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
+.ph-os .lap-win:not([hidden]) ~ .ph-home i { background: rgba(255,255,255,.7); }
+html.calm .ph-frame, html.calm .ph-screen { transition: none; }
+
+/* the phone: one column at a time (the inbox, then the message), and app icons that fit */
+.ph-os .lm { display: block; height: 100%; }
+.ph-os .lm .lm-list { height: 100%; border-right: 0; }
+.ph-os .lm .lm-view { display: none; }
+.ph-os .lm.lm-open .lm-list { display: none; }
+.ph-os .lm.lm-open .lm-view { display: block; height: 100%; overflow: auto; }
+.ph-os .lm-back { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 8px -4px; padding: 4px 6px; border: 0; background: none; color: var(--cyan); font: 600 13px Inter, sans-serif; cursor: pointer; }
+.ph-os .lm-back svg { width: 16px; height: 16px; }
+.ph-os .ld-icons { position: relative; left: auto; top: auto; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: auto; gap: 14px 4px; width: auto; }
+.ph-os .ld-ic { min-width: 0; padding: 4px 0; }
+.ph-os .ld-ic > span { width: 50px; height: 50px; }
+.ph-os .ld-ic b { font-size: 10.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-os .lk-accts, .ph-os .lk-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ph-os .lk-mr { flex-direction: column; align-items: stretch; }
+
+/* the glare on the phone's glass, sliding with the hand and the pointer */
+.ph-glare { position: absolute; inset: 11px; border-radius: 36px; pointer-events: none; z-index: 6; mix-blend-mode: screen; overflow: hidden;
+  background: linear-gradient(118deg, rgba(255,255,255,0) calc(30% + var(--gx, 0%)), rgba(255,255,255,.075) calc(38% + var(--gx, 0%)), rgba(255,255,255,.02) calc(46% + var(--gx, 0%)), rgba(255,255,255,0) calc(52% + var(--gx, 0%))),
+              radial-gradient(120% 60% at calc(18% + var(--gx, 0%)) calc(6% + var(--gy, 0%)), rgba(255,255,255,.07), rgba(255,255,255,0) 60%); }
+.ph-frame { background: linear-gradient(145deg, #d9d6cf, #8f8b83 22%, #c9c5bc 48%, #77736c 78%, #b9b5ad); box-shadow: 0 0 0 1px #5c5952 inset, 0 0 0 9px #050607 inset, 0 30px 80px rgba(0,0,0,.6); padding: 12px; }
+.ph-glass { box-shadow: 0 0 0 1px #000; }
+.ph-cam { top: 24px; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 3px #0b0d12, inset 2px -2px 0 3px #1b2a44; }
+.ph-side { background: linear-gradient(90deg, #8f8b83, #d4d0c8); }
+.ph-os .lk-mr select, .ph-os .lk-mr input { flex: 0 0 auto; }
+.ph-os .lap-win[hidden] { display: none !important; }
+.ph-os .ld-widget { display: block !important; position: relative; left: auto; right: auto; top: auto; bottom: auto; }

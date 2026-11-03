@@ -139,19 +139,25 @@ function lapFamilyMail() {
 
 /* ---------- opening and closing (the office does the zoom) ---------- */
 function lapOsHtml(): string {
+  // the phone: the same apps, in a tall screen with a status bar on top and the home bar below
+  if (Lap.phone) return `<div class="lap-os ph-os">
+    <div class="lap-bar ph-status"></div>
+    <div class="lap-area"><div class="lap-desk"></div><div class="lap-win" hidden></div></div>
+    <button class="ph-home" data-act="lap-app" data-k="" aria-label="Home"><i></i></button>
+  </div>`;
   return `<div class="lap-os">
     <div class="lap-area"><div class="lap-desk"></div><div class="lap-win" hidden></div></div>
     <div class="lap-bar"></div>
   </div>`;
 }
 /** Draw the laptop into its overlay (the office calls this when it opens). */
-function lapMount(root: HTMLElement) {
-  Lap.root = root; Lap.app = ''; try { mailTick(); } catch (e) { /* later */ }
+function lapMount(root: HTMLElement, phone?: boolean) {
+  Lap.root = root; Lap.app = ''; Lap.phone = !!phone; try { mailTick(); } catch (e) { /* later */ }
   root.innerHTML = lapOsHtml();
   lapRender();
   clearInterval(Lap.clock); Lap.clock = setInterval(() => { if (!Lap.root || !Lap.root.isConnected) { clearInterval(Lap.clock); return; } lapBar(); }, 10000);
 }
-function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.bankIn = false; Lap.bankBusy = false; }   // closing the laptop logs you out of the bank
+function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.phone = false; Lap.bankIn = false; Lap.bankBusy = false; }   // closing the laptop logs you out of the bank
 function lapRefresh() { if (Lap.root && Lap.root.isConnected) lapRender(true); }
 
 function lapRender(soft?: boolean) {
@@ -175,6 +181,10 @@ function lapBar() {
   const R = Lap.root as HTMLElement; if (!R) return; const bar = R.querySelector('.lap-bar') as HTMLElement; if (!bar) return;
   const d = lapGameNow(), today = lapYmd(d), notes = (lapS().calendar as CalNote[]).filter(c => c.date === today).length, un = lapUnread();
   const time = d.toTimeString().slice(0, 5), date = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  if (Lap.phone) {   // the phone's status bar: the time, mail waiting, signal and battery
+    patchHtml(bar, `<b class="ph-time">${time}</b><span class="ph-notch"></span><span class="ph-ind">${un ? `<i class="ph-dot" title="${un} unread">${icon('mail')}</i>` : ''}<svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><span class="ph-bat"><i style="width:${78}%"></i></span></span>`);
+    return;
+  }
   patchHtml(bar, `<button class="lb-home ${Lap.app ? '' : 'on'}" data-act="lap-app" data-k="" aria-label="Desktop">${icon('star')}</button>
     <div class="lb-apps">${LAP_APPS.map(a => `<button class="lb-app ${Lap.app === a[0] ? 'on' : ''}" data-act="lap-app" data-k="${a[0]}" title="${esc(a[1])}" style="--c:${a[3]}">${icon(a[2])}${a[0] === 'mail' && un ? `<i class="lb-badge">${un}</i>` : ''}</button>`).join('')}</div>
     <span class="lb-sp"></span>
@@ -208,7 +218,7 @@ function lapMailHtml(): string {
   const L = lapMail(), cur = L.filter(m => m.id === Lap.mailId)[0];
   const kindIc: any = { court: 'shield', report: 'alert', lease: 'fleet', family: 'user', bank: 'bank', note: 'calendar' };
   const list = L.slice(0, 120).map(m => `<button class="lm-row ${m.read ? '' : 'new'} ${cur === m ? 'on' : ''}" data-act="lap-mail" data-id="${m.id}"><span class="lm-ic k-${m.kind}">${icon(kindIc[m.kind] || 'mail')}</span><span class="lm-t"><b>${esc(m.from)}</b><span>${esc(m.subject)}</span><small>${esc(atText(m.at))}${m.done ? ' · ' + esc(m.done) : ''}</small></span></button>`).join('') || '<p class="muted lm-empty">No mail yet.</p>';
-  const view = cur ? `<div class="lm-view"><div class="lm-vh"><h3>${esc(cur.subject)}</h3><small><b>${esc(cur.from)}</b>${cur.addr ? ` &lt;${esc(cur.addr)}&gt;` : ''} · ${esc(dateStr(new Date(cur.at)))}</small></div>
+  const view = cur ? `<div class="lm-view"><div class="lm-vh">${Lap.phone ? `<button class="lm-back" data-act="lap-mail-back">${icon('back')}Inbox</button>` : ''}<h3>${esc(cur.subject)}</h3><small><b>${esc(cur.from)}</b>${cur.addr ? ` &lt;${esc(cur.addr)}&gt;` : ''} · ${esc(dateStr(new Date(cur.at)))}</small></div>
       <div class="lm-body">${esc(cur.body).replace(/\n/g, '<br>')}</div>
       ${cur.kind === 'family' && cur.fam && cur.fam.chosen != null ? `<div class="lm-sent"><small>You replied</small><p>${esc(cur.fam.replies[cur.fam.chosen][0])}</p></div>` : ''}
       ${cur.acts && cur.acts.length && !(cur.kind === 'lease' && cur.done) && !(cur.kind === 'family' && cur.fam && cur.fam.chosen != null) ? `<div class="lm-acts">${cur.kind === 'family' ? '<small>Reply</small>' : ''}${cur.acts.map(a => `<button class="btn ${a.kind === 'primary' ? 'primary' : 'ghost'} sm" data-act="${a.act}" data-id="${esc(a.act === 'lap-lease' || a.act === 'lap-fam' ? cur.id : (a.data || ''))}" data-v="${esc(a.data || '')}">${esc(a.label)}</button>`).join('')}</div>` : ''}
@@ -216,10 +226,11 @@ function lapMailHtml(): string {
       <div class="lm-foot"><button class="btn ghost sm" data-act="lap-mail-del" data-id="${cur.id}">${icon('trash')}Delete</button></div></div>`
     : `<div class="lm-view lm-none"><span>${icon('mail')}</span><p>Choose a message.</p></div>`;
   const on = (State.settings as any).mailReports !== false;
-  return `<div class="lm"><div class="lm-list"><div class="lm-lh"><b>Inbox</b><small>${lapUnread()} unread</small></div>${list}
+  return `<div class="lm ${cur ? 'lm-open' : ''}"><div class="lm-list"><div class="lm-lh"><b>Inbox</b><small>${lapUnread()} unread</small></div>${list}
     <label class="lm-set"><input type="checkbox" data-act="lap-mail-reports" ${on ? 'checked' : ''}> Receive the accident investigators' preliminary reports</label></div>${view}</div>`;
 }
 ACTIONS['lap-mail'] = el => { const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (!m) return; Lap.mailId = m.id; if (!m.read) { m.read = true; Store.soon(); } Sound.tick(); lapRender(true); try { renderTopbar(); } catch (e) { /* ignore */ } };
+ACTIONS['lap-mail-back'] = () => { Lap.mailId = ''; Sound.tick(); lapRender(true); };
 ACTIONS['lap-mail-del'] = el => { const S = lapS(); S.mail = S.mail.filter((x: LapMail) => x.id !== el.getAttribute('data-id')); Lap.mailId = ''; Store.soon(); Sound.tick(); lapRender(true); };
 ACTIONS['lap-mail-reports'] = el => { (State.settings as any).mailReports = (el as HTMLInputElement).checked; Store.soon(); };
 ACTIONS['lap-lease'] = el => { const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (m) lapLeaseAnswer(m, el.getAttribute('data-v') === 'yes'); };
