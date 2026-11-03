@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.88 (2026-11-03)
+
+- pets: a standing pose sculpted alongside the curled one (corgi and ginger kitten shapes, leg pivots and weights), single fur strands (7,000 on a dog, 5,200 on a cat) laid along the body, tabby stripes, pink ear insides, eyes with irises; a state machine (sleep, wake, rise, walk, turn, down) crossfades the poses, walks a diagonal gait between the office wander points and back, and sleeps four to nine minutes after
+
 ## 0.9.87 (2026-11-03)
 
 - pets sculpted as one smooth body (a distance field of blended shapes, meshed with surface nets, about 12,000 to 22,000 points), with fur (strand shading, sheen and two fur shells), coat shading (light chest, muzzle and paws, darker back), and the head, ears, tail and paws animated by painted weights
