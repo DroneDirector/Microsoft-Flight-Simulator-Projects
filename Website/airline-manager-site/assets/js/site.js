@@ -159,10 +159,14 @@
     }
     if (cached && Date.now() - cached.at < 3600e3) return apply(cached);
     if (!W.fetch) return;
-    fetch("https://api.github.com/repos/" + cfg.repo + "/releases?per_page=30", { headers: { Accept: "application/vnd.github+json" } })
-      .then(function (r) { return r.ok ? r.json() : []; })
+    // GitHub doesn't list releases newest first (0.9.100 comes after 0.9.69): two pages, and the highest version wins
+    function vcmp(a, b) { var pa = String(a).split(/[.-]/), pb = String(b).split(/[.-]/); for (var i = 0; i < Math.max(pa.length, pb.length); i++) { var d = (parseInt(pa[i], 10) || 0) - (parseInt(pb[i], 10) || 0); if (d) return d; } return 0; }
+    function page(n) { return fetch("https://api.github.com/repos/" + cfg.repo + "/releases?per_page=100&page=" + n, { headers: { Accept: "application/vnd.github+json" } }).then(function (r) { return r.ok ? r.json() : []; }).catch(function () { return []; }); }
+    Promise.all([page(1), page(2)])
+      .then(function (pp) { return (pp[0] || []).concat(pp[1] || []); })
       .then(function (list) {
-        var rel = (list || []).filter(function (x) { return x.tag_name && x.tag_name.indexOf(cfg.tag) === 0 && !x.draft; })[0];
+        var rel = (list || []).filter(function (x) { return x.tag_name && x.tag_name.indexOf(cfg.tag) === 0 && !x.draft; })
+          .sort(function (a, b) { return vcmp(b.tag_name.slice(cfg.tag.length), a.tag_name.slice(cfg.tag.length)); })[0];
         if (!rel) return;
         var r = { version: rel.tag_name.slice(cfg.tag.length), android: "", windows: "", at: Date.now() };
         (rel.assets || []).forEach(function (a) { if (/\.apk$/i.test(a.name)) r.android = a.browser_download_url; if (/PC.*\.zip$/i.test(a.name)) r.windows = a.browser_download_url; });

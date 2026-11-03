@@ -60,17 +60,24 @@ function ams_release() {
     $r = get_transient('ams_release');
     if ($r === false && ams_opt('live') === '1') {
         $r = ['version' => '', 'android' => '', 'windows' => '', 'date' => ''];
-        $res = wp_remote_get('https://api.github.com/repos/' . AMS_REPO . '/releases?per_page=30', ['timeout' => 4, 'headers' => ['Accept' => 'application/vnd.github+json', 'User-Agent' => 'airline-manager-site']]);
-        if (!is_wp_error($res) && wp_remote_retrieve_response_code($res) === 200) {
-            foreach ((array) json_decode(wp_remote_retrieve_body($res), true) as $rel) {
+        // GitHub doesn't list releases newest first (0.9.100 comes after 0.9.69): two pages, the highest version wins
+        $best = null;
+        foreach ([1, 2] as $pg) {
+            $res = wp_remote_get('https://api.github.com/repos/' . AMS_REPO . '/releases?per_page=100&page=' . $pg, ['timeout' => 4, 'headers' => ['Accept' => 'application/vnd.github+json', 'User-Agent' => 'airline-manager-site']]);
+            if (is_wp_error($res) || wp_remote_retrieve_response_code($res) !== 200) break;
+            $list = (array) json_decode(wp_remote_retrieve_body($res), true);
+            foreach ($list as $rel) {
                 if (empty($rel['tag_name']) || strpos($rel['tag_name'], AMS_TAG) !== 0 || !empty($rel['draft'])) continue;
-                $r['version'] = substr($rel['tag_name'], strlen(AMS_TAG));
-                $r['date'] = substr((string) ($rel['published_at'] ?? ''), 0, 10);
-                foreach ((array) ($rel['assets'] ?? []) as $a) {
-                    if (preg_match('/\.apk$/i', $a['name'])) $r['android'] = $a['browser_download_url'];
-                    if (preg_match('/PC.*\.zip$/i', $a['name'])) $r['windows'] = $a['browser_download_url'];
-                }
-                break;
+                if ($best === null || version_compare(substr($rel['tag_name'], strlen(AMS_TAG)), substr($best['tag_name'], strlen(AMS_TAG)), '>')) $best = $rel;
+            }
+            if (count($list) < 100) break;
+        }
+        if ($best) {
+            $r['version'] = substr($best['tag_name'], strlen(AMS_TAG));
+            $r['date'] = substr((string) ($best['published_at'] ?? ''), 0, 10);
+            foreach ((array) ($best['assets'] ?? []) as $a) {
+                if (preg_match('/\.apk$/i', $a['name'])) $r['android'] = $a['browser_download_url'];
+                if (preg_match('/PC.*\.zip$/i', $a['name'])) $r['windows'] = $a['browser_download_url'];
             }
         }
         set_transient('ams_release', $r, $r['version'] ? 3 * HOUR_IN_SECONDS : 20 * MINUTE_IN_SECONDS);
