@@ -529,7 +529,8 @@ function flightPathFor(from: string, to: string, noSim?: boolean, cls?: 'H' | 'L
   // where each of the plan's waypoints is along the path (for its levels and speeds)
   const wpD: { [id: string]: number } = {}; for (const id in wpRaw) wpD[id] = idx(map[sid.length + wpRaw[id]]);
   // still much longer than the trip itself: the app's own departure and arrival instead
-  if ((sd || sa) && !noSim && len > gc * 1.35 + (PL ? 400 : 120)) { const own = flightPathFor(from, to, true); if (own) return (_paths[key] = own); }
+  const picked = !!(PK.sid || PK.star || PK.app);   // ones you chose are flown even when they are long
+  if ((sd || sa) && !noSim && !picked && len > gc * 1.35 + (PL ? 400 : 120)) { const own = flightPathFor(from, to, true); if (own) return (_paths[key] = own); }
   return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa), wpD, awy: AW || null, depSrc: sd ? SimProcedures.src[from] || 'sim' : '', arrSrc: sa ? SimProcedures.src[to] || 'sim' : '', fixes: (sd ? sd.fixes : []).concat(sa ? sa.fixes : []) } as any);
 }
 
@@ -552,7 +553,8 @@ function flightPathPos(f: any, now?: number): { pos: number[]; hdg: number; d: n
   now = now || Date.now();
   const prof: FlightProfile = f.coop || f.tfc ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
   // the simulator's procedures much longer than the trip the times are worked out for: the app's own ones instead
-  if ((fp as any).sim && !flightPlanFor(f.from, f.to) && prof.routeNm > 0 && fp.len > prof.routeNm * 1.4 + 40) { const own = flightPathFor(f.from, f.noDest ? null : f.to, true); if (own) fp = _flightPaths[pk] = own; }
+  const pkF: any = procPick(f.from, f.to) || {};
+  if ((fp as any).sim && !flightPlanFor(f.from, f.to) && !(pkF.sid || pkF.star || pkF.app) && prof.routeNm > 0 && fp.len > prof.routeNm * 1.4 + 40) { const own = flightPathFor(f.from, f.noDest ? null : f.to, true); if (own) fp = _flightPaths[pk] = own; }
   const fe = flightEl(f, now), q = profileAt(prof, fe.el);
   // the profile's distance (along airways) mapped onto this path
   const d = prof.routeNm > 0 ? q.d / prof.routeNm * fp.len : 0;

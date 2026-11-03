@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.106 (2026-11-03)
+
+- Descent profile meets the arrival's and approach's altitude and speed limits (flightperf cons; ARINC glide slope codes); chosen procedures are never swapped for a shorter path; limits drawn on the planner's profile
+
 ## 0.9.105 (2026-11-03)
 
 - Planner: SID/STAR/approach and transition pickers (plProcPickers; FlightPlanR sid/sidTr/star/starTr/app/appTr honoured by simDeparture/simArrival); procedure fixes on the map with altitude and speed limits (legFixes, FlightPath.fixes), Departure/Arrival zoom

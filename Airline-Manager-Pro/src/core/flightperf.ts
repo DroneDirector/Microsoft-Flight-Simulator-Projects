@@ -169,6 +169,23 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
   const GLIDE = 318;   // ft per nm on a 3° path
   // take-off roll and landing roll from the type's speeds (docs/reference), at a typical 80% load
   const SPD = flightSpeeds(typeId, Math.round(t.seats * 0.8), gc), accel = P.jet ? 2.0 : 2.4, decel = P.jet ? 1.9 : 1.6;
+  // the arrival's and approach's altitude and speed limits at their fixes (published, or built from navaids), as
+  // [miles to go, altitude rule, altitude, speed]: the descent is planned to meet them, as crews do
+  const cons: [number, string, number, number][] = [];
+  try {
+    const PP: any = FPH || (A && B ? flightPathFor(from, to, false, CLS) : null);
+    if (PP && PP.fixes && PP.len > 0) {
+      const k = routeNm / PP.len, arrStart = (PP.parts.filter((x: any) => x.kind === 'star')[0] || { from: PP.len * 0.6 }).from;
+      for (const f of PP.fixes as ProcFix[]) {
+        if (!f.alt && !f.spd) continue;
+        let bi = 0, bd = 1e9; for (let i = 0; i < PP.pts.length; i += 1) { const d = gcDistanceNm(PP.pts[i], f.pos); if (d < bd) { bd = d; bi = i; } }
+        if (bd > 3 || PP.cum[bi] < arrStart - 1) continue;   // the departure's limits are for the climb
+        const elev = ((apt(to) as any) || {}).elev || 0;
+        const ad = f.ad === 'I' || f.ad === 'J' ? '+' : f.ad === 'G' || f.ad === 'H' || f.ad === 'V' ? '@' : f.ad || '';   // glide slope intercept: at or above
+        cons.push([(PP.len - PP.cum[bi]) * k, ad, f.alt ? Math.max(0, f.alt - elev) : 0, f.spd || 0]);
+      }
+    }
+  } catch (e) { /* no procedure known */ }
   const descPlan = (top: number) => {
     const finalAlt = Math.min(top, P.finalNm * GLIDE), low = Math.min(top, 10000);
     // [miles out, altitude, indicated speed]: on the final in the landing configuration; before it, slowing
@@ -180,7 +197,19 @@ function flightProfile(typeId: string, from: string, to: string, when?: number):
     nodes.push([lowNm, low, P.jet ? 250 : Math.min(P.descIas, 250)]);
     if (top > low) nodes.push([lowNm + (top - low) / 1000 * P.descK, top, P.descIas]);
     nodes.sort((a, b) => a[0] - b[0]);
-    for (let i = 1; i < nodes.length; i++) if (nodes[i][1] < nodes[i - 1][1]) nodes[i][1] = nodes[i - 1][1];
+    // the procedure's limits: at or below, at, between (never above) and at or above (never below) at each fix,
+    // and the speed limits, worked in where the fix is; never steeper than the type can descend
+    const at0 = (dn: number, k: number) => { for (let i = 1; i < nodes.length; i++) if (dn <= nodes[i][0]) { const a = nodes[i - 1], b = nodes[i], f = (dn - a[0]) / ((b[0] - a[0]) || 1); return a[k] + (b[k] - a[k]) * f; } return nodes[nodes.length - 1][k]; };
+    for (const [dn, ad, alt, spd] of cons) {
+      if (dn <= P.finalNm * 0.5 || dn >= nodes[nodes.length - 1][0]) continue;
+      let h = at0(dn, 1), v = at0(dn, 2);
+      if (alt) { if ((ad === '-' || ad === '@' || ad === '' || ad === 'B') && h > alt) h = alt; if ((ad === '+' || ad === '@' || ad === '') && h < alt) h = Math.min(top, alt); }
+      if (spd && v > spd) v = spd;
+      if (h !== at0(dn, 1) || v !== at0(dn, 2)) nodes.push([dn, Math.min(top, Math.max(0, h)), v]);
+    }
+    nodes.sort((a, b) => a[0] - b[0]);
+    if (cons.length) { for (let i = nodes.length - 2; i >= 0; i--) if (nodes[i][1] > nodes[i + 1][1]) nodes[i][1] = nodes[i + 1][1]; }   // never higher nearer the runway
+    else for (let i = 1; i < nodes.length; i++) if (nodes[i][1] < nodes[i - 1][1]) nodes[i][1] = nodes[i - 1][1];
     const todNm = nodes[nodes.length - 1][0];
     // approach starts at 10,000 ft for airliners and turboprops, about 10 miles out for light aircraft
     const apprNm = P.jet || P.maxAlt > 15000 ? lowNm : Math.min(todNm, P.finalNm + 7);
