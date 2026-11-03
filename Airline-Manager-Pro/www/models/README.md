@@ -77,6 +77,34 @@ a heavier, higher-quality building can go to the PC while phones keep the lighte
 | `hangars/hangar-very-large.glb` | Very large hangar: 96 × 100 m, 30 m high, doors 26.5 m (747, 777-9, A380) |
 | `hangars/hangar-very-large-pc.glb` | The same, PC only |
 
+## Hangar equipment and furniture (`hangar-props/`)
+
+One file for each kind: every one of that kind in the hangars uses it. Metres, front towards +Z (the side you face it
+from: a chair's front is where you sit, a desk's where you work), standing on the floor. It is fitted to the size of the
+app's own. Tables, counters and trolleys keep working as places to put things down. The tug by the doors is the apron's
+own (`vehicles/pushback-tug.glb`).
+
+| File | What |
+|---|---|
+| `hangar-props/tool-trolley.glb` | Red rolling tool chest (tools on top) |
+| `hangar-props/work-stand.glb` | Yellow work platform with steps (at the engine) |
+| `hangar-props/traffic-cone.glb` | Traffic cone on its base |
+| `hangar-props/workbench.glb` | Workbench with pegboard and vice (along the back wall) |
+| `hangar-props/fire-extinguisher.glb` | Fire extinguisher on its stand |
+| `hangar-props/waste-bin.glb` | Waste bin (hangar, office, break room) |
+| `hangar-props/office-desk.glb` | Work table in the maintenance office (the monitor, keyboard and mouse stand on it) |
+| `hangar-props/office-chair.glb` | Office chair |
+| `hangar-props/keyboard.glb` | Computer keyboard |
+| `hangar-props/computer-mouse.glb` | Computer mouse |
+| `hangar-props/bookshelf.glb` | Shelf of manuals |
+| `hangar-props/kitchen-counter.glb` | Break room counter with cupboards |
+| `hangar-props/sink.glb` | Sink and tap |
+| `hangar-props/coffee-machine.glb` | Coffee machine |
+| `hangar-props/coffee-mug.glb` | Coffee mug |
+| `hangar-props/drinking-glass.glb` | Drinking glass |
+| `hangar-props/break-room-table.glb` | Break room table |
+| `hangar-props/break-room-chair.glb` | Break room chair |
+
 ## The vending machine's parts (`items/vending-machine.glb`)
 
 Name these parts (nodes or meshes) in your file and the machine works with them; any part left out stays the app's own.

@@ -88,7 +88,7 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   }
   const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
   const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
-  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES');
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES');
   const have = f => files.includes(f) ? ' (in use)' : '';
   const md = [
     '# Replaceable models', '',
@@ -114,6 +114,13 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     'a heavier, higher-quality building can go to the PC while phones keep the lighter one.', '',
     '| File | Size |', '|---|---|',
     ...hgr.flatMap(([f, n]) => [`| \`hangars/${f}.glb\`${have('hangars/' + f + '.glb')} | ${n} |`, `| \`hangars/${f}-pc.glb\`${have('hangars/' + f + '-pc.glb')} | The same, PC only |`]), '',
+    '## Hangar equipment and furniture (`hangar-props/`)', '',
+    'One file for each kind: every one of that kind in the hangars uses it. Metres, front towards +Z (the side you face it',
+    'from: a chair\'s front is where you sit, a desk\'s where you work), standing on the floor. It is fitted to the size of the',
+    'app\'s own. Tables, counters and trolleys keep working as places to put things down. The tug by the doors is the apron\'s',
+    'own (`vehicles/pushback-tug.glb`).', '',
+    '| File | What |', '|---|---|',
+    ...hpr.map(([f, n]) => `| \`hangar-props/${f}.glb\`${have('hangar-props/' + f + '.glb')} | ${n} |`), '',
     '## The vending machine\'s parts (`items/vending-machine.glb`)', '',
     'Name these parts (nodes or meshes) in your file and the machine works with them; any part left out stays the app\'s own.',
     'Rows are A (top), B, C; columns 1 (left), 2, 3: nine products, as in the app.', '',
