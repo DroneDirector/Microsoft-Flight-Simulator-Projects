@@ -581,10 +581,10 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
             #if NUM_DIR_LIGHTS > 0
               vec3 Ld = directionalLights[0].direction, Lc = directionalLights[0].color;
               float ndl = dot(normal, Ld), wrap = max(0.0, (ndl + 0.45) / 1.45) - max(0.0, ndl);
-              totalEmissiveRadiance += diffuseColor.rgb * Lc * vec3(0.6, 0.2, 0.12) * wrap * 0.4;
+              totalEmissiveRadiance += diffuseColor.rgb * Lc * vec3(0.6, 0.2, 0.12) * wrap * 0.28;
               float thin = clamp(earW + 0.35 * exp(-pow(length(vRest.xy - vec2(0.0, uEyeL.y - 0.035)) / 0.012, 2.0)), 0.0, 1.0);
-              float through = pow(max(0.0, dot(normalize(-vViewPosition), -Ld)), 4.0);
-              totalEmissiveRadiance += Lc * vec3(0.9, 0.22, 0.1) * uSkin * thin * through * 0.9;
+              float through = pow(max(0.0, dot(normalize(-vViewPosition), Ld)), 4.0);   // the light behind it, shining towards you
+              totalEmissiveRadiance += Lc * vec3(0.9, 0.22, 0.1) * uSkin * thin * through * 0.7;
             #endif
           }`);
     };
