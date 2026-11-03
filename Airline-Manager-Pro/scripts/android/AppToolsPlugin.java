@@ -93,6 +93,7 @@ public class AppToolsPlugin extends Plugin {
             if (b != null) r.put("battTemp", b.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0);
             android.os.PowerManager pm = (android.os.PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
             if (pm != null && Build.VERSION.SDK_INT >= 29) r.put("thermal", pm.getCurrentThermalStatus());
+            if (pm != null) r.put("powerSave", pm.isPowerSaveMode());
             if (pm != null && Build.VERSION.SDK_INT >= 30) { float h = pm.getThermalHeadroom(0); if (!Float.isNaN(h)) r.put("headroom", Math.round(h * 100)); }
             r.put("sdk", Build.VERSION.SDK_INT);
             r.put("canClose", MainActivity.canCloseOthers());

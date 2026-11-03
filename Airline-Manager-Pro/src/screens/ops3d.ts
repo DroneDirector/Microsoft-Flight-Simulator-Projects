@@ -263,7 +263,8 @@ function opsOpen2(root: HTMLElement, q: number) {
       setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); } opsUi(); }, wait);
     }, 40);
     R.iv = setInterval(() => { if (R.on && !document.hidden) opsMonitorDraw(); }, 5000);
-    const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && (!R.overlay || R.zoomAnim)) opsFrame(); };   // the room rests while a screen is open (not while it grows or shrinks)
+    R.perf = Perf.state();
+    const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && (!R.overlay || R.zoomAnim) && !Perf.skip(R.perf)) opsFrame(); };   // the room rests while a screen is open (not while it grows or shrinks)
     R.raf = requestAnimationFrame(loop);
   }, 30);
 }
@@ -290,7 +291,7 @@ function opsFrame() {
   }
   if (R.glow) { if (R.overlay || R.zoomAnim || (R.seat && !R.hover)) R.glow.hide(); R.glow.step(dt); }
   if (R.A && R.A.monScr) R.A.monScr.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, zk * 1.4)));   // the screen lights up as it opens
-  R.ren.render(R.scene, R.cam);
+  R.ren.render(R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function opsAimed(e?: PointerEvent): string { const o = opsAimedObj(e); return o ? o.userData.act : ''; }
 /** What you can use at the mouse (or, walking with the mouse taken, at the dot in the middle), within reach. */

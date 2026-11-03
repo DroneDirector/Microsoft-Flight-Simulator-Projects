@@ -429,7 +429,8 @@ function ofOpen2(root: HTMLElement, q: number) {
   });
   if (Human.ready) setTimeout(photo, 30); else Human.load().then(() => setTimeout(photo, 30), () => next());
   R.loading = true;
-  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && (!R.overlay || R.lapZ)) ofFrame(); };   // the room rests while the planner is open
+  R.perf = Perf.state();
+  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && (!R.overlay || R.lapZ) && !Perf.skip(R.perf)) ofFrame(); };   // the room rests while the planner is open
   R.raf = requestAnimationFrame(loop);
 }
 function ofReady() {
@@ -670,7 +671,7 @@ function ofFrame() {
     R.cam.lookAt(ahead);
   } else ofWalk(dt, now);
   if (R.glow) { if ((R.seat && !R.lapHover) || R.overlay || R.lapZ) R.glow.hide(); R.glow.step(dt); }
-  R.ren.render(R.scene, R.cam);
+  R.ren.render(R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function ofBlocked(x: number, z: number): boolean {
   if (x < -2.9 || x > 2.9 || z < -3.1 || z > 2.7) return true;

@@ -133,7 +133,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   v3dSize();
   v3dBind();
   v3dShowInfo();
-  V3d.last = 0; V3d.raf = requestAnimationFrame(v3dLoop);
+  V3d.last = 0; (V3d as any).perf = Perf.state(); V3d.raf = requestAnimationFrame(v3dLoop);
   addEventListener('resize', v3dSize);
 }
 
@@ -600,6 +600,7 @@ function v3dLoop(now: number) {
   if (!V3d.open) return;
   V3d.raf = requestAnimationFrame(v3dLoop);
   if (document.hidden || now - V3d.last < 1000 / (gameBoost() ? 60 : V3D_FPS) - 2) return;
+  if (Perf.skip((V3d as any).perf, now)) return;   // warm, or saving battery: fewer frames
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
   V3d.frames = (V3d.frames || 0) + 1;   // counted for the Game Booster's frame-rate chart
   if (V3d.root && V3d.root.getAttribute('data-m') !== V3d.mode) { V3d.root.setAttribute('data-m', V3d.mode); if (!/^(walk|free)$/.test(V3d.mode)) v3dUi(true); }
@@ -860,6 +861,7 @@ function v3dLoop(now: number) {
     VL.drawnAt = now;
     if (VL.cabinFwdFor) { try { cabinOutsidePass(V3d.planes[VL.cabinFwdFor]); } catch (e) { /* the windows keep the last view */ } }
     V3d.r.render(V3d.scene, V3d.cam);
+    if (V3d.loaded && !(V3d as any).dprWas) Perf.frame((V3d as any).perf, V3d.r, gameBoost() ? 60 : V3D_FPS);   // the cabin keeps its own sharpness
   }
 
   v3dClockStep(now);
