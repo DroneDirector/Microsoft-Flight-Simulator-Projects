@@ -153,8 +153,26 @@ const Human = (function () {
     const b64 = (window as any).__HUMANS_B64;
     const p = b64 ? Promise.resolve(Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer)
       : fetch('humans.bin').then(r => { if (!r.ok) throw new Error('humans.bin: HTTP ' + r.status); return r.arrayBuffer(); });
-    loading = p.then(buf => (DATA = decode(buf)));
+    loading = p.then(buf => (DATA = decode(buf))).then(d => Promise.race([loadFaces(), new Promise(ok => setTimeout(ok, 5000))]).then(() => d, () => d));
     return loading;
+  }
+  /* ---------- the face textures (photographic skin, mapped on with the eyes, nose, mouth and ears in place) ---------- */
+  // face-a: the lighter skin, face-b: the darker; each is tinted to the person's own skin colour. Their landmarks in
+  // the picture (as fractions of its width and height): the centre line, the eyes, the ears, and rows for the top of
+  // the face, the eyes, the tip of the nose, the line between the lips and the chin.
+  const FACE_SET = [
+    { file: 'assets/faces/face-a.jpg', avg: [0.4544, 0.161, 0.0831], c: 0.4990, eye: 0.0852, ear: 0.3512, top: 0.205, eyeV: 0.4205, nose: 0.586, mouth: 0.708, chin: 0.873, earBox: [0.112, 0.19, 0.36, 0.578] },
+    { file: 'assets/faces/face-b.jpg', avg: [0.1105, 0.0354, 0.0191], c: 0.4990, eye: 0.0852, ear: 0.3483, top: 0.24, eyeV: 0.4316, nose: 0.586, mouth: 0.698, chin: 0.862, earBox: [0.114, 0.192, 0.38, 0.586] },
+  ];
+  let FACES: any[] = null, DETAIL = null;
+  function loadFaces() {
+    if (FACES) return Promise.resolve(FACES);
+    const tex = (url, srgb) => fetch(url).then(r => { if (!r.ok) throw new Error(url); return r.blob(); }).then(b => createImageBitmap(b)).then(bm => {
+      const t = new THREE.Texture(bm); t.flipY = false; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping;
+      t.anisotropy = 16; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.needsUpdate = true; return t; });
+    return Promise.all(FACE_SET.map(f => tex(f.file, true)).concat([tex('assets/faces/skin-detail.png', false)])).then(ts => {
+      ts[ts.length - 1].wrapT = THREE.RepeatWrapping; DETAIL = ts.pop(); FACES = ts; return FACES;
+    }).catch(() => { FACES = []; return FACES; });   // without them: the drawn skin as before
   }
 
   function decode(buf) {
@@ -281,12 +299,16 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       // the ankles (the foot turns at the ankle) and the spine (the upper body bends, twists and leans from the waist)
       uAnkL: { value: new THREE.Matrix3() }, uAnkR: { value: new THREE.Matrix3() }, uAnkPL: { value: v3(I.J['foot.L']) }, uAnkPR: { value: v3(I.J['foot.R'] || I.J['foot.L']).multiply(I.J['foot.R'] ? new THREE.Vector3(1, 1, 1) : new THREE.Vector3(-1, 1, 1)) },
       uSpine: { value: new THREE.Matrix3() }, uSpineP: { value: new THREE.Vector3(0, c.waistY, -0.02) },
+      // the face texture: on or off, its picture and average colour, and how it lines up with this head
+      uFaceOn: { value: 0 }, tFace: { value: null }, tDetail: { value: null }, uFaceAvg: { value: new THREE.Vector3(0.45, 0.16, 0.08) },
+      uFaceU: { value: new THREE.Vector4(0.42, 1.71, 0.085, 0.351) }, uFaceC: { value: 0.499 },
+      uFaceY: { value: new THREE.Vector4(-0.57, -1.15, -1.52, -2.17) }, uEarZY: { value: new THREE.Vector4(0, 0.1, 1.4, 1.6) }, uEarTex: { value: new THREE.Vector4(0.112, 0.19, 0.36, 0.578) }, uFaceV: { value: new THREE.Vector4(0.42, 0.586, 0.708, 0.873) }, uFaceTop: { value: new THREE.Vector2(0.22, 0.205) },
     };
     m.userData.U = U;
     m.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, U);
       const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR,uHipL,uHipR; uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR,uLegL,uLegR,uKneeL,uKneeR; uniform float uFlush;
-        uniform vec3 uAnkPL,uAnkPR,uSpineP; uniform mat3 uAnkL,uAnkR,uSpine; uniform float uPress,uLipLow,uLipUp,uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink,uJaw,uLipR,uMouthIn;
+        uniform vec3 uAnkPL,uAnkPR,uSpineP,uFaceAvg; uniform sampler2D tFace,tDetail; uniform vec4 uFaceU,uFaceY,uFaceV,uEarZY,uEarTex; uniform vec2 uFaceTop; uniform float uFaceOn,uFaceC; uniform mat3 uAnkL,uAnkR,uSpine; uniform float uPress,uLipLow,uLipUp,uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink,uJaw,uLipR,uMouthIn;
         varying vec3 vRest; varying vec3 vF; varying vec3 vON; varying vec4 vA; varying vec4 vB; varying float vBeard;
         float hairlineAt(float az){ float a = abs(az);
           float h = mix(uHairline, uHairline - 0.12, smoothstep(0.35, 0.9, a));
@@ -363,16 +385,59 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
           float low = fbm(R * 22.0), mid = fbm(R * 90.0);
           col *= 0.95 + 0.1 * low;
           col = mix(col, col * vec3(1.06, 0.93, 0.9), 0.35 * mid);
+          // the face: the photographic skin, lined up by the eyes, nose, mouth, chin and ears, tinted to this person's skin
+          float tx = 0.0, fH = 0.0, earW = 0.0;
+          if (uFaceOn > 0.5 && headW > 0.3) {
+            float az = atan(vB.x, vB.z), aa = abs(az);
+            float uo = aa < uFaceU.x ? aa / uFaceU.x * uFaceU.z : aa < uFaceU.y ? mix(uFaceU.z, uFaceU.w, (aa - uFaceU.x) / (uFaceU.y - uFaceU.x)) : mix(uFaceU.w, 0.5, (aa - uFaceU.y) / (3.14159 - uFaceU.y));
+            float y = vB.y, fv;
+            if (y > uFaceTop.x) fv = mix(uFaceTop.y, 0.02, clamp((y - uFaceTop.x) / 0.7, 0.0, 1.0));
+            else if (y > uFaceY.x) fv = mix(uFaceTop.y, uFaceV.x, (uFaceTop.x - y) / (uFaceTop.x - uFaceY.x));
+            else if (y > uFaceY.y) fv = mix(uFaceV.x, uFaceV.y, (uFaceY.x - y) / (uFaceY.x - uFaceY.y));
+            else if (y > uFaceY.z) fv = mix(uFaceV.y, uFaceV.z, (uFaceY.y - y) / (uFaceY.y - uFaceY.z));
+            else if (y > uFaceY.w) fv = mix(uFaceV.z, uFaceV.w, (uFaceY.z - y) / (uFaceY.z - uFaceY.w));
+            else fv = mix(uFaceV.w, 0.985, clamp((uFaceY.w - y) / 0.35, 0.0, 1.0));
+            vec2 fuv = vec2(uFaceC + sign(az) * uo, fv);
+            // the ears: the ear in the photograph laid onto the ear itself, from its front edge to its back and top to bottom
+            earW = smoothstep(0.8, 0.9, abs(vB.x)) * smoothstep(-1.0, -0.85, vB.y) * smoothstep(0.35, 0.2, vB.y);
+            if (earW > 0.0) {
+              float ez = clamp((R.z - uEarZY.x) / max(0.001, uEarZY.y - uEarZY.x), 0.0, 1.0), ey = clamp((uEarZY.w - R.y) / max(0.001, uEarZY.w - uEarZY.z), 0.0, 1.0);
+              vec2 euv = R.x < 0.0 ? vec2(mix(uEarTex.x, uEarTex.y, ez), mix(uEarTex.z, uEarTex.w, ey)) : vec2(mix(1.0 - uEarTex.x, 1.0 - uEarTex.y, ez), mix(uEarTex.z, uEarTex.w, ey));
+              fuv = mix(fuv, euv, earW);
+            }
+            vec3 ft = texture2D(tFace, fuv).rgb;
+            // the photograph's own relief: brighter than its surroundings is raised, darker is a crease or a pore
+            float lumN = dot(ft, vec3(0.3, 0.59, 0.11)), lumB = dot(texture2D(tFace, fuv, 3.5).rgb, vec3(0.3, 0.59, 0.11));
+            fH = (lumN - lumB) / max(0.004, lumB);
+            // the dark of the eye openings in the picture is never shown: the eyes themselves are there
+            float rel = dot(ft, vec3(0.3, 0.59, 0.11)) / max(0.001, dot(uFaceAvg, vec3(0.3, 0.59, 0.11)));
+            vec3 ec0 = vec3(sign(R.x) * uEyeL.x, uEyeL.y, uEyeL.z);
+            float hole = smoothstep(0.32, 0.16, rel) * step(length(R - ec0), uEyeR0 * 2.2);
+            vec3 fc = ft / max(uFaceAvg, vec3(0.002)) * mix(uSkin, uSkin * vec3(1.12, 0.78, 0.74), uFlush);
+            tx = smoothstep(0.3, 0.75, headW) * (1.0 - hole);
+            // finer than the photograph can hold: its own pores again, much smaller, for sharpness close up
+            vec3 an0 = abs(normalize(vON)); an0 /= (an0.x + an0.y + an0.z);
+            float dz = texture2D(tDetail, R.yz * 34.0).r * an0.x + texture2D(tDetail, R.xz * 34.0).r * an0.y + texture2D(tDetail, R.xy * 34.0).r * an0.z;
+            fc *= mix(1.0, dz * 2.0, 0.22);
+            fc *= 1.0 - clamp(-fH * 0.6, 0.0, 0.22);   // the creases and the deepest pores a touch darker (cavities)
+            col = mix(col, fc, tx);
+          } else if (uFaceOn > 0.5) {
+            // hands, arms, the neck: the same skin detail (pores and fine texture) from the photograph
+            vec3 an = abs(normalize(vON)); an /= (an.x + an.y + an.z);
+            float dd = texture2D(tDetail, R.yz * 14.0).r * an.x + texture2D(tDetail, R.xz * 14.0).r * an.y + texture2D(tDetail, R.xy * 14.0).r * an.z;
+            col *= mix(1.0, dd * 2.0, 0.55);
+          }
           vec3 E = uEyeL; vec3 Rx = vec3(abs(R.x), R.y, R.z);
           float cheek = exp(-pow(length(Rx.xy - vec2(E.x + 0.012, E.y - 0.035)) / 0.022, 2.0)) * step(E.z - 0.03, R.z);
           float nose = exp(-pow(length(R.xy - vec2(0.0, E.y - 0.035)) / 0.014, 2.0)) * step(E.z - 0.01, R.z);
           float ear = headW > 0.5 && abs(vB.x) > 0.85 ? 1.0 : 0.0;
-          col = mix(col, col * vec3(1.08, 0.86, 0.84), clamp(0.55 * cheek + 0.4 * nose + 0.3 * ear, 0.0, 1.0));
+          col = mix(col, col * vec3(1.08, 0.86, 0.84), clamp(0.55 * cheek + 0.4 * nose + 0.3 * ear, 0.0, 1.0) * (1.0 - tx));
           float tz = headW > 0.5 ? exp(-pow(abs(R.x) / 0.03, 2.0)) * smoothstep(E.y - 0.06, E.y - 0.03, R.y) * step(E.z - 0.02, R.z) : 0.0;
           rough = 0.56 - 0.14 * tz;
+          rough = mix(rough, clamp(rough - fH * 0.5, 0.3, 0.7), tx);   // the photograph's highlights: oilier where it shines
           vec2 ml = (R.xy - uMouth.xy) / vec2(0.024, 0.0105);
           float lip = (headW > 0.5 && R.z > uMouth.z - 0.03) ? smoothstep(1.05, 0.8, length(ml)) : 0.0;
-          col = mix(col, uLip, lip); rough = mix(rough, 0.38, lip);
+          col = mix(col, uLip, lip * (1.0 - 0.7 * tx)); rough = mix(rough, 0.38, lip);
           // the inside of the mouth as it opens: the upper teeth, the dark of the mouth, the tongue below
           if (headW > 0.5 && uJaw > 0.02 && uMouthIn > 0.5 && R.z > uMouth.z - 0.03) {
             vec2 mq = (R.xy - uMouth.xy) / vec2(0.018 * (1.0 - 0.25 * max(0.0, uLipR)), 0.0028);
@@ -385,7 +450,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
           float bw = uBrowT * (1.0 - 0.6 * u) * smoothstep(-0.05, 0.15, u);
           float brow = (headW > 0.5 && u > -0.05 && u < 1.0 && R.z > E.z - 0.012) ? smoothstep(bw + 0.0007, bw - 0.0005, abs(R.y - by)) : 0.0;
           brow *= 0.7 + 0.3 * mix(0.5, vnoise(R * vec3(2400.0, 600.0, 600.0)), 1.0 - smoothstep(0.3, 0.8, length(fwidth(R * 2400.0))));
-          col = mix(col, uBrow, brow * 0.8);
+          col = mix(col, uBrow, brow * 0.8 * (1.0 - 0.45 * tx));
           vec3 ec = vec3(sign(R.x) * E.x, E.y, E.z);
           float de = length(R - ec);
           float lash = (headW > 0.5 && R.y > ec.y - 0.002 && R.z > ec.z && de < uEyeR0 * (uFem > 0.5 ? 1.32 : 1.24)) ? 1.0 : 0.0;
@@ -488,7 +553,8 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
             float hgt;
             if (isSkin > 0.5) {
               float pd = pores(vRest * 1100.0);
-              hgt = (smoothstep(0.05, 0.45, pd) * 0.00006 + (fbm(vRest * 160.0) - 0.5) * 0.00012) * fade;
+              hgt = (smoothstep(0.05, 0.45, pd) * 0.00006 + (fbm(vRest * 160.0) - 0.5) * 0.00012) * fade * (1.0 - 0.6 * tx);
+              hgt += fH * 0.00028 * tx;   // the face's own relief, from the photograph: pores, lines, the folds of the ears
             } else {
               vec3 n0 = normalize(vON);
               float w = 0.0;
@@ -509,7 +575,18 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
           if (isSkin < 0.5) material.sheenColor = diffuseColor.rgb * 0.7;`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          if (isSkin > 0.5) { float rimL = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0); totalEmissiveRadiance += uSkin * vec3(0.5, 0.14, 0.08) * (0.06 + 0.2 * rimL); }`);
+          if (isSkin > 0.5) { float rimL = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 2.0); totalEmissiveRadiance += uSkin * vec3(0.5, 0.14, 0.08) * (0.06 + 0.2 * rimL);
+            // light under the skin: a warm glow where the light falls away (past the shadow line), and through thin
+            // parts (the ears, the edge of the nose) when the light is behind them
+            #if NUM_DIR_LIGHTS > 0
+              vec3 Ld = directionalLights[0].direction, Lc = directionalLights[0].color;
+              float ndl = dot(normal, Ld), wrap = max(0.0, (ndl + 0.45) / 1.45) - max(0.0, ndl);
+              totalEmissiveRadiance += diffuseColor.rgb * Lc * vec3(0.6, 0.2, 0.12) * wrap * 0.28;
+              float thin = clamp(earW + 0.35 * exp(-pow(length(vRest.xy - vec2(0.0, uEyeL.y - 0.035)) / 0.012, 2.0)), 0.0, 1.0);
+              float through = pow(max(0.0, dot(normalize(-vViewPosition), Ld)), 4.0);   // the light behind it, shining towards you
+              totalEmissiveRadiance += Lc * vec3(0.9, 0.22, 0.1) * uSkin * thin * through * 0.7;
+            #endif
+          }`);
     };
     m.customProgramCacheKey = () => 'crew-body';
     return m;
@@ -1283,6 +1360,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     const mat = bodyMaterial(c, I);
     { let zs = 0, zn = 0; const P = geo.attributes.position; for (let i = 0; i < P.count; i++) if (Math.abs(P.getY(i) - (I.neckY - 0.2)) < 0.01 && b.A[i * 4 + 1] < 0.5) { zs += P.getZ(i); zn++; } mat.userData.U.uSideZ.value = zn ? zs / zn : 0; }
     const body = new THREE.Mesh(geo, mat); body.castShadow = body.receiveShadow = true; root.add(body);
+    try { faceFit(mat.userData.U, b, I, c); } catch (e) { /* the drawn face */ }
     // everything on the head turns with it
     const np = I.neckPivot, headPivot = new THREE.Group(), head = new THREE.Group();
     headPivot.position.set(np[0], np[1], np[2]); head.position.set(-np[0], -np[1], -np[2]); headPivot.add(head); root.add(headPivot);
@@ -1394,6 +1472,29 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     };
   }
 
+  /** Line the face texture up with this head: where its eyes, nose, mouth, chin and ears are, in its own head space. */
+  function faceFit(U, b, I, c) {
+    if (!FACES || !FACES.length) return;
+    const R = b.rest, A = b.A, B = b.B, n = R.length / 3, E = I.eyeL, M = c.mouth || I.mouth;
+    let eI = -1, eD = 1e9, nI = -1, nZ = -1e9, cI = -1, cY = 1e9, mI = -1, mD = 1e9, earA = 0, earN = 0, ez0 = 1e9, ez1 = -1e9, ey0 = 1e9, ey1 = -1e9;
+    for (let i = 0; i < n; i++) {
+      if (A[i * 4 + 3] < 0.5) continue; const x = R[i * 3], y = R[i * 3 + 1], z = R[i * 3 + 2];
+      const de = Math.hypot(x - E[0], y - E[1], z - (E[2] + 0.012)); if (de < eD) { eD = de; eI = i; }
+      if (M) { const dm = Math.hypot(x - M[0], y - M[1], z - M[2]); if (dm < mD) { mD = dm; mI = i; } }
+      if (Math.abs(x) < 0.004 && y < E[1] && (!M || y > M[1]) && z > nZ) { nZ = z; nI = i; }
+      if (Math.abs(x) < 0.006 && (!M || z > M[2] - 0.03) && y < cY) { cY = y; cI = i; }
+      if (B[i * 4] > 0.85 && B[i * 4 + 1] < 0.25 && B[i * 4 + 1] > -0.9) { earA += Math.atan2(B[i * 4], B[i * 4 + 2]); earN++; ez0 = Math.min(ez0, z); ez1 = Math.max(ez1, z); ey0 = Math.min(ey0, y); ey1 = Math.max(ey1, y); }
+    }
+    if (eI < 0 || nI < 0 || cI < 0 || mI < 0) return;
+    const by = (i) => B[i * 4 + 1], eyeAz = Math.abs(Math.atan2(B[eI * 4], B[eI * 4 + 2])), earAz = earN ? earA / earN : 1.71;
+    // the darker skin uses the darker photograph, the lighter the lighter one (each tinted to the exact skin)
+    const sk = new THREE.Color(c.skin), lum = 0.3 * sk.r + 0.59 * sk.g + 0.11 * sk.b, F = FACE_SET[lum < 0.12 && FACES[1] ? 1 : 0], tex = FACES[lum < 0.12 && FACES[1] ? 1 : 0];
+    U.tFace.value = tex; U.tDetail.value = DETAIL; U.uFaceAvg.value.set(F.avg[0], F.avg[1], F.avg[2]); U.uFaceC.value = F.c;
+    U.uFaceU.value.set(Math.max(0.2, eyeAz), Math.max(eyeAz + 0.3, earAz), F.eye, F.ear);
+    if (earN) U.uEarZY.value.set(ez0, ez1, ey0, ey1); U.uEarTex.value.set(F.earBox[0], F.earBox[1], F.earBox[2], F.earBox[3]);
+    U.uFaceY.value.set(by(eI), by(nI), by(mI), by(cI)); U.uFaceV.value.set(F.eyeV, F.nose, F.mouth, F.chin); U.uFaceTop.value.set(0.22, F.top);
+    U.uFaceOn.value = (window as any).__noFaceTex ? 0 : 1;
+  }
   return { load, build, get ready() { return !!DATA; }, timings: T };
 })();
 
