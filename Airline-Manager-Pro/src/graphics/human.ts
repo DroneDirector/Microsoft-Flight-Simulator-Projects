@@ -1462,7 +1462,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       }
     }
     return {
-      root, joints, headPivot, top: box.max.y, width: Math.max(box.max.x - box.min.x, 0.5), bustBottom: I.neckY - 0.3, headY: I.headC[1],
+      root, joints, headPivot, body, U, top: box.max.y, width: Math.max(box.max.x - box.min.x, 0.5), bustBottom: I.neckY - 0.3, headY: I.headC[1],
       /** Breathing, a gentle sway, head and eye movement, blinking. */
       pose(p) {
         const t = p.t;
@@ -1602,6 +1602,36 @@ function humanReach(m: any, sd: 'L' | 'R', target: any, prev?: number[], pt?: an
     if (!better) st *= 0.5;
   }
   return a;
+}
+
+/** Where a hand's skin is (points in the figure's own space, a few hundred of them) for the arm pose a and the hand
+ *  h ({ W, curl, th, k1, k2 }): the same bending the figure's shader does, so a held thing can be checked against
+ *  it (nothing goes through the fingers). */
+function humanHandPts(m: any, sd: 'L' | 'R', a: number[], h: any): any[] {
+  const T = THREE, U = m.U, J = m.joints[sd], b = m.body; if (!U || !b) return [];
+  const G = b.geometry, PA = G.attributes.position.array, FA = G.attributes.fa.array, RA = G.attributes.rest.array, lf = sd === 'L';
+  if (!J.idx) { const L: number[] = [], n = PA.length / 3; for (let i = 0; i < n; i++) if (FA[i * 4 + 1] > 0.5 && (RA[i * 3] > 0) === lf && FA[i * 4] > U.uHandK.value.x - 0.03) L.push(i); const st = Math.max(1, Math.floor(L.length / 500)); J.idx = L.filter((_, i) => i % st === 0); }
+  const k = lf ? 1 : -1, M4 = (m4: any) => new T.Matrix3().setFromMatrix4(m4);
+  const Arm = M4(new T.Matrix4().makeRotationY(k * -a[2]).multiply(new T.Matrix4().makeRotationZ(k * a[1])).multiply(new T.Matrix4().makeRotationX(-a[0]))), Elb = M4(new T.Matrix4().makeRotationX(-a[3]));
+  const cu = h && h.curl || 0, W = h && h.W ? h.W : new T.Matrix3(), C1 = M4(new T.Matrix4().makeRotationAxis(J.ax, cu * (h && h.k1 || 1.15))), C2 = M4(new T.Matrix4().makeRotationAxis(J.ax, cu * (h && h.k2 || 1.25))), Th = M4(new T.Matrix4().makeRotationAxis(J.T, -k * (h && h.th || 0)));
+  const K = U.uHandK.value, wp = J.w, fg = J.F, pn = J.N, sp = lf ? U.uShL.value : U.uShR.value, ep = lf ? U.uElL.value : U.uElR.value, eS = U.uElbowS.value, spP = U.uSpineP.value, Sp = U.uSpine.value;
+  const ss = (e0: number, e1: number, x: number) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+  const mixRot = (p: any, c: any, R: any, w: number) => { if (w <= 0) return; const q = p.clone().sub(c).applyMatrix3(R).add(c); p.lerp(q, w); };
+  const kl = K.y - K.x, pt = wp.clone().add(fg.clone().multiplyScalar(0.025)).add(pn.clone().multiplyScalar(0.018)), p1 = wp.clone().add(fg.clone().multiplyScalar(K.y - K.x)), p2 = wp.clone().add(fg.clone().multiplyScalar(K.z - K.x));
+  const out: any[] = [];
+  for (const i of J.idx) {
+    const p = new T.Vector3(PA[i * 3], PA[i * 3 + 1], PA[i * 3 + 2]), f = FA[i * 4];
+    if (cu > 0) {
+      const dv = p.clone().sub(wp), df = dv.dot(fg), tw = ss(0.012, 0.03, dv.dot(pn)) * ss(kl + 0.022, kl + 0.006, df) * ss(0.004, 0.02, df) * (f >= K.x - 0.01 ? 1 : 0);
+      mixRot(p, pt, Th, tw); mixRot(p, p2, C2, ss(K.z - 0.012, K.z + 0.012, f) * (1 - tw)); mixRot(p, p1, C1, ss(K.y - 0.012, K.y + 0.012, f) * (1 - tw));
+    }
+    mixRot(p, wp, W, ss(K.x - 0.012, K.x + 0.008, f));
+    mixRot(p, ep, Elb, ss(eS - 0.03, eS + 0.03, f));
+    mixRot(p, sp, Arm, ss(0, 0.06, f));
+    mixRot(p, spP, Sp, ss(spP.y - 0.08, spP.y + 0.22, RA[i * 3 + 1]));
+    out.push(p);
+  }
+  return out;
 }
 
 /** The wrist's turn that points a hand's fingers along Fd with its palm facing Nd (both in the figure's own

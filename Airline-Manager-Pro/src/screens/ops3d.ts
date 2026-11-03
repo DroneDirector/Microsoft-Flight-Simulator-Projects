@@ -80,8 +80,13 @@ function opsBuild(scene: any, q: number) {
   // the ultra-wide monitor: a curved 49-inch screen on a stand
   { const r = 1.25, wA = 1.08, hA = 0.32, L = wA / r, y0 = 1.12, zc = -0.3 + r;   // 30 cm behind the keyboard
     const sg = new T.CylinderGeometry(r, r, hA, 48, 1, true, Math.PI - L / 2, L); const uv = sg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i));
-    const [c] = ctCanvas(2048, 608); A.monCv = c; const tex = ctTex(c); A.monTex = tex;
+    // drawn at the screen's own proportions (1.08 m by 0.32 m), sharp: twice the pixels on the PC
+    const MW = DESKTOP ? 4096 : 2560, [c] = ctCanvas(MW, Math.round(MW * hA / wA)); A.monCv = c; const tex = ctTex(c); A.monTex = tex;
+    try { tex.anisotropy = OpsRoom.ren ? Math.min(16, OpsRoom.ren.capabilities.getMaxAnisotropy()) : 16; } catch (e) { /* default */ }
     const scr = new T.Mesh(sg, new T.MeshBasicMaterial({ map: tex, toneMapped: false, side: T.DoubleSide })); scr.position.set(0, y0, zc); root.add(scr); A.monScr = scr; A.monY = y0; A.monZ = zc - r;
+    // the glass over it: the room's light glints off it as you move, as on your phone
+    const gsg = new T.CylinderGeometry(r - 0.004, r - 0.004, hA + 0.006, 64, 1, true, Math.PI - (L + 0.004) / 2, L + 0.004);
+    const glass = new T.Mesh(gsg, roomGlassMat(T, 0.12)); glass.position.set(0, y0, zc); glass.renderOrder = 2; root.add(glass);
     const sh = new T.Mesh(new T.CylinderGeometry(r + 0.012, r + 0.012, hA + 0.03, 48, 1, true, Math.PI - (L + 0.03) / 2, L + 0.03), new T.MeshPhysicalMaterial({ color: 0x0E1013, roughness: 0.35, side: T.DoubleSide })); sh.position.set(0, y0, zc + 0.0); root.add(sh);
     const back = new T.Mesh(new T.CylinderGeometry(r + 0.045, r + 0.045, hA + 0.02, 48, 1, true, Math.PI - L / 2, L), mat.black); back.position.set(0, y0, zc); root.add(back);
     bx(0.08, 0.28, 0.05, mat.metal, 0, 0.93, -0.37); bx(0.36, 0.012, 0.22, mat.metal, 0, 0.778, -0.35);
@@ -108,7 +113,7 @@ function opsBuild(scene: any, q: number) {
     add(new T.CylinderGeometry(0.04, 0.034, 0.1, 20), M({ color: 0xF4F4F2, roughness: 0.3 }), 0.72, 0.825, -0.1); add(new T.CylinderGeometry(0.036, 0.036, 0.004, 20), M({ color: 0x3A2216 }), 0.72, 0.872, -0.1);
   }
   // your phone, on the desk to the right of the keyboard, screen on
-  phoneMesh(T, root, A, [0.5, 0.777, 0.16], -0.3);
+  phoneMesh(T, root, A, [0.5, 0.761, 0.04], -0.3);   // on the desk, right of the keyboard
   // the fancy chair: a high-backed leather chair with a headrest, stitched in the company colour, on five wheels
   { const g = new T.Group(); g.position.set(0, 0, 0.72); g.rotation.y = Math.PI; root.add(g);
     { const hit = new T.Mesh(new T.BoxGeometry(0.7, 1.5, 0.7), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, 0.75, 0); hit.userData.act = 'sit'; g.add(hit); A.hits.push(hit); }
@@ -171,33 +176,54 @@ function opsMonitorDraw() {
   let blocks: Block[] = []; try { blocks = scheduleBlocks(); } catch (e) { /* none */ }
   let fl: any[] = []; try { fl = fleetOf(); } catch (e) { /* none */ }
   const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
-  // the header
-  x.fillStyle = '#12263D'; x.fillRect(0, 0, W, 64); x.fillStyle = co.color || '#2C8CFF'; x.fillRect(0, 62, W, 3);
-  x.fillStyle = '#EAF2FA'; x.font = '700 30px Inter, Arial, sans-serif'; x.textBaseline = 'middle'; x.fillText(`${co.name} · Operations`, 28, 33);
-  x.textAlign = 'right'; x.fillStyle = '#9FB6CC'; x.font = '600 26px Inter, Arial, sans-serif';
-  x.fillText(`${_schedDay ? 'Tomorrow' : 'Today'} · ${fl.length} aircraft · ${blocks.filter(b => b.kind === 'flight').length} legs   ${hm(nowMin)}`, W - 28, 33); x.textAlign = 'left';
-  // the timeline
-  const L = 230, Rr = W - 30, top = 108, rows = Math.max(1, fl.length), rh = Math.min(52, (H - top - 16) / rows), px = (m: number) => L + (Math.max(0, Math.min(1440, m)) / 1440) * (Rr - L);
-  x.font = '600 20px Inter, Arial, sans-serif'; x.fillStyle = '#7F98B0';
-  for (let h = 0; h <= 24; h += 3) { const X = px(h * 60); x.fillRect(X, top - 10, 1, H - top); if (h < 24) x.fillText(`${String(h).padStart(2, '0')}:00`, X + 6, top - 24); }
+  // drawn for the screen's size (sizes below are for a 2048-pixel-wide screen), at the screen's own proportions:
+  // the departures on the left, the timeline of the next hours on the right, so nothing looks stretched
+  const s = W / 2048, F = (w: number, px: number) => `${w} ${Math.round(px * s)}px Inter, Arial, sans-serif`;
+  const rr = (X: number, Y: number, w: number, h: number, r: number) => { x.beginPath(); (x as any).roundRect ? (x as any).roundRect(X, Y, w, h, r) : x.rect(X, Y, w, h); };
+  const hdr = 64 * s; x.fillStyle = '#12263D'; x.fillRect(0, 0, W, hdr); x.fillStyle = co.color || '#2C8CFF'; x.fillRect(0, hdr - 2 * s, W, 3 * s);
+  x.fillStyle = '#EAF2FA'; x.font = F(700, 30); x.textBaseline = 'middle'; x.fillText(`${co.name} · Operations`, 28 * s, hdr / 2);
+  x.textAlign = 'right'; x.fillStyle = '#9FB6CC'; x.font = F(600, 24);
+  x.fillText(`${_schedDay ? 'Tomorrow' : 'Today'} · ${fl.length} aircraft · ${blocks.filter(b => b.kind === 'flight').length} legs`, W - 160 * s, hdr / 2);
+  x.fillStyle = '#EAF2FA'; x.font = F(700, 30); x.fillText(hm(nowMin), W - 28 * s, hdr / 2); x.textAlign = 'left';
+  // the departures board
+  const PW = 470 * s, top0 = hdr + 18 * s;
+  x.fillStyle = 'rgba(255,255,255,.035)'; x.fillRect(0, hdr, PW, H - hdr); x.fillStyle = 'rgba(255,255,255,.08)'; x.fillRect(PW, hdr, 2 * s, H - hdr);
+  x.fillStyle = '#9FB6CC'; x.font = F(700, 18); x.fillText(_schedDay ? 'FIRST DEPARTURES' : 'NEXT DEPARTURES', 24 * s, top0 + 12 * s);
+  const legs = blocks.filter(b => b.kind === 'flight' && (_schedDay || b.end >= nowMin)).sort((a, b) => a.start - b.start), drh = 46 * s, nRows = Math.max(1, Math.floor((H - top0 - 40 * s) / drh));
+  legs.slice(0, nRows).forEach((b, i) => {
+    const y = top0 + 34 * s + i * drh, air = !_schedDay && b.start <= nowMin && b.end > nowMin && !b.cancelled, late = !b.cancelled && (b.delayMin || 0) >= 5;
+    if (i % 2) { x.fillStyle = 'rgba(255,255,255,.03)'; x.fillRect(0, y, PW, drh); }
+    x.fillStyle = '#EAF2FA'; x.font = F(700, 20); x.fillText(hm(b.start), 24 * s, y + drh / 2);
+    x.fillText(`${b.from} – ${b.to}`, 104 * s, y + drh / 2);
+    x.fillStyle = '#7F98B0'; x.font = F(600, 17); x.fillText(b.reg, 262 * s, y + drh / 2);
+    const st = b.cancelled ? ['Cancelled', '#E05A5A'] : air ? ['In the air', '#3FD0A0'] : late ? [`+${b.delayMin} min`, '#F2B544'] : ['On time', '#7FC4F5'];
+    x.fillStyle = st[1]; x.font = F(700, 16); x.textAlign = 'right'; x.fillText(st[0], PW - 20 * s, y + drh / 2); x.textAlign = 'left';
+  });
+  if (!legs.length) { x.fillStyle = '#7F98B0'; x.font = F(600, 18); x.fillText('Nothing planned.', 24 * s, top0 + 56 * s); }
+  // the timeline: two hours back and ten ahead (tomorrow: from 05:00), an hour every column
+  const t0 = _schedDay ? 300 : Math.max(0, Math.min(1440 - 720, Math.floor((nowMin - 120) / 60) * 60)), t1 = t0 + 720;
+  const L = PW + 170 * s, Rr = W - 24 * s, top = hdr + 56 * s, rows = Math.max(1, fl.length), rh = Math.min(56 * s, (H - top - 14 * s) / rows), px = (m: number) => L + (Math.max(t0, Math.min(t1, m)) - t0) / (t1 - t0) * (Rr - L);
+  x.font = F(600, 18); x.fillStyle = '#7F98B0';
+  for (let h = Math.ceil(t0 / 60); h * 60 <= t1; h++) { const X = px(h * 60); x.fillStyle = h % 2 ? 'rgba(127,152,176,.25)' : 'rgba(127,152,176,.55)'; x.fillRect(X, top - 8 * s, Math.max(1, s), H - top); if (h % 2 === 0 && h * 60 < t1) { x.fillStyle = '#7F98B0'; x.fillText(`${String(h % 24).padStart(2, '0')}:00`, X + 6 * s, top - 22 * s); } }
   fl.forEach((a: any, i: number) => {
     const y = top + i * rh;
-    if (i % 2) { x.fillStyle = 'rgba(255,255,255,.03)'; x.fillRect(0, y, W, rh); }
-    x.fillStyle = '#EAF2FA'; x.font = `700 ${Math.round(Math.min(24, rh * 0.48))}px Inter, Arial, sans-serif`; x.fillText(a.reg, 24, y + rh * 0.38);
-    x.fillStyle = '#7F98B0'; x.font = `500 ${Math.round(Math.min(18, rh * 0.34))}px Inter, Arial, sans-serif`; try { x.fillText(acType(a.typeId).model, 24, y + rh * 0.74); } catch (e) { /* no type */ }
+    if (i % 2) { x.fillStyle = 'rgba(255,255,255,.03)'; x.fillRect(PW + 2 * s, y, W, rh); }
+    x.fillStyle = '#EAF2FA'; x.font = F(700, Math.min(22, rh / s * 0.44)); x.fillText(a.reg, PW + 22 * s, y + rh * 0.36);
+    x.fillStyle = '#7F98B0'; x.font = F(500, Math.min(16, rh / s * 0.3)); try { x.fillText(acType(a.typeId).model, PW + 22 * s, y + rh * 0.72); } catch (e) { /* no type */ }
     for (const b of blocks.filter(bb => bb.reg === a.reg)) {
-      const x0 = px(b.start), x1 = Math.max(x0 + 4, px(b.end)), late = !b.cancelled && (b.delayMin || 0) >= 5;
+      if (b.end < t0 || b.start > t1) continue;
+      const x0 = px(b.start), x1 = Math.max(x0 + 4 * s, px(b.end)), late = !b.cancelled && (b.delayMin || 0) >= 5;
       x.globalAlpha = b.end < nowMin && !_schedDay ? 0.45 : 1;
       x.fillStyle = b.kind === 'maint' ? '#C98A1E' : b.cancelled ? '#9A2E2E' : (co.color || '#2C8CFF');
-      const r = Math.min(8, rh * 0.2); x.beginPath(); (x as any).roundRect ? (x as any).roundRect(x0, y + rh * 0.14, x1 - x0, rh * 0.72, r) : x.rect(x0, y + rh * 0.14, x1 - x0, rh * 0.72); x.fill();
-      if (late) { x.strokeStyle = '#F2B544'; x.lineWidth = 3; x.stroke(); }
-      if (x1 - x0 > 90) { x.fillStyle = '#FFFFFF'; x.font = `600 ${Math.round(Math.min(19, rh * 0.36))}px Inter, Arial, sans-serif`; x.fillText(b.kind === 'maint' ? 'Maintenance' : b.cancelled ? 'Cancelled' : `${b.from}–${b.to}`, x0 + 8, y + rh * 0.52); }
+      rr(x0, y + rh * 0.16, x1 - x0, rh * 0.68, Math.min(8 * s, rh * 0.2)); x.fill();
+      if (late) { x.strokeStyle = '#F2B544'; x.lineWidth = 3 * s; x.stroke(); }
+      if (x1 - x0 > 80 * s) { x.save(); x.beginPath(); x.rect(x0, y, x1 - x0 - 6 * s, rh); x.clip(); x.fillStyle = '#FFFFFF'; x.font = F(600, Math.min(18, rh / s * 0.34)); x.fillText(b.kind === 'maint' ? 'Maintenance' : b.cancelled ? 'Cancelled' : `${b.from}–${b.to}`, x0 + 8 * s, y + rh * 0.5); x.restore(); }
       x.globalAlpha = 1;
     }
   });
-  if (!fl.length) { x.fillStyle = '#9FB6CC'; x.font = '600 30px Inter, Arial, sans-serif'; x.fillText('No aircraft yet: buy or lease one to plan its flying.', L, top + 60); }
+  if (!fl.length) { x.fillStyle = '#9FB6CC'; x.font = F(600, 28); x.fillText('No aircraft yet: buy or lease one to plan its flying.', L, top + 60 * s); }
   // now
-  if (!_schedDay) { const X = px(nowMin); x.fillStyle = '#F2B544'; x.fillRect(X - 1.5, top - 12, 3, H - top + 12); x.beginPath(); x.roundRect ? x.roundRect(X - 38, top - 44, 76, 28, 6) : x.rect(X - 38, top - 44, 76, 28); x.fill(); x.fillStyle = '#1A120A'; x.font = '700 18px Inter, Arial, sans-serif'; x.textAlign = 'center'; x.fillText(hm(nowMin), X, top - 30); x.textAlign = 'left'; }
+  if (!_schedDay) { const X = px(nowMin); x.fillStyle = '#F2B544'; x.fillRect(X - 1.5 * s, top - 10 * s, 3 * s, H - top + 10 * s); rr(X - 36 * s, top - 46 * s, 72 * s, 26 * s, 6 * s); x.fill(); x.fillStyle = '#1A120A'; x.font = F(700, 17); x.textAlign = 'center'; x.fillText(hm(nowMin), X, top - 33 * s); x.textAlign = 'left'; }
   A.monTex.needsUpdate = true;
   // the wall clock: your hub's time (the device's clock, as the schedule uses)
   if (A.clockCv) { const cc = A.clockCv as HTMLCanvasElement, y = cc.getContext('2d') as CanvasRenderingContext2D; y.fillStyle = '#05080C'; y.fillRect(0, 0, 512, 128); y.fillStyle = '#FF5A3C'; y.font = '700 84px "Courier New", monospace'; y.textAlign = 'center'; y.textBaseline = 'middle'; y.fillText(hm(nowMin), 256, 68); A.clock.material.map.needsUpdate = true; }
@@ -289,7 +315,7 @@ function opsFrame() {
   else {
     R.cam.position.set(0, 1.2 - 0.075 * ze, 0.76 - 0.5 * ze);
     const P = R.pk ? phoneStep(R, dt, now) : null;   // your phone: reaching for it, holding it
-    if (R.me) { try { const by = Math.PI + R.look.yaw * (1 - ze) * (P ? 1 - P.lookK : 1) + (P ? P.turn : 0); R.me.pitch = R.look.pitch * (1 - ze) * (P ? 1 - P.lookK : 1); const hip = P && P.slide ? R.me.chair.clone().add(new T.Vector3(0, 0, -P.slide)) : R.me.chair; const eye = selfPose(R.me, hip, by, 0.2 * ze + (P ? P.lean : 0), 1, 0, 0, now, dt, P ? P.arms : undefined); R.cam.position.lerpVectors(eye, R.cam.position, ze); } catch (e) { R.me = null; } }
+    if (R.me) { try { const by = Math.PI + R.look.yaw * (1 - ze) * (P ? 1 - P.lookK : 1) + (P ? P.turn : 0); R.me.pitch = R.look.pitch * (1 - ze) * (P ? 1 - P.lookK : 1); const hip = P && P.slide ? R.me.chair.clone().add(new T.Vector3(0, 0, -P.slide)) : R.me.chair; const eye = selfPose(R.me, hip, by, 0.2 * ze + (P ? P.lean : 0), 1, 0, 0, P && P.t != null ? P.t : now, dt, P ? P.arms : undefined); R.cam.position.lerpVectors(eye, R.cam.position, ze); } catch (e) { R.me = null; } }
     const yaw = Math.PI + R.look.yaw * (1 - ze), p = R.look.pitch * (1 - ze) + 0.0 * ze;
     const ahead = R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)));
     if (P && P.at && P.lookK > 0) ahead.lerp(P.at, P.lookK);   // your eyes on the phone

@@ -158,6 +158,8 @@ function padLoop() {
       if (hit(3)) padCursor(!Pad.shown);
       // the phone in your hand: Cross brings its screen up (unless you are pointing at something with the cursor)
       if (!ct && R.pk && R.pk.st === 'hold' && !R.overlay && !Pad.shown && hit(0)) { try { phoneOpen(R); } catch (e) { /* none */ } Pad.prev = B; return; }
+      // L1 / R1 turn it in your hand, the d-pad up and down tilts it
+      if (!ct && R.pk && R.pk.st === 'hold' && !R.overlay) { const ty = (hit(5) ? 1 : 0) - (hit(4) ? 1 : 0), tp = (hit(13) ? 1 : 0) - (hit(12) ? 1 : 0); if (ty || tp) { try { phoneTurn(R, ty, tp); } catch (e) { /* none */ } } }
     }
     // ---- the pointer: the left stick (in the 3D views once shown with Triangle) ----
     const pointerOn = !(v3 || of || ct) || Pad.shown;
