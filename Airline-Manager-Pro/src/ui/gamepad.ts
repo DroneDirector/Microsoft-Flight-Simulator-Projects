@@ -82,10 +82,18 @@ function padBack() {
   const layer = document.querySelector('.layer, .modal-back, .sheet-back, .ct-modal:not([hidden])');
   if (layer) { try { closeAll(); } catch (e) { /* none */ } return; }
   try { if (placeBack()) return; } catch (e) { /* none */ }
-  if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) { try { if (OfficeRoom.overlay) ofPlannerClose(); else ofLeave(); } catch (e) { /* none */ } return; }
+  if (typeof OpsRoom !== 'undefined' && OpsRoom.on) { try { padRoomBack(OpsRoom, true); } catch (e) { /* none */ } return; }
+  if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) { try { padRoomBack(OfficeRoom, false); } catch (e) { /* none */ } return; }
   if (typeof CourtRoom !== 'undefined' && CourtRoom.on) { try { ctLeaveAsk(); } catch (e) { /* none */ } return; }
   if (typeof V3d !== 'undefined' && V3d.open) { try { ACTIONS['v3d-close'](null as any, null as any); } catch (e) { /* none */ } return; }
   if (State.screen !== 'ops') { const b = document.createElement('b'); b.setAttribute('data-screen', 'ops'); ACTIONS.go(b, null); }
+}
+/** Circle in your office or Operations: the phone's screen goes down, then the phone, then what is open, then you leave. */
+function padRoomBack(R: any, ops: boolean) {
+  if (R.overlay && R.overlay.classList.contains('ph-screen')) { phoneClose(R); return; }
+  if (R.overlay) { if (ops) opsScreenClose(); else if (R.overlay.querySelector('.lap-os') && typeof ofLaptopClose === 'function') ofLaptopClose(); else ofPlannerClose(); return; }
+  if (R.pk && R.pk.st === 'hold') { phonePut(R); return; }
+  if (ops) opsLeave(); else ofLeave();
 }
 /** The d-pad: the cursor jumps to the nearest button that way. */
 function padJump(dx: number, dy: number) {
@@ -148,6 +156,8 @@ function padLoop() {
       if (R.stick) R.stick = [lx, -ly];
       if (R.look && (rx || ry)) { R.look.yaw = R.look.yaw - rx * dt * 1.6 * sens; R.look.pitch = clamp(R.look.pitch - ry * dt * 1.2 * sens, -1.0, 0.8); }   // all the way round
       if (hit(3)) padCursor(!Pad.shown);
+      // the phone in your hand: Cross brings its screen up (unless you are pointing at something with the cursor)
+      if (!ct && R.pk && R.pk.st === 'hold' && !R.overlay && !Pad.shown && hit(0)) { try { phoneOpen(R); } catch (e) { /* none */ } Pad.prev = B; return; }
     }
     // ---- the pointer: the left stick (in the 3D views once shown with Triangle) ----
     const pointerOn = !(v3 || of || ct) || Pad.shown;

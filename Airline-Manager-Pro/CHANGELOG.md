@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.80 (2026-11-03)
+
+- phone keyboard on the screen (letters, shift and caps lock, numbers and symbols, emoji, space, delete, send), toggle kept in settings.phoneKb; drafts kept while you type
+- controller: Circle in your office and Operations closes the phone screen, puts the phone down, closes what is open, then leaves; Cross with the phone in hand brings its screen up
+- fix: saying something on a call no longer also sent it as a message
+
 ## 0.9.79 (2026-11-03)
 
 - phone-talk.ts: replies follow what you write (tone and topic: greetings, how are you, thanks, praise, apologies, insults, firing, work, pay, time off, sickness, home, love, jokes, goodbye, call me), family or staff, and the relationship (State.phoneRel: rel, hurt); several lines with typing; call-backs
