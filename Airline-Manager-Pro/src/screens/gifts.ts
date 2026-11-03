@@ -5,7 +5,7 @@
 // open and turn round (ui/viewer3d.ts).
 
 interface GiftItem { kind: string; name: string; desc: string; lines?: string[]; color?: string }
-interface GiftEx { id: string; at: number; cat: 'aviation'; icao: string; cid: string; reg: string; typeId: string; given: GiftItem[]; received: GiftItem[] }
+interface GiftEx { id: string; at: number; cat: 'aviation' | 'career'; icao: string; cid: string; reg: string; typeId: string; given: GiftItem[]; received: GiftItem[] }
 
 function giftsAll(): GiftEx[] { const S: any = State; return S.gifts || (S.gifts = []); }
 
@@ -218,15 +218,38 @@ function giftBuild(T: any, it: GiftItem, ex: GiftEx): any {
     case 'tin': return giftTin(T, it.color || '#1F4D3A', (apt(ex.icao) || { city: ex.icao } as any).city.toUpperCase());
     case 'carving': return giftCarving(T, it.color || '#B9874E');
     case 'book': return giftBook(T, it.color || '#24324A', it.name);
+    case 'cert': return giftCert(T, it.lines || [it.name], it.color);
+    case 'medal': return giftMedal(T, it);
     default: return giftFrame(T, ex.icao);
   }
 }
+
+/** A framed certificate (a type rating, a milestone), with its words in an engraved style. */
+function giftCert(T: any, lines: string[], col?: string): any {
+  const [c, x] = v3vCanvas(768, 560); x.fillStyle = '#F6F1E4'; x.fillRect(0, 0, 768, 560);
+  x.strokeStyle = col || '#8A6A2A'; x.lineWidth = 10; x.strokeRect(22, 22, 724, 516); x.lineWidth = 2; x.strokeRect(40, 40, 688, 480);
+  x.fillStyle = '#2A2014'; x.textAlign = 'center';
+  lines.forEach((l, i) => { x.font = `${i === 0 ? 700 : i === 1 ? 700 : 500} ${i === 0 ? 24 : i === 1 ? 44 : 26}px Georgia, serif`; if (i === 0) x.fillStyle = col || '#8A6A2A'; else x.fillStyle = '#2A2014'; let s2 = l; while (x.measureText(s2).width > 640 && s2.length > 6) s2 = s2.slice(0, -2); x.fillText(s2, 384, 120 + (i === 0 ? 0 : i === 1 ? 70 : 70 + (i - 1) * 52)); });
+  x.fillStyle = col || '#B8902F'; x.beginPath(); x.arc(640, 450, 42, 0, 7); x.fill(); x.fillStyle = '#F6F1E4'; v3vDrawIcon(x, 'star', 640, 450, 46, 2.2);
+  const g = new T.Group();
+  const frame = new T.Mesh(new T.BoxGeometry(2.3, 1.75, 0.1), giftWood(T, '#2A1A10')); frame.position.y = 1.0; g.add(frame);
+  const pic = new T.Mesh(new T.PlaneGeometry(2.05, 1.5), new T.MeshStandardMaterial({ map: v3vTex(T, c), roughness: 0.7 })); pic.position.set(0, 1.0, 0.052); g.add(pic);
+  const leg = new T.Mesh(new T.BoxGeometry(0.1, 1.5, 0.06), giftWood(T, '#2A1A10')); leg.position.set(0, 0.62, -0.4); leg.rotation.x = 0.35; g.add(leg);
+  g.rotation.x = -0.12; return g;
+}
+/** A milestone medal: the badge medal, in gold, with the milestone's words. */
+function giftMedal(T: any, it: GiftItem): any { return badgeMedal(T, { id: 'm', group: 'pilot', cat: 'Milestone', title: it.name, desc: it.desc, tier: 2, metric: '', need: 0, icon: it.color || 'star' } as any, (it as any).at || Date.now()); }
 
 /* ---------- Ranking → Gifts ---------- */
 let _giftCat = 'aviation';
 function giftsHtml(): string {
   const all = giftsAll().filter(g => g.cat === _giftCat && (!g.cid || g.cid === State.companyId || (company(g.cid) as any)));
-  const cats = `<div class="seg gift-cats"><button class="${_giftCat === 'aviation' ? 'on' : ''}" data-act="gift-cat" data-c="aviation">Aviation Gifts</button></div>`;
+  const cats = `<div class="seg gift-cats"><button class="${_giftCat === 'aviation' ? 'on' : ''}" data-act="gift-cat" data-c="aviation">Aviation Gifts</button><button class="${_giftCat === 'career' ? 'on' : ''}" data-act="gift-cat" data-c="career">Career Milestones</button></div>`;
+  if (_giftCat === 'career') {
+    if (!all.length) return `${cats}<div class="card gift-empty">${icon('star')}<span><b>No milestones yet</b><small>Your type ratings and career milestones (hours, landings, your first widebody, promotions) are awarded here: a certificate, a plaque or a medal, each one in 3D.</small></span></div>`;
+    return `${cats}<div class="card"><div class="gift-row career">${all.map(ex => { const it = ex.received[0], th = viewerThumb(ex.id + 'received0', T => giftBuild(T, it, ex), 280);
+      return `<button class="gift-it" data-act="gift-3d" data-id="${esc(ex.id)}" data-side="received" data-i="0" aria-label="Open ${esc(it.name)} in 3D"><span class="gift-th">${th ? `<img src="${th}" alt="">` : icon('star')}</span><b>${esc(it.name)}</b><small>${esc(dateStr(new Date(ex.at)).slice(0, 10))} · ${esc(it.desc)}</small></button>`; }).join('')}</div></div>`;
+  }
   if (!all.length) return `${cats}<div class="card gift-empty">${icon('star')}<span><b>No aviation gifts yet</b><small>The first time one of your aircraft lands at an airport your airline has never been to, the airport welcomes it with a water salute, and the airline and the airport exchange gifts and commemorative plaques. They are kept here.</small></span></div>`;
   const card = (ex: GiftEx, side: 'received' | 'given', i: number) => {
     const it = ex[side][i], th = viewerThumb(ex.id + side + i, T => giftBuild(T, it, ex), 280);
@@ -245,5 +268,5 @@ ACTIONS['gift-3d'] = el => {
   const ex = giftsAll().filter(g => g.id === el.getAttribute('data-id'))[0]; if (!ex) return;
   const side = el.getAttribute('data-side') as 'received' | 'given', it = ex[side][+el.getAttribute('data-i')]; if (!it) return;
   const A: any = apt(ex.icao) || { name: ex.icao };
-  viewer3dOpen({ title: it.name, sub: `${side === 'received' ? 'From ' + A.name : 'Given to ' + A.name} · ${dateStr(new Date(ex.at)).slice(0, 10)}`, info: `<p>${esc(it.desc)}</p>${it.lines ? `<p class="v3v-eng">${it.lines.map(esc).join('<br>')}</p>` : ''}`, build: T => giftBuild(T, it, ex) });
+  viewer3dOpen({ title: it.name, sub: `${ex.cat === 'career' ? 'Awarded' : side === 'received' ? 'From ' + A.name : 'Given to ' + A.name} · ${dateStr(new Date(ex.at)).slice(0, 10)}`, info: `<p>${esc(it.desc)}</p>${it.lines ? `<p class="v3v-eng">${it.lines.map(esc).join('<br>')}</p>` : ''}`, build: T => giftBuild(T, it, ex) });
 };

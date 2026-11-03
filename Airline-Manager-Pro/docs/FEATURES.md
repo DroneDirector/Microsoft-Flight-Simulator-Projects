@@ -48,6 +48,8 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | You fly one aircraft at a time, chosen from your fleet | Built |
 | A water salute the first time your airline lands at an airport: two fire trucks spray an arch of water over the aircraft, at the real airport, with a newspaper story and photo | Built |
 | Gifts and commemorative plaques exchanged with the airport on a first visit, kept under Ranking → Gifts → Aviation Gifts | Built |
+| Your own check rides for a new type, graded live from the simulator: stable approach, speeds below 10,000 ft, the landing, an engine failure | Built |
+| Career milestones (hours, landings, promotions, first widebody, type ratings) celebrated with a certificate, plaque or medal in 3D and the newspaper | Built |
 | Your office: your own pet (corgi or kitten) with its own coat, food and water bowls you fill, and a family photo from your look and your partner | Built |
 | Office laptop and Operations computer with their own desktop and apps, full screen | Built |
 | A new career starts with finances on hold until you register the company | Built |

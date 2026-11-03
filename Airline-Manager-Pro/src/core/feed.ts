@@ -330,7 +330,7 @@ function finishLeg(e: FlightEvent) {
   // a charter you flew, the tours, the weekly challenge, a check ride on a new type, and the news
   try { if (job) Jobs.delivered(job.id, Date.now(), m.net, txId); } catch (er) { /* ignore */ }
   try { Jobs.afterMyLeg(from, to, sm.landingFpm); Jobs.checkWeekly(); } catch (er) { /* ignore */ }
-  try { Ratings.myCheckRide(a.typeId, sm.landingFpm, sm.landingG, grounded || LEG_ISSUES.length > 0); } catch (er) { /* ignore */ }
+  try { if (!rideAfterLeg(a.typeId, sm.landingFpm, sm.landingG, grounded || LEG_ISSUES.length > 0)) Ratings.myCheckRide(a.typeId, sm.landingFpm, sm.landingG, grounded || LEG_ISSUES.length > 0); } catch (er) { /* ignore */ }
   try { Online.discord('mine', `${flight} landed at ${to}`, `${me.name} flew ${from} → ${to} in ${a.reg}.`, [['Landing', `${Math.abs(sm.landingFpm)} fpm, ${sm.landingG} g`], ['Block', hours(sm.blockMin)], ['Passengers', String(sm.pax)], ['Result', money(m.net, { sign: true })]]); } catch (er) { /* ignore */ }
   _myCallsign = null;
   Store.save(); refresh(); animateBalance(before, c.balance);

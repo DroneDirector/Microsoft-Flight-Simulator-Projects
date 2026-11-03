@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.109 (2026-11-03)
+
+- Your check rides (career-rides.ts: booked ride graded live from the simulator: stable approach, 250 kt below 10,000 ft, landing, engine failure); career milestones (hours, landings, promotions, first widebody, type ratings) as awards in Gifts → Career Milestones (certificate, plaque, medal in 3D)
+
 ## 0.9.108 (2026-11-03)
 
 - Airline life (airline-life.ts): decision events (part stuck at an outstation, VIP charter, mistake fare, fixed fuel price), rivals answering new routes and poaching staff, codeshare partners with daily connecting revenue and monthly fees
