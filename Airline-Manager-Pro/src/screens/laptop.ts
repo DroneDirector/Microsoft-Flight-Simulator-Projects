@@ -139,19 +139,25 @@ function lapFamilyMail() {
 
 /* ---------- opening and closing (the office does the zoom) ---------- */
 function lapOsHtml(): string {
+  // the phone: the same apps, in a tall screen with a status bar on top and the home bar below
+  if (Lap.phone) return `<div class="lap-os ph-os">
+    <div class="lap-bar ph-status"></div>
+    <div class="lap-area"><div class="lap-desk"></div><div class="lap-win" hidden></div></div>
+    <button class="ph-home" data-act="lap-app" data-k="" aria-label="Home"><i></i></button>
+  </div>`;
   return `<div class="lap-os">
     <div class="lap-area"><div class="lap-desk"></div><div class="lap-win" hidden></div></div>
     <div class="lap-bar"></div>
   </div>`;
 }
 /** Draw the laptop into its overlay (the office calls this when it opens). */
-function lapMount(root: HTMLElement) {
-  Lap.root = root; Lap.app = ''; try { mailTick(); } catch (e) { /* later */ }
+function lapMount(root: HTMLElement, phone?: boolean) {
+  Lap.root = root; Lap.app = ''; Lap.phone = !!phone; try { mailTick(); } catch (e) { /* later */ }
   root.innerHTML = lapOsHtml();
   lapRender();
   clearInterval(Lap.clock); Lap.clock = setInterval(() => { if (!Lap.root || !Lap.root.isConnected) { clearInterval(Lap.clock); return; } lapBar(); }, 10000);
 }
-function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.bankIn = false; Lap.bankBusy = false; }   // closing the laptop logs you out of the bank
+function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.phone = false; Lap.bankIn = false; Lap.bankBusy = false; }   // closing the laptop logs you out of the bank
 function lapRefresh() { if (Lap.root && Lap.root.isConnected) lapRender(true); }
 
 function lapRender(soft?: boolean) {
@@ -175,6 +181,10 @@ function lapBar() {
   const R = Lap.root as HTMLElement; if (!R) return; const bar = R.querySelector('.lap-bar') as HTMLElement; if (!bar) return;
   const d = lapGameNow(), today = lapYmd(d), notes = (lapS().calendar as CalNote[]).filter(c => c.date === today).length, un = lapUnread();
   const time = d.toTimeString().slice(0, 5), date = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  if (Lap.phone) {   // the phone's status bar: the time, mail waiting, signal and battery
+    patchHtml(bar, `<b class="ph-time">${time}</b><span class="ph-notch"></span><span class="ph-ind">${un ? `<i class="ph-dot" title="${un} unread">${icon('mail')}</i>` : ''}<svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><span class="ph-bat"><i style="width:${78}%"></i></span></span>`);
+    return;
+  }
   patchHtml(bar, `<button class="lb-home ${Lap.app ? '' : 'on'}" data-act="lap-app" data-k="" aria-label="Desktop">${icon('star')}</button>
     <div class="lb-apps">${LAP_APPS.map(a => `<button class="lb-app ${Lap.app === a[0] ? 'on' : ''}" data-act="lap-app" data-k="${a[0]}" title="${esc(a[1])}" style="--c:${a[3]}">${icon(a[2])}${a[0] === 'mail' && un ? `<i class="lb-badge">${un}</i>` : ''}</button>`).join('')}</div>
     <span class="lb-sp"></span>
