@@ -20,6 +20,20 @@ const VEHICLE_FILES: [string, string][] = [
   ['de-icing-truck', 'De-icing truck'], ['ground-power-unit', 'Ground power unit'], ['lavatory-truck', 'Lavatory service truck'], ['water-truck', 'Potable water truck'],
 ];
 const JETWAY_FILES: [string, string][] = [['jet-bridge', 'Jet bridge (passenger boarding bridge)']];
+/** The hangar buildings, by size (the shell: walls, roof, windows, doors; the floor, the rooms and what is in them stay
+ *  the app's own). Front (the doors) towards +Z. On the PC a file with "-pc" at the end is used first, if it is there. */
+const HANGAR_FILES: [string, string][] = [
+  ['hangar-small', 'Small hangar: 36 × 42 m, 13 m high, doors 10.5 m (turboprops, business and small jets)'],
+  ['hangar-medium', 'Medium hangar: 52 × 66 m, 18 m high, doors 15 m (A320, 737, regional jets)'],
+  ['hangar-large', 'Large hangar: 82 × 94 m, 25 m high, doors 21.5 m (767, 787, A330, A350, 777)'],
+  ['hangar-very-large', 'Very large hangar: 96 × 100 m, 30 m high, doors 26.5 m (747, 777-9, A380)'],
+];
+/** The hangar's vending machine and what it sells (no real brands). Cans and bars stand upright: the top towards +Y. */
+const ITEM_FILES: [string, string][] = [
+  ['vending-machine', 'Vending machine (the hangar break room)'],
+  ['can-cola', 'Can of cola'], ['can-lemon', 'Can of lemon soda'], ['can-orange', 'Can of orange soda'], ['can-water', 'Can of sparkling water'], ['can-icedtea', 'Can of iced tea'],
+  ['bar-chocolate', 'Chocolate bar'], ['bar-peanut', 'Peanut bar'], ['bar-oat', 'Oat bar'], ['bar-caramel', 'Caramel bar'],
+];
 
 /** The file name for an aircraft type: maker and model, e.g. airbus-a320neo.glb, boeing-737-800.glb. */
 function modelSlug(s: string): string { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }

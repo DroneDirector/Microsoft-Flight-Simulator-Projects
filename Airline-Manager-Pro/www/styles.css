@@ -4112,3 +4112,59 @@ html.calm .dclock b em { animation: none; }
 .card.fc > span:nth-child(2) { flex: 1; min-width: 0; }
 .card.fc small { display: block; color: var(--muted); margin-top: 2px; }
 .fc-ic { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: rgba(63, 208, 160, .18); color: #3FD0A0; }
+
+/* the hangar: the list in Maintenance */
+.hg-list { display: grid; gap: 10px; margin-bottom: 14px; }
+.hg-card { padding: 12px 14px; }
+.hg-card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.hg-card-h > svg { width: 22px; height: 22px; color: #F2B544; flex: none; }
+.hg-card-h span { display: flex; flex-direction: column; }
+.hg-card-h small, .hg-ac small { color: var(--muted, #8FA6BD); }
+.hg-ac { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.07); }
+.hg-ac > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hg-ac em { font-style: normal; font-size: 12.5px; margin-top: 2px; }
+.hg-ac em.bad { color: #F2B544; } .hg-ac em.ok { color: #3FD0A0; }
+.hg-none { display: flex; align-items: center; gap: 8px; }
+
+/* the hangar in 3D */
+.hg3d .ct-top { background: linear-gradient(180deg, rgba(30,24,12,.84), rgba(18,14,8,.74)); border-color: rgba(242,181,68,.4); }
+.hg3d .ct-top small { color: #F2B544; }
+.hg3d .op-spots button { border-color: rgba(242,181,68,.45); background: rgba(24,18,8,.84); }
+.hg3d .op-spots button:hover { background: rgba(242,181,68,.25); }
+.hg3d .ct-loader, .exit-hangar .ct-loader { background: radial-gradient(ellipse at 50% 42%, #2A2112 0%, #120E08 60%, #070504 100%); }
+.hg3d .ctl-glow, .exit-hangar .ctl-glow { background: radial-gradient(circle, rgba(242,181,68,.22), rgba(242,181,68,0) 65%); }
+.hg3d .ctl-house, .exit-hangar .ctl-house { fill: #241B0E; }
+.hg3d .ctl-rings i, .exit-hangar .ctl-rings i { border-color: rgba(242,181,68,.18); border-top-color: #F2B544; }
+.hg3d .ctl-name b, .exit-hangar .ctl-name b { color: #FFE2A0; font-family: Inter, Arial, sans-serif; letter-spacing: .08em; }
+.hg3d .ctl-fill, .exit-hangar .ctl-fill { background: linear-gradient(90deg, #8A5A14, #F2B544, #FFE7B0); }
+.hg3d .ctl-tip, .exit-hangar .ctl-tip, .hg3d .ctl-info b, .exit-hangar .ctl-info b { color: #FFE2A0; }
+.hg-emb .hg-plane { animation: hgTow 5s ease-in-out infinite; }
+@keyframes hgTow { 0%, 100% { transform: translateX(-6px); } 50% { transform: translateX(6px); } }
+.hg-fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 8; }
+.hg-fade.on { opacity: 1; }
+.hg-hand { position: absolute; right: 16px; bottom: 76px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 210px; padding: 10px; border-radius: 14px; background: rgba(18,14,8,.82); border: 1px solid rgba(242,181,68,.4); color: #F3ECE0; font: 500 13px Inter, sans-serif; z-index: 7; }
+.hg-hand-n b { display: block; font-size: 14px; } .hg-hand-n small, .hg-hand-t { color: #CDBF9F; font-size: 11.5px; }
+.hg-hand button { display: flex; justify-content: space-between; align-items: center; padding: 8px 11px; border-radius: 10px; background: rgba(242,181,68,.16); border: 1px solid rgba(242,181,68,.45); color: #FFE7B0; font: 600 13px Inter, sans-serif; cursor: pointer; }
+.hg-hand button.on, .hg-hand button:hover { background: rgba(242,181,68,.32); }
+.hg-hand kbd, .hg-spots kbd { padding: 0 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,.3); font: 600 10.5px Inter, sans-serif; color: #D6CBB8; }
+.hg-panel { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(560px, calc(100% - 24px)); z-index: 9; }
+.hg-vend, .hg-talk { padding: 14px; border-radius: 16px; background: rgba(16,13,9,.92); border: 1px solid rgba(242,181,68,.45); color: #F3ECE0; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.hg-vend-h, .hg-talk-h { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.hg-vend-h b, .hg-talk-h b { font: 700 16px Inter, sans-serif; } .hg-vend-h small, .hg-talk-h small { display: block; color: #CDBF9F; font-size: 12px; }
+.hg-vend-h > b { flex: 1; } .hg-vend-h { flex-wrap: wrap; } .hg-vend-h small { order: 3; width: 100%; margin-top: -6px; }
+.hg-talk-h > span { flex: 1; }
+.hg-vend-h button, .hg-talk-h button { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 99px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); color: #F3ECE0; cursor: pointer; }
+.hg-vend-h button svg, .hg-talk-h button svg { width: 14px; height: 14px; }
+.hg-vend-g { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hg-vend-g button { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.14); color: #F3ECE0; font: 600 12.5px Inter, sans-serif; text-align: left; cursor: pointer; }
+.hg-vend-g button:hover { background: rgba(242,181,68,.2); border-color: rgba(242,181,68,.5); }
+.hg-vend-g em { display: block; font-style: normal; color: #3CFF7A; font: 700 11px "Courier New", monospace; }
+.hg-ic { flex: none; display: block; background: linear-gradient(180deg, var(--c1) 0 58%, var(--c2) 58% 72%, var(--c1) 72%); border: 1px solid rgba(255,255,255,.25); }
+.hg-ic.can { width: 16px; height: 28px; border-radius: 4px 4px 3px 3px; }
+.hg-ic.bar { width: 12px; height: 32px; border-radius: 2px; background: linear-gradient(170deg, var(--c1) 0 50%, var(--c2) 50% 58%, var(--c1) 58%); }
+.hg-talk-t { margin: 0 0 8px; font: 500 15px/1.45 Inter, sans-serif; }
+.hg-talk-v { margin-bottom: 10px; }
+.hg-talk-q { display: flex; flex-wrap: wrap; gap: 6px; }
+.hg-talk-q button { padding: 7px 12px; border-radius: 99px; background: rgba(242,181,68,.14); border: 1px solid rgba(242,181,68,.45); color: #FFE7B0; font: 600 12.5px Inter, sans-serif; cursor: pointer; }
+.hg-talk-q button:hover { background: rgba(242,181,68,.3); }
+@media (max-width: 600px) { .hg-vend-g { grid-template-columns: repeat(2, 1fr); } .hg-hand { width: 170px; bottom: 150px; } }

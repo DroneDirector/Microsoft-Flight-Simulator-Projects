@@ -58,6 +58,43 @@ water salute, the museum. Remove the file and the app's own model comes back. Th
 |---|---|
 | `jetways/jet-bridge.glb` | Jet bridge (passenger boarding bridge) |
 
+## Hangars (`hangars/`)
+
+The hangar building for each size: walls, roof, columns, windows and the doors (the floor, the rooms along the back wall,
+the aircraft, the people and the equipment stay the app's own). Metres, the doors towards +Z, the floor at 0, centred.
+It is fitted to the size shown. Meshes named `window`, `glass` or `skylight` show the sky at the base (day, sunrise,
+sunset, night). For the PC only, a file with `-pc` at the end (e.g. `hangars/hangar-large-pc.glb`) is used first, so
+a heavier, higher-quality building can go to the PC while phones keep the lighter one.
+
+| File | Size |
+|---|---|
+| `hangars/hangar-small.glb` | Small hangar: 36 × 42 m, 13 m high, doors 10.5 m (turboprops, business and small jets) |
+| `hangars/hangar-small-pc.glb` | The same, PC only |
+| `hangars/hangar-medium.glb` | Medium hangar: 52 × 66 m, 18 m high, doors 15 m (A320, 737, regional jets) |
+| `hangars/hangar-medium-pc.glb` | The same, PC only |
+| `hangars/hangar-large.glb` | Large hangar: 82 × 94 m, 25 m high, doors 21.5 m (767, 787, A330, A350, 777) |
+| `hangars/hangar-large-pc.glb` | The same, PC only |
+| `hangars/hangar-very-large.glb` | Very large hangar: 96 × 100 m, 30 m high, doors 26.5 m (747, 777-9, A380) |
+| `hangars/hangar-very-large-pc.glb` | The same, PC only |
+
+## Hangar items (`items/`)
+
+The break room's vending machine and what it sells. Fitted to the size of the app's own model; cans and bars stand
+upright (top towards +Y), the machine's front towards +Z.
+
+| File | What |
+|---|---|
+| `items/vending-machine.glb` | Vending machine (the hangar break room) |
+| `items/can-cola.glb` | Can of cola |
+| `items/can-lemon.glb` | Can of lemon soda |
+| `items/can-orange.glb` | Can of orange soda |
+| `items/can-water.glb` | Can of sparkling water |
+| `items/can-icedtea.glb` | Can of iced tea |
+| `items/bar-chocolate.glb` | Chocolate bar |
+| `items/bar-peanut.glb` | Peanut bar |
+| `items/bar-oat.glb` | Oat bar |
+| `items/bar-caramel.glb` | Caramel bar |
+
 ## People (`people/`)
 
 A base model for each gender and group of looks. The app picks the group from each person's look (skin tone and eyes);

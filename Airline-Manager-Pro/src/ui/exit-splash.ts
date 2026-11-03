@@ -8,12 +8,12 @@ const ExitSplash: any = { on: false };
 
 interface ExitStep { pct: number; step: string; run: () => void }
 
-function exitSplash(kind: 'office' | 'ops' | 'court' | 'v3d', title: string, steps: ExitStep[], then?: () => void) {
+function exitSplash(kind: 'office' | 'ops' | 'court' | 'v3d' | 'hangar', title: string, steps: ExitStep[], then?: () => void) {
   if (ExitSplash.on && ExitSplash.el) { try { ExitSplash.el.remove(); } catch (e) { /* gone */ } }
   const el = document.createElement('div'); el.className = 'exit-splash exit-' + kind;
   const first = steps.length ? steps[0].step : 'Loading…';
   if (kind === 'v3d') el.innerHTML = v3dLoaderHtml().replace('<b>3D view</b>', `<b>${esc(title)}</b>`).replace('Loading the mountains and the sea…', esc(first));
-  else el.innerHTML = ctLoaderHtml(title, first, kind === 'office' ? OF_WINGS : kind === 'ops' ? OPS_EMBLEM : undefined, kind === 'ops' ? OPS_SCENE : undefined);
+  else el.innerHTML = ctLoaderHtml(title, first, kind === 'office' ? OF_WINGS : kind === 'ops' ? OPS_EMBLEM : kind === 'hangar' ? HG_EMBLEM : undefined, kind === 'ops' ? OPS_SCENE : kind === 'hangar' ? HG_SCENE : undefined);
   document.body.appendChild(el); ExitSplash.on = true; ExitSplash.el = el;
   // first of all, everything you did there is saved (only the graphics are cleared, never your data)
   steps = [{ pct: 10, step: 'Saving your changes…', run: () => { try { Store.save(); Store.flushNative(); } catch (e) { /* saved with the next change */ } } } as ExitStep].concat(steps);
