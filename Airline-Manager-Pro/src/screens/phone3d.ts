@@ -1,0 +1,150 @@
+/** The phone on a desk (pos, turned by yaw), screen up and on; its parts in A (phoneAt, phoneScr, its hit for clicks). */
+function phoneMesh(T: any, root: any, A: any, pos: number[], yaw: number) {
+  { const g = new T.Group(); g.position.set(pos[0], pos[1], pos[2]); g.rotation.set(-Math.PI / 2, 0, yaw); root.add(g); A.phoneAt = g; A.hits = A.hits || [];
+    const W = 0.072, H = 0.152, r = 0.009, sh = new T.Shape(); sh.moveTo(-W / 2 + r, -H / 2); sh.lineTo(W / 2 - r, -H / 2); sh.quadraticCurveTo(W / 2, -H / 2, W / 2, -H / 2 + r); sh.lineTo(W / 2, H / 2 - r); sh.quadraticCurveTo(W / 2, H / 2, W / 2 - r, H / 2); sh.lineTo(-W / 2 + r, H / 2); sh.quadraticCurveTo(-W / 2, H / 2, -W / 2, H / 2 - r); sh.lineTo(-W / 2, -H / 2 + r); sh.quadraticCurveTo(-W / 2, -H / 2, -W / 2 + r, -H / 2);
+    // a titanium frame with rounded edges, a matte grey back with a camera island and a small engraved emblem,
+    // the side buttons, and black glass on the front with the screen behind it
+    const frameM = new T.MeshPhysicalMaterial({ color: 0xb8b4ab, metalness: 0.92, roughness: 0.28, clearcoat: 0.3 });
+    const bodyM = new T.Mesh(new T.ExtrudeGeometry(sh, { depth: 0.0058, bevelEnabled: true, bevelThickness: 0.0014, bevelSize: 0.0014, bevelSegments: 4, curveSegments: 12 }), frameM);
+    bodyM.position.z = -0.0072; bodyM.castShadow = true; g.add(bodyM);
+    const inset = (w: number, h: number, rr: number) => { const q = new T.Shape(); q.moveTo(-w / 2 + rr, -h / 2); q.lineTo(w / 2 - rr, -h / 2); q.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + rr); q.lineTo(w / 2, h / 2 - rr); q.quadraticCurveTo(w / 2, h / 2, w / 2 - rr, h / 2); q.lineTo(-w / 2 + rr, h / 2); q.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - rr); q.lineTo(-w / 2, -h / 2 + rr); q.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + rr, -h / 2); return new T.ShapeGeometry(q, 10); };
+    const back = new T.Mesh(inset(W - 0.002, H - 0.002, r * 0.9), new T.MeshPhysicalMaterial({ color: 0x86837d, metalness: 0.15, roughness: 0.62, sheen: 0.2 })); back.position.z = -0.0087; back.rotation.y = Math.PI; g.add(back);
+    // the camera island: three lenses in a row and a flash
+    const isl = new T.Mesh(new T.ExtrudeGeometry((() => { const q = new T.Shape(), w = W * 0.74, h = 0.022, rr = 0.011; q.moveTo(-w / 2 + rr, -h / 2); q.lineTo(w / 2 - rr, -h / 2); q.absarc(w / 2 - rr, 0, rr, -Math.PI / 2, Math.PI / 2, false); q.lineTo(-w / 2 + rr, h / 2); q.absarc(-w / 2 + rr, 0, rr, Math.PI / 2, Math.PI * 1.5, false); return q; })(), { depth: 0.0018, bevelEnabled: true, bevelThickness: 0.0005, bevelSize: 0.0005, bevelSegments: 2 }), new T.MeshPhysicalMaterial({ color: 0x15171b, metalness: 0.3, roughness: 0.18, clearcoat: 1 }));
+    isl.position.set(0, H / 2 - 0.022, -0.0087); isl.rotation.y = Math.PI; g.add(isl);
+    for (let i = 0; i < 3; i++) {
+      const lx = -W * 0.22 + i * W * 0.17, ring = new T.Mesh(new T.CylinderGeometry(0.0062, 0.0062, 0.0012, 28), frameM); ring.rotation.x = Math.PI / 2; ring.position.set(lx, H / 2 - 0.022, -0.0112); g.add(ring);
+      const lens = new T.Mesh(new T.CylinderGeometry(0.0046, 0.0046, 0.0014, 28), new T.MeshPhysicalMaterial({ color: 0x050608, metalness: 0.1, roughness: 0.05, clearcoat: 1, iridescence: 0.6 })); lens.rotation.x = Math.PI / 2; lens.position.set(lx, H / 2 - 0.022, -0.0114); g.add(lens);
+    }
+    const flash = new T.Mesh(new T.CylinderGeometry(0.0018, 0.0018, 0.0008, 16), new T.MeshStandardMaterial({ color: 0xf2e8d0, roughness: 0.3, emissive: 0x332a18 })); flash.rotation.x = Math.PI / 2; flash.position.set(W * 0.29, H / 2 - 0.022, -0.0108); g.add(flash);
+    { const em = new T.Mesh(new T.RingGeometry(0.0045, 0.0052, 4, 1), new T.MeshStandardMaterial({ color: 0x9a978f, metalness: 0.6, roughness: 0.35, side: T.DoubleSide })); em.position.set(0, -0.005, -0.0089); em.rotation.set(0, Math.PI, Math.PI / 4); g.add(em); }
+    // the side buttons (volume up and down, and the power key) on the right edge
+    for (const [by, bl] of [[0.03, 0.016], [0.012, 0.016], [-0.016, 0.012]] as number[][]) { const bt = new T.Mesh(new T.BoxGeometry(0.0012, bl, 0.0028), frameM); bt.position.set(W / 2 + 0.0019, by, -0.0042); g.add(bt); }
+    // the front glass: black bezel round the screen
+    const glassBlack = new T.Mesh(inset(W - 0.0006, H - 0.0006, r * 0.95), new T.MeshPhysicalMaterial({ color: 0x050607, metalness: 0, roughness: 0.08, clearcoat: 1 })); glassBlack.position.z = -0.00005; g.add(glassBlack);
+    const cv = document.createElement('canvas'); cv.width = 216; cv.height = 456; const tx = new T.CanvasTexture(cv); tx.colorSpace = T.SRGBColorSpace; A.phoneCv = cv; A.phoneTex = tx;
+    const scr = new T.Mesh(new T.PlaneGeometry(W - 0.005, H - 0.005), new T.MeshBasicMaterial({ map: tx, toneMapped: false })); scr.position.z = 0.0001; g.add(scr); A.phoneScr = scr; scr.userData.size = [W - 0.005, H - 0.005];
+    // the glass over the screen: it catches the room's light, so a soft glare slides over it as the phone moves
+    const glass = new T.Mesh(inset(W - 0.0008, H - 0.0008, r * 0.95), new T.MeshPhysicalMaterial({ color: 0x000000, metalness: 0, roughness: 0.03, transparent: true, opacity: 0.22, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.6, depthWrite: false }));
+    glass.position.z = 0.0003; g.add(glass);
+    const cam = new T.Mesh(new T.CircleGeometry(0.0022, 20), new T.MeshBasicMaterial({ color: 0x020203 })); cam.position.set(0, H / 2 - 0.0095, 0.00025); g.add(cam);
+    const hit = new T.Mesh(new T.BoxGeometry(W + 0.03, H + 0.03, 0.04), new T.MeshBasicMaterial({ visible: false })); hit.userData.act = 'phone'; g.add(hit); A.hits.push(hit);
+    phoneLock(A); }
+}
+// Your phone, in your office and in Operations: lying on the desk with its screen on; click it and your hand picks
+// it up; tap it and its screen comes up to you in its frame (the laptop's apps in a phone layout, to scroll and tap);
+// lower it, and put it back where it was. Each room gives its room object (R: R.A, R.cam, R.root, R.me, R.overlay)
+// and R.phoneAfter (the room's own buttons back after the screen goes down).
+/** The lock screen on the phone in the room: the company's colours, the time and what is waiting. */
+function phoneLock(A: any) {
+  const cv = A && A.phoneCv as HTMLCanvasElement; if (!cv) return;
+  const x = cv.getContext('2d') as CanvasRenderingContext2D, co: any = company(), W = cv.width, H = cv.height, d = typeof lapGameNow === 'function' ? lapGameNow() : new Date();
+  const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, co.color || '#2C8CFF'); g.addColorStop(1, co.color2 || '#0B2A55'); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#fff'; x.textAlign = 'center'; x.font = '600 52px Inter, sans-serif'; x.fillText(d.toTimeString().slice(0, 5), W / 2, 120);
+  x.font = '500 15px Inter, sans-serif'; x.fillText(d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }), W / 2, 148);
+  let un = 0; try { un = lapUnread(); } catch (e) { /* none */ }
+  if (un) { x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(16, 190, W - 32, 46); x.fillStyle = '#fff'; x.font = '600 14px Inter, sans-serif'; x.fillText(`${un} new ${un === 1 ? 'message' : 'messages'}`, W / 2, 218); }
+  x.fillStyle = 'rgba(255,255,255,.7)'; x.fillRect(W / 2 - 40, H - 16, 80, 4);
+  if (A.phoneTex) A.phoneTex.needsUpdate = true;
+}
+const PH_PK_D = { reach: 0.75, lift: 0.95, lower: 0.95, release: 0.6 };
+function phonePick(R: any) {
+  const A = R.A; if (!A || !A.phoneAt || (R.pk && R.pk.st !== 'idle') || R.overlay) return;
+  phoneLock(A);
+  R.pk = { st: 'reach', t: 0, P0: A.phoneAt.position.clone(), q0: A.phoneAt.quaternion.clone(), a: {} };
+  if (R.glow) R.glow.hide(); R.lapHover = false; R.hover = false; phoneUi(R); Sound.tick();
+}
+function phonePut(R: any) { const pk = R.pk; if (!pk || pk.st !== 'hold') return; pk.st = 'lower'; pk.t = 0; phoneUi(R); }
+function phoneReset(R: any) {
+  const pk = R.pk; if (!pk) return;
+  if (R.overlay && R.overlay.classList.contains('ph-screen')) { try { lapUnmount(); } catch (e) { /* closed */ } R.overlay.remove(); R.overlay = null; document.body.classList.remove('of-over'); }
+  if (R.A && R.A.phoneAt) { R.A.phoneAt.position.copy(pk.P0); R.A.phoneAt.quaternion.copy(pk.q0); }
+  R.pk = null; phoneUi(R);
+}
+function phoneUi(R: any) {
+  const pk = R.pk, on = !!(pk && pk.st === 'hold' && !R.overlay);
+  let b = R.root && R.root.querySelector('.of-pk') as HTMLElement;
+  if (!on) { if (b) b.remove(); return; }
+  if (b) return;
+  b = document.createElement('div'); b.className = 'of-ph of-pk';
+  b.innerHTML = `<button class="btn primary sm" data-pk="open">${icon('user')}Use the phone</button><button class="btn sm" data-pk="put">Put it down</button>`;
+  b.addEventListener('pointerdown', e => e.stopPropagation());
+  b.addEventListener('click', e => { const k = (e.target as HTMLElement).closest('[data-pk]'); if (!k) return; e.stopPropagation(); if (k.getAttribute('data-pk') === 'open') phoneOpen(R); else phonePut(R); });
+  R.root.appendChild(b);
+}
+/** Each frame in the chair while the phone is in play: where it is, your right hand on it, leaning to the desk. */
+function phoneStep(R: any, dt: number, t: number): { lean: number; turn: number; slide: number; lookK: number; at: any; arms: any } {
+  const pk = R.pk, A = R.A, T = THREE, out = { lean: 0, turn: 0, slide: 0, lookK: 0, at: null as any, arms: null as any };
+  if (!pk || !A || !A.phoneAt) return out;
+  const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, D = PH_PK_D;
+  pk.t += dt;
+  let w = 0, mv = 0;
+  if (pk.st === 'reach') { w = E(pk.t / D.reach); if (pk.t >= D.reach) { pk.st = 'lift'; pk.t = 0; } }
+  else if (pk.st === 'lift') { w = 1; mv = E(pk.t / D.lift); if (pk.t >= D.lift) { pk.st = 'hold'; pk.t = 0; phoneUi(R); } }
+  else if (pk.st === 'hold') { w = 1; mv = 1; }
+  else if (pk.st === 'lower') { w = 1; mv = 1 - E(pk.t / D.lower); if (pk.t >= D.lower) { pk.st = 'release'; pk.t = 0; Sound.tick(); } }
+  else if (pk.st === 'release') { w = 1 - E(pk.t / D.release); if (pk.t >= D.release) { R.pk = null; phoneUi(R); return out; } }
+  const down = pk.st === 'reach' || pk.st === 'release' ? w : 1 - mv;
+  out.lean = 0.35 * down; out.turn = -0.3 * down; out.slide = 0.08 * down;
+  // in your hand: low and a little to the right, screen towards you, never quite still
+  const e0 = R.me && R.me.eye0 ? R.me.eye0 : new T.Vector3(0, 1.2, 1.02), S = Math.sin;
+  const hold = new T.Vector3(e0.x + 0.06 + 0.002 * S(t * 1.2), e0.y - 0.2 + 0.002 * S(t * 0.9 + 1), e0.z - 0.31);
+  const qh = new T.Quaternion().setFromEuler(new T.Euler(-0.32 + 0.006 * S(t * 1.1), 0.08 + 0.008 * S(t * 0.8), 0.004 * S(t * 0.6), 'YXZ'));
+  const pos = pk.P0.clone().lerp(hold, mv); pos.y += 0.07 * Math.sin(Math.PI * mv);
+  A.phoneAt.position.copy(pos); A.phoneAt.quaternion.copy(pk.q0).slerp(qh, mv); A.phoneAt.updateMatrixWorld(true);
+  out.at = A.phoneAt.localToWorld(new T.Vector3(0, 0, 0));
+  out.lookK = pk.st === 'reach' || pk.st === 'release' ? 0.85 * w : 0.9 + 0.1 * mv;
+  // the right hand round its right edge, from behind
+  const grip = A.phoneAt.localToWorld(new T.Vector3(0.046, -0.02, -0.022));
+  out.arms = (m: any) => {
+    const res: any = {}, rest = humanGesture({ kind: 'sit', v: 0 }, t);
+    if (w < 0.002) { pk.a.R = null; return res; }
+    const from = m.root.localToWorld(humanHandAt(m, 'R', rest.R)), to = from.lerp(grip, w);
+    pk.a.R = humanReach(m, 'R', m.root.worldToLocal(to), pk.a.R || rest.R); res.R = pk.a.R;
+    return res;
+  };
+  return out;
+}
+/** The phone's screen on your screen, as it is held now. */
+function phoneRect(R: any): { x: number; y: number; w: number; h: number } {
+  const T = THREE, S = R.A.phoneScr, rr = R.root.getBoundingClientRect(), z = (window as any).__uiZoom || 1;
+  const [w, h] = S.userData.size; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const [x, y] of [[-w / 2, -h / 2], [w / 2, -h / 2], [-w / 2, h / 2], [w / 2, h / 2]]) {
+    const v = S.localToWorld(new T.Vector3(x, y, 0)).project(R.cam), sx = (v.x + 1) / 2 * rr.width / z, sy = (1 - v.y) / 2 * rr.height / z;
+    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+  }
+  return { x: x0, y: y0, w: Math.max(20, x1 - x0), h: Math.max(40, y1 - y0) };
+}
+/** Tap the phone in your hand: its screen comes up to you, still a phone in its frame, to scroll and tap. */
+function phoneOpen(R: any) {
+  if (!R.on || R.overlay || !R.pk || R.pk.st !== 'hold') return;
+  Sound.tick(); aimUnlock();
+  for (const sel of ['.of-spots', '.ct-box', '.ct-pad', '.ct-hint', '.of-aim', '.op-ui', '.op-dot', '.op-pad']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
+  const from = phoneRect(R);
+  const ov = document.createElement('div'); ov.className = 'ph-screen';
+  ov.innerHTML = `<div class="ph-frame"><div class="ph-glass"></div><span class="ph-glare"></span><span class="ph-cam"></span><button class="ph-side" data-pk="close" aria-label="Lower the phone" title="Lower the phone (Esc)"></button></div>`;
+  // the glare on the glass moves a little with your hand and with the pointer, as light does on a real screen
+  const glr = () => { const fr0 = ov.querySelector('.ph-frame') as HTMLElement; if (!fr0 || !ov.isConnected) return; const t = performance.now() / 1000; fr0.style.setProperty('--gx', (ov as any)._gx + 6 * Math.sin(t * 0.7) + '%'); fr0.style.setProperty('--gy', (ov as any)._gy + 4 * Math.sin(t * 0.53 + 1) + '%'); requestAnimationFrame(glr); };
+  (ov as any)._gx = 0; (ov as any)._gy = 0;
+  ov.addEventListener('pointermove', e => { const r = ov.getBoundingClientRect(); (ov as any)._gx = ((e.clientX - r.left) / r.width - 0.5) * 40; (ov as any)._gy = ((e.clientY - r.top) / r.height - 0.5) * 30; });
+  requestAnimationFrame(glr);
+  R.root.appendChild(ov); R.overlay = ov; document.body.classList.add('of-over'); phoneUi(R);
+  ov.addEventListener('click', e => { const t = e.target as HTMLElement; if (t === ov || t.closest('[data-pk=close]')) { e.stopPropagation(); phoneClose(R); } });
+  try { lapMount(ov.querySelector('.ph-glass') as HTMLElement, true); } catch (e) { (ov.querySelector('.ph-glass') as HTMLElement).innerHTML = '<p class="muted">The phone could not start.</p>'; }
+  const fr = ov.querySelector('.ph-frame') as HTMLElement, z = (window as any).__uiZoom || 1, rr = R.root.getBoundingClientRect(), b = fr.getBoundingClientRect();
+  const tx = { x: (b.left - rr.left) / z, y: (b.top - rr.top) / z, w: b.width / z, h: b.height / z };
+  fr.style.transformOrigin = '0 0'; fr.style.transition = 'none';
+  fr.style.transform = `translate(${from.x - tx.x}px, ${from.y - tx.y}px) scale(${from.w / tx.w}, ${from.h / tx.h})`; ov.classList.add('in');
+  void fr.offsetWidth;
+  requestAnimationFrame(() => { fr.style.transition = ''; fr.classList.add('go'); fr.style.transform = 'none'; });
+}
+function phoneClose(R: any) {
+  const ov = R.overlay; if (!ov || !ov.classList.contains('ph-screen') || ov.classList.contains('out')) return;
+  Sound.tick(); try { lapUnmount(); } catch (e) { /* closed */ }
+  const fr = ov.querySelector('.ph-frame') as HTMLElement, to = phoneRect(R), z = (window as any).__uiZoom || 1, rr = R.root.getBoundingClientRect(), b = fr.getBoundingClientRect();
+  const cur = { x: (b.left - rr.left) / z, y: (b.top - rr.top) / z, w: b.width / z, h: b.height / z };
+  ov.classList.add('out'); ov.classList.remove('in'); fr.style.transform = `translate(${to.x - cur.x}px, ${to.y - cur.y}px) scale(${to.w / cur.w}, ${to.h / cur.h})`;
+  setTimeout(() => { ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); phoneUi(R); try { if (R.phoneAfter) R.phoneAfter(); } catch (e) { /* ui */ } }, 560);
+}
+

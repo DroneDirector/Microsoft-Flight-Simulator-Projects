@@ -3404,3 +3404,30 @@ html.calm .police-btn .pl-l, html.calm .police-btn .pl-r { opacity: .5; }
 .ph-os .ph-home i { width: 128px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.85); box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
 .ph-os .lap-win:not([hidden]) ~ .ph-home i { background: rgba(255,255,255,.7); }
 html.calm .ph-frame, html.calm .ph-screen { transition: none; }
+
+/* the phone: one column at a time (the inbox, then the message), and app icons that fit */
+.ph-os .lm { display: block; height: 100%; }
+.ph-os .lm .lm-list { height: 100%; border-right: 0; }
+.ph-os .lm .lm-view { display: none; }
+.ph-os .lm.lm-open .lm-list { display: none; }
+.ph-os .lm.lm-open .lm-view { display: block; height: 100%; overflow: auto; }
+.ph-os .lm-back { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 8px -4px; padding: 4px 6px; border: 0; background: none; color: var(--cyan); font: 600 13px Inter, sans-serif; cursor: pointer; }
+.ph-os .lm-back svg { width: 16px; height: 16px; }
+.ph-os .ld-icons { position: relative; left: auto; top: auto; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: auto; gap: 14px 4px; width: auto; }
+.ph-os .ld-ic { min-width: 0; padding: 4px 0; }
+.ph-os .ld-ic > span { width: 50px; height: 50px; }
+.ph-os .ld-ic b { font-size: 10.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-os .lk-accts, .ph-os .lk-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ph-os .lk-mr { flex-direction: column; align-items: stretch; }
+
+/* the glare on the phone's glass, sliding with the hand and the pointer */
+.ph-glare { position: absolute; inset: 11px; border-radius: 36px; pointer-events: none; z-index: 6; mix-blend-mode: screen; overflow: hidden;
+  background: linear-gradient(118deg, rgba(255,255,255,0) calc(30% + var(--gx, 0%)), rgba(255,255,255,.075) calc(38% + var(--gx, 0%)), rgba(255,255,255,.02) calc(46% + var(--gx, 0%)), rgba(255,255,255,0) calc(52% + var(--gx, 0%))),
+              radial-gradient(120% 60% at calc(18% + var(--gx, 0%)) calc(6% + var(--gy, 0%)), rgba(255,255,255,.07), rgba(255,255,255,0) 60%); }
+.ph-frame { background: linear-gradient(145deg, #d9d6cf, #8f8b83 22%, #c9c5bc 48%, #77736c 78%, #b9b5ad); box-shadow: 0 0 0 1px #5c5952 inset, 0 0 0 9px #050607 inset, 0 30px 80px rgba(0,0,0,.6); padding: 12px; }
+.ph-glass { box-shadow: 0 0 0 1px #000; }
+.ph-cam { top: 24px; width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 3px #0b0d12, inset 2px -2px 0 3px #1b2a44; }
+.ph-side { background: linear-gradient(90deg, #8f8b83, #d4d0c8); }
+.ph-os .lk-mr select, .ph-os .lk-mr input { flex: 0 0 auto; }
+.ph-os .lap-win[hidden] { display: none !important; }
+.ph-os .ld-widget { display: block !important; position: relative; left: auto; right: auto; top: auto; bottom: auto; }

@@ -181,14 +181,7 @@ function ofBuild(scene: any, q: number) {
   // the family photo, the phone, notes, coffee, pens
   A.photoAt = new T.Group(); A.photoAt.position.set(-0.42, 0.775, 0.3); A.photoAt.rotation.y = 0.5; root.add(A.photoAt);   // turned towards you
   // your phone, lying on the desk to your right, screen up
-  { const g = new T.Group(); g.position.set(0.34, 0.777, 0.56); g.rotation.set(-Math.PI / 2, 0, -0.35); root.add(g); A.phoneAt = g;
-    const W = 0.072, H = 0.152, r = 0.009, sh = new T.Shape(); sh.moveTo(-W / 2 + r, -H / 2); sh.lineTo(W / 2 - r, -H / 2); sh.quadraticCurveTo(W / 2, -H / 2, W / 2, -H / 2 + r); sh.lineTo(W / 2, H / 2 - r); sh.quadraticCurveTo(W / 2, H / 2, W / 2 - r, H / 2); sh.lineTo(-W / 2 + r, H / 2); sh.quadraticCurveTo(-W / 2, H / 2, -W / 2, H / 2 - r); sh.lineTo(-W / 2, -H / 2 + r); sh.quadraticCurveTo(-W / 2, -H / 2, -W / 2 + r, -H / 2);
-    const bodyM = new T.Mesh(new T.ExtrudeGeometry(sh, { depth: 0.006, bevelEnabled: true, bevelThickness: 0.0012, bevelSize: 0.0012, bevelSegments: 3, curveSegments: 10 }), new T.MeshPhysicalMaterial({ color: 0x1a1d22, metalness: 0.6, roughness: 0.32, clearcoat: 0.6 }));
-    bodyM.position.z = -0.0072; bodyM.castShadow = true; g.add(bodyM);
-    const cv = document.createElement('canvas'); cv.width = 216; cv.height = 456; const tx = new T.CanvasTexture(cv); tx.colorSpace = T.SRGBColorSpace; A.phoneCv = cv; A.phoneTex = tx;
-    const scr = new T.Mesh(new T.PlaneGeometry(W - 0.005, H - 0.005), new T.MeshBasicMaterial({ map: tx, toneMapped: false })); scr.position.z = 0.0001; g.add(scr); A.phoneScr = scr; scr.userData.size = [W - 0.005, H - 0.005];
-    const hit = new T.Mesh(new T.BoxGeometry(W + 0.03, H + 0.03, 0.04), new T.MeshBasicMaterial({ visible: false })); hit.userData.act = 'phone'; g.add(hit); A.hits.push(hit);
-    ofPhoneLock(A); }
+  phoneMesh(T, root, A, [0.34, 0.777, 0.56], -0.35);
   bx(0.24, 0.015, 0.17, mat.white, 0.0, 0.783, 0.33, 0.1);   // a notepad
   add(new T.CylinderGeometry(0.006, 0.006, 0.15, 8), mat.black, 0.06, 0.79, 0.3).rotation.set(Math.PI / 2, 0, 0.6);
   add(new T.CylinderGeometry(0.04, 0.035, 0.09, 20), mat.white, 0.78, 0.82, 0.32); add(new T.TorusGeometry(0.025, 0.007, 8, 16), mat.white, 0.82, 0.82, 0.32).rotation.y = 0;
@@ -390,6 +383,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   fit(); R.fit = fit; window.addEventListener('resize', fit);
   // looking: drag (or the mouse once the view has it on the PC), the arrow keys in the chair
   R.look = { yaw: 0, pitch: -0.08 }; R.seat = true; R.free = { x: 0, z: 0.98, v: 0, bob: 0 };
+  R.phoneAfter = () => ofVisitUi();
   let drag: any = null, moved = 0, justLocked = false;
   cv.addEventListener('pointerdown', e => {
     // walking on the PC: the view takes the mouse (no pointer, turn as far as you like); a click then uses what glows
@@ -932,114 +926,13 @@ function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; slide
   return out;
 }
 
-/* ---------- your phone: picked up in your hand, its screen brought up to use, put back ---------- */
-/** The lock screen on the phone in the room: the company's colours, the time and what is waiting. */
-function ofPhoneLock(A: any) {
-  const cv = A && A.phoneCv as HTMLCanvasElement; if (!cv) return;
-  const x = cv.getContext('2d') as CanvasRenderingContext2D, co: any = company(), W = cv.width, H = cv.height, d = typeof lapGameNow === 'function' ? lapGameNow() : new Date();
-  const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, co.color || '#2C8CFF'); g.addColorStop(1, co.color2 || '#0B2A55'); x.fillStyle = g; x.fillRect(0, 0, W, H);
-  x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(0, 0, W, H);
-  x.fillStyle = '#fff'; x.textAlign = 'center'; x.font = '600 52px Inter, sans-serif'; x.fillText(d.toTimeString().slice(0, 5), W / 2, 120);
-  x.font = '500 15px Inter, sans-serif'; x.fillText(d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }), W / 2, 148);
-  let un = 0; try { un = lapUnread(); } catch (e) { /* none */ }
-  if (un) { x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(16, 190, W - 32, 46); x.fillStyle = '#fff'; x.font = '600 14px Inter, sans-serif'; x.fillText(`${un} new ${un === 1 ? 'message' : 'messages'}`, W / 2, 218); }
-  x.fillStyle = 'rgba(255,255,255,.7)'; x.fillRect(W / 2 - 40, H - 16, 80, 4);
-  if (A.phoneTex) A.phoneTex.needsUpdate = true;
-}
-const OF_PK_D = { reach: 0.75, lift: 0.95, lower: 0.95, release: 0.6 };
-function ofPhonePick() {
-  const R = OfficeRoom, A = R.A; if (!A || !A.phoneAt || (R.pk && R.pk.st !== 'idle') || (R.ph && R.ph.st !== 'idle') || ofLapK() > 0) return;
-  ofPhoneLock(A);
-  R.pk = { st: 'reach', t: 0, P0: A.phoneAt.position.clone(), q0: A.phoneAt.quaternion.clone(), a: {} };
-  if (R.glow) R.glow.hide(); R.lapHover = false; ofPhoneUi(); Sound.tick();
-}
-function ofPhonePut() { const pk = OfficeRoom.pk; if (!pk || pk.st !== 'hold') return; pk.st = 'lower'; pk.t = 0; ofPhoneUi(); }
-function ofPhoneReset() {
-  const R = OfficeRoom, pk = R.pk; if (!pk) return;
-  if (R.overlay && R.overlay.classList.contains('ph-screen')) { try { lapUnmount(); } catch (e) { /* closed */ } R.overlay.remove(); R.overlay = null; document.body.classList.remove('of-over'); }
-  if (R.A && R.A.phoneAt) { R.A.phoneAt.position.copy(pk.P0); R.A.phoneAt.quaternion.copy(pk.q0); }
-  R.pk = null; ofPhoneUi();
-}
-function ofPhoneUi() {
-  const R = OfficeRoom, pk = R.pk, on = !!(pk && pk.st === 'hold' && !R.overlay);
-  let b = R.root && R.root.querySelector('.of-pk') as HTMLElement;
-  if (!on) { if (b) b.remove(); return; }
-  if (b) return;
-  b = document.createElement('div'); b.className = 'of-ph of-pk';
-  b.innerHTML = `<button class="btn primary sm" data-pk="open">${icon('user')}Use the phone</button><button class="btn sm" data-pk="put">Put it down</button>`;
-  b.addEventListener('pointerdown', e => e.stopPropagation());
-  b.addEventListener('click', e => { const k = (e.target as HTMLElement).closest('[data-pk]'); if (!k) return; e.stopPropagation(); if (k.getAttribute('data-pk') === 'open') ofPhoneOpen(); else ofPhonePut(); });
-  R.root.appendChild(b);
-}
-/** Each frame in the chair while the phone is in play: where it is, your right hand on it, leaning to the desk. */
-function ofPhoneStep(dt: number, t: number): { lean: number; turn: number; slide: number; lookK: number; at: any; arms: any } {
-  const R = OfficeRoom, pk = R.pk, A = R.A, T = THREE, out = { lean: 0, turn: 0, slide: 0, lookK: 0, at: null as any, arms: null as any };
-  if (!pk || !A || !A.phoneAt) return out;
-  const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, D = OF_PK_D;
-  pk.t += dt;
-  let w = 0, mv = 0;
-  if (pk.st === 'reach') { w = E(pk.t / D.reach); if (pk.t >= D.reach) { pk.st = 'lift'; pk.t = 0; } }
-  else if (pk.st === 'lift') { w = 1; mv = E(pk.t / D.lift); if (pk.t >= D.lift) { pk.st = 'hold'; pk.t = 0; ofPhoneUi(); } }
-  else if (pk.st === 'hold') { w = 1; mv = 1; }
-  else if (pk.st === 'lower') { w = 1; mv = 1 - E(pk.t / D.lower); if (pk.t >= D.lower) { pk.st = 'release'; pk.t = 0; Sound.tick(); } }
-  else if (pk.st === 'release') { w = 1 - E(pk.t / D.release); if (pk.t >= D.release) { R.pk = null; ofPhoneUi(); return out; } }
-  const down = pk.st === 'reach' || pk.st === 'release' ? w : 1 - mv;
-  out.lean = 0.35 * down; out.turn = -0.3 * down; out.slide = 0.08 * down;
-  // in your hand: low and a little to the right, screen towards you, never quite still
-  const e0 = R.me && R.me.eye0 ? R.me.eye0 : new T.Vector3(0, 1.2, 1.02), S = Math.sin;
-  const hold = new T.Vector3(e0.x + 0.06 + 0.002 * S(t * 1.2), e0.y - 0.2 + 0.002 * S(t * 0.9 + 1), e0.z - 0.31);
-  const qh = new T.Quaternion().setFromEuler(new T.Euler(-0.32 + 0.006 * S(t * 1.1), 0.08 + 0.008 * S(t * 0.8), 0.004 * S(t * 0.6), 'YXZ'));
-  const pos = pk.P0.clone().lerp(hold, mv); pos.y += 0.07 * Math.sin(Math.PI * mv);
-  A.phoneAt.position.copy(pos); A.phoneAt.quaternion.copy(pk.q0).slerp(qh, mv); A.phoneAt.updateMatrixWorld(true);
-  out.at = A.phoneAt.localToWorld(new T.Vector3(0, 0, 0));
-  out.lookK = pk.st === 'reach' || pk.st === 'release' ? 0.85 * w : 0.9 + 0.1 * mv;
-  // the right hand round its right edge, from behind
-  const grip = A.phoneAt.localToWorld(new T.Vector3(0.046, -0.02, -0.022));
-  out.arms = (m: any) => {
-    const res: any = {}, rest = humanGesture({ kind: 'sit', v: 0 }, t);
-    if (w < 0.002) { pk.a.R = null; return res; }
-    const from = m.root.localToWorld(humanHandAt(m, 'R', rest.R)), to = from.lerp(grip, w);
-    pk.a.R = humanReach(m, 'R', m.root.worldToLocal(to), pk.a.R || rest.R); res.R = pk.a.R;
-    return res;
-  };
-  return out;
-}
-/** The phone's screen on your screen, as it is held now. */
-function ofPhoneRect(): { x: number; y: number; w: number; h: number } {
-  const R = OfficeRoom, T = THREE, S = R.A.phoneScr, rr = R.root.getBoundingClientRect(), z = (window as any).__uiZoom || 1;
-  const [w, h] = S.userData.size; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-  for (const [x, y] of [[-w / 2, -h / 2], [w / 2, -h / 2], [-w / 2, h / 2], [w / 2, h / 2]]) {
-    const v = S.localToWorld(new T.Vector3(x, y, 0)).project(R.cam), sx = (v.x + 1) / 2 * rr.width / z, sy = (1 - v.y) / 2 * rr.height / z;
-    x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
-  }
-  return { x: x0, y: y0, w: Math.max(20, x1 - x0), h: Math.max(40, y1 - y0) };
-}
-/** Tap the phone in your hand: its screen comes up to you, still a phone in its frame, to scroll and tap. */
-function ofPhoneOpen() {
-  const R = OfficeRoom; if (!R.on || R.overlay || !R.pk || R.pk.st !== 'hold') return;
-  Sound.tick(); aimUnlock();
-  for (const sel of ['.of-spots', '.ct-box', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
-  const from = ofPhoneRect();
-  const ov = document.createElement('div'); ov.className = 'ph-screen';
-  ov.innerHTML = `<div class="ph-frame"><div class="ph-glass"></div><span class="ph-cam"></span><button class="ph-side" data-pk="close" aria-label="Lower the phone" title="Lower the phone (Esc)"></button></div>`;
-  R.root.appendChild(ov); R.overlay = ov; document.body.classList.add('of-over'); ofPhoneUi();
-  ov.addEventListener('click', e => { const t = e.target as HTMLElement; if (t === ov || t.closest('[data-pk=close]')) { e.stopPropagation(); ofPhoneClose(); } });
-  try { lapMount(ov.querySelector('.ph-glass') as HTMLElement, true); } catch (e) { (ov.querySelector('.ph-glass') as HTMLElement).innerHTML = '<p class="muted">The phone could not start.</p>'; }
-  const fr = ov.querySelector('.ph-frame') as HTMLElement, z = (window as any).__uiZoom || 1, rr = R.root.getBoundingClientRect(), b = fr.getBoundingClientRect();
-  const tx = { x: (b.left - rr.left) / z, y: (b.top - rr.top) / z, w: b.width / z, h: b.height / z };
-  fr.style.transformOrigin = '0 0'; fr.style.transition = 'none';
-  fr.style.transform = `translate(${from.x - tx.x}px, ${from.y - tx.y}px) scale(${from.w / tx.w}, ${from.h / tx.h})`; ov.classList.add('in');
-  void fr.offsetWidth;
-  requestAnimationFrame(() => { fr.style.transition = ''; fr.classList.add('go'); fr.style.transform = 'none'; });
-}
-function ofPhoneClose() {
-  const R = OfficeRoom, ov = R.overlay; if (!ov || !ov.classList.contains('ph-screen') || ov.classList.contains('out')) return;
-  Sound.tick(); try { lapUnmount(); } catch (e) { /* closed */ }
-  const fr = ov.querySelector('.ph-frame') as HTMLElement, to = ofPhoneRect(), z = (window as any).__uiZoom || 1, rr = R.root.getBoundingClientRect(), b = fr.getBoundingClientRect();
-  const cur = { x: (b.left - rr.left) / z, y: (b.top - rr.top) / z, w: b.width / z, h: b.height / z };
-  ov.classList.add('out'); ov.classList.remove('in'); fr.style.transform = `translate(${to.x - cur.x}px, ${to.y - cur.y}px) scale(${to.w / cur.w}, ${to.h / cur.h})`;
-  setTimeout(() => { ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); ofPhoneUi(); ofVisitUi(); }, 560);
-}
+/* ---------- your phone (shared with Operations: phone3d.ts) ---------- */
+function ofPhonePick() { const R = OfficeRoom; if ((R.ph && R.ph.st !== 'idle') || ofLapK() > 0) return; phonePick(R); }
+function ofPhonePut() { phonePut(OfficeRoom); }
+function ofPhoneReset() { phoneReset(OfficeRoom); }
+function ofPhoneStep(dt: number, t: number) { return phoneStep(OfficeRoom, dt, t); }
+function ofPhoneOpen() { phoneOpen(OfficeRoom); }
+function ofPhoneClose() { phoneClose(OfficeRoom); }
 
 /* ---------- the interview ---------- */
 const OF_Q: [string, string][] = [['what', 'Tell me, in your own words, what happened.'], ['claim', 'The report says: {did} Is that true?'], ['why', 'Why did it happen?'], ['again', 'How do I know it won\'t happen again?'], ['keep', 'Give me one good reason to keep you.']];

@@ -106,7 +106,9 @@ function opsBuild(scene: any, q: number) {
     for (let i = 0; i < 4; i++) bx(0.06, 0.3, 0.24, M({ color: cols[(i + 3) % cols.length], roughness: 0.6 }), -0.99 + i * 0.065, 0.925, -0.52);   // upright binders behind the stack
     const hit = new T.Mesh(new T.BoxGeometry(0.6, 0.4, 0.4), new T.MeshBasicMaterial({ visible: false })); hit.position.set(-0.88, 0.95, -0.35); hit.userData.act = 'archives'; root.add(hit); A.hits.push(hit);
     add(new T.CylinderGeometry(0.04, 0.034, 0.1, 20), M({ color: 0xF4F4F2, roughness: 0.3 }), 0.72, 0.825, -0.1); add(new T.CylinderGeometry(0.036, 0.036, 0.004, 20), M({ color: 0x3A2216 }), 0.72, 0.872, -0.1);
-    bx(0.075, 0.009, 0.155, mat.black, 0.82, 0.78, 0.12, 0.3); }
+  }
+  // your phone, on the desk to the right of the keyboard, screen on
+  phoneMesh(T, root, A, [0.5, 0.777, 0.16], -0.3);
   // the fancy chair: a high-backed leather chair with a headrest, stitched in the company colour, on five wheels
   { const g = new T.Group(); g.position.set(0, 0, 0.72); g.rotation.y = Math.PI; root.add(g);
     { const hit = new T.Mesh(new T.BoxGeometry(0.7, 1.5, 0.7), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, 0.75, 0); hit.userData.act = 'sit'; g.add(hit); A.hits.push(hit); }
@@ -224,7 +226,7 @@ function opsOpen2(root: HTMLElement, q: number) {
     const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
     fit(); R.fit = fit; window.addEventListener('resize', fit);
     // looking around from the chair: drag, or the arrow keys
-    R.look = { yaw: 0, pitch: -0.16 };
+    R.look = { yaw: 0, pitch: -0.16 }; R.pk = null; R.phoneAfter = () => opsUi();
     let drag: any = null, moved = 0;
     let justLocked = false;
     cv.addEventListener('pointerdown', e => {
@@ -247,7 +249,8 @@ function opsOpen2(root: HTMLElement, q: number) {
     root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-op]') as HTMLElement; if (b) opsClick(b); });
     R.key$ = (e: KeyboardEvent) => {
       if (!R.on) return; const k = e.key.toLowerCase();
-      if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); opsScreenClose(); } return; }   // the screens have the keys (typing)
+      if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay.classList.contains('ph-screen')) phoneClose(R); else opsScreenClose(); } return; }
+      if (k === 'escape' && R.pk && R.pk.st === 'hold') { e.preventDefault(); e.stopImmediatePropagation(); phonePut(R); return; }   // the screens have the keys (typing)
       if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; opsLeave(); return; }   // the first Esc only gives the mouse back
       if (/^arrow\w+$/.test(k) || (!R.seat && /^(w|a|s|d|shift)$/.test(k))) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
     };
@@ -285,9 +288,12 @@ function opsFrame() {
   if (!R.seat) opsWalk(dt, now);
   else {
     R.cam.position.set(0, 1.2 - 0.075 * ze, 0.76 - 0.5 * ze);
-    if (R.me) { try { const by = Math.PI + R.look.yaw * (1 - ze); R.me.pitch = R.look.pitch * (1 - ze); const eye = selfPose(R.me, R.me.chair, by, 0.2 * ze, 1, 0, 0, now, dt); R.cam.position.lerpVectors(eye, R.cam.position, ze); } catch (e) { R.me = null; } }
+    const P = R.pk ? phoneStep(R, dt, now) : null;   // your phone: reaching for it, holding it
+    if (R.me) { try { const by = Math.PI + R.look.yaw * (1 - ze) * (P ? 1 - P.lookK : 1) + (P ? P.turn : 0); R.me.pitch = R.look.pitch * (1 - ze) * (P ? 1 - P.lookK : 1); const hip = P && P.slide ? R.me.chair.clone().add(new T.Vector3(0, 0, -P.slide)) : R.me.chair; const eye = selfPose(R.me, hip, by, 0.2 * ze + (P ? P.lean : 0), 1, 0, 0, now, dt, P ? P.arms : undefined); R.cam.position.lerpVectors(eye, R.cam.position, ze); } catch (e) { R.me = null; } }
     const yaw = Math.PI + R.look.yaw * (1 - ze), p = R.look.pitch * (1 - ze) + 0.0 * ze;
-    R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p))));
+    const ahead = R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)));
+    if (P && P.at && P.lookK > 0) ahead.lerp(P.at, P.lookK);   // your eyes on the phone
+    R.cam.lookAt(ahead);
   }
   if (R.glow) { if (R.overlay || R.zoomAnim || (R.seat && !R.hover)) R.glow.hide(); R.glow.step(dt); }
   if (R.A && R.A.monScr) R.A.monScr.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, zk * 1.4)));   // the screen lights up as it opens
@@ -325,10 +331,10 @@ function opsWalk(dt: number, now?: number) {
   // what's in front of you glows: the door (leave), the chair (sit), the monitor, the archives
   const obj = opsAimedObj(), hint = obj ? obj.userData.act : '', aim = R.root.querySelector('.op-dot') as HTMLElement;
   if (R.glow) { if (obj) R.glow.showObj(obj); else R.glow.hide(); }
-  if (aim) { aim.hidden = false; aim.textContent = hint === 'door' ? 'Click the door to leave Operations' : hint === 'sit' ? 'Click to sit in your chair' : hint === 'monitor' ? 'Click to work at the monitor' : hint === 'archives' ? 'The archives' : '·'; aim.classList.toggle('on', !!hint); }
+  if (aim) { aim.hidden = false; aim.textContent = hint === 'door' ? 'Click the door to leave Operations' : hint === 'sit' ? 'Click to sit in your chair' : hint === 'monitor' ? 'Click to work at the monitor' : hint === 'phone' ? 'Click to pick up your phone' : hint === 'archives' ? 'The archives' : '·'; aim.classList.toggle('on', !!hint); }
 }
 function opsSit() { const R = OpsRoom; aimUnlock(); R.seat = true; R.look = { yaw: 0, pitch: -0.16 }; const d = R.root.querySelector('.op-dot') as HTMLElement; if (d) d.hidden = true; Sound.tick(); opsUi(); }
-function opsStand() { const R = OpsRoom; R.seat = false; R.free = { x: 0.3, z: 1.3, v: 0, bob: 0 }; R.look = { yaw: 0, pitch: -0.05 }; Sound.tick(); opsUi(); }
+function opsStand() { const R = OpsRoom; phoneReset(R); R.seat = false; R.free = { x: 0.3, z: 1.3, v: 0, bob: 0 }; R.look = { yaw: 0, pitch: -0.05 }; Sound.tick(); opsUi(); }
 /** Through the door: it opens, and you are back in the Overview. */
 function opsDoor() { const R = OpsRoom; Sound.tick(); R.doorT = 1; aimUnlock(); setTimeout(() => opsLeave(true), 650); }
 function opsHover(e: PointerEvent) {
@@ -341,7 +347,9 @@ function opsHover(e: PointerEvent) {
 }
 function opsClickAt(e?: PointerEvent) {
   const R = OpsRoom; if (R.loading || R.overlay) return;
+  if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') phoneOpen(R); return; }   // the phone in your hand: a tap brings its screen up
   const a = opsAimed(e);
+  if (a === 'phone') { if (!R.seat) opsSit(); setTimeout(() => phonePick(R), R.seat ? 0 : 300); return; }
   if (a === 'door') { opsDoor(); return; }
   if (a === 'sit') { if (!R.seat) opsSit(); return; }
   if (a === 'monitor' && !R.seat) { opsSit(); setTimeout(() => opsScreenOpen(R.tab || 'schedule'), 250); return; }

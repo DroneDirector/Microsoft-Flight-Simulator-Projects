@@ -218,7 +218,7 @@ function lapMailHtml(): string {
   const L = lapMail(), cur = L.filter(m => m.id === Lap.mailId)[0];
   const kindIc: any = { court: 'shield', report: 'alert', lease: 'fleet', family: 'user', bank: 'bank', note: 'calendar' };
   const list = L.slice(0, 120).map(m => `<button class="lm-row ${m.read ? '' : 'new'} ${cur === m ? 'on' : ''}" data-act="lap-mail" data-id="${m.id}"><span class="lm-ic k-${m.kind}">${icon(kindIc[m.kind] || 'mail')}</span><span class="lm-t"><b>${esc(m.from)}</b><span>${esc(m.subject)}</span><small>${esc(atText(m.at))}${m.done ? ' · ' + esc(m.done) : ''}</small></span></button>`).join('') || '<p class="muted lm-empty">No mail yet.</p>';
-  const view = cur ? `<div class="lm-view"><div class="lm-vh"><h3>${esc(cur.subject)}</h3><small><b>${esc(cur.from)}</b>${cur.addr ? ` &lt;${esc(cur.addr)}&gt;` : ''} · ${esc(dateStr(new Date(cur.at)))}</small></div>
+  const view = cur ? `<div class="lm-view"><div class="lm-vh">${Lap.phone ? `<button class="lm-back" data-act="lap-mail-back">${icon('back')}Inbox</button>` : ''}<h3>${esc(cur.subject)}</h3><small><b>${esc(cur.from)}</b>${cur.addr ? ` &lt;${esc(cur.addr)}&gt;` : ''} · ${esc(dateStr(new Date(cur.at)))}</small></div>
       <div class="lm-body">${esc(cur.body).replace(/\n/g, '<br>')}</div>
       ${cur.kind === 'family' && cur.fam && cur.fam.chosen != null ? `<div class="lm-sent"><small>You replied</small><p>${esc(cur.fam.replies[cur.fam.chosen][0])}</p></div>` : ''}
       ${cur.acts && cur.acts.length && !(cur.kind === 'lease' && cur.done) && !(cur.kind === 'family' && cur.fam && cur.fam.chosen != null) ? `<div class="lm-acts">${cur.kind === 'family' ? '<small>Reply</small>' : ''}${cur.acts.map(a => `<button class="btn ${a.kind === 'primary' ? 'primary' : 'ghost'} sm" data-act="${a.act}" data-id="${esc(a.act === 'lap-lease' || a.act === 'lap-fam' ? cur.id : (a.data || ''))}" data-v="${esc(a.data || '')}">${esc(a.label)}</button>`).join('')}</div>` : ''}
@@ -226,10 +226,11 @@ function lapMailHtml(): string {
       <div class="lm-foot"><button class="btn ghost sm" data-act="lap-mail-del" data-id="${cur.id}">${icon('trash')}Delete</button></div></div>`
     : `<div class="lm-view lm-none"><span>${icon('mail')}</span><p>Choose a message.</p></div>`;
   const on = (State.settings as any).mailReports !== false;
-  return `<div class="lm"><div class="lm-list"><div class="lm-lh"><b>Inbox</b><small>${lapUnread()} unread</small></div>${list}
+  return `<div class="lm ${cur ? 'lm-open' : ''}"><div class="lm-list"><div class="lm-lh"><b>Inbox</b><small>${lapUnread()} unread</small></div>${list}
     <label class="lm-set"><input type="checkbox" data-act="lap-mail-reports" ${on ? 'checked' : ''}> Receive the accident investigators' preliminary reports</label></div>${view}</div>`;
 }
 ACTIONS['lap-mail'] = el => { const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (!m) return; Lap.mailId = m.id; if (!m.read) { m.read = true; Store.soon(); } Sound.tick(); lapRender(true); try { renderTopbar(); } catch (e) { /* ignore */ } };
+ACTIONS['lap-mail-back'] = () => { Lap.mailId = ''; Sound.tick(); lapRender(true); };
 ACTIONS['lap-mail-del'] = el => { const S = lapS(); S.mail = S.mail.filter((x: LapMail) => x.id !== el.getAttribute('data-id')); Lap.mailId = ''; Store.soon(); Sound.tick(); lapRender(true); };
 ACTIONS['lap-mail-reports'] = el => { (State.settings as any).mailReports = (el as HTMLInputElement).checked; Store.soon(); };
 ACTIONS['lap-lease'] = el => { const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (m) lapLeaseAnswer(m, el.getAttribute('data-v') === 'yes'); };
