@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.79 (2026-11-03)
+
+- phone-talk.ts: replies follow what you write (tone and topic: greetings, how are you, thanks, praise, apologies, insults, firing, work, pay, time off, sickness, home, love, jokes, goodbye, call me), family or staff, and the relationship (State.phoneRel: rel, hurt); several lines with typing; call-backs
+- calls: ringing, answered or not, their voice and yours, suggested lines or your own words, incoming calls with Answer and Decline, missed calls; recents show direction and length
+
 ## 0.9.78 (2026-11-03)
 
 - 3D view: going into the cabin (Cabin, Walk, the window views) shows a Loading cabin screen (cabinLoadShow) while the cabin is built; v3dModeSet
