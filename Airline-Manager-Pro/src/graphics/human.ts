@@ -20,15 +20,44 @@ function animAuto(): number { let q = 2; try { q = typeof cabinQ === 'function' 
  *  open — wide on a, e and o, less on i and u, closed on m, b and p, closing between words and at the ends of
  *  sentences; round — the lips pushed forward and narrowed on o, u and w, spread on e and i. Shut (0) before and
  *  after the line, so mouths only move in dialogue. */
-function humanSpeech(text: string, startMs: number, nowMs?: number): { open: number; round: number } {
+function humanSpeech(text: string, startMs: number, nowMs?: number): { open: number; round: number; press?: number; low?: number; up?: number } {
   const shut = { open: 0, round: 0 }; if (!text) return shut;
-  const t = ((nowMs == null ? Date.now() : nowMs) - startMs) / 1000, pos = t * 13;
-  if (pos < 0 || pos >= text.length + 1.5) return shut;
-  const ch = (i: number) => (text[i] || ' ').toLowerCase();
-  const op = (c: string) => /[a]/.test(c) ? 1 : /[eo]/.test(c) ? 0.8 : /[iuy]/.test(c) ? 0.5 : /[mbp]/.test(c) ? 0 : /[fv]/.test(c) ? 0.12 : /[.,!?;:]/.test(c) ? 0 : c === ' ' ? 0.1 : 0.3;
-  const rd = (c: string) => /[ouw]/.test(c) ? 1 : /[ei]/.test(c) ? -0.7 : /[sz]/.test(c) ? -0.4 : 0;
-  const i = Math.floor(pos), f = pos - i, k = f * f * (3 - 2 * f);
-  return { open: (op(ch(i)) * (1 - k) + op(ch(i + 1)) * k) * (0.85 + 0.15 * Math.sin(t * 19)), round: rd(ch(i)) * (1 - k) + rd(ch(i + 1)) * k };
+  const ph = humanSounds(text), t = ((nowMs == null ? Date.now() : nowMs) - startMs) / 1000, pos = t * 13 * ph.length / Math.max(1, text.length);
+  if (pos < 0 || pos >= ph.length + 1) return shut;
+  const v = humanViseme(ph, pos); v.open *= 0.88 + 0.12 * Math.sin(t * 19); return v;
+}
+// The mouth shape for each sound: [open, round (+) or spread (-), lips pressed, lower lip tucked, upper lip lifted].
+// Sounds are the voice's own (IPA, with the voice model's single letters for the long vowels) or made from the letters.
+const HUMAN_VIS: { [c: string]: number[] } = {};
+(function () {
+  const set = (cs: string, v: number[]) => { for (const c of cs) HUMAN_VIS[c] = v; };
+  set(' ', [0.04, 0, 0, 0, 0]); set(',.!?;:…—', [0, 0, 0.35, 0, 0]);
+  set('pbm', [0, 0, 1, 0, 0]); set('fv', [0.12, 0, 0, 1, 0]); set('θð', [0.28, -0.2, 0, 0, 0]);
+  set('sz', [0.12, -0.45, 0, 0, 0]); set('tdnlɾ', [0.22, -0.2, 0, 0, 0]); set('ʃʒʧʤ', [0.22, 0.55, 0, 0, 0.8]);
+  set('kgŋhx', [0.35, 0, 0, 0, 0]); set('ɹr', [0.25, 0.45, 0, 0, 0.2]); set('w', [0.1, 1, 0, 0, 0]); set('j', [0.3, -0.6, 0, 0, 0]);
+  set('i', [0.3, -0.75, 0, 0, 0]); set('ɪe', [0.38, -0.55, 0, 0, 0]); set('A', [0.5, -0.5, 0, 0, 0]); set('ɛ', [0.55, -0.4, 0, 0, 0]);
+  set('æ', [0.75, -0.35, 0, 0, 0]); set('aɑɐI', [0.9, 0, 0, 0, 0]); set('ʌ', [0.7, 0, 0, 0, 0]); set('ɒɔ', [0.75, 0.5, 0, 0, 0]);
+  set('əɜɚᵊ', [0.4, 0, 0, 0, 0]); set('oOQ', [0.55, 0.8, 0, 0, 0]); set('uʊ', [0.3, 0.95, 0, 0, 0]); set('W', [0.8, 0.45, 0, 0, 0]); set('Y', [0.65, 0.5, 0, 0, 0]);
+})();
+/** The sounds of a line made from its letters (when the voice's own sounds aren't there): th, sh, ch, ee, oo… */
+function humanSounds(text: string): string {
+  let t = String(text || '').toLowerCase().replace(/\byou\b/g, 'yoo').replace(/\b(the)\b/g, 'θə').replace(/\b([bhmw]|sh)e\b/g, '$1ee');   // short words that read differently
+  const pairs: [RegExp, string][] = [[/tch|ch/g, 'ʧ'], [/sh|ti(?=on)/g, 'ʃ'], [/th/g, 'θ'], [/ph/g, 'f'], [/wh/g, 'w'], [/ck|q/g, 'k'], [/ng\b/g, 'ŋ'], [/ee|ea|ie/g, 'E'], [/oo/g, 'U'], [/ou|ow/g, 'W'], [/ai|ay|a(?=[^aeiou\s]e\b)/g, 'A'], [/oi|oy/g, 'Y'], [/igh|i(?=[^aeiou\s]e\b)/g, 'I'], [/o(?=[^aeiou\s]e\b)|oa/g, 'O'], [/x/g, 'ks'], [/j/g, 'ʤ'], [/([bcdfgklmnprstvz])\1/g, '$1'], [/e\b(?=\s|$)/g, '']];
+  for (const [re, r] of pairs) t = t.replace(re, r);
+  return t.replace(/a/g, 'æ').replace(/e/g, 'ɛ').replace(/i/g, 'ɪ').replace(/o/g, 'ɒ').replace(/u/g, 'ʌ').replace(/y(?=\s|$|[.,!?])/g, 'i').replace(/y/g, 'j').replace(/c/g, 'k').replace(/r/g, 'ɹ').replace(/E/g, 'i').replace(/U/g, 'u').replace(/[^a-zæɛɪɒʌʧʃθŋiuWAYIOʤɹ ,.!?;:]/g, '');   // long ee and oo kept apart from the short vowels until here
+}
+/** The mouth at a point in a string of sounds, each sound blending into its neighbours as real mouths do. */
+function humanViseme(ph: string, pos: number): { open: number; round: number; press: number; low: number; up: number } {
+  const s = ph.replace(/[ˈˌːˑ]/g, ''), o = [0, 0, 0, 0, 0]; let wt = 0;
+  for (let k = Math.floor(pos) - 1; k <= Math.floor(pos) + 2; k++) {
+    const w = Math.max(0, 1 - Math.abs(pos - (k + 0.5)) / 1.15); if (!w) continue;
+    const v = HUMAN_VIS[s[k] || ' '] || [0.3, 0, 0, 0, 0], ww = w * w * (3 - 2 * w);
+    for (let n = 0; n < 5; n++) o[n] += v[n] * ww; wt += ww;
+  }
+  const d = wt || 1;
+  // pressed lips win over an open neighbour (the mouth really closes for m, b, p)
+  const press = o[2] / d, open = (o[0] / d) * (1 - 0.8 * press);
+  return { open, round: o[1] / d, press, low: o[3] / d, up: o[4] / d };
 }
 /** The mouth of a person who talks, everywhere people talk (office, court, cabin, and any new place): while their
  *  line is heard as a voice, the mouth follows the voice from the moment it is heard to its end, again from the
@@ -40,6 +69,10 @@ function humanTalk(name: string, text?: string, atMs?: number): { open: number; 
   if (V && V.speaking && name && humanVoiceIs(V.who, name) && (!V.audibleAt || Date.now() < V.audibleAt)) return 0;
   if (V && V.speaking && V.audibleAt && name && humanVoiceIs(V.who, name)) {
     const now = Date.now();
+    // the natural voice: its own sounds, timed to each sentence as it is heard, opening wider when it is louder
+    const seg = (V.track || []).filter((x: any) => now >= x.t0 && now < x.t0 + x.dur)[0];
+    if (seg) { const v = humanViseme(seg.ph, (now - seg.t0) / seg.dur * seg.ph.replace(/[ˈˌːˑ]/g, '').length), lv = typeof V.level === 'function' ? V.level() : -1; if (lv >= 0) v.open *= 0.55 + Math.min(0.9, lv * 2.2); return v; }
+    if (V.track && V.track.length) return { open: 0, round: 0 };   // a pause between sentences
     const t = V.text || '', cycle = (t.length + 1.5) / 13 * 1000;
     return humanSpeech(t, V.audibleAt, V.audibleAt + ((now - V.audibleAt) % Math.max(400, cycle)));
   }
@@ -240,7 +273,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       uHiVis: { value: c.hivis ? 1 : 0 }, uSkirt: { value: c.skirt ? 1 : 0 }, uFem: { value: c.female ? 1 : 0 }, uBald: { value: c.bald ? 1 : 0 },
       uBrowT: { value: c.female ? 0.0028 : 0.0038 }, uElbowS: { value: I.armLen * 0.56 }, uKneeY: { value: I.kneeY }, uCrotchY: { value: I.crotchY },
       uLegX: { value: c.legX }, uSideZ: { value: 0 }, uMech: { value: c.mech ? 1 : 0 }, uPockets: { value: c.pockets ? 1 : 0 },
-      uHeadRot: { value: new THREE.Matrix3() }, uNeckP: { value: v3(I.neckPivot) }, uBlink: { value: 0 }, uJaw: { value: 0 }, uLipR: { value: 0 }, uMouthIn: { value: 2 },
+      uHeadRot: { value: new THREE.Matrix3() }, uNeckP: { value: v3(I.neckPivot) }, uBlink: { value: 0 }, uJaw: { value: 0 }, uLipR: { value: 0 }, uMouthIn: { value: 2 }, uPress: { value: 0 }, uLipLow: { value: 0 }, uLipUp: { value: 0 },
       // arms: shoulder and elbow turns (left arm at +x), for gestures and body language
       uShL: { value: v3(I.J['upperarm01.L']) }, uShR: { value: v3(I.J['upperarm01.R']) },
       uElL: { value: v3(I.J['upperarm01.L']).lerp(v3(I.J['wrist.L']), 0.56 / 0.97) }, uElR: { value: v3(I.J['upperarm01.R']).lerp(v3(I.J['wrist.R']), 0.56 / 0.97) },
@@ -253,7 +286,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     m.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, U);
       const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR,uHipL,uHipR; uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR,uLegL,uLegR,uKneeL,uKneeR; uniform float uFlush;
-        uniform float uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink,uJaw,uLipR,uMouthIn;
+        uniform float uPress,uLipLow,uLipUp,uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink,uJaw,uLipR,uMouthIn;
         varying vec3 vRest; varying vec3 vF; varying vec3 vON; varying vec4 vA; varying vec4 vB; varying float vBeard;
         float hairlineAt(float az){ float a = abs(az);
           float h = mix(uHairline, uHairline - 0.12, smoothstep(0.35, 0.9, a));
@@ -282,6 +315,9 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
                 vec3 hd = normalize(vec3(d.x, 0.0, d.z)); transformed = c + hd * cos(ne) * r + vec3(0.0, sin(ne) * r, 0.0); } } }
           // talking: the jaw turns on its hinge in front of the ears, carrying the chin, the lower lip and the lower
           // cheeks; the upper lip lifts a little; the lips round (pushed forward, narrower) or spread (wider, flatter)
+          // the lips at rest, for the mouth shapes below: the upper and the lower lip, at the front of the mouth
+          vec3 dm0 = transformed - uMouth; float lipF = exp(-pow(dm0.x / 0.032, 2.0)) * smoothstep(-0.03, -0.008, dm0.z) * step(0.3, fa.w);
+          float upL = smoothstep(-0.002, 0.004, dm0.y) * smoothstep(0.022, 0.006, dm0.y) * lipF, loL = smoothstep(0.002, -0.004, dm0.y) * smoothstep(-0.026, -0.006, dm0.y) * lipF;
           if (fa.w > 0.3 && (uJaw > 0.0 || uLipR != 0.0)) {
             vec3 dm = transformed - uMouth; float ax = abs(dm.x);
             float face = smoothstep(-0.095, -0.045, dm.z) * smoothstep(0.075, 0.04, ax);
@@ -294,6 +330,11 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
             float lipA = exp(-pow(dm.x / 0.034, 2.0) - pow(dm.y / 0.016, 2.0)) * smoothstep(-0.04, -0.012, dm.z);
             transformed.x *= 1.0 - 0.16 * max(0.0, uLipR) * lipA + 0.07 * max(0.0, -uLipR) * lipA;
             transformed.z += (0.0035 * max(0.0, uLipR) - 0.0012 * max(0.0, -uLipR)) * lipA; }
+          // mouth shapes: m, b, p press the lips together; f, v tuck the lower lip under the top teeth; sh, ch push
+          // the lips forward and lift the upper one
+          if (uPress > 0.0 || uLipLow > 0.0 || uLipUp > 0.0) {
+            transformed.y += (-0.0036 * uPress + 0.003 * uLipUp) * upL + (0.0036 * uPress + 0.005 * uLipLow) * loL;
+            transformed.z += (0.0018 * uPress + 0.0026 * uLipUp) * (upL + loL) - 0.004 * uLipLow * loL; }
           // head turn
           transformed = mix(transformed, uNeckP + uHeadRot * (transformed - uNeckP), smoothstep(0.15, 0.85, fa.w));
           // arms: the forearm turns at the elbow, then the whole arm at the shoulder
@@ -1330,7 +1371,8 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         U.uBlink.value = p.blink;
         // speaking: Low still, Medium the jaw, High the jaw and the lips with the dark of the mouth, Ultra also the teeth and the tongue
         const sp = p.talk, SL = animLevel('animSpeak'), op0 = typeof sp === 'number' ? sp : sp ? sp.open : 0, op = isFinite(op0) ? op0 : 0;   // never a broken number into the face
-        U.uJaw.value = SL ? op * (SL === 1 ? 0.8 : 1) : 0; U.uLipR.value = SL >= 2 && sp && typeof sp === 'object' && isFinite(sp.round) ? sp.round : 0; U.uMouthIn.value = SL >= 3 ? 2 : SL === 2 ? 1 : 0;
+        U.uJaw.value = SL ? op * (SL === 1 ? 0.8 : 1) : 0; U.uLipR.value = SL >= 2 && sp && typeof sp === 'object' && isFinite(sp.round) ? sp.round : 0;
+        const shp = (k: string) => SL >= 2 && sp && typeof sp === 'object' && isFinite(sp[k]) ? sp[k] : 0; U.uPress.value = shp('press'); U.uLipLow.value = shp('low'); U.uLipUp.value = shp('up'); U.uMouthIn.value = SL >= 3 ? 2 : SL === 2 ? 1 : 0;
         for (const e of eyes) e.rotation.set(-p.gaze[1] * 0.25, p.gaze[0] * 0.3, 0);
       },
     };
