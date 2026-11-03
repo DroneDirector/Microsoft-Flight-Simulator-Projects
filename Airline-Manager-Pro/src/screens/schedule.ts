@@ -80,7 +80,7 @@ function scheduleDayCard(blocks: Block[], nowMin: number): string {
       ${legs.length ? `<div class="day-track">${legs.map((l, i) => `<div class="day-leg ${l.st}" style="--i:${i}">
         <time>${hm(l.b.start)}</time><span class="dl-r">${l.b.kind === 'maint' ? `<b>Maintenance at ${esc(l.b.from)}</b>` : `<b>${esc(l.b.from)}</b><i>${l.st === 'active' ? `<em class="dl-prog" style="width:${(l.prog * 100).toFixed(1)}%"></em>` : ''}</i><b>${esc(l.b.to)}</b>`}</span>
         <small>${l.st === 'cancelled' ? 'Cancelled' : l.st === 'done' ? 'Landed' : l.st === 'active' ? (l.b.kind === 'maint' ? 'In the hangar' : 'Flying now') : l.st === 'next' ? 'Next' : 'Planned'}${l.b.retry ? ' · second try' : ''}</small>
-        ${schedLateNote(l.b, hm)}</div>`).join('')}</div>`
+        ${schedLateNote(l.b, hm)}${l.st === 'next' && l.b.kind !== 'maint' && !_schedDay ? turnaroundHtml(l.b.reg) : ''}</div>`).join('')}</div>`
       : `<p class="muted">No flights planned for ${esc(reg)} ${_schedDay ? 'tomorrow' : 'today'}.</p>`}
     </div>`;
 }

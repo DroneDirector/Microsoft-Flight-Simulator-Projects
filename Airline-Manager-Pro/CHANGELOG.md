@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.110 (2026-11-03)
+
+- Turnaround timeline in the Schedule with ways to buy back time (ops-decisions.ts turnaroundHtml, ta-buy); weather decisions before departure (de-icing, thunderstorms at the destination)
+
 ## 0.9.109 (2026-11-03)
 
 - Your check rides (career-rides.ts: booked ride graded live from the simulator: stable approach, 250 kt below 10,000 ft, landing, engine failure); career milestones (hours, landings, promotions, first widebody, type ratings) as awards in Gifts → Career Milestones (certificate, plaque, medal in 3D)
