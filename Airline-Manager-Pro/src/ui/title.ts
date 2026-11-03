@@ -50,6 +50,7 @@ function titleAfterSplash() {
 function titleOpen() {
   const T = TitleScreen; if (T.on) return;
   T.on = true; document.body.classList.add('ts-on');
+  try { Voice.stop(); } catch (e) { /* none */ }
   const S: any = State.settings; if (S.titleMusic === undefined) S.titleMusic = true;
   const r = document.createElement('div'); r.className = 'ts'; r.setAttribute('role', 'dialog'); r.setAttribute('aria-label', 'Start screen');
   r.innerHTML = titleHtml(); document.body.appendChild(r); T.root = r;
@@ -463,3 +464,27 @@ const GameSaves = {
     Backup.restore(JSON.stringify(d));
   },
 };
+
+/* ---------- quiet on the start screen ---------- */
+// While the start screen is up, the game keeps running underneath, but nothing of it shows or sounds: no messages,
+// no pop-ups, no badges, no voices and no sounds; only the soundtrack and the film (the phone's own notifications
+// still arrive in its notification shade). What you open yourself (Options, Quit, a new game) still works, with its
+// clicks; pop-ups the game wanted to show wait until you leave the start screen.
+let _tsInput = 0;
+document.addEventListener('pointerdown', () => { _tsInput = performance.now(); }, true);
+document.addEventListener('keydown', () => { _tsInput = performance.now(); }, true);
+/** True while the start screen is up and you haven't just done something yourself. */
+function titleQuiet(): boolean { return !!TitleScreen.on && performance.now() - _tsInput > 1500; }
+(function titleHush() {
+  const W: any = window;
+  const t0 = W.toast; if (typeof t0 === 'function') W.toast = function (...a: any[]) { if (titleQuiet()) return; return t0.apply(this, a); };
+  const o0 = W.openLayer;
+  if (typeof o0 === 'function') W.openLayer = function (kind: any, html: any, opts?: any) {
+    if (!titleQuiet()) return o0.call(this, kind, html, opts);
+    titleDefer(() => o0.call(this, kind, html, opts));
+    const d = document.createElement('div'); d.innerHTML = `<div class="panel">${html}</div>`; return d;   // not shown now
+  };
+  const b0 = W.badgeReveal; if (typeof b0 === 'function') W.badgeReveal = function (list: any) { if (titleQuiet()) { titleDefer(() => b0(list)); return; } return b0(list); };
+  const S: any = Sound; for (const k of Object.keys(S)) { const f = S[k]; if (typeof f === 'function') S[k] = function (...a: any[]) { if (titleQuiet()) return; return f.apply(S, a); }; }
+  const V: any = Voice, sp = V.speak; if (typeof sp === 'function') V.speak = function (text: string, onEnd?: () => void, who?: string) { if (titleQuiet()) { if (onEnd) onEnd(); return false; } return sp.call(V, text, onEnd, who); };
+})();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.92 (2026-11-03)
+
+- start screen quiet: toasts, game pop-ups (deferred until it closes), badge reveals, sounds and voices are held back while it is up unless you just tapped or pressed a key (titleQuiet); voices stop when it opens
+
 ## 0.9.91 (2026-11-03)
 
 - New game: always confirmed; pilot creation with difficulty (look editor difficulty option), then the airline; wipeToScratch writes a whole fresh save (every saved key emptied, settings, registration and device data kept) and reloads into the game; Continue and a loaded save go to the game UI; Load game asks first; Back to the title screen from the rail logo and the company menu (title-open); the film opens with the sunset flight shot
