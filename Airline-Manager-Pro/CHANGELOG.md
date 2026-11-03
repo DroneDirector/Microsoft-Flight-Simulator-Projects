@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.98 (2026-11-03)
+
+- Schedule: Refresh button with a countdown (sched-refresh), schedRefreshAll redraws every open schedule, by itself every 30 seconds
+
 ## 0.9.97 (2026-11-03)
 
 - top bar: a digital clock after the battery (dclockHtml, ticking every second, the game date from companyDate); the Schedule's now line (.g-now) moves and updates its time every second on every open schedule

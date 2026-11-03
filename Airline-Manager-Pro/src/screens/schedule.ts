@@ -85,6 +85,27 @@ function scheduleDayCard(blocks: Block[], nowMin: number): string {
     </div>`;
 }
 
+/* ---------- refreshing: by the button, and by itself every 30 seconds ---------- */
+const SCHED_EVERY = 30000;
+let _schedAt = Date.now();
+/** Draw every open schedule again (the app, the laptop, the Operations computer) with the latest flights and delays. */
+function schedRefreshAll() {
+  _schedAt = Date.now();
+  document.querySelectorAll('.screen-schedule, section.screen[data-k="schedule"]').forEach((el: any) => { try { patchHtml(el, SCREENS.schedule.render()); } catch (e) { /* next time */ } });
+}
+ACTIONS['sched-refresh'] = el => {
+  Sound.tick(); schedRefreshAll();
+  const b = document.querySelector('.sched-refresh') as HTMLElement; if (b) { b.classList.remove('spin'); void b.offsetWidth; b.classList.add('spin'); }
+  toast('Schedule refreshed', 'ok');
+};
+setInterval(() => {
+  if (document.hidden || !document.querySelector('.screen-schedule, section.screen[data-k="schedule"]')) { _schedAt = Math.max(_schedAt, Date.now() - SCHED_EVERY + 1000); return; }
+  const left = SCHED_EVERY - (Date.now() - _schedAt);
+  if (left <= 0) { schedRefreshAll(); const b = document.querySelector('.sched-refresh') as HTMLElement; if (b) { b.classList.remove('spin'); void b.offsetWidth; b.classList.add('spin'); } }
+  const s = String(Math.max(1, Math.ceil((SCHED_EVERY - (Date.now() - _schedAt)) / 1000))) + ' s';
+  document.querySelectorAll('[data-sched-next]').forEach((e: any) => { if (e.textContent !== s) e.textContent = s; });
+}, 1000);
+
 function schedRepaintDay() {
   const card = $('.day-card'), html = scheduleDayCard(scheduleBlocks(), new Date().getHours() * 60 + new Date().getMinutes());
   if (card && html) { const d = document.createElement('div'); d.innerHTML = html.trim(); const n = d.firstElementChild as HTMLElement; n.style.animation = 'none'; n.querySelectorAll('.day-leg').forEach((x: any) => x.style.animation = 'none'); card.replaceWith(n); }
@@ -108,6 +129,7 @@ ACTIONS['sched-pick'] = el => {
 SCREENS.schedule = {
   title: 'Schedule', icon: 'clock',
   mount(root: HTMLElement) {
+    _schedAt = Date.now();   // the next refresh by itself in 30 seconds from opening it
     const iv = setInterval(() => { if (!root.isConnected) { clearInterval(iv); return; } if (!document.hidden) schedRepaintDay(); }, 5000);
   },
   render() {
@@ -119,6 +141,7 @@ SCREENS.schedule = {
     return `
     <div class="screen-head"><div><h1>Schedule</h1><p class="sub">${_schedDay ? 'Tomorrow' : 'Today'}, ${fl.length} aircraft · delays move the legs after them; a leg more than five hours late is cancelled and flown the next day</p></div>
       <span class="seg"><button class="${!_schedDay ? 'on' : ''}" data-act="sched-day" data-d="0">Today</button><button class="${_schedDay ? 'on' : ''}" data-act="sched-day" data-d="1">Tomorrow</button></span>
+      <button class="btn ghost sched-refresh" data-act="sched-refresh" aria-label="Refresh the schedule (it also refreshes by itself every 30 seconds)">${icon('reload')}<span>Refresh</span><small data-sched-next>${Math.max(1, Math.ceil((SCHED_EVERY - (Date.now() - _schedAt)) / 1000))} s</small></button>
       <button class="btn ghost sched-opsroom" data-act="ops-room">${icon('clock')}Operations office</button>
       <button class="btn primary" data-act="new-route">${icon('plus')}New route</button></div>
     ${scheduleDayCard(blocks, nowMin)}
