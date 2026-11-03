@@ -3753,7 +3753,7 @@ button.rail-brand:active { transform: scale(.94); }
 .of-dip { position: absolute; inset: 0; z-index: 25; background: #000; pointer-events: none; }
 .of-ph.of-bw { gap: 8px; }
 /* a new career: the money waits until you start */
-.fin-hold { display: inline-flex; align-items: center; gap: 9px; height: 40px; padding: 0 14px 0 8px; margin-left: 8px; border-radius: 12px; color: #1A1206; background: linear-gradient(90deg, #F2B33D, #FFD27A); box-shadow: 0 0 0 0 rgba(242, 179, 61, .6); animation: finPulse 2s ease-in-out infinite; transition: transform .2s var(--spring); flex: none; }
+.fin-hold { position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 9px; height: 40px; padding: 0 14px 0 8px; margin-left: 8px; border-radius: 12px; color: #1A1206; background: linear-gradient(90deg, #F2B33D, #FFD27A); box-shadow: 0 0 0 0 rgba(242, 179, 61, .6); animation: finPulse 2s ease-in-out infinite; transition: transform .2s var(--spring); flex: none; }
 .fin-hold:hover { transform: translateY(-1px) scale(1.02); }
 .fin-hold .fh-ic { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: rgba(26, 18, 6, .14); }
 .fin-hold .fh-ic .ic { width: 15px; height: 15px; }
@@ -3794,3 +3794,8 @@ button.rail-brand:active { transform: scale(.94); }
 body.ts-on .tour, body.ts-on .tour-dim, body.ts-on .pull-ind { display: none !important; }   /* the guided tour waits while the start screen is up */
 .ts-hold .th-core { position: absolute; inset: 0; margin: auto; }
 .ts-hold .th-core .ic { margin: 0; display: block; }
+
+.fin-hold .fh-fx { position: absolute; inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); z-index: -1; pointer-events: none; border-radius: 14px; }
+.fin-hold > span { position: relative; z-index: 1; }
+.fin-hold .fh-t b { text-shadow: 0 1px 0 rgba(255, 240, 200, .5); }
+.fin-hold .fh-t small { color: rgba(48, 28, 4, .82); opacity: 1; font-weight: 600; }
