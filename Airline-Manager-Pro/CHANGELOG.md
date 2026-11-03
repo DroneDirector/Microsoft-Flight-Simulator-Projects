@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.71 (2026-11-03)
+
+- figure system: ankles (uAnkL/R about the foot joints) and a spine (uSpine about the waist) in the body shader; shoes, headPivot and a chest group follow
+- humanWalk: gait cycle (hip, two-bump knee, ankle push-off and toe lift, pelvis turn and roll, shoulder counter-turn, arm swing with elbow, steady head), per-person seed and speed; humanSitMove for sitting down and standing up; cabinLerpG blends the new fields
+
 ## 0.9.70 (2026-11-03)
 
 - mouths: visemes (HUMAN_VIS, humanViseme, humanSounds) with lips pressed, lower lip tucked and upper lip lifted in the face shader (uPress, uLipLow, uLipUp); natural voice drives them from its phonemes per sentence (Voice.track) with loudness from an analyser (Voice.level)
