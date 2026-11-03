@@ -372,8 +372,11 @@ function opsHover(e: PointerEvent) {
   R.hover = !!h; if (R.glow) { if (h) R.glow.showObj(h.object); else R.glow.hide(); }   // what you can use glows softly under the mouse
 }
 function opsClickAt(e?: PointerEvent) {
-  const R = OpsRoom; if (R.loading || R.overlay) return;
-  if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') phoneOpen(R); return; }   // the phone in your hand: a tap brings its screen up
+  const R = OpsRoom; if (R.loading) return;
+  // the monitor's screen is up: a click beside it puts it away (and on the phone, picks the phone up after)
+  if (R.overlay) { if (R.overlay.classList.contains('op-screen') && !R.zoomAnim) { const a = opsAimed(e); opsScreenClose(); if (a === 'phone') setTimeout(() => { if (!R.overlay) phonePick(R); }, 800); } return; }
+  // the phone in your hand: a tap brings its screen up; a click on the monitor puts the phone down first, then opens it
+  if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') { if (opsAimed(e) === 'monitor') phoneThen(R, () => opsScreenOpen(R.tab || 'schedule')); else phoneOpen(R); } return; }
   const a = opsAimed(e);
   if (a === 'phone') { if (!R.seat) opsSit(); setTimeout(() => phonePick(R), R.seat ? 0 : 300); return; }
   if (a === 'door') { opsDoor(); return; }
@@ -427,9 +430,9 @@ function opsScreenOpen(key: string) {
   opsScreenFill(key);
   if (opsReduced()) return;
   // the screen grows out of the monitor while you lean in towards it
-  const m = opsMonRect(), W = R.root.clientWidth, H = R.root.clientHeight;
+  const m = opsMonRect(), W = ov.offsetWidth || R.root.clientWidth, H = ov.offsetHeight || R.root.clientHeight;
   ov.classList.add('op-zoom'); ov.style.transformOrigin = '0 0';
-  ov.style.transform = `translate(${m.x}px, ${m.y}px) scale(${m.w / W}, ${m.h / H})`; ov.style.opacity = '0';
+  ov.style.transform = `translate(${m.x - ov.offsetLeft}px, ${m.y - ov.offsetTop}px) scale(${m.w / W}, ${m.h / H})`; ov.style.opacity = '0';
   const fx = document.createElement('div'); fx.className = 'op-zoom-fx'; fx.style.left = m.x + 'px'; fx.style.top = m.y + 'px'; fx.style.width = m.w + 'px'; fx.style.height = m.h + 'px'; R.root.appendChild(fx);
   R.zoomAnim = { t0: performance.now(), dir: 1, done: () => { ov.classList.remove('op-zoom', 'op-zoom-go'); ov.style.transform = ''; ov.style.opacity = ''; ov.style.transformOrigin = ''; } };
   void ov.offsetWidth;
@@ -450,10 +453,10 @@ function opsScreenClose() {
   const finish = () => { ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); opsUi(); };
   if (opsReduced()) { finish(); return; }
   // back into the monitor while you sit back in your chair, and the office comes into view around it
-  const m = opsMonRect(), W = R.root.clientWidth, H = R.root.clientHeight;
+  const m = opsMonRect(), W = ov.offsetWidth || R.root.clientWidth, H = ov.offsetHeight || R.root.clientHeight;
   ov.style.pointerEvents = 'none'; ov.style.transformOrigin = '0 0'; ov.classList.add('op-zoom', 'op-zoom-go', 'op-zoom-back');
   R.zoomAnim = { t0: performance.now(), dir: -1, done: finish };
-  requestAnimationFrame(() => { ov.style.transform = `translate(${m.x}px, ${m.y}px) scale(${m.w / W}, ${m.h / H})`; ov.style.opacity = '0'; });
+  requestAnimationFrame(() => { ov.style.transform = `translate(${m.x - ov.offsetLeft}px, ${m.y - ov.offsetTop}px) scale(${m.w / W}, ${m.h / H})`; ov.style.opacity = '0'; });
 }
 /** After a change anywhere (a leg moved, a route added): the screen over the room and the monitor show it too. */
 function opsRefresh() {

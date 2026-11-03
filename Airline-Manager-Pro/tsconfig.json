@@ -147,6 +147,7 @@
     "src/screens/laptop.ts",
     "src/screens/ops3d.ts",
     "src/screens/phone3d.ts",
+    "src/screens/pet3d.ts",
     "src/screens/phone-apps.ts",
     "src/screens/phone-talk.ts",
     "src/data/stars.ts",

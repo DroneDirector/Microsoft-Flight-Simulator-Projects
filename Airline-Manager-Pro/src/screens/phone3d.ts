@@ -75,6 +75,21 @@ function phoneUi(R: any) {
   b.addEventListener('click', e => { const k = (e.target as HTMLElement).closest('[data-pk]'); if (!k) return; e.stopPropagation(); const v = k.getAttribute('data-pk'); if (v === 'open') phoneOpen(R); else if (v === 'put') phonePut(R); else phoneTurn(R, v === 'tl' ? -1 : v === 'tr' ? 1 : 0, v === 'tu' ? -1 : v === 'td' ? 1 : 0); });
   R.root.appendChild(b);
 }
+/** Put the phone down first (its animation plays to the end), then do something else: open the laptop, the monitor. */
+function phoneThen(R: any, f: () => void) {
+  if (!R.pk) { f(); return; }
+  R.afterPhone = f;
+  if (R.overlay && R.overlay.classList.contains('ph-screen')) { phoneClose(R); setTimeout(() => phonePut(R), 600); }
+  else phonePut(R);
+}
+/** The phone's screen is up and you click beside it, on the laptop or the monitor: the phone goes down, then that opens. */
+function phoneBesideAct(R: any, e: MouseEvent): string {
+  try {
+    if (typeof OfficeRoom !== 'undefined' && R === OfficeRoom) return ofAimed(e as any) === 'laptop' ? 'laptop' : '';
+    if (typeof OpsRoom !== 'undefined' && R === OpsRoom) return opsAimed(e as any) === 'monitor' ? 'monitor' : '';
+  } catch (x) { /* nothing there */ }
+  return '';
+}
 /** Turn the phone gently in your hand, only when you choose to (a step each time, within what a wrist does). */
 function phoneTurn(R: any, dy: number, dp: number) {
   const pk = R.pk; if (!pk || pk.st !== 'hold') return;
@@ -94,7 +109,7 @@ function phoneStep(R: any, dt: number, t: number): { lean: number; turn: number;
   else if (pk.st === 'lift') { w = 1; mv = E(pk.t / D.lift); if (pk.t >= D.lift) { pk.st = 'hold'; pk.t = 0; phoneUi(R); } }
   else if (pk.st === 'hold') { w = 1; mv = 1; }
   else if (pk.st === 'lower') { w = 1; mv = 1 - E(pk.t / D.lower); if (pk.t >= D.lower) { pk.st = 'release'; pk.t = 0; Sound.tick(); } }
-  else if (pk.st === 'release') { w = 1 - E(pk.t / D.release); if (pk.t >= D.release) { R.pk = null; phoneUi(R); return out; } }
+  else if (pk.st === 'release') { w = 1 - E(pk.t / D.release); if (pk.t >= D.release) { R.pk = null; phoneUi(R); const f = R.afterPhone; R.afterPhone = null; if (f) setTimeout(f, 30); return out; } }
   const down = pk.st === 'reach' || pk.st === 'release' ? w : 1 - mv;
   out.lean = 0.35 * down; out.turn = -0.3 * down; out.slide = 0.08 * down;
   // in your hand: low and a little to the right, screen towards you, perfectly still (you sit still too, the
@@ -215,6 +230,15 @@ function phoneRect(R: any): { x: number; y: number; w: number; h: number } {
   }
   return { x: x0, y: y0, w: Math.max(20, x1 - x0), h: Math.max(40, y1 - y0) };
 }
+/** The phone on the screen is laid out at a real phone's size (400 by 858) and then shrunk to fit whatever it is
+ *  shown on, so on a small screen (a phone in landscape) everything in it is smaller in step, never cut off. */
+const PH_W = 400, PH_H = 858;
+function phoneFitScreen(ov: any) {
+  const z = (window as any).__uiZoom || 1, rr = ov.getBoundingClientRect(), w = rr.width / z, h = rr.height / z;
+  const k = Math.min(1, (h * 0.94) / PH_H, (w * 0.92) / PH_W);
+  ov.style.setProperty('--phz', String(Math.max(0.2, Math.round(k * 1000) / 1000)));
+}
+function phoneZoomOf(ov: any): number { return +(ov && ov.style.getPropertyValue('--phz')) || 1; }
 /** Tap the phone in your hand: its screen comes up to you, still a phone in its frame, to scroll and tap. */
 function phoneOpen(R: any) {
   if (!R.on || R.overlay || !R.pk || R.pk.st !== 'hold') return;
@@ -229,12 +253,20 @@ function phoneOpen(R: any) {
   ov.addEventListener('pointermove', e => { const r = ov.getBoundingClientRect(); (ov as any)._gx = ((e.clientX - r.left) / r.width - 0.5) * 40; (ov as any)._gy = ((e.clientY - r.top) / r.height - 0.5) * 30; });
   requestAnimationFrame(glr);
   R.root.appendChild(ov); R.overlay = ov; document.body.classList.add('of-over'); phoneUi(R);
-  ov.addEventListener('click', e => { const t = e.target as HTMLElement; if (t === ov || t.closest('[data-pk=close]')) { e.stopPropagation(); phoneClose(R); } });
+  phoneFitScreen(ov); (ov as any)._fit = () => phoneFitScreen(ov); window.addEventListener('resize', (ov as any)._fit);
+  ov.addEventListener('click', e => {
+    const t = e.target as HTMLElement; if (!(t === ov || t.closest('[data-pk=close]'))) return;
+    e.stopPropagation();
+    const a = t === ov ? phoneBesideAct(R, e) : '';
+    if (a === 'laptop') phoneThen(R, () => ofLaptopOpen());
+    else if (a === 'monitor') phoneThen(R, () => opsScreenOpen(R.tab || 'schedule'));
+    else phoneClose(R);
+  });
   try { lapMount(ov.querySelector('.ph-glass') as HTMLElement, true); } catch (e) { (ov.querySelector('.ph-glass') as HTMLElement).innerHTML = '<p class="muted">The phone could not start.</p>'; }
   const fr = ov.querySelector('.ph-frame') as HTMLElement, z = (window as any).__uiZoom || 1, rr = R.root.getBoundingClientRect(), b = fr.getBoundingClientRect();
   const tx = { x: (b.left - rr.left) / z, y: (b.top - rr.top) / z, w: b.width / z, h: b.height / z };
   fr.style.transformOrigin = '0 0'; fr.style.transition = 'none';
-  fr.style.transform = `translate(${from.x - tx.x}px, ${from.y - tx.y}px) scale(${from.w / tx.w}, ${from.h / tx.h})`; ov.classList.add('in');
+  const k0 = phoneZoomOf(ov); fr.style.transform = `translate(${(from.x - tx.x) / k0}px, ${(from.y - tx.y) / k0}px) scale(${from.w / tx.w}, ${from.h / tx.h})`; ov.classList.add('in');
   void fr.offsetWidth;
   requestAnimationFrame(() => { fr.style.transition = ''; fr.classList.add('go'); fr.style.transform = 'none'; });
   setTimeout(() => { if (fr.isConnected && !ov.classList.contains('out')) fr.style.transform = 'none'; }, 700);   // in any case, in its place
@@ -244,7 +276,8 @@ function phoneClose(R: any) {
   Sound.tick(); try { lapUnmount(); } catch (e) { /* closed */ }
   const fr = ov.querySelector('.ph-frame') as HTMLElement, to = phoneRect(R), z = (window as any).__uiZoom || 1, rr = R.root.getBoundingClientRect(), b = fr.getBoundingClientRect();
   const cur = { x: (b.left - rr.left) / z, y: (b.top - rr.top) / z, w: b.width / z, h: b.height / z };
-  ov.classList.add('out'); ov.classList.remove('in'); fr.style.transform = `translate(${to.x - cur.x}px, ${to.y - cur.y}px) scale(${to.w / cur.w}, ${to.h / cur.h})`;
+  if (ov._fit) window.removeEventListener('resize', ov._fit);
+  const k1 = phoneZoomOf(ov); ov.classList.add('out'); ov.classList.remove('in'); fr.style.transform = `translate(${(to.x - cur.x) / k1}px, ${(to.y - cur.y) / k1}px) scale(${to.w / cur.w}, ${to.h / cur.h})`;
   setTimeout(() => { ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); phoneUi(R); try { if (R.phoneAfter) R.phoneAfter(); } catch (e) { /* ui */ } }, 560);
 }
 
