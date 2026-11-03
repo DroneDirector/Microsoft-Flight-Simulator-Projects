@@ -169,8 +169,8 @@ function opsBuild(scene: any, q: number) {
 
 /** The monitor: your schedule as on the Schedule screen (the same day, the same blocks, delays and cancellations),
  *  with the time now; drawn again every few seconds and after every change. */
-function opsMonitorDraw() {
-  const R = OpsRoom, A = R.A; if (!A || !A.monCv) return;
+function opsMonitorDraw(AA?: any) {
+  const R = OpsRoom, A = AA || R.A; if (!A || !A.monCv) return;
   const c = A.monCv as HTMLCanvasElement, x = c.getContext('2d') as CanvasRenderingContext2D, W = c.width, H = c.height, co = company();
   const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#0C1A2B'); g.addColorStop(1, '#081321'); x.fillStyle = g; x.fillRect(0, 0, W, H);
   let blocks: Block[] = []; try { blocks = scheduleBlocks(); } catch (e) { /* none */ }

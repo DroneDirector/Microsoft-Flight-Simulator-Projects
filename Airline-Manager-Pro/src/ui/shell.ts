@@ -135,6 +135,7 @@ function refresh() {
   renderTopbar();
   try { if (typeof ofScreenRefresh === 'function') ofScreenRefresh(); } catch (e) { /* the office shows it next time */ }
   try { if (typeof opsRefresh === 'function') opsRefresh(); } catch (e) { /* Operations shows it next time */ }
+  try { if (typeof hgRefresh === 'function') hgRefresh(); } catch (e) { /* the hangar shows it next time */ }
   try { if (typeof lapRefresh === 'function') lapRefresh(); } catch (e) { /* the laptop shows it next time */ }
   // in one of your offices the app's own view is hidden behind the room: it is drawn again when you leave
   // (two live maps of the same screen would otherwise take turns, and the one you look at flickers)

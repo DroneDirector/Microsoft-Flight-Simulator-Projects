@@ -88,7 +88,7 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   }
   const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
   const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
-  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS');
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES');
   const have = f => files.includes(f) ? ' (in use)' : '';
   const md = [
     '# Replaceable models', '',
@@ -106,6 +106,32 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     ...veh.map(([f, n]) => `| \`vehicles/${f}.glb\`${have('vehicles/' + f + '.glb')} | ${n} |`), '',
     '## Jet bridges (`jetways/`)', '', '| File | What |', '|---|---|',
     ...jw.map(([f, n]) => `| \`jetways/${f}.glb\`${have('jetways/' + f + '.glb')} | ${n} |`), '',
+    '## Hangars (`hangars/`)', '',
+    'The hangar building for each size: walls, roof, columns, windows and the doors (the floor, the rooms along the back wall,',
+    'the aircraft, the people and the equipment stay the app\'s own). Metres, the doors towards +Z, the floor at 0, centred.',
+    'It is fitted to the size shown. Meshes named `window`, `glass` or `skylight` show the sky at the base (day, sunrise,',
+    'sunset, night). For the PC only, a file with `-pc` at the end (e.g. `hangars/hangar-large-pc.glb`) is used first, so',
+    'a heavier, higher-quality building can go to the PC while phones keep the lighter one.', '',
+    '| File | Size |', '|---|---|',
+    ...hgr.flatMap(([f, n]) => [`| \`hangars/${f}.glb\`${have('hangars/' + f + '.glb')} | ${n} |`, `| \`hangars/${f}-pc.glb\`${have('hangars/' + f + '-pc.glb')} | The same, PC only |`]), '',
+    '## The vending machine\'s parts (`items/vending-machine.glb`)', '',
+    'Name these parts (nodes or meshes) in your file and the machine works with them; any part left out stays the app\'s own.',
+    'Rows are A (top), B, C; columns 1 (left), 2, 3: nine products, as in the app.', '',
+    '| Name | What it is | How the app uses it |', '|---|---|---|',
+    '| `slot-A1` … `slot-C3` | An empty node where each product stands, at the front of its shelf | The products (the app\'s, or their own files below) are set there, more of the same behind it |',
+    '| `coil-A1` … `coil-C3` | The spiral behind each product | Turns once round its own Z axis when that product is chosen |',
+    '| `flap` | The tray\'s flap, its origin on the hinge (top edge) | Swings in round its X axis when you take the product |',
+    '| `tray` | An empty node on the floor of the tray | Where the chosen product drops to |',
+    '| `display` | A flat mesh facing the front | The machine\'s messages are drawn on it (Make a choice, Take your item …) |',
+    '| anything else | The cabinet, glass, keypad, lights, name | Shown as it is |', '',
+    'Put each `slot-` node on the shelf, under the middle of the front product; the others stand behind it, 14 cm apart.',
+    'Which product is in which slot: A1 cola, A2 lemon soda, A3 orange soda, B1 chocolate bar, B2 peanut bar, B3 sparkling water,',
+    'C1 oat bar, C2 iced tea, C3 caramel bar. Names may also use capitals or an underscore (`Slot_A1`).', '',
+    '## Hangar items (`items/`)', '',
+    'The break room\'s vending machine and what it sells. Fitted to the size of the app\'s own model; cans and bars stand',
+    'upright (top towards +Y), the machine\'s front towards +Z.', '',
+    '| File | What |', '|---|---|',
+    ...itm.map(([f, n]) => `| \`items/${f}.glb\`${have('items/' + f + '.glb')} | ${n} |`), '',
     '## People (`people/`)', '',
     'A base model for each gender and group of looks. The app picks the group from each person\'s look (skin tone and eyes);',
     'when that file is missing it uses `person-male.glb` or `person-female.glb`, and when that is missing too its own figure.',
