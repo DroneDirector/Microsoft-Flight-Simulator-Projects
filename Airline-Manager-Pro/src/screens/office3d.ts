@@ -825,7 +825,7 @@ function ofReportsUi() {
   const sp = R.root.querySelector('.of-spots') as HTMLElement; if (sp) sp.hidden = true;   // the list instead of the places, until you go back
   (R.root.querySelector('.ct-ctl') as HTMLElement).innerHTML = '<button class="btn ghost" data-of="back">Back</button>';
   (R.root.querySelector('.ct-opts') as HTMLElement).innerHTML = L.slice(0, 12).map((inc: any) => { const p = staffById(inc.staffId);
-    return `<div class="of-rep-row"><button class="of-rep" data-of="invite" data-id="${esc(inc.id)}"><b>${esc(p.name)}</b><small>${esc(inc.title)} · ${esc(inc.date || '')}${courtReportable(inc) ? ' · can go to court' : ''}</small><span>Invite in</span></button>${courtReportable(inc) ? `<button class="of-rep court" data-of="tocourt" data-id="${esc(inc.id)}"><span>Report to the police</span></button>` : ''}</div>`; }).join('');
+    return `<div class="of-rep-row"><button class="of-rep" data-of="invite" data-id="${esc(inc.id)}"><b>${esc(p.name)}</b><small>${esc(inc.title)} · ${esc(inc.date || '')}${courtReportable(inc) ? ' · can go to court' : ''}</small><span>Invite in</span></button>${courtReportable(inc) ? `<button class="of-rep court police-btn" data-of="tocourt" data-id="${esc(inc.id)}"><i class="pl-l"></i><i class="pl-r"></i><span>Report to the police</span></button>` : ''}</div>`; }).join('');
 }
 /** The person comes up: you sit down at your desk, there is a knock, and they walk in and sit facing you. */
 function ofInviteNow(id: string) {
@@ -1096,7 +1096,7 @@ function ofQuestions() {
   const left = OF_Q.filter(q => R.asked.indexOf(q[0]) < 0);
   (b.querySelector('.ct-opts') as HTMLElement).innerHTML = left.map(q => `<button class="ct-opt" data-of="ask" data-k="${q[0]}">${esc(ofFill(q[1]))}</button>`).join('');
   const p = R.p, strong = (p.warnings || 0) >= 1;
-  (b.querySelector('.ct-ctl') as HTMLElement).innerHTML = R.answers >= 1 ? `<span class="of-dec">Your decision:</span>${R.cond ? `<button class="btn primary" data-of="dec" data-k="improve">${R.cond.kind === 'equipment' ? 'I agree: I\'ll get you the right equipment' : R.cond.kind === 'hours' ? 'I agree: I\'ll sort out the hours' : 'I agree: I\'ll get you more people'}</button>` : ''}<button class="btn ghost" data-of="dec" data-k="keep">Keep them, no warning</button><button class="btn ghost" data-of="dec" data-k="discipline">${strong ? 'Final warning' : 'Discipline'}</button><button class="btn danger" data-of="dec" data-k="dismiss">Dismiss</button>${courtReportable(R.inc) ? '<button class="btn danger" data-of="dec" data-k="court">Report to the police</button>' : ''}` : '';
+  (b.querySelector('.ct-ctl') as HTMLElement).innerHTML = R.answers >= 1 ? `<span class="of-dec">Your decision:</span>${R.cond ? `<button class="btn primary" data-of="dec" data-k="improve">${R.cond.kind === 'equipment' ? 'I agree: I\'ll get you the right equipment' : R.cond.kind === 'hours' ? 'I agree: I\'ll sort out the hours' : 'I agree: I\'ll get you more people'}</button>` : ''}<button class="btn ghost" data-of="dec" data-k="keep">Keep them, no warning</button><button class="btn ghost" data-of="dec" data-k="discipline">${strong ? 'Final warning' : 'Discipline'}</button><button class="btn danger" data-of="dec" data-k="dismiss">Dismiss</button>${courtReportable(R.inc) ? '<button class="btn danger police-btn" data-of="dec" data-k="court"><i class="pl-l"></i><i class="pl-r"></i><span>Report to the police</span></button>' : ''}` : '';
 }
 function ofAsk(k: string) {
   const R = OfficeRoom, V = R.vis, p = R.p; if (!V) return;

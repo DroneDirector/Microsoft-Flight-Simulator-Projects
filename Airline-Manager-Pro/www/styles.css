@@ -3347,3 +3347,21 @@ body.aim-locked .office3d .of-aim { font-size: 22px; }
 .ct-box.dragging { cursor: grabbing; transition: none !important; box-shadow: 0 18px 50px rgba(0,0,0,.55); user-select: none; }
 .ct-box.dragging .ct-who, .ct-box.dragging .box-grip { cursor: grabbing; }
 .ct-box.min .box-grip { display: flex !important; }
+
+/* "Report to the police": the button flashes red and blue like a police car's light bar */
+.police-btn { position: relative; overflow: hidden; isolation: isolate; border-radius: 12px; background: linear-gradient(180deg, #121a33, #0b1022) !important; border: 1px solid rgba(140,160,255,.5) !important; color: #fff !important; animation: polGlow 1s steps(1) infinite; }
+.police-btn > span { position: relative; z-index: 3; color: #fff !important; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.7); }
+.police-btn::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; z-index: 2; background: linear-gradient(90deg, #ff2a3c 0 25%, #2a6bff 25% 50%, #2a6bff 50% 75%, #ff2a3c 75% 100%); background-size: 200% 100%; animation: polBar 0.5s steps(1) infinite; }
+.police-btn .pl-l, .police-btn .pl-r { position: absolute; top: -60%; bottom: -60%; width: 80%; z-index: 0; filter: blur(8px); opacity: 0; pointer-events: none; }
+.police-btn .pl-l { left: -20%; background: radial-gradient(closest-side, rgba(255,35,55,1), rgba(255,35,55,.35) 60%, rgba(255,35,55,0)); animation: polL 1s linear infinite; }
+.police-btn .pl-r { right: -20%; background: radial-gradient(closest-side, rgba(35,105,255,1), rgba(35,105,255,.35) 60%, rgba(35,105,255,0)); animation: polR 1s linear infinite; }
+.police-btn::after { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.25) 50%, transparent 65%); transform: translateX(-120%); animation: polSweep 2.4s ease-in-out infinite; }
+/* two quick flashes on one side, then two on the other */
+@keyframes polL { 0%, 9% { opacity: 1; } 10%, 19% { opacity: .15; } 20%, 32% { opacity: 1; } 33%, 100% { opacity: 0; } }
+@keyframes polR { 0%, 49% { opacity: 0; } 50%, 59% { opacity: 1; } 60%, 69% { opacity: .15; } 70%, 82% { opacity: 1; } 83%, 100% { opacity: 0; } }
+@keyframes polGlow { 0% { box-shadow: 0 0 18px rgba(255,35,55,.7), 0 0 0 1px rgba(255,35,55,.6) inset; } 50% { box-shadow: 0 0 18px rgba(35,105,255,.75), 0 0 0 1px rgba(35,105,255,.6) inset; } }
+@keyframes polBar { 0% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
+@keyframes polSweep { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+.police-btn:active { transform: scale(.97); }
+html.calm .police-btn, html.calm .police-btn::before, html.calm .police-btn .pl-l, html.calm .police-btn .pl-r, html.calm .police-btn::after { animation: none; }
+html.calm .police-btn .pl-l, html.calm .police-btn .pl-r { opacity: .5; }
