@@ -37,13 +37,13 @@ function airportWind(icao: string, pos: number[]): { dir: number; kt: number; re
 }
 
 const _rwyCache: { [k: string]: RunwayEnd } = {};
-/** The runway end in use at an airport (landing and take-off into the wind, longer runways preferred). */
-function activeRunway(icao: string): RunwayEnd {
-  const a: any = apt(icao); if (!a) return null;
-  const wind = airportWind(icao, a.pos), key = icao + '|' + Math.round(wind.dir / 10) + '|' + new Date().toISOString().slice(0, 10);
-  if (_rwyCache[key] !== undefined) return _rwyCache[key];
-  const rows: any[] = ((World.runways || {})[icao] || []) as any[];
-  let best: RunwayEnd = null, bs = -1e9;
+const _rwyEnds: { [icao: string]: { day: string; ends: (RunwayEnd & { paved: boolean })[] } } = {};
+/** Every runway end at an airport (both directions of each open runway), with whether it has an ILS. */
+function runwayEnds(icao: string): (RunwayEnd & { paved: boolean })[] {
+  const a: any = apt(icao); if (!a) return [];
+  const day = new Date().toISOString().slice(0, 10), c = _rwyEnds[icao];
+  if (c && c.day === day) return c.ends;
+  const rows: any[] = ((World.runways || {})[icao] || []) as any[], out: (RunwayEnd & { paved: boolean })[] = [];
   for (const r of rows) {
     const [id1, id2, lenFt, , surf, la1, lo1, la2, lo2, hdg1] = r;
     try { if (rows.length > 1 && notamRwyClosed(icao, id1, id2)) continue; } catch (e) { /* no NOTAMs yet */ }
@@ -53,16 +53,44 @@ function activeRunway(icao: string): RunwayEnd {
     const lenM = (lenFt || 0) * 0.3048 || gcDistanceNm(e1, e2) * NM;
     const paved = /ASP|CON|BIT|PEM|ASF/i.test(surf || '');
     for (const dir of [0, 1]) {
-      const hd = dir ? (h + 180) % 360 : h, head = Math.cos((wind.dir - hd) * D2R);
-      const score = head * 2 + Math.min(lenM, 4000) / 1500 + (paved ? 0.5 : 0);
-      if (score > bs) {
-        bs = score;
-        const ils = paved && lenM >= 1800 && (a.size === 2 || (a.size === 1 && lenM >= 2200) || !!AIRPORTS[icao]) && !(() => { try { return notamIlsOut(icao, String(dir ? id2 : id1)); } catch (e) { return false; } })();
-        best = { icao, name: String(dir ? id2 : id1 || ''), other: String(dir ? id1 : id2 || ''), thr: dir ? e2 : e1, end: dir ? e1 : e2, hdg: hd, lenM, ils };
-      }
+      const name = String(dir ? id2 : id1 || ''); if (!name) continue;
+      const ils = paved && lenM >= 1800 && (a.size === 2 || (a.size === 1 && lenM >= 2200) || !!AIRPORTS[icao]) && !(() => { try { return notamIlsOut(icao, name); } catch (e) { return false; } })();
+      out.push({ icao, name, other: String(dir ? id1 : id2 || ''), thr: dir ? e2 : e1, end: dir ? e1 : e2, hdg: dir ? (h + 180) % 360 : h, lenM, ils, paved });
     }
   }
+  _rwyEnds[icao] = { day, ends: out };
+  return out;
+}
+/** The wind along a runway end: + headwind, − tailwind, and the crosswind (kt). */
+function runwayWind(re: RunwayEnd): { head: number; cross: number; dir: number; kt: number; real: boolean } {
+  const a: any = apt(re.icao), w = airportWind(re.icao, a ? a.pos : re.thr);
+  return { head: Math.round(w.kt * Math.cos((w.dir - re.hdg) * D2R)), cross: Math.round(Math.abs(w.kt * Math.sin((w.dir - re.hdg) * D2R))), dir: w.dir, kt: w.kt, real: w.real };
+}
+/** A runway end by its name (08, 26L), or null. */
+function runwayByName(icao: string, name: string): RunwayEnd {
+  if (!name) return null;
+  return runwayEnds(icao).filter(r => rwyMatch(r.name, name))[0] || null;
+}
+/** The runway end in use at an airport (landing and take-off into the wind, longer runways preferred). */
+function activeRunway(icao: string): RunwayEnd {
+  const a: any = apt(icao); if (!a) return null;
+  const wind = airportWind(icao, a.pos), key = icao + '|' + Math.round(wind.dir / 10) + '|' + new Date().toISOString().slice(0, 10);
+  if (_rwyCache[key] !== undefined) return _rwyCache[key];
+  let best: RunwayEnd = null, bs = -1e9;
+  for (const r of runwayEnds(icao)) {
+    const head = Math.cos((wind.dir - r.hdg) * D2R), score = head * 2 + Math.min(r.lenM, 4000) / 1500 + (r.paved ? 0.5 : 0);
+    if (score > bs) { bs = score; best = r; }
+  }
   return (_rwyCache[key] = best);
+}
+const RWY_TAIL_MAX = 10;   // kt: the usual tailwind limit for take-off and landing
+/** The runways a route's flights use: the ones assigned in the Flight planner, otherwise the one in use. */
+function routeRunways(from: string, to: string): { dep: RunwayEnd; arr: RunwayEnd; depSet: boolean; arrSet: boolean } {
+  const pk = procPick(from, to);
+  // an assigned runway with too much tailwind isn't used until the wind turns (as the tower would)
+  const ok = (re: RunwayEnd) => re && -runwayWind(re).head <= RWY_TAIL_MAX ? re : null;
+  const d = pk && pk.depRwy ? ok(runwayByName(from, pk.depRwy)) : null, r = pk && pk.arrRwy ? ok(runwayByName(to, pk.arrRwy)) : null;
+  return { dep: d || activeRunway(from), arr: r || activeRunway(to), depSet: !!d, arrSet: !!r };
 }
 
 /** Round off the corners of a polyline (two passes of corner cutting), keeping the end points. */
@@ -108,7 +136,7 @@ function smoothPath(p: number[][], passes = 2): number[][] {
 }
 
 /* ---------- Published procedures from the simulator (through the PC app, when linked) ---------- */
-interface SimLeg { t: number; fix: string; lat: number; lon: number; alt: number; crs: number; dist: number; turn: number; arcLat?: number; arcLon?: number }
+interface SimLeg { t: number; fix: string; lat: number; lon: number; alt: number; crs: number; dist: number; turn: number; arcLat?: number; arcLon?: number; ad?: string; alt2?: number; spd?: number; role?: string }
 interface SimProc { name: string; kind: string; type?: number; suffix?: string; rwy?: string; common: SimLeg[]; runways: { name: string; rwy?: string; legs: SimLeg[] }[]; enroute: { name: string; legs: SimLeg[] }[] }
 interface SimProcs { icao: string; sids: SimProc[]; stars: SimProc[]; apps: SimProc[] }
 
@@ -116,11 +144,15 @@ const SimProcedures = {
   data: {} as { [icao: string]: SimProcs | false },
   asked: {} as { [icao: string]: boolean },
   get(icao: string): SimProcs {
-    const d = this.data[icao]; if (d) return d; if (d === false) return null;
-    try { const k = JSON.parse(localStorage.getItem('amp-proc:' + icao) || 'null'); if (k && k.l) return (this.data[icao] = k.l); } catch (e) { /* none */ }
+    const d = this.data[icao]; if (d) return d; if (d === false) { const b = BundledProcs.get(icao); if (b) this.src[icao] = 'faa'; return b; }
+    try { const k = JSON.parse(localStorage.getItem('amp-proc:' + icao) || 'null'); if (k && k.l) { this.src[icao] = 'sim'; return (this.data[icao] = k.l); } } catch (e) { /* none */ }
     this.ask(icao);
+    // the published ones that come with the app (US airports, FAA), with or without the simulator
+    const b = BundledProcs.get(icao); if (b) { this.src[icao] = 'faa'; return b; }
     return null;
   },
+  /** Where an airport's procedures come from: 'sim' (Flight Simulator's navigation data), 'faa' (the FAA's, with the app). */
+  src: {} as { [icao: string]: string },
   ask(icao: string) {
     if (this.asked[icao] || Link.status !== 'connected') return;
     this.asked[icao] = true;
@@ -129,12 +161,50 @@ const SimProcedures = {
   received(icao: string, procs: any, error?: string) {
     icao = String(icao || '').toUpperCase();
     if (!procs || error) { this.data[icao] = false; return; }
-    this.data[icao] = procs;
+    this.data[icao] = procs; this.src[icao] = 'sim';
     try { AirportLayouts.keep('amp-proc:' + icao, procs as any); } catch (e) { /* storage full */ }
     // only flights that start from now on use them: a flight never changes its path in the air
     for (const k of Object.keys(_paths)) if (k.indexOf(icao) >= 0) delete _paths[k];
   },
 };
+
+/** The published departures, arrivals and approaches that come with the app: the FAA's for the airports in the
+ *  United States and its territories (tools/navdata/cifp.py), loaded a group of airports at a time when needed. */
+const BundledProcs = {
+  index: null as { [icao: string]: 1 }, cycle: '', loading: false, groups: {} as { [g: string]: { [icao: string]: any } | false }, done: {} as { [icao: string]: SimProcs }, busy: {} as { [g: string]: boolean },
+  start() {
+    if (this.index || this.loading) return; this.loading = true;
+    fetch('navdata/cifp/index.json').then(r => r.ok ? r.json() : null).then((j: any) => {
+      const ix: any = {}; for (const k of (j && j.airports) || []) ix[k] = 1; this.index = ix; this.cycle = (j && j.cycle) || '';
+    }).catch(() => { this.index = {}; });
+  },
+  has(icao: string): boolean { this.start(); return !!(this.index && this.index[icao]); },
+  get(icao: string): SimProcs {
+    if (!this.has(icao)) return null;
+    const g = icao.slice(0, 2), G = this.groups[g];
+    if (G) { if (this.done[icao]) return this.done[icao]; const v = G[icao]; return v ? (this.done[icao] = bundledExpand(icao, v)) : null; }
+    if (G === false || this.busy[g]) return null;
+    this.busy[g] = true;
+    fetch('navdata/cifp/' + g + '.json').then(r => r.ok ? r.json() : null).then((j: any) => {
+      this.groups[g] = j || false;
+      // flights starting from now on use them (a flight never changes its path in the air)
+      if (j) for (const k of Object.keys(_paths)) if (k.slice(0, 2) === g || k.indexOf('>' + g) >= 0) delete _paths[k];
+    }).catch(() => { this.groups[g] = false; }).then(() => { delete this.busy[g]; });
+    return null;
+  },
+};
+/** A leg as the file has it ([type, fix, lat, lon, alt, course, distance, turn, arc lat, arc lon, rule, alt 2, speed, role]) to a SimLeg. */
+function bundledLeg(a: any[]): SimLeg {
+  const l: any = { t: a[0], fix: a[1] || '', lat: a[2] || 0, lon: a[3] || 0, alt: a[4] || 0, crs: a[5] || 0, dist: a[6] || 0, turn: a[7] || 0 };
+  if (a[8] || a[9]) { l.arcLat = a[8]; l.arcLon = a[9]; }
+  if (a[10]) l.ad = a[10]; if (a[11]) l.alt2 = a[11]; if (a[12]) l.spd = a[12]; if (a[13]) l.role = a[13];
+  return l;
+}
+function bundledExpand(icao: string, v: any): SimProcs {
+  const pr = (p: any): SimProc => ({ name: p.name, kind: p.kind, type: p.type, suffix: p.suffix, rwy: p.rwy, common: (p.common || []).map(bundledLeg),
+    runways: (p.runways || []).map((r: any) => ({ name: r.name, rwy: r.rwy, legs: r.legs.map(bundledLeg) })), enroute: (p.enroute || []).map((r: any) => ({ name: r.name, legs: r.legs.map(bundledLeg) })) });
+  return { icao, sids: (v.sids || []).map(pr), stars: (v.stars || []).map(pr), apps: (v.apps || []).map(pr) };
+}
 
 /* ---------- Real-world airways (from the simulator, through the PC app) ---------- */
 // Airliners and cargo jets fly the high airways, turboprops and light aircraft the low ones, between where
@@ -277,7 +347,7 @@ const _paths: { [k: string]: FlightPath } = {};
 /** The whole path of a flight from runway to runway (cached). Null when the runways aren't known. */
 function flightPathFor(from: string, to: string, noSim?: boolean, cls?: 'H' | 'L'): FlightPath {
   if (!from || !to || from === to || !World.runways) return null;
-  const dep = activeRunway(from), arr = activeRunway(to);
+  const RR = routeRunways(from, to), dep = RR.dep, arr = RR.arr;   // assigned in the planner, or by the wind
   if (!dep || !arr) return null;
   const PL0 = flightPlanFor(from, to);   // a flight plan from the planner: its waypoints instead of the great circle
   // otherwise the real airways (high or low) from the simulator, when known
@@ -362,7 +432,7 @@ function flightPathFor(from: string, to: string, noSim?: boolean, cls?: 'H' | 'L
   const wpD: { [id: string]: number } = {}; for (const id in wpRaw) wpD[id] = idx(map[sid.length + wpRaw[id]]);
   // still much longer than the trip itself: the app's own departure and arrival instead
   if ((sd || sa) && !noSim && len > gc * 1.35 + (PL ? 400 : 120)) { const own = flightPathFor(from, to, true); if (own) return (_paths[key] = own); }
-  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa), wpD, awy: AW || null } as any);
+  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa), wpD, awy: AW || null, depSrc: sd ? SimProcedures.src[from] || 'sim' : '', arrSrc: sa ? SimProcedures.src[to] || 'sim' : '' } as any);
 }
 
 /** The point `d` nm along a path, and the direction of travel there. */

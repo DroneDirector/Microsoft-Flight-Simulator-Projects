@@ -9,7 +9,10 @@
 // latitude and longitude (5530N02015W), or an airport's code when it is one.
 
 interface PlanWp { id: string; name: string; lat: number; lon: number; alt: number; spd?: number; mach?: number; apt?: string; via?: string }
-interface FlightPlanR { key: string; from: string; to: string; wps: PlanWp[]; climbIas?: number; descIas?: number; altn?: string; on: boolean; v: number; at: number; typeId?: string }
+interface FlightPlanR { key: string; from: string; to: string; wps: PlanWp[]; climbIas?: number; descIas?: number; altn?: string; on: boolean; v: number; at: number; typeId?: string;
+  /** Runways and procedures assigned for every flight between the two airports (yours and your pilots'), even
+   *  while the waypoints are switched off: '' or missing means chosen by the wind and the direction of flight. */
+  depRwy?: string; arrRwy?: string; sid?: string; sidTr?: string; star?: string; starTr?: string; app?: string; appTr?: string }
 
 /** The plan the Flight planner is showing (worked out as flown even while it is switched off). */
 let _planPreview: string = null;
@@ -21,8 +24,17 @@ function flightPlanFor(from: string, to: string): FlightPlanR {
   const p = plansAll()[planKey(from, to)];
   return p && (p.on || _planPreview === p.key) && p.wps && p.wps.length ? p : null;   // also while the planner previews it
 }
+/** The runways and procedures assigned between two airports (whether or not its waypoints are flown). */
+function procPick(from: string, to: string): FlightPlanR {
+  if (!from || !to || from === to) return null;
+  const p = plansAll()[planKey(from, to)];
+  return p && (p.depRwy || p.arrRwy || p.sid || p.star || p.app) ? p : null;
+}
 /** Changes whenever the plan does: the cached paths and profiles are made again. */
-function planSig(from: string, to: string): string { const p = flightPlanFor(from, to); return p ? '|plan' + p.v : ''; }
+function planSig(from: string, to: string): string {
+  const p = flightPlanFor(from, to), q = procPick(from, to);
+  return (p ? '|plan' + p.v : '') + (q ? `|pk${q.depRwy || ''}>${q.arrRwy || ''}>${q.sid || ''}.${q.sidTr || ''}>${q.starTr || ''}.${q.star || ''}>${q.app || ''}.${q.appTr || ''}` : '');
+}
 
 /** A position as a waypoint name: 5530N02015W. */
 function coordName(lat: number, lon: number): string {

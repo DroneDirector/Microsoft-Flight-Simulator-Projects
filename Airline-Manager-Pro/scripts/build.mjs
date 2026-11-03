@@ -80,7 +80,13 @@ const humans = join(root, 'assets/humans.bin');
 copyFileSync(humans, join(root, 'www/humans.bin'));
 
 // Every airport and runway in the world (OurAirports, public domain; see tools/airports)
-for (const f of ['airports-world.json', 'runways-world.json']) copyFileSync(join(root, 'assets', f), join(root, 'www', f));
+for (const f of ['airports-world.json', 'runways-world.json', 'navaids-world.json']) copyFileSync(join(root, 'assets', f), join(root, 'www', f));
+// Published procedures for US airports (FAA CIFP, public domain; fetched by the build, see tools/navdata)
+const navSrc = join(root, 'assets/navdata/cifp');
+if (existsSync(navSrc)) {
+  mkdirSync(join(root, 'www/navdata/cifp'), { recursive: true });
+  for (const f of readdirSync(navSrc)) copyFileSync(join(navSrc, f), join(root, 'www/navdata/cifp', f));
+}
 
 const tpl = readFileSync(join(root, 'www/index.template.html'), 'utf8');
 writeFileSync(join(root, 'www/index.html'), tpl.replace(/%APP_NAME%/g, cfg.appName).replace(/%APP_VERSION%/g, cfg.version));
