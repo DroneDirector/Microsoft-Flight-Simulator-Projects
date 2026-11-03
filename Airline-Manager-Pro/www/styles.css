@@ -3810,3 +3810,9 @@ body.ts-on .tour, body.ts-on .tour-dim, body.ts-on .pull-ind { display: none !im
 @keyframes dcBlink { 50% { opacity: .25; } }
 html.calm .dclock b em { animation: none; }
 @media (max-width: 900px) { .dclock { padding: 0 8px; } .dclock b { font-size: 15px; } .dclock b small { display: none; } }
+/* the schedule's refresh button: turns as it refreshes, counts down to the next refresh by itself */
+.sched-refresh { gap: 6px; }
+.sched-refresh small { min-width: 28px; padding: 2px 6px; border-radius: 8px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ink-2); background: var(--panel-3); text-align: center; }
+.sched-refresh.spin .ic { animation: schedSpin .7s var(--ease); }
+@keyframes schedSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+@media (max-width: 900px) { .sched-refresh > span { display: none; } }
