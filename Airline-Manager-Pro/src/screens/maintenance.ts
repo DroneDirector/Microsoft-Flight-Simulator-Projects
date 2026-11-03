@@ -58,8 +58,7 @@ SCREENS.maint = {
         }).join('') || emptyState('No open reports', 'Damage the simulator detects after a flight shows up here.')}
         <h3>In the hangar</h3>
         ${hangarHtml(sched)}
-        <h3>Walk into your hangars</h3>
-        ${hgListHtml()}
+        <button class="btn ghost hg-go" data-act="go" data-screen="hangars">${icon('wrench')}Your hangars: walk in</button>
       </div>
       <div class="maint-cond card">
         <div class="card-h"><b>Fleet condition</b></div>

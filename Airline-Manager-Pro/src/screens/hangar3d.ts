@@ -100,6 +100,22 @@ function hgListHtml(): string {
         <button class="btn sm primary" data-act="hangar-visit" data-reg="${esc(h.reg)}">${icon('wrench')}Walk in</button></div>`; }).join('')}</div>`; }).join('')}</div>`;
 }
 
+/** The line under Hangars on the Overview: how many aircraft are in for work. */
+function hgBusyLine(): string {
+  let n = 0; try { n = fleetOf().filter(hgInWork).length; } catch (e) { n = 0; }
+  return n ? `${n} aircraft in for work: walk in and see them` : 'Every hangar is empty: walk in and look around';
+}
+/** The Hangars page (from the Overview): every hangar at every base, empty or with an aircraft in for work. */
+SCREENS.hangars = {
+  title: 'Hangars', icon: 'wrench', nav: false,
+  render() {
+    const n = fleetOf().filter(hgInWork).length;
+    return `<div class="screen-head"><div><button class="back-btn" data-act="go" data-screen="ops">${icon('chevron', 'flip')}<span>Overview</span></button>
+      <h1>Hangars</h1><p class="sub">${n ? `${n} aircraft in for work` : 'No aircraft in for work right now'} · one hangar of every size at each base, more when more aircraft are in</p></div></div>
+      ${hgListHtml()}`;
+  },
+};
+
 /* ---------- what the vending machine sells (made-up products, no brands) ---------- */
 interface HgProd { k: string; name: string; type: 'can' | 'bar'; c1: string; c2: string; inner?: string; file: string }
 const HG_PRODUCTS: HgProd[] = [
@@ -812,7 +828,8 @@ function hgOpen2(root: HTMLElement, q: number) {
       try { ren.compile(scene, cam); } catch (e) { /* first frame */ }
       R.loading = false; R.t0 = performance.now(); hgFrame();
       ctProgress(100, 'Ready', R);
-      const wait = Math.max(300, 3000 - (performance.now() - R.loadT0));
+      // the splash stays at least 5 seconds, and until everything is loaded (it is, by now)
+      const wait = Math.max(300, 5000 - (performance.now() - R.loadT0));
       setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); } hgUi(true); }, wait);
     }, 40);
     R.iv = setInterval(() => { if (R.on && !document.hidden) { opsMonitorDraw(R.A); hgSkyUpdate(); } }, 15000);
@@ -1308,7 +1325,7 @@ function hgLeave() {
   exitSplash('hangar', HangarRoom.sz ? HangarRoom.sz.name : 'Hangar', [
     { pct: 30, step: 'Closing the hangar…', run: () => HangarRoom.close(true) },
     { pct: 55, step: 'Clearing the hangar from memory…', run: exitFreeMemory },
-    { pct: 85, step: 'Loading Maintenance…', run: () => { try { closeAll(); go('maint'); } catch (e) { refresh(); } } },
+    { pct: 85, step: 'Loading your hangars…', run: () => { try { closeAll(); go('hangars'); } catch (e) { refresh(); } } },
   ]);
 }
 
