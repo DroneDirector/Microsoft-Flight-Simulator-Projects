@@ -25,7 +25,7 @@ const SAVE_VERSION = 1;
 const SAVED_KEYS = ['companyId', 'divisionId', 'myReg', 'settings', 'profiles', 'companies', 'pilots', 'candidates',
   'fleet', 'live', 'today', 'routes', 'logbook', 'issues', 'notices', 'txns', 'fines',
   'staff', 'staffCandidates', 'incidents', 'coPilot', 'birthdayGreeted', 'simDate', 'myLoad', 'salaryV2',
-  'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown', 'aiNext', 'aiDay', 'cases', 'screen', 'badges', 'progress', 'popLog', 'ratingDay', 'condTick', 'groundedUntil', 'payNext', 'poolNext', 'conductPausedAt', 'seenVersion', 'wnClosed', 'coop', 'favs', 'licence', 'bank', 'jobs', 'landRecs', 'ofp', 'plans', 'acars', 'simInstalled', 'usedMarket', 'payV3', 'unions', 'moraleNext', 'paxRecords', 'noFly', 'paxReviews', 'groundV1', 'groundWarned', 'news', 'whistle', 'wbDay', 'thanksDue', 'thanks', 'newsSeen', 'newsCool', 'newsWatchV1', 'newsWx', 'conductDrama', 'difficulty', 'conductPlan', 'pet', 'mkt', 'stock', 'bookings', 'challenges', 'gevents', 'briefings', 'mktReal', 'faCrew', 'birthdayBowed'];
+  'linkPc', 'linkedOnce', 'knownAirports', 'lastTouchdown', 'aiNext', 'aiDay', 'cases', 'screen', 'badges', 'progress', 'popLog', 'ratingDay', 'condTick', 'groundedUntil', 'payNext', 'poolNext', 'conductPausedAt', 'seenVersion', 'wnClosed', 'coop', 'favs', 'licence', 'bank', 'jobs', 'landRecs', 'ofp', 'plans', 'acars', 'simInstalled', 'usedMarket', 'payV3', 'unions', 'moraleNext', 'paxRecords', 'noFly', 'paxReviews', 'groundV1', 'groundWarned', 'news', 'whistle', 'wbDay', 'thanksDue', 'thanks', 'newsSeen', 'newsCool', 'newsWatchV1', 'newsWx', 'conductDrama', 'difficulty', 'conductPlan', 'pet', 'family', 'finHold', 'regNext', 'fresh', 'mkt', 'stock', 'bookings', 'challenges', 'gevents', 'briefings', 'mktReal', 'faCrew', 'birthdayBowed'];
 
 // Changes between save versions go here, e.g. MIGRATIONS[2] = data => { ...; return data; }
 const MIGRATIONS: { [v: number]: (d: any) => any } = {};
@@ -70,7 +70,10 @@ const Store = {
     for (const k of DEVICE_KEYS) if (k in d) S[k] = k === 'settings' ? Object.assign({}, S[k], d[k]) : d[k];
   },
 
+  /** Every save was deleted on the start screen: nothing is saved until a new game is started or a save is loaded. */
+  nogame(): boolean { try { return localStorage.getItem('amp-nogame') === '1'; } catch (e) { return false; } },
   save() {
+    if (this.nogame()) return;
     if (Mode.switching) return;   // the other world is opening: this one is saved already
     const out: any = {};
     for (const k of SAVED_KEYS) out[k] = (State as any)[k];
@@ -103,7 +106,7 @@ const Store = {
     let has = false;
     try { has = !!localStorage.getItem(STORE_KEY); } catch (e) { /* storage unavailable */ }
     const T = this.native();
-    if (has || Mode.coop() || !T || !T.backupRead) return;
+    if (has || Mode.coop() || !T || !T.backupRead || this.nogame()) return;
     T.backupRead().then((r: any) => {
       if (!r || !r.data) return;
       try { JSON.parse(r.data); localStorage.setItem(STORE_KEY, r.data); location.reload(); } catch (e) { /* broken copy: start fresh */ }

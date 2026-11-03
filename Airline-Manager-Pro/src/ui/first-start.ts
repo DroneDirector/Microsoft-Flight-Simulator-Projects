@@ -75,7 +75,9 @@ function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: 
   st.bank = { loans: [], insurance: {}, insNext: {}, campaigns: [], rentNext: {} };
   st.mkt = null; st.coop = null; st.usedMarket = null; st.pet = null; st.stock = {}; st.difficulty = _fsDiff;
   st.salaryV2 = true; st.payV3 = true; st.groundV1 = true;
+  st.finHold = true; st.regNext = 0; st.fresh = true;   // the money waits for you to start your career (career-start.ts)
   const json = JSON.stringify({ v: SAVE_VERSION, app: APP.version, savedAt: Date.now(), state: st });
+  try { localStorage.removeItem('amp-nogame'); } catch (e) { /* ignore */ }
   // nothing from the old game may be saved over it before the app starts again
   try { (Mode as any).switching = true; clearTimeout((Store as any)._nativeTimer); (Store as any)._native = ''; } catch (e) { /* ignore */ }
   try { localStorage.setItem(Mode.key(), json); } catch (e) { toast('The new game couldn\'t be stored', 'warn'); return; }

@@ -159,6 +159,8 @@
     "src/screens/view3d.ts",
     "src/ui/gamepad.ts",
     "src/ui/exit-splash.ts",
+    "src/core/career-start.ts",
+    "src/ui/room-notes.ts",
     "src/ui/title.ts",
     "src/main.ts"
   ]

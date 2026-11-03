@@ -6,13 +6,32 @@ interface LookEditOpts {
   sexOnly?: boolean; confirmName?: string; difficulty?: boolean; onAccept: (look: Look, identity?: { name: string; dob: string; nat: string }) => void;
 }
 
-let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string; pet?: Pet } = null;
+let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string; pet?: Pet; who?: 'me' | 'partner'; me?: Look; partner?: any } = null;
+
+/* ---------- your family: your partner (your wife, or your husband if you are a woman), on the photo in your office ---------- */
+const FAM_H: { [s: string]: number } = { m: 178, f: 166 };
+/** Your partner's look: the one you chose, or one made up for you; always the other sex to yours, in their own clothes. */
+function familyPartner(mySex: string, base?: string): any {
+  const S: any = State, want = mySex === 'f' ? 'm' : 'f';
+  let L: any = S.family && S.family.partner;
+  if (!L || L.sex !== want) {
+    const old = L; L = Object.assign(ctLook('partner-' + (base || 'me') + want, want as any, 'public'), { top: want === 'f' ? 'blouse' : 'shirt' });
+    if (old) { L.skin = old.skin; L.height = FAM_H[want] + ((old.height || FAM_H[old.sex]) - FAM_H[old.sex]); }   // keep the skin and how tall they are for one of their sex
+  }
+  L = Object.assign({}, L, { civil: true, hat: 'none', neck: 'open', bottom: 'trousers' });
+  if (!L.height) L.height = FAM_H[want];
+  return L;
+}
+function famHeightHtml(L: any): string {
+  const h = Math.round(L.height || FAM_H[L.sex === 'f' ? 'f' : 'm']), ft = h / 30.48, fi = Math.floor(ft), inch = Math.round((ft - fi) * 12);
+  return `<div class="le-group"><b>Height</b><div class="le-height"><input type="range" min="145" max="205" step="1" value="${h}" data-le-height aria-label="Height in centimetres"><span data-le-hv>${h} cm · ${fi}′${inch}″</span></div></div>`;
+}
 
 const LE_TABS = [['person', 'Person'], ['face', 'Face'], ['hair', 'Hair'], ['outfit', 'Outfit']];
 
 function openLookEditor(o: LookEditOpts) {
   _le = { o, look: JSON.parse(JSON.stringify(dressed(o.look, o.role))), id: o.identity ? Object.assign({}, o.identity) : null, tab: o.identity ? 'person' : 'face', cam: 'full' };
-  if (o.identity) _le.pet = JSON.parse(JSON.stringify(petData()));   // your own pilot: your pet too
+  if (o.identity) { _le.pet = JSON.parse(JSON.stringify(petData())); _le.who = 'me'; _le.partner = familyPartner(_le.look.sex, (myPilot() || {} as any).id); if (!(_le.look as any).height) (_le.look as any).height = FAM_H[_le.look.sex === 'f' ? 'f' : 'm']; }   // your own pilot: your partner and your pet too
   if (o.sexOnly) _le.tab = 'person';
   _le.cam = leCamForTab(_le.tab);
   openLayer('modal', lookEditorHtml(), { cls: 'full look-pop' });
@@ -27,7 +46,8 @@ function leCamForKey(k: string): string {
   if (k === 'neck') return 'bust';
   return 'full';
 }
-function leFigHtml(): string { return avatarSvg(_le.look, _le.o.role, { accent: company().color, cls: 'hero' }).replace('<canvas ', `<canvas data-cam="${_le.cam}" `); }
+function leFigHtml(): string { return avatarSvg(_le.look, _le.who === 'partner' ? 'fa' : _le.o.role, { accent: company().color, cls: 'hero' }).replace('<canvas ', `<canvas data-cam="${_le.cam}" `); }
+function lePartnerWord(): string { return _le.partner && _le.partner.sex === 'm' ? 'husband' : 'wife'; }
 
 function leChoice(key: string, opts: string[][], cur: any): string {
   return `<div class="le-opts">${opts.map(op => `<button class="le-opt ${String(cur) === op[0] ? 'on' : ''}" data-act="le-set" data-k="${key}" data-v="${op[0]}">${op[1]}</button>`).join('')}</div>`;
@@ -43,6 +63,13 @@ function lookEditorBody(): string {
       ${role === 'captain' || role === 'fo' ? `<div class="le-group"><b>Pilot's cap</b>${leChoice('hat', [['none', 'No cap'], ['cap', 'Wear the cap']], L.hat)}</div>` : ''}
       <div class="le-group"><button class="btn ghost" data-act="le-shuffle">${icon('sync')}Another person</button></div>`;
   }
+  if (_le.who === 'partner') {
+    if (t === 'face' || t === 'hair') { /* the same as yours, below */ }
+    else return `<div class="le-group"><b>Your ${lePartnerWord()}</b><p class="muted">With you and your two children on the family photo on your desk. ${_le.partner.sex === 'm' ? 'He' : 'She'} is always the other sex to you: change yours and your ${lePartnerWord()} changes with it.</p></div>
+      <div class="le-group"><b>Skin tone</b>${leSwatches('skin', SKIN_TONES, L.skin)}</div>
+      ${famHeightHtml(L)}
+      <div class="le-group"><button class="btn ghost" data-act="le-shuffle">${icon('sync')}Another look</button></div>`;
+  }
   if (t === 'person') return `
     ${_le.o.difficulty ? `<div class="le-group"><b>Difficulty</b><p class="muted">How hard the game is: prices, earnings, costs and loans. You can change it later in Settings.</p>${difficultyPickHtml(_fsDiff, 'ng-diff')}</div>` : ''}
     ${id ? `<div class="le-group"><b>Name</b><input class="le-in" data-le-name value="${esc(id.name)}" maxlength="40" autocomplete="off"></div>
@@ -52,6 +79,7 @@ function lookEditorBody(): string {
     </div>` : ''}
     <div class="le-group"><b>Male or female</b>${leChoice('sex', [['m', 'Male'], ['f', 'Female']], L.sex)}</div>
     <div class="le-group"><b>Skin tone</b>${leSwatches('skin', SKIN_TONES, L.skin)}</div>
+    ${id ? famHeightHtml(L) : ''}
     ${id ? leVoiceHtml(L) : ''}`;
   if (t === 'pet' && _le.pet) return petEditorHtml(_le.pet);
   if (t === 'face') return `
@@ -88,7 +116,8 @@ function lookEditorHtml(): string {
     <div class="le-side">
       <div class="modal-head"><div><h2>${esc(_le.o.title)}</h2><small>${_le.o.sexOnly ? '' : 'Everyone is always in uniform: you can swap any garment, never remove it.'}</small></div>
         <button class="icon-btn" data-act="close-layer" aria-label="Close without saving">${icon('close')}</button></div>
-      ${_le.o.sexOnly ? '' : `<div class="tabs">${LE_TABS.concat(_le.pet ? [['pet', 'Pet']] : []).filter(x => x[0] !== 'person' || true).map(x => `<button class="tab ${_le.tab === x[0] ? 'on' : ''}" data-act="le-tab" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>`}
+      ${_le.partner ? `<div class="seg le-who" role="tablist"><button class="${_le.who !== 'partner' ? 'on' : ''}" data-act="le-who" data-w="me">${icon('user')}You</button><button class="${_le.who === 'partner' ? 'on' : ''}" data-act="le-who" data-w="partner">${icon('user')}Your <span data-le-pw>${lePartnerWord()}</span></button></div>` : ''}
+      ${_le.o.sexOnly ? '' : `<div class="tabs">${LE_TABS.filter(x => _le.who !== 'partner' || x[0] !== 'outfit').concat(_le.pet && _le.who !== 'partner' ? [['pet', 'Pet']] : []).map(x => `<button class="tab ${_le.tab === x[0] ? 'on' : ''}" data-act="le-tab" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>`}
       <div class="le-body" data-le-body>${lookEditorBody()}</div>
       <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="le-accept">${icon('check')}Accept</button></div>
     </div>
@@ -133,6 +162,18 @@ ACTIONS['le-voice'] = el => {
 };
 ACTIONS['le-voice-dl'] = () => { leReadIdentity(); VoicePack.manifest = null; VoicePack.download().then(() => leRefresh(true)); toast('Getting the other voices…', 'info'); };
 
+/** Switch between editing yourself and your partner (the same tabs, the figure changes to them). */
+ACTIONS['le-who'] = el => {
+  leReadIdentity(); const w = el.getAttribute('data-w') as 'me' | 'partner'; if (!_le.partner || w === _le.who) return;
+  if (w === 'partner') { _le.me = _le.look; _le.partner = familyPartnerFor(_le.me.sex, _le.partner); _le.look = _le.partner; if (_le.tab === 'outfit' || _le.tab === 'pet') _le.tab = 'person'; }
+  else { _le.partner = _le.look; _le.look = _le.me; }
+  _le.who = w; _le.cam = leCamForTab(_le.tab); Sound.tick();
+  const side = $('.look-pop .le-side'); if (side) { const tmp = document.createElement('div'); tmp.innerHTML = lookEditorHtml(); const ns = tmp.querySelector('.le-side'); if (ns) side.innerHTML = ns.innerHTML; }
+  leRefresh(true);
+};
+/** Your partner stays the other sex to you (a new one is made if you changed yours). */
+function familyPartnerFor(mySex: string, cur: any): any { const want = mySex === 'f' ? 'm' : 'f'; if (cur && cur.sex === want) return cur; const S: any = State, keep = S.family; S.family = { partner: cur }; try { return familyPartner(mySex, (myPilot() || {} as any).id); } finally { S.family = keep; } }
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.hasAttribute || !el.hasAttribute('data-le-height') || !_le) return; const h = +el.value; (_le.look as any).height = h; const v = $('[data-le-hv]'); if (v) { const ft = h / 30.48, fi = Math.floor(ft); v.textContent = `${h} cm · ${fi}′${Math.round((ft - fi) * 12)}″`; } });
 ACTIONS['le-tab'] = el => {
   leReadIdentity(); _le.tab = el.getAttribute('data-t'); _le.cam = leCamForTab(_le.tab); Sound.tick();
   $all('.look-pop .tab').forEach(t => t.classList.toggle('on', t.getAttribute('data-t') === _le.tab));
@@ -144,24 +185,28 @@ ACTIONS['le-set'] = el => {
   (_le.look as any)[k] = /^(skin|hairColor|uniform)$/.test(k) ? +v : v;
   if (k === 'sex' && _le.o.sexOnly) { const hat = _le.look.hat; _le.look = randomLook('cp' + Math.random(), v as any, _le.o.role); _le.look.hat = hat; }
   if (k === 'top' && v === 'overalls') _le.look.bottom = 'trousers';
-  _le.look = dressed(_le.look, _le.o.role);
+  _le.look = _le.who === 'partner' ? Object.assign(dressed(_le.look, 'fa'), { civil: true, hat: 'none' }) : dressed(_le.look, _le.o.role);
+  if (_le.who === 'partner') _le.partner = _le.look;
   _le.cam = _le.tab === 'outfit' || _le.tab === 'person' ? leCamForKey(k) : leCamForTab(_le.tab);
   if (k === 'glasses' || k === 'hat') _le.cam = 'face';
   Sound.tick(); leRefresh(true);
 };
 ACTIONS['le-shuffle'] = () => {
   leReadIdentity();
-  const keep = _le.look.sex, hat = _le.look.hat;
-  _le.look = randomLook('shuffle' + Math.random(), keep, _le.o.role);
+  const keep = _le.look.sex, hat = _le.look.hat, hgt = (_le.look as any).height;
+  if (_le.who === 'partner') { _le.look = Object.assign(ctLook('shuffle' + Math.random(), keep as any, 'public'), { top: keep === 'f' ? 'blouse' : 'shirt', civil: true, hat: 'none', neck: 'open', bottom: 'trousers', height: hgt }); _le.partner = _le.look; Sound.tick(); leRefresh(true); return; }
+  _le.look = randomLook('shuffle' + Math.random(), keep, _le.o.role); (_le.look as any).height = hgt;
   if (_le.o.sexOnly) _le.look.hat = hat;
   if (!_le.o.sexOnly) _le.look.top = dressed(_le.look, _le.o.role).top;
   Sound.tick(); leRefresh(true);
 };
 ACTIONS['le-accept'] = () => {
   leReadIdentity();
+  if (_le.who === 'partner') { _le.partner = _le.look; _le.look = _le.me; _le.who = 'me'; }
   const o = _le.o, look = dressed(_le.look, o.role), id = _le.id;
+  const partner = _le.partner ? familyPartnerFor(look.sex, _le.partner) : null;
   const before = JSON.stringify(dressed(o.look, o.role)), changed = JSON.stringify(look) !== before || (o.identity && JSON.stringify(id) !== JSON.stringify(o.identity));
-  const apply = () => { Haptics.success(); if (_le.pet) { (State as any).pet = _le.pet; Store.soon(); } o.onAccept(look, id); };
+  const apply = () => { Haptics.success(); if (_le.pet) { (State as any).pet = _le.pet; Store.soon(); } if (partner) { (State as any).family = Object.assign({}, (State as any).family, { partner }); Store.soon(); } o.onAccept(look, id); };
   // someone who already exists: ask first; "No" keeps the look they have now
   if (o.confirmName && changed) {
     confirmChange(`Change ${o.confirmName}'s appearance?`, 'The new look is used everywhere in the app from now on.', 'Yes, change it', 'No, keep the current look',

@@ -1666,7 +1666,7 @@ function selfEyeOff(S: any, yaw: number, lean: number): any {
 }
 /** Place and pose yourself for this frame: the hips (in the room), facing (yaw: 0 faces +z), leaning forward,
  *  sitting (0…1), walking speed and distance; arms(m) may give the arm poses (reaching, holding). Returns the eyes. */
-function selfPose(S: any, hip: any, yaw: number, lean: number, sit: number, v: number, dist: number, t: number, dt: number, arms?: (m: any) => { L?: number[]; R?: number[] } | null): any {
+function selfPose(S: any, hip: any, yaw: number, lean: number, sit: number, v: number, dist: number, t: number, dt: number, arms?: (m: any) => { L?: number[]; R?: number[]; legs?: number[] } | null): any {
   const m = S.m;
   S.g.position.copy(hip); S.yawG.rotation.y = yaw; S.leanG.rotation.x = lean;
   let gT = cabinLerpG(humanGesture(null, t), humanGesture({ kind: 'walk', v: Math.max(0.6, v), seed: 'me' }, dist / 1.25), Math.min(1, v / 0.6));
@@ -1675,7 +1675,7 @@ function selfPose(S: any, hip: any, yaw: number, lean: number, sit: number, v: n
   const g = Object.assign({}, S.G); g.lean = 0; g.nod = 0; g.shake = 0; g.tilt = 0;
   // sitting and leaning in: the legs stay where they were
   if (g.legs && sit > 0) g.legs = [g.legs[0] + lean * sit, g.legs[1], g.legs[2] + lean * sit, g.legs[3]];
-  if (arms) { m.root.rotation.set(0, 0, 0); m.root.position.set(0, 0, 0); S.g.updateMatrixWorld(true); const a: any = arms(m); if (a) { if (a.L) g.L = a.L; if (a.R) g.R = a.R; if (a.hand) g.hand = a.hand; } }
+  if (arms) { m.root.rotation.set(0, 0, 0); m.root.position.set(0, 0, 0); S.g.updateMatrixWorld(true); const a: any = arms(m); if (a) { if (a.L) g.L = a.L; if (a.R) g.R = a.R; if (a.hand) g.hand = a.hand; if (a.legs) g.legs = a.legs; } }
   m.pose({ t, yaw: 0, gaze: [0, 0], blink: 0, g, noHead: true });
   // the head bows to look down (S.pitch, the view's): the eyes go forward and down a little, so you see your feet
   const eye = hip.clone().add(selfEyeOff(S, yaw, lean)), dn = Math.max(0, -(S.pitch || 0));

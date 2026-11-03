@@ -43,15 +43,21 @@ function mailAdd(m: Partial<LapMail> & { from: string; subject: string; body: st
 /** A notification sliding down from the top of the phone while you are using it (new mail, messages from the
  *  bell). Tap it to open what it is about; it goes up again after a few seconds, or swipe it up. */
 function phoneNote(n: { title: string; body?: string; ic?: string; c?: string; app?: string; id?: string; notice?: string; thread?: string }) {
-  const R = Lap.root as HTMLElement; if (!Lap.phone || !R || !R.isConnected) return;
-  const os = R.querySelector('.ph-os') as HTMLElement; if (!os) return;
+  // on the phone in your hand, the laptop, or a monitor zoomed in, in a room (roomZoomEl)
+  const R = Lap.root as HTMLElement; let os: HTMLElement = null;
+  if (R && R.isConnected) os = R.querySelector(Lap.phone ? '.ph-os' : '.lap-os') as HTMLElement;
+  else { try { os = roomZoomEl(); } catch (e) { os = null; } }
+  if (!os) return;
+  if (!(R && R.isConnected && Lap.phone)) n = Object.assign({}, n, { app: '' });   // a computer screen: messages only
   os.querySelectorAll('.ph-note').forEach(o => o.remove());
   const d = lapGameNow(), el = document.createElement('button');
-  el.className = 'ph-note'; el.type = 'button';
+  el.className = 'ph-note' + (R && R.isConnected && Lap.phone ? '' : ' desk-note'); el.type = 'button';
   el.innerHTML = `<span class="pn-ic" style="--c:${n.c || '#3FD0E8'}">${icon(n.ic || 'bell')}</span><span class="pn-t"><span class="pn-h"><b>${esc(n.title)}</b><small>${d.toTimeString().slice(0, 5)}</small></span>${n.body ? `<span class="pn-b">${esc(n.body)}</span>` : ''}</span>`;
   const gone = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 350); };
   el.addEventListener('click', e => {
     e.stopPropagation(); gone();
+    // a message about a flight, in a room: asked first, then out of the room and into the 3D view
+    if (n.notice) { try { const N: any = (State.notices as any[]).filter(x => x.id === n.notice)[0], f = N && N.ref && State.live.filter(x => x.id === N.ref)[0]; if (f && roomNow() && roomNow() !== 'court') { roomAskFlight(f); return; } } catch (er) { /* the message */ } }
     if (n.notice) { const b = document.createElement('b'); b.setAttribute('data-id', n.notice); try { ACTIONS['open-notice'](b, null); } catch (er) { /* gone */ } return; }
     if (n.app) { if (Lap.app === 'browser') lapBrowserHide(); Lap.app = n.app; if (n.thread) { PhA.thread = n.thread; PhA.newMsg = false; } if (n.app === 'mail' && n.id) { Lap.mailId = n.id; const m = lapMail().filter(x => x.id === n.id)[0]; if (m && !m.read) { m.read = true; Store.soon(); } } Sound.tick(); lapRender(); }
   });

@@ -26,7 +26,7 @@ function bankState(): BankState {
 function insuranceOf(cid: string): 'none' | 'basic' | 'full' { return bankState().insurance[cid] || 'none'; }
 
 function payTxn(cid: string, label: string, amount: number, kind: string, lines: [string, number][], at?: number) {
-  const c = company(cid); if (!c) return;
+  const c = company(cid); if (!c || (State as any).finHold) return;   // a new career: nothing is booked until it starts
   const d = new Date(at || Date.now());
   c.balance += amount;
   State.txns.unshift({ id: uid(), companyId: cid, date: dateStr(d).slice(0, 10), time: dateStr(d).slice(11), label, amount, kind: kind as any, lines } as any);

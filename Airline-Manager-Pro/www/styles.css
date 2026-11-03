@@ -3722,3 +3722,74 @@ button.rail-brand { width: 100%; border-radius: 12px; transition: background .2s
 button.rail-brand:hover, button.rail-brand:focus-visible { background: var(--panel-3); color: #fff; outline: none; }
 button.rail-brand:active { transform: scale(.94); }
 .ts-sel { margin: 8px 0 4px; border-color: var(--neo1); box-shadow: 0 0 16px rgba(255, 63, 184, .3); }
+.le-who { margin: 2px 0 8px; }
+.le-who button { display: inline-flex; align-items: center; gap: 6px; }
+.le-who .ic { width: 15px; height: 15px; }
+.le-height { display: flex; align-items: center; gap: 12px; }
+.le-height input[type=range] { flex: 1; accent-color: var(--cyan); }
+.le-height span { min-width: 104px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13px; }
+/* messages in a room: a card at the top to read; on a computer screen, a notification at its top right */
+.room-note { position: absolute; left: 50%; top: 14px; z-index: 30; display: flex; align-items: center; gap: 10px; max-width: min(520px, calc(100% - 28px)); padding: 10px 14px 10px 10px; border-radius: 16px;
+  background: rgba(14, 22, 34, .82); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); border: 1px solid rgba(255, 255, 255, .12); box-shadow: 0 12px 30px rgba(0, 0, 0, .4); color: #EEF3F8;
+  transform: translate(-50%, -140%); opacity: 0; transition: transform .45s var(--spring), opacity .3s; pointer-events: auto; }
+.room-note.show { transform: translate(-50%, 0); opacity: 1; }
+.room-note .rn-ic { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #F2A93B; color: #1A1206; }
+.room-note.warn .rn-ic { background: #FF5A5F; color: #fff; }
+.room-note .rn-ic .ic { width: 18px; height: 18px; }
+.room-note .rn-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.room-note .rn-t b { font-size: 13.5px; line-height: 1.3; }
+.room-note .rn-t small { font-size: 11.5px; color: rgba(225, 235, 245, .62); }
+.desk-note { position: absolute; top: 12px; right: 12px; z-index: 40; display: flex; gap: 10px; align-items: flex-start; width: min(360px, calc(100% - 24px)); padding: 11px 12px; border: 0; border-radius: 14px; text-align: left; color: #fff; cursor: pointer;
+  background: rgba(30, 38, 52, .9); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); box-shadow: 0 14px 34px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .1);
+  transform: translateX(120%); opacity: 0; transition: transform .45s var(--spring), opacity .3s; }
+.desk-note.show { transform: none; opacity: 1; }
+.desk-note .pn-ic { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--c, #3FD0E8); color: #fff; }
+.desk-note .pn-ic .ic { width: 17px; height: 17px; }
+.desk-note .pn-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.desk-note .pn-h { display: flex; justify-content: space-between; gap: 8px; }
+.desk-note .pn-h b { font-size: 13px; }
+.desk-note .pn-h small, .desk-note .pn-b { font-size: 12px; color: rgba(230, 238, 247, .72); }
+.of-dip { position: absolute; inset: 0; z-index: 25; background: #000; pointer-events: none; }
+.of-ph.of-bw { gap: 8px; }
+/* a new career: the money waits until you start */
+.fin-hold { display: inline-flex; align-items: center; gap: 9px; height: 40px; padding: 0 14px 0 8px; margin-left: 8px; border-radius: 12px; color: #1A1206; background: linear-gradient(90deg, #F2B33D, #FFD27A); box-shadow: 0 0 0 0 rgba(242, 179, 61, .6); animation: finPulse 2s ease-in-out infinite; transition: transform .2s var(--spring); flex: none; }
+.fin-hold:hover { transform: translateY(-1px) scale(1.02); }
+.fin-hold .fh-ic { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: rgba(26, 18, 6, .14); }
+.fin-hold .fh-ic .ic { width: 15px; height: 15px; }
+.fin-hold .fh-t { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
+.fin-hold .fh-t b { font-size: 13px; }
+.fin-hold .fh-t small { font-size: 11px; opacity: .78; }
+.fin-hold.nudge { animation: finNudge .5s var(--ease), finPulse 2s 0.5s ease-in-out infinite; }
+.fin-hold.go { animation: finGo .75s var(--ease) forwards; pointer-events: none; }
+@keyframes finPulse { 50% { box-shadow: 0 0 0 7px rgba(242, 179, 61, 0); } 0%, 100% { box-shadow: 0 0 0 0 rgba(242, 179, 61, .55); } }
+@keyframes finNudge { 25% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+@keyframes finGo { 0% { transform: scale(1); filter: brightness(1); } 30% { transform: scale(1.12); filter: brightness(1.4); box-shadow: 0 0 30px 10px rgba(255, 210, 122, .7); } 100% { transform: scale(.6) translateY(-30px); opacity: 0; filter: blur(4px); } }
+@media (max-width: 900px) { .fin-hold .fh-t small { display: none; } }
+/* deleting every save, on the start screen */
+.ts-danger { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 90, 120, .25); }
+.ts-tick { display: inline-flex; align-items: center; gap: 9px; font-size: 13px; color: rgba(240, 225, 255, .85); cursor: pointer; }
+.ts-tick input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ts-tick span { display: grid; place-items: center; width: 20px; height: 20px; border: 1.5px solid rgba(255, 120, 150, .7); transform: skewX(-10deg); transition: background .2s, box-shadow .2s; }
+.ts-tick input:checked + span { background: linear-gradient(135deg, #FF4D6D, #FF3FB8); box-shadow: 0 0 12px rgba(255, 77, 109, .6); }
+.ts-tick input:checked + span::after { content: ''; width: 9px; height: 5px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: skewX(10deg) rotate(-45deg) translate(1px, -1px); }
+.ts-tick input:focus-visible + span { outline: 2px solid var(--neo2); outline-offset: 2px; }
+.ts-pb.danger { border-color: rgba(255, 90, 120, .6); color: #FFD6DE; }
+.ts-pb.danger:hover { background: rgba(255, 60, 100, .2); border-color: #FF5A7A; box-shadow: 0 0 16px rgba(255, 60, 100, .45); }
+.ts-holdw { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 16px 0 6px; }
+.ts-holdw small { font-size: 12.5px; letter-spacing: .06em; color: rgba(240, 225, 255, .8); font-variant-numeric: tabular-nums; }
+.ts-hold { --k: 0; position: relative; width: 128px; height: 128px; border-radius: 50%; display: grid; place-items: center; touch-action: none; -webkit-user-select: none; user-select: none;
+  box-shadow: 0 0 calc(10px + var(--k) * 50px) calc(var(--k) * 12px) rgba(255, 60, 100, calc(.25 + var(--k) * .5)); transition: transform .2s var(--spring); }
+.ts-hold > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ts-hold .th-track { fill: rgba(20, 8, 30, .8); stroke: rgba(255, 120, 150, .25); stroke-width: 6; }
+.ts-hold .th-fill { fill: none; stroke: url(#none); stroke: #FF4D6D; stroke-width: 6; stroke-linecap: round; filter: drop-shadow(0 0 6px #FF3FB8); }
+.ts-hold .th-core { position: relative; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; color: #fff; background: radial-gradient(circle, rgba(255, 77, 109, calc(.25 + var(--k) * .75)), rgba(120, 20, 60, .6)); }
+.ts-hold .th-core .ic { width: 28px; height: 28px; }
+.ts-hold.holding { transform: scale(.96); animation: tsShake .12s linear infinite; animation-play-state: running; }
+.ts-hold.holding .th-core { animation: tsThrob .5s ease-in-out infinite; }
+.ts-hold.done { animation: tsBoom .5s var(--ease) forwards; }
+@keyframes tsShake { 0%, 100% { translate: 0 0; } 25% { translate: calc(var(--k) * 2px) calc(var(--k) * -1px); } 75% { translate: calc(var(--k) * -2px) calc(var(--k) * 1px); } }
+@keyframes tsThrob { 50% { transform: scale(1.08); } }
+@keyframes tsBoom { 40% { transform: scale(1.25); filter: brightness(2); } 100% { transform: scale(.2); opacity: 0; filter: blur(6px); } }
+body.ts-on .tour, body.ts-on .tour-dim, body.ts-on .pull-ind { display: none !important; }   /* the guided tour waits while the start screen is up */
+.ts-hold .th-core { position: absolute; inset: 0; margin: auto; }
+.ts-hold .th-core .ic { margin: 0; display: block; }
