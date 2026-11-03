@@ -9,7 +9,7 @@ function fleetCard(a: Aircraft, i: number): string {
   return `<button class="ac-card st-${fleetState(a)}" data-act="ac-detail" data-reg="${a.reg}" style="--i:${i}">
     <div class="ac-stage">${aircraftArt(a.typeId, { color: div ? div.color : c.color, color2: c.color2, reg: a.reg })}</div>
     <div class="ac-info">
-      ${_blocked[a.reg] ? `<span class="crew-short">${icon('pilots')}${esc(_blocked[a.reg].join(', '))}</span>` : ''}
+      ${_blocked[a.reg] ? `<span class="crew-short">${icon('pilots')}${_blocked[a.reg].map(n => `<span class="crew-need" role="button" data-act="go-hire" data-id="${crewNeedRole(n)}" title="Hire ${esc(n)}">${esc(n)}</span>`).join(', ')}</span>` : ''}
       <div class="ac-row1"><b class="ac-reg">${esc(a.reg)}</b>${State.myReg[a.companyId] === a.reg ? '<span class="you-tag">You fly this</span>' : ''}${(a as any).lease ? '<span class="lease-tag">Leased</span>' : ''}${(a as any).noBase ? '<span class="nostand-tag">No stand</span>' : ''}${liveChip(a.reg, a.status)}</div>
       <div class="ac-type">${esc(t.maker)} ${esc(t.model)}</div>
       <div class="ac-dev"><span class="dev-tag ${t.devKind}">${esc(t.dev)}</span>${div ? `<span class="div-tag" style="--dc:${div.color}">${esc(div.name)}</span>` : ''}</div>
@@ -23,6 +23,8 @@ function fleetCard(a: Aircraft, i: number): string {
 }
 
 let _blocked: { [reg: string]: string[] } = {};
+/** Which kind of crew a shortage line is about ("2 flight attendants", "a mechanic", "ramp team at EKVG", "a pilot"). */
+function crewNeedRole(text: string): string { const t = String(text).toLowerCase(); return /attendant|cabin/.test(t) ? 'fa' : /mechanic/.test(t) ? 'mech' : /ground|ramp|handling/.test(t) ? 'ground' : /first officer|co-?pilot/.test(t) ? 'fo' : 'captain'; }
 SCREENS.fleet = {
   title: 'Fleet', icon: 'fleet',
   render() {
@@ -87,6 +89,9 @@ ACTIONS['ac-detail'] = el => {
     <div class="modal-body ac-detail">
       ${focus ? flightLogHtml(focus) : ''}
       <div class="acd-hero">${aircraftArt(a.typeId, { color: div ? div.color : c.color, color2: c.color2, reg: a.reg })}</div>
+      ${f ? `<div class="acd-live">${icon('fleet')}<span><b>${esc(f.from)} to ${esc(f.to)}</b><small>${esc(String((f as any).phase || 'In the air'))}</small></span>
+        <button class="btn sm primary" data-act="show-flight" data-id="${esc(f.id)}">${icon('map')}Show on the map</button>
+        <button class="btn sm ghost" data-act="ac-3d" data-id="${esc(f.id)}"><b>3D</b> view</button></div>` : ''}
       ${a.status !== 'flying' && onBoardParked(a) ? `<div class="fc-sync ob-row" data-ob="${esc(a.reg)}">${onBoardHtml(onBoardParked(a))}</div>` : ''}
       <div class="kv-row">
         <div><small>Airframe hours</small><b>${num(a.hoursMin / 60)}</b></div>
@@ -113,4 +118,11 @@ ACTIONS['ac-detail'] = el => {
         <div><h3>Recent flights</h3>${log.length ? log.map(l => `<button class="mini-row ${focus && focus.id === l.id ? 'on' : ''}" data-act="log-open" data-id="${l.id}">${statusChip(l.result)}<span>${esc(l.from)} to ${esc(l.to)}</span><small>${num(l.landingFpm)} fpm</small></button>`).join('') : '<p class="muted">No flights logged yet.</p>'}</div>
       </div>
     </div>`, { cls: 'wide' });
+};
+
+/** From an aircraft in the air: straight into the 3D view of its flight (the map selects it on the way). */
+ACTIONS['ac-3d'] = el => {
+  const id = el.getAttribute('data-id'); if (!State.live.some(f => f.id === id)) return;
+  showFlightOnMap(id);
+  setTimeout(() => { try { if (v3dSupported()) v3dOpen(id, _curMap(), null); } catch (e) { /* the map shows it */ } }, 700);
 };
