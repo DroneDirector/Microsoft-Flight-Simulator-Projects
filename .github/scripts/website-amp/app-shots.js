@@ -3,7 +3,7 @@
 // The website keeps the same file names, so new versions of the screens simply replace the old ones.
 const { chromium } = require('playwright');
 const file = process.argv[2], out = process.argv[3];
-const clean = `closeAll(); document.querySelectorAll('.toast').forEach(t => t.remove());`;
+const clean = `closeAll(); document.querySelectorAll('.toast, .fp, .bdr, .tour').forEach(t => t.remove());`;
 const click = s => `document.querySelector('${s}').click()`;
 const money = `(function(){ const t = State.txns.filter(x => x.kind === 'revenue' && x.lines && x.lines.length > 2)[0] || State.txns.filter(x => x.kind === 'revenue')[0]; ACTIONS['tx-detail']({ getAttribute: () => t.id }, null); })()`;
 const plan = [
@@ -31,8 +31,13 @@ const plan = [
   const p = await b.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1.5 });
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('file://' + file); await p.waitForTimeout(7000);   // after the five-second start-up screen
-  // no "What's new" or welcome pop-ups in the pictures
-  await p.evaluate(`try { closeAll(); } catch (e) {}`);
+  // past the start screen (its film and menu) into the game, as Continue does
+  await p.evaluate(`try { if (typeof TitleScreen !== 'undefined' && TitleScreen.on) { _tsInput = performance.now(); ACTIONS['ts-continue'](); } } catch (e) {}`);
+  await p.waitForTimeout(3000);
+  // no "What's new" or welcome pop-ups in the pictures, no flight cards, badges or the guided tour
+  await p.evaluate(`try { closeAll(); State.settings.fpOn = false; document.querySelectorAll('.fp-stack, .bdr, .tour').forEach(e => e.remove()); } catch (e) {}`);
+  const onTitle = await p.evaluate(`typeof TitleScreen !== 'undefined' && !!TitleScreen.on`);
+  if (onTitle) { console.log('Still on the start screen: no screenshots taken, the website keeps the previous pictures'); await b.close(); process.exit(0); }
   let failed = 0;
   for (const [name, js, wait] of plan) {
     try {

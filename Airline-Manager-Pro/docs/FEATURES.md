@@ -46,6 +46,11 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | Phone notification when a hired pilot reaches the gate, also with the app closed | Built (setting) |
 | You can't fly hired pilots' aircraft | Built |
 | You fly one aircraft at a time, chosen from your fleet | Built |
+| A water salute the first time your airline lands at an airport: two fire trucks spray an arch of water over the aircraft, at the real airport, with a newspaper story and photo | Built |
+| Gifts and commemorative plaques exchanged with the airport on a first visit, kept under Ranking → Gifts → Aviation Gifts | Built |
+| Your office: your own pet (corgi or kitten) with its own coat, food and water bowls you fill, and a family photo from your look and your partner | Built |
+| Office laptop and Operations computer with their own desktop and apps, full screen | Built |
+| A new career starts with finances on hold until you register the company | Built |
 
 ## Overview widgets
 
@@ -94,6 +99,11 @@ Each widget opens its own page.
 | Fuel prices per airport and day; tankering | Built |
 | Job board: charters and cargo jobs, flown by you or a hired pilot | Built |
 | Tours and a weekly challenge | Built |
+| Schedule refreshes by itself every 30 seconds, with a Refresh button and a countdown | Built |
+| Force departure for a delayed flight at your home hub once the cause is fixed (crew assigned, enough crew, the fault repaired) | Built |
+| Who is missing: for a delay for want of people, the pilot, cabin crew, mechanics and ground crew needed, available and why not | Built |
+| Flight planner: the take-off and landing runway for every flight on a route, by the wind or assigned, with the wind on each runway | Built |
+| Published departures, arrivals and approaches with their real waypoints for 2,900+ US airports (FAA), without the simulator running | Built |
 
 ## Flight logs
 
@@ -206,6 +216,13 @@ Only damage the simulator can actually detect.
 | Pilot messages open the map on that aircraft and follow it | Built |
 | Google Maps style (needs your own Google Cloud billing account and API key) | Possible, not planned |
 | Bing Maps | Not possible: free Bing Maps accounts were shut down in June 2025 |
+| Start screen: a film to its own soundtrack, Continue, New game, Save and Load (20 slots), Options and Quit | Built |
+| Autosave every 5, 10, 15, 25 or 30 minutes in its own slot (setting) | Built |
+| Quit and back to the start screen ask first, then offer to save the game in a slot | Built |
+| Flight pop-ups for each step of your flights: delay, taxi, take-off, departure, approach, landing, taxi in, at the gate; each one can be switched off (setting) | Built |
+| Phone notifications for the same steps, also with the app closed (Android) | Built |
+| Digital clock in the top bar, with the game date | Built |
+| Gifts, plaques and badges as 3D models you turn freely with mouse, touch, keyboard or a game controller (PlayStation, Xbox, Switch Pro), with the controls of the device you use | Built |
 
 ## Crew
 

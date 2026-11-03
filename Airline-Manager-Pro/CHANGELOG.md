@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.104 (2026-11-03)
+
+- Update check reads every page of releases and takes the highest version (GitHub lists 0.9.100+ after 0.9.69, so per_page=30 stopped at 0.9.99); the website's version and download links likewise (site.js, airline-manager-site.php)
+- Website screenshots: app-shots.js enters the game past the start screen and hides pop-ups
+- FEATURES.md: the features since the start screen
+
 ## 0.9.103 (2026-11-03)
 
 - Flight pop-ups (flight-pops.ts: fpWatch, fpShow; phone notifications fnSchedule/fnNow; Settings → Flight pop-ups, all and per step, app and phone)

@@ -29,9 +29,13 @@ const Updater = {
     if (!APP.updates || this.state === 'downloading' || this.state === 'installing') return;
     this.state = 'checking'; updateChanged();
     try {
-      const r = await fetch(`https://api.github.com/repos/${APP.updates.repo}/releases?per_page=30`, { headers: { Accept: 'application/vnd.github+json' } });
+      // GitHub doesn't list releases newest first (0.9.100 comes after 0.9.69), so every page is read and the
+      // highest version wins
+      const page = (n: number) => fetch(`https://api.github.com/repos/${APP.updates.repo}/releases?per_page=100&page=${n}`, { headers: { Accept: 'application/vnd.github+json' } });
+      const r = await page(1);
       if (!r.ok) throw new Error(`The update server answered ${r.status} ${r.statusText}`);
-      const list: any[] = await r.json();
+      let list: any[] = await r.json();
+      for (let n = 2; n <= 5 && list.length === (n - 1) * 100; n++) { try { const rn = await page(n); if (!rn.ok) break; list = list.concat(await rn.json()); } catch (e) { break; } }
       const rel = list.filter(x => !x.draft && String(x.tag_name).indexOf(APP.updates.tagPrefix) === 0)
         .sort((a, b) => cmpVersion(b.tag_name.slice(APP.updates.tagPrefix.length), a.tag_name.slice(APP.updates.tagPrefix.length)))[0];
       try { localStorage.setItem(UPDATE_CHECK_KEY, String(Date.now())); } catch (e) { /* no storage */ }
