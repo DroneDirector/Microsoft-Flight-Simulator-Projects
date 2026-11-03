@@ -6,12 +6,13 @@ interface LookEditOpts {
   sexOnly?: boolean; confirmName?: string; onAccept: (look: Look, identity?: { name: string; dob: string; nat: string }) => void;
 }
 
-let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string } = null;
+let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string; pet?: Pet } = null;
 
 const LE_TABS = [['person', 'Person'], ['face', 'Face'], ['hair', 'Hair'], ['outfit', 'Outfit']];
 
 function openLookEditor(o: LookEditOpts) {
   _le = { o, look: JSON.parse(JSON.stringify(dressed(o.look, o.role))), id: o.identity ? Object.assign({}, o.identity) : null, tab: o.identity ? 'person' : 'face', cam: 'full' };
+  if (o.identity) _le.pet = JSON.parse(JSON.stringify(petData()));   // your own pilot: your pet too
   if (o.sexOnly) _le.tab = 'person';
   _le.cam = leCamForTab(_le.tab);
   openLayer('modal', lookEditorHtml(), { cls: 'full look-pop' });
@@ -51,6 +52,7 @@ function lookEditorBody(): string {
     <div class="le-group"><b>Male or female</b>${leChoice('sex', [['m', 'Male'], ['f', 'Female']], L.sex)}</div>
     <div class="le-group"><b>Skin tone</b>${leSwatches('skin', SKIN_TONES, L.skin)}</div>
     ${id ? leVoiceHtml(L) : ''}`;
+  if (t === 'pet' && _le.pet) return petEditorHtml(_le.pet);
   if (t === 'face') return `
     <div class="le-group"><b>Face shape</b>${leChoice('face', [['oval', 'Oval'], ['round', 'Round'], ['square', 'Square'], ['long', 'Long']], L.face)}</div>
     <div class="le-group"><b>Eyes</b>${leChoice('eyes', [['almond', 'Almond'], ['round', 'Round'], ['mono', 'Monolid']], L.eyes)}</div>
@@ -85,7 +87,7 @@ function lookEditorHtml(): string {
     <div class="le-side">
       <div class="modal-head"><div><h2>${esc(_le.o.title)}</h2><small>${_le.o.sexOnly ? '' : 'Everyone is always in uniform: you can swap any garment, never remove it.'}</small></div>
         <button class="icon-btn" data-act="close-layer" aria-label="Close without saving">${icon('close')}</button></div>
-      ${_le.o.sexOnly ? '' : `<div class="tabs">${LE_TABS.filter(x => x[0] !== 'person' || true).map(x => `<button class="tab ${_le.tab === x[0] ? 'on' : ''}" data-act="le-tab" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>`}
+      ${_le.o.sexOnly ? '' : `<div class="tabs">${LE_TABS.concat(_le.pet ? [['pet', 'Pet']] : []).filter(x => x[0] !== 'person' || true).map(x => `<button class="tab ${_le.tab === x[0] ? 'on' : ''}" data-act="le-tab" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>`}
       <div class="le-body" data-le-body>${lookEditorBody()}</div>
       <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="le-accept">${icon('check')}Accept</button></div>
     </div>
@@ -104,6 +106,7 @@ function leRefresh(body?: boolean) {
   if (body) { const b = $('[data-le-body]'); if (b) b.innerHTML = lookEditorBody(); }
 }
 function leReadIdentity() {
+  if (_le && _le.pet) { const pn = $('[data-pet-name]') as HTMLInputElement; if (pn) _le.pet.name = pn.value.trim().slice(0, 24); }
   if (!_le.id) return;
   const n = $('[data-le-name]') as HTMLInputElement, d = $('[data-le-dob]') as HTMLInputElement, nt = $('[data-le-nat]') as HTMLSelectElement;
   if (n) _le.id.name = n.value.trim() || _le.id.name;
@@ -156,7 +159,7 @@ ACTIONS['le-accept'] = () => {
   leReadIdentity();
   const o = _le.o, look = dressed(_le.look, o.role), id = _le.id;
   const before = JSON.stringify(dressed(o.look, o.role)), changed = JSON.stringify(look) !== before || (o.identity && JSON.stringify(id) !== JSON.stringify(o.identity));
-  const apply = () => { Haptics.success(); o.onAccept(look, id); };
+  const apply = () => { Haptics.success(); if (_le.pet) { (State as any).pet = _le.pet; Store.soon(); } o.onAccept(look, id); };
   // someone who already exists: ask first; "No" keeps the look they have now
   if (o.confirmName && changed) {
     confirmChange(`Change ${o.confirmName}'s appearance?`, 'The new look is used everywhere in the app from now on.', 'Yes, change it', 'No, keep the current look',
@@ -175,3 +178,11 @@ function confirmChange(title: string, body: string, yes: string, no: string, onY
 }
 ACTIONS['confirm-yes'] = () => { const f = (window as any).__confirmYes; (window as any).__confirmYes = (window as any).__confirmNo = null; if (f) f(); };
 ACTIONS['confirm-no'] = () => { const f = (window as any).__confirmNo; (window as any).__confirmYes = (window as any).__confirmNo = null; if (f) f(); else closeTop(); };
+
+ACTIONS['pet-set'] = el => {
+  if (!_le || !_le.pet) return; leReadIdentity();
+  const P: any = _le.pet, k = el.getAttribute('data-k') || '', v = el.getAttribute('data-v') || '';
+  if (k === 'coat' || k === 'bed') P[k] = +v; else if (k === 'white') P.white = v === '1';
+  else { P[k] = v; if (k === 'kind' && v !== 'none' && (!P.name || P.name === 'Buddy' || P.name === 'Mittens')) P.name = v === 'cat' ? 'Mittens' : 'Buddy'; if (k === 'kind' && v === 'cat') P.coat = Math.min(P.coat, PET_COATS.cat.length - 1); }
+  Sound.tick(); leRefresh(true);
+};

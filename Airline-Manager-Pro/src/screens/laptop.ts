@@ -173,14 +173,23 @@ function lapOsHtml(): string {
     <div class="lap-bar"></div>
   </div>`;
 }
+/** The laptop on a small screen (a phone in landscape): laid out as on a laptop at least 1000 by 640, and shrunk as a
+ *  whole to fit, so nothing in it is too big or cut off; on tablets and PCs it simply fills the screen. */
+function lapFit() {
+  const R = Lap.root as HTMLElement, os = R && R.querySelector('.lap-os') as HTMLElement; if (!os || Lap.phone) return;
+  const W = R.clientWidth, H = R.clientHeight, k = Math.min(1, H / 640, W / 1000);
+  if (k >= 0.999 || !W || !H) { os.style.zoom = ''; os.style.width = ''; os.style.height = ''; os.style.right = ''; os.style.bottom = ''; return; }
+  (os.style as any).zoom = String(k); os.style.right = 'auto'; os.style.bottom = 'auto'; os.style.width = (W / k) + 'px'; os.style.height = (H / k) + 'px';
+}
 /** Draw the laptop into its overlay (the office calls this when it opens). */
 function lapMount(root: HTMLElement, phone?: boolean) {
   Lap.root = root; Lap.app = ''; Lap.phone = !!phone; try { mailTick(); } catch (e) { /* later */ }
   root.innerHTML = lapOsHtml();
   lapRender();
+  if (!Lap.phone) { lapFit(); Lap.fit$ = () => lapFit(); window.addEventListener('resize', Lap.fit$); }
   clearInterval(Lap.clock); Lap.clock = setInterval(() => { if (!Lap.root || !Lap.root.isConnected) { clearInterval(Lap.clock); return; } lapBar(); }, 10000);
 }
-function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.phone = false; Lap.bankIn = false; Lap.bankBusy = false; try { clearTimeout(PhA.callT); PhA.calling = null; PhA.callState = ''; PhA.typing = ''; if (PhCall.c) phCallEnd(); } catch (e) { /* none */ } }   // closing the laptop logs you out of the bank
+function lapUnmount() { if (Lap.fit$) { window.removeEventListener('resize', Lap.fit$); Lap.fit$ = null; } lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.phone = false; Lap.bankIn = false; Lap.bankBusy = false; try { clearTimeout(PhA.callT); PhA.calling = null; PhA.callState = ''; PhA.typing = ''; if (PhCall.c) phCallEnd(); } catch (e) { /* none */ } }   // closing the laptop logs you out of the bank
 function lapRefresh() { if (Lap.root && Lap.root.isConnected) lapRender(true); }
 
 function lapRender(soft?: boolean) {

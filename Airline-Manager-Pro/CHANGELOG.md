@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.86 (2026-11-03)
+
+- phone on the screen laid out at 400 by 858 and zoomed to fit (phoneFitScreen); the laptop laid out at least 1000 by 640 and zoomed on small screens (lapFit); a closed laptop window no longer shows its empty frame
+- the laptop and the Operations monitor open inset over the room; a click beside them puts them away (on the phone, picks it up after); with the phone in hand or its screen up, a click on the laptop or monitor puts the phone down first, then opens it (phoneThen)
+- pet3d.ts: your dog or cat asleep in its bed by the bookshelf (own model: breathing, ear twitches, tail flicks, dream paws; tap it and it stirs); chosen in your pilot's look editor (Pet tab: dog, cat or none, name, coat, markings, size, ears, bed); State.pet
+
 ## 0.9.85 (2026-11-03)
 
 - home screen widgets: the adaptive one (more sections and bigger charts as it grows) plus small, medium and large; airline (balance, profit today, next flight, in the air, what needs you; profit, jet fuel and fleet charts) and the tablet (memory, processor, graphics, storage with charts; Free memory, Clean space and Android's Free up space, Refresh); a Tracking on/off button per widget; readings every 15 minutes only while the tablet is awake (inexact, never wakes it)

@@ -3582,3 +3582,9 @@ html.calm .ph-frame, html.calm .ph-screen { transition: none; }
 .flight-card .fc-mini > span { min-width: max-content; }
 /* the flipping digits inside a number are inline (they were stacked by the label rule above) */
 .flight-card.mini .fc-mini b span:not(.fc-cs) { display: inline !important; flex-direction: row; line-height: inherit; }
+/* the phone on the screen: a real phone's size, shrunk as a whole to fit small screens (phoneFitScreen) */
+.ph-frame { height: 858px !important; width: 400px; max-width: none !important; aspect-ratio: auto; zoom: var(--phz, 1); }
+/* the laptop's and the monitor's screens over the room: the room shows round them, and a click there puts them away */
+.office3d .of-planner.lap-screen, .ops3d .of-planner.op-screen { inset: 2.5% 3%; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08); }
+/* a closed window on the laptop is gone (its frame never shows over the desktop) */
+.lap-win[hidden] { display: none !important; }
