@@ -182,6 +182,7 @@
     "src/core/goals.ts",
     "src/core/alliances.ts",
     "src/core/crew-start.ts",
+    "src/core/crew-lease.ts",
     "src/core/career-rides.ts",
     "src/core/ops-decisions.ts",
     "src/screens/hangar3d.ts",
