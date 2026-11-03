@@ -15,10 +15,51 @@ let _revealQ: BadgeDef[] = [], _revealing = false;
 /** Show one or more badges, one after the other (best first). */
 function badgeReveal(list: BadgeDef[]) {
   _revealQ = _revealQ.concat(list.slice().sort((a, b) => b.tier - a.tier));
-  if (!_revealing) badgeRevealNext();
+  if (!_revealing) revealGate();
 }
+
+/* ---------- when a badge or gift is shown ----------
+ * Not while you are working in the Schedule, Dispatch, the Flight planner, Crew, Finance, Routes or Fleet: it waits
+ * until you are back in the Overview. Arriving in the Overview (also when the game starts, with badges and gifts that
+ * came while you were away) it plays after a few seconds; if you tap something before then, it plays first and the
+ * tap is used to close nothing: you tap again for what you wanted. Elsewhere it plays at once. */
+const REVEAL_BUSY = ['schedule', 'dispatch', 'planner', 'pilots', 'finance', 'routes', 'fleet', 'market'];
+const REVEAL_WAIT_MS = 3500;
+let _revealTimer: any = 0, _revealArmed = false, _opsAt = 0;
+function revealGate() {
+  if (_revealing || !_revealQ.length) return;
+  if (typeof TitleScreen !== 'undefined' && TitleScreen.on) return;   // played after the start screen
+  const scr = State.screen;
+  if (REVEAL_BUSY.indexOf(scr) >= 0) { revealDisarm(); return; }     // back in the Overview
+  if (scr === 'ops') {
+    const left = REVEAL_WAIT_MS - (Date.now() - _opsAt);
+    if (left > 0) { if (!_revealArmed) { _revealArmed = true; clearTimeout(_revealTimer); _revealTimer = setTimeout(() => { _revealArmed = false; revealGate(); }, left); } return; }
+  }
+  revealDisarm(); badgeRevealNext();
+}
+function revealDisarm() { _revealArmed = false; clearTimeout(_revealTimer); }
+/** A tap on anything while a reveal is about to start: the reveal starts now, and the tap does nothing else. */
+let _revealSwallow = false;
+document.addEventListener('pointerdown', (e: Event) => {
+  if (!_revealArmed || _revealing || !_revealQ.length) return;
+  const t = e.target as HTMLElement; if (t && t.closest && t.closest('.bdr')) return;
+  e.preventDefault(); e.stopPropagation(); revealDisarm(); badgeRevealNext(); _revealSwallow = true;
+}, true);
+document.addEventListener('click', (e: Event) => { if (_revealSwallow) { _revealSwallow = false; e.preventDefault(); e.stopPropagation(); } }, true);
+(function revealWatchScreens() {
+  const W: any = window, g0 = W.go;
+  if (typeof g0 === 'function') W.go = function (screen: string, instant?: boolean) {
+    const before = State.screen, r = g0.call(this, screen, instant);
+    if (State.screen === 'ops' && before !== 'ops') _opsAt = Date.now();
+    if (State.screen !== before || !_revealArmed) setTimeout(revealGate, 0);
+    return r;
+  };
+  // the start screen closing (Continue, a loaded game): the Overview's wait starts then
+  setInterval(() => { const on = typeof TitleScreen !== 'undefined' && TitleScreen.on; if (on) { W.__revTitle = true; return; } if (W.__revTitle) { W.__revTitle = false; _opsAt = Date.now(); } if (_revealQ.length && !_revealing && !_revealArmed) revealGate(); }, 700);
+})();
 function badgeRevealNext() {
   const b = _revealQ.shift(); if (!b) { _revealing = false; return; }
+  _revealSwallow = false;
   _revealing = true;
   const S: any = State, t = clamp(b.tier, 0, TIER_LOOK.length - 1), L = TIER_LOOK[t], at = (S.badges || {})[b.id];
   const calm = State.settings.reduceMotion, dur = calm ? 300 : 2600 + t * 450;   // the reveal takes longer for rarer badges
@@ -26,15 +67,15 @@ function badgeRevealNext() {
   el.style.setProperty('--c', L[0]); el.style.setProperty('--d', L[1]); el.style.setProperty('--g', L[2]); el.style.setProperty('--T', dur + 'ms');
   el.innerHTML = `<div class="bdr-dim"></div>
     <div class="bdr-beams">${Array.from({ length: 7 + t * 2 }, (_, i) => `<i style="--k:${i};--r:${(i - (7 + t * 2) / 2) * (12 - t)}deg"></i>`).join('')}</div>
-    <div class="bdr-tier">${esc(TIER_NAMES[t])}</div>
+    <div class="bdr-tier">${esc((b as any).rankText || TIER_NAMES[t])}</div>
     <div class="bdr-card"><div class="bdr-in">
       <div class="bdr-back"><span>${brandMark()}</span></div>
       <div class="bdr-front"><div class="bdr-shine"></div>
-        <span class="bdr-rank">${esc(TIER_NAMES[t]).toUpperCase()}</span>
-        <span class="bdr-ic">${icon(b.icon)}</span>
+        <span class="bdr-rank">${esc((b as any).rankText || TIER_NAMES[t]).toUpperCase()}</span>
+        ${(b as any).img ? `<span class="bdr-ic bdr-img"><img src="${(b as any).img}" alt=""></span>` : `<span class="bdr-ic">${icon(b.icon)}</span>`}
         <b class="bdr-title">${esc(b.title)}</b>
         <small class="bdr-desc">${esc(b.desc)}</small>
-        <em class="bdr-date">${at ? 'Earned ' + esc(dateStr(new Date(at)).slice(0, 10)) : ''}</em>
+        <em class="bdr-date">${(b as any).dateText ? esc((b as any).dateText) : at ? 'Earned ' + esc(dateStr(new Date(at)).slice(0, 10)) : ''}</em>
       </div></div></div>
     <div class="bdr-sparks">${Array.from({ length: 18 + t * 6 }, (_, i) => `<i style="--a:${(i * 137.5) % 360}deg;--s:${0.5 + ((i * 7) % 10) / 10};--w:${(i % 5) * 60}ms"></i>`).join('')}</div>
     <div class="bdr-tap">Tap to continue</div>`;
@@ -48,7 +89,7 @@ function badgeRevealNext() {
   el.addEventListener('click', () => {
     if (!el.classList.contains('done')) { clearTimeout(end); el.classList.add('done', 'skip'); return; }   // first tap: straight to the end
     if (closing) return; closing = true;
-    el.classList.add('out'); setTimeout(() => { el.remove(); badgeRevealNext(); }, 380);
+    el.classList.add('out'); setTimeout(() => { el.remove(); _revealing = false; revealGate(); }, 380);
   });
 }
 /** Confetti bursting out from behind the card as it turns over: paper pieces that flutter, spin and fall. */

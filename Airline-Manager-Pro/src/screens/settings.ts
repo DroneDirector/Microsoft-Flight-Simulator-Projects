@@ -228,6 +228,7 @@ const SETTINGS: SetSection[] = [
       <div class="danger-zone"><span><b>Saved on this device</b><small>Your companies are saved automatically and kept when the app updates.</small></span><button class="btn ghost sm danger-txt" data-act="reset-ask">${icon('trash')}Delete everything</button></div>` },
   ] },
   { id: 'backup', title: 'Backup and restore', icon: 'shield', items: [
+    { type: 'choice', key: 'autosaveMin', label: 'Autosave', hint: 'Saves your game by itself in its own Autosave slot, which you can load from the start screen like any other save. This is a real saved game, on top of the automatic backups.', options: [['0', 'Off'], ['5', '5 min'], ['10', '10 min'], ['15', '15 min'], ['25', '25 min'], ['30', '30 min']] },
     { type: 'html', html: () => `<p class="fine-print">${icon('info')}Everything is saved on this phone the moment it changes: settings, looks, staff, fleet, money, flight logs and the link to your PC. When you open the app again it is exactly as you left it, also after updates.</p>` },
     { type: 'html', html: () => {
       const f = Backup.folder, native = !!Backup.tools() || DESKTOP;

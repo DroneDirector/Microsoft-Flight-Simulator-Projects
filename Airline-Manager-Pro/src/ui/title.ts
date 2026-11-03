@@ -94,7 +94,7 @@ function titleHtml(): string {
         ${Store.nogame() ? '' : item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
         ${item('ts-load', 'download', 'Load game', 'Pick up any save')}
         ${item('ts-options', 'gear', 'Options', 'Every setting')}
-        ${item('ts-quit', 'power', 'Quit', 'Hold to close')}
+        ${item('ts-quit', 'power', 'Quit', 'Asks first, offers to save')}
       </nav>
     </div>
     <div class="ts-panel" hidden></div>
@@ -372,6 +372,7 @@ function titleSlots(mode: 'save' | 'load') {
   const auto = mode === 'load' ? SaveSlots.meta().at.map((at: number, i: number) => ({ at, i: i + 1 })).filter((r: any) => r.at).sort((a: any, b: any) => b.at - a.at) : [];
   titlePanel(mode, `<div class="ts-ph"><h2>${mode === 'save' ? 'Save game' : 'Load game'}</h2><button class="ts-x" data-act="ts-panel-close" aria-label="Close">${icon('close')}</button></div>
     <p class="ts-p">${mode === 'save' ? 'Pick a slot. The whole airline is saved: money, staff, every aircraft, where each one is in the air or on the ground, the markets and the other airlines.' : 'Pick a save. Everything goes back to that moment: money, staff, the aircraft (in the air where they were), the markets and the other airlines.'}</p>
+    ${mode === 'load' && typeof autosaveMeta === 'function' && autosaveMeta() ? (() => { const a = autosaveMeta(), d = new Date(a.at); return `<div class="ts-slots"><div class="ts-slot"><button class="ts-sb" data-act="ts-auto-game"><span class="ts-sn">${icon('clock')}</span><span class="ts-si"><b>Autosave · ${esc(a.airline || 'Airline')}</b><small>${esc(a.pilot || '')}${a.pilot ? ' · ' : ''}${esc(dateStr(d).slice(0, 10))} ${esc(d.toTimeString().slice(0, 5))}</small></span></button></div></div>`; })() : ''}
     <div class="ts-slots">${Array.from({ length: GameSaves.N }, (_, i) => row(i + 1)).join('')}</div>
     ${mode === 'save' ? `<div class="ts-danger"><label class="ts-tick"><input type="checkbox" data-ts-delbk><span></span>Also delete the automatic backups</label><button class="ts-pb danger" data-act="ts-delall">${icon('trash')}Delete all saves</button></div>` : ''}
     ${mode === 'load' ? `<h3 class="ts-h3">Automatic backups</h3><div class="ts-slots auto">${auto.length ? auto.map((r: any) => `<button class="ts-slot" data-act="ts-auto-load" data-i="${r.i}"><span class="ts-sn">A${r.i}</span><span class="ts-si"><b>Backup ${r.i}</b><small>${esc(dateStr(new Date(r.at)).slice(0, 10))} ${esc(new Date(r.at).toTimeString().slice(0, 5))}</small></span></button>`).join('') : '<small class="ts-p">None yet.</small>'}</div>
@@ -381,7 +382,7 @@ ACTIONS['ts-none'] = () => { /* empty */ };
 ACTIONS['ts-slot-save'] = el => {
   const i = +(el.getAttribute('data-i') || 0); if (!i) return;
   const has = GameSaves.meta()[i - 1];
-  const go = () => { GameSaves.save(i).then(() => { Haptics.success(); Sound.chime(); toast(`Saved in slot ${i}`, 'ok'); titleSlots('save'); }).catch(() => toast('The save couldn\'t be written', 'warn')); };
+  const go = () => { GameSaves.save(i).then(() => { try { setLastSlot(i); } catch (e) { /* ignore */ } Haptics.success(); Sound.chime(); toast(`Saved in slot ${i}`, 'ok'); titleSlots('save'); }).catch(() => toast('The save couldn\'t be written', 'warn')); };
   if (!has) { go(); return; }
   titleAsk(el, `Overwrite slot ${i}?`, 'Overwrite', go);
 };
@@ -394,7 +395,7 @@ ACTIONS['ts-slot-load'] = el => {
     <p class="ts-p">Are you sure you want to load this save game? The game goes back to that moment, and everything since then that isn't saved in a slot is replaced.</p>
     <div class="ts-row"><button class="ts-pb hot" data-act="ts-load-go" data-i="${i}">${icon('download')}Yes, load it</button><button class="ts-pb" data-act="ts-load">No</button></div>`);
 };
-ACTIONS['ts-load-go'] = el => { const i = +(el.getAttribute('data-i') || 0); if (i) { Sound.tick(); GameSaves.load(i); } };
+ACTIONS['ts-load-go'] = el => { const i = +(el.getAttribute('data-i') || 0); if (i) { Sound.tick(); try { setLastSlot(i); } catch (e) { /* ignore */ } GameSaves.load(i); } };
 ACTIONS['ts-auto-load'] = el => {
   const i = +(el.getAttribute('data-i') || 0); if (!i) return;
   titleAsk(el, 'Are you sure you want to load this backup?', 'Load', () => { SaveSlots.read(i).then((t: string) => { if (!t) { toast('That backup save could not be read', 'warn'); return; } GameSaves.restoreText(t); }).catch(() => toast('That backup save could not be read', 'warn')); });
@@ -412,12 +413,7 @@ function titleAsk(el: HTMLElement, q: string, yes: string, ok: () => void) {
   slot.appendChild(a); Sound.tick();
 }
 
-/** From the game: back to the start screen (the game is saved first). */
-ACTIONS['title-open'] = () => {
-  closeAll(); Sound.tick();
-  try { saveNow(true); } catch (e) { /* ignore */ }
-  titleOpen();
-};
+// Back to the start screen from the game: ACTIONS['title-open'] in quit-save.ts (asks first, then offers to save)
 
 /* ---------- deleting every save ---------- */
 ACTIONS['ts-delall'] = () => {

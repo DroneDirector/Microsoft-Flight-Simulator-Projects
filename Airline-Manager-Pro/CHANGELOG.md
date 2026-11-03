@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.101 (2026-11-03)
+
+- Autosave setting (quit-save.ts: slot game-21, autosaveMeta, Load list row); quit and back-to-title ask, then offer to save (leaveAsk, leaveSave, lastSlot)
+- Gifts on first visit (gifts.ts: giftsExchange, giftLocal, 3D models: plaque, model aircraft, jumper, vase, dish, tin, carving, frame, book); Ranking → Gifts → Aviation Gifts; gift reveal (first time per gift) and a clickable notification (ref gift-)
+- 3D object viewer (viewer3d.ts): drag/pinch/keys/controller with controller drawing per type; badges as 3D medals (badge-3d)
+- Reveal gating (badge-reveal.ts revealGate): waits outside busy screens, a few seconds after reaching the Overview, a tap plays it first
+- Force departure for delayed legs at the home hub once the cause is fixed (schedule.ts forceDepCheck)
+
 ## 0.9.100 (2026-11-03)
 
 - Water salute on an airline's first landing at an airport (salute3d.ts: firstVisitCheck, State.visited seeded from hub, fleet and log book; newsPublish with a photo rendered from the 3D scene, random viewpoint per article; saluteOpen 3D film: trucks, particle water jets, real runways, airport name, sun position, weather and land by country)

@@ -149,6 +149,8 @@
     "src/screens/phone3d.ts",
     "src/screens/pet3d.ts",
     "src/screens/salute3d.ts",
+    "src/ui/viewer3d.ts",
+    "src/screens/gifts.ts",
     "src/screens/phone-apps.ts",
     "src/screens/phone-talk.ts",
     "src/data/stars.ts",
@@ -163,6 +165,7 @@
     "src/core/career-start.ts",
     "src/ui/room-notes.ts",
     "src/ui/title.ts",
+    "src/ui/quit-save.ts",
     "src/main.ts"
   ]
 }

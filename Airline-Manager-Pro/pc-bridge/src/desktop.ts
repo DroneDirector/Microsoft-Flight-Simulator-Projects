@@ -120,7 +120,7 @@ export class Desktop {
    *  twenty saves of the start screen (slot g1 … g20): Documents\\Airline Manager Pro\\saves\\game-1 … game-20.json. */
   private saves(req: http.IncomingMessage, res: http.ServerResponse) {
     const q = new URL(req.url || '', 'http://x').searchParams, sl = q.get('slot') || '', g = /^g(\d+)$/.exec(sl), n = g ? +g[1] : +sl;
-    if (g ? !(n >= 1 && n <= 20) : !(n >= 1 && n <= 5)) { res.writeHead(400); res.end('slot'); return; }
+    if (g ? !(n >= 1 && n <= 21) : !(n >= 1 && n <= 5)) { res.writeHead(400); res.end('slot'); return; }
     const dir = path.join(this.backupDir(), g ? 'saves' : 'backups'), f = path.join(dir, g ? `game-${n}.json` : `save-${n}.json`);
     if (req.method === 'DELETE') { try { fs.unlinkSync(f); } catch (e) { /* not there */ } return json(res, { ok: true }); }
     if (req.method === 'PUT') return readBody(req, b => {
