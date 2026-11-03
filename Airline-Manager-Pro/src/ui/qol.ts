@@ -374,14 +374,22 @@ function textPdf(lines: string[]): string {
 }
 
 /* ---------- the Android home screen widget ---------- */
-let _wgLast = '';
+let _wgLast = '', _wgAt = 0;
 function widgetTick() {
   const cap = (window as any).Capacitor, T = cap && cap.Plugins && cap.Plugins.AppTools; if (!T || !T.widget) return;
   const c = company(); let next = '';
   try { const l = nextLeg(); next = l.from && l.to ? `${l.from} → ${l.to}` : 'No flight planned'; } catch (e) { /* ignore */ }
   const flying = State.live.filter((f: any) => !f.tfc && (f.you || (plane(f.reg) && plane(f.reg).companyId === c.id) || f.coop)).length;
-  const d = { title: c.name, balance: money(c.balance, { compact: true }), next, flying: `${flying} in the air` };
-  const k = JSON.stringify(d); if (k === _wgLast) return; _wgLast = k;
+  // more for the bigger widgets: today's profit and its chart, jet fuel and its chart, the fleet, what needs you, the 3D frame rate
+  let profit = '', hProfit = '', hFuel = '', fuel = '', fleet = '', alerts = '', fps = '';
+  try { const ser: any[] = profitSeries('day') || [], last = ser[ser.length - 1]; if (last) { const v = last.rev - last.cost; profit = (v >= 0 ? '+' : '-') + money(Math.abs(v), { compact: true }) + ' today'; } hProfit = ser.slice(-30).map(x => Math.round(x.rev - x.cost)).join(','); } catch (e) { /* none */ }
+  try { const m: any = (State as any).mkt && (State as any).mkt.fuel; if (m && m.hist) { hFuel = m.hist.slice(-40).map((x: any) => x.v).join(','); const h = m.hist, ch = h.length > 1 ? h[h.length - 1].v - h[h.length - 2].v : 0; fuel = `Jet fuel $${fuelPrice(c.hub).toFixed(2)}/kg ${ch > 0.001 ? '▲' : ch < -0.001 ? '▼' : ''}`.trim(); } } catch (e) { /* none */ }
+  try { const fl = fleetOf(c.id); const st = (k: string) => fl.filter((a: any) => fleetState(a) === k).length; fleet = `${st('flight')} flying · ${st('avail')} ready · ${st('maint')} maint.`; } catch (e) { /* none */ }
+  try { const n = (State as any).incidents.filter((x: any) => x.status === 'open').length + State.notices.filter((x: any) => !x.read).length; alerts = n ? `${n} need${n === 1 ? 's' : ''} you` : ''; } catch (e) { /* none */ }
+  try { fps = (typeof Perf !== 'undefined' && Perf.lastFps) ? String(Perf.lastFps) : ''; } catch (e) { /* none */ }
+  let hFlying = ''; try { const H: number[] = JSON.parse(localStorage.getItem('amp.wgFlying') || '[]'); H.push(flying); while (H.length > 40) H.shift(); localStorage.setItem('amp.wgFlying', JSON.stringify(H)); hFlying = H.join(','); } catch (e) { /* none */ }
+  const d = { title: c.name, balance: money(c.balance, { compact: true }), next, flying: `${flying} in the air`, profit, fleet, alerts, fuel, fps, hProfit, hFuel, hFlying };
+  const k = JSON.stringify(Object.assign({}, d, { hFlying: '' })); if (k === _wgLast && Date.now() - _wgAt < 5 * 60000) return; _wgLast = k; _wgAt = Date.now();
   Promise.resolve(T.widget(d)).catch(() => { /* older app */ });
 }
 
