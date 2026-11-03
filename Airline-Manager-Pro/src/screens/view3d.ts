@@ -440,6 +440,10 @@ function v3dBuildAirport(L: AirportLayout) {
   // generic airport buildings: glass and steel terminal fronts (large buildings) or office windows (smaller
   // ones), a light roof with plant on it; the windows lit at night
   let bTex: any = null; try { bTex = v3dBuildingTextures(); } catch (e) { /* plain buildings */ }
+  // all the buildings are joined into three pieces (roofs, terminal fronts, office walls), so the phone handles three
+  // things to draw instead of two for every building (BufferGeometryUtils; each building on its own if that fails)
+  const joinB: { roof: any[]; terminal: any[]; office: any[] } = { roof: [], terminal: [], office: [] }, BGU: any = (window as any).BufferGeometryUtils;
+  const part = (geo: any, gr: any) => { const o = new T.BufferGeometry(); for (const k of ['position', 'normal', 'uv']) { const at = geo.attributes[k]; if (!at) continue; o.setAttribute(k, new T.BufferAttribute(at.array.slice(gr.start * at.itemSize, (gr.start + gr.count) * at.itemSize), at.itemSize)); } return o; };
   for (const a of L.areas || []) {
     if (a.k === 'apron' || a.pts.length < 3) continue;
     try {   // one odd building outline never stops the rest of the airport
@@ -448,8 +452,16 @@ function v3dBuildAirport(L: AirportLayout) {
     let area = 0; for (let i = 0, n = a.pts.length; i < n; i++) { const p = a.pts[i], q = a.pts[(i + 1) % n]; area += p[0] * q[1] - q[0] * p[1]; } area = Math.abs(area) / 2;
     const big = area > 6000, hgt = big ? 16 : area > 1500 ? 12 : 9;
     const geo = new T.ExtrudeGeometry(sh, { depth: hgt, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, gy(c[0], c[1]) - 0.5, 0);
-    const bm = new T.Mesh(geo, bTex ? [bTex.roof, big ? bTex.terminal : bTex.office] : new T.MeshLambertMaterial({ color: 0xC9CDD2 })); bm.renderOrder = 9; g.add(bm);
+    if (bTex && BGU && BGU.mergeGeometries && !geo.index && geo.groups.length >= 2) {
+      for (const gr of geo.groups) (gr.materialIndex === 0 ? joinB.roof : big ? joinB.terminal : joinB.office).push(part(geo, gr));
+      geo.dispose();
+    } else { const bm = new T.Mesh(geo, bTex ? [bTex.roof, big ? bTex.terminal : bTex.office] : new T.MeshLambertMaterial({ color: 0xC9CDD2 })); bm.renderOrder = 9; g.add(bm); }
     } catch (e) { /* skip this building */ }
+  }
+  for (const k of ['roof', 'terminal', 'office'] as ('roof' | 'terminal' | 'office')[]) {
+    const list = joinB[k]; if (!list.length) continue;
+    try { const m = new T.Mesh(BGU.mergeGeometries(list, false), bTex[k]); m.renderOrder = 9; g.add(m); for (const geo of list) geo.dispose(); }
+    catch (e) { for (const geo of list) { const m = new T.Mesh(geo, bTex[k]); m.renderOrder = 9; g.add(m); } }
   }
   // the airport's ground paint, drawn from its own layout into one picture and laid over the terrain like a sheet
   try { const lt = v3dAirportLights(L, loc, gy); if (lt) g.add(lt); } catch (e) { /* no lights */ }
@@ -464,7 +476,7 @@ function v3dBuildAirport(L: AirportLayout) {
     for (let k = 0; k < pos.count; k++) { const x = pos.getX(k), z = pos.getZ(k), wx = q[0] + x * cs + z * sn, wz = q[1] - x * sn + z * cs; pos.setXYZ(k, wx, gy(wx, wz) + 0.5, wz); }
     pos.needsUpdate = true; geo.computeBoundingSphere();
     const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 })); m.renderOrder = 4;
-    g.add(m);
+    g.add(m); (g.userData.rwyMats = g.userData.rwyMats || []).push(m.material);   // darker when wet (v3d-wet.ts)
   }
   // the airport built before goes (its geometry and its own pictures; the buildings' shared facade materials stay)
   if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { try { if (o.geometry) o.geometry.dispose(); if (o.material && !Array.isArray(o.material) && o.material.map && o.material.map.dispose) o.material.map.dispose(); } catch (e) { /* gone already */ } }); }
@@ -629,6 +641,7 @@ function v3dLoop(now: number) {
   v3dPrefetch(f, w0);
   if (V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
   v3dLoaderTick(now);
+  try { v3dWetTick(now); } catch (e) { /* dry */ }
 
   // aircraft within about 40 km
   const seen: { [id: string]: boolean } = {};
@@ -751,6 +764,10 @@ function v3dLoop(now: number) {
     const PA: any = P; if (s.gear && s.gear.floats) { const wantA = v3dAmphibWheels(g, w, ph); PA.amph = PA.amph == null ? wantA : PA.amph + (wantA - PA.amph) * Math.min(1, dt * 0.6); }
     if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI, amphib: PA.amph } as any);
     try { v3dEmergencyStep(P, g, fireI, feI, now, ground, w); } catch (e) { /* no effects */ }
+    try { v3dContrailStep(P, g, w, now); } catch (e) { /* no trail */ }
+    try { v3dHazeStep(P, w, now); } catch (e) { /* no haze */ }
+    try { v3dGroundStep(P, g, w, now); } catch (e) { /* no vehicles */ }
+    try { (P as any).reg = g.reg; v3dLodStep(P); } catch (e) { /* full model */ }
     // the air blown forward out of the open reversers kicks up spray and dust from the runway
     if (PR.rev > 0.6 && now - (PR.revAt || 0) > 90) {
       PR.revAt = now; const body = P.model.userData.body; body.updateMatrixWorld();
@@ -776,7 +793,11 @@ function v3dLoop(now: number) {
     if (PA.amph && P.model.userData.body && P.model.userData.body.userData.ampLift) P.model.position.y += P.model.userData.body.userData.ampLift * PG.gw;   // standing on the wheels below the floats
     P.model.rotateZ(-(P.pitch + tm[2]) * D2R);   // nose up
     P.model.rotateX(-(P.bank + tm[1]) * D2R);   // a turn to the right lowers the right wing
-    (P.model.userData as any).flex = tm[3] * Math.max(0.5, shapeOf(P.type).span / 30);
+    // the wings carry the aircraft: on the ground they droop a little under their own weight and the fuel, in the air
+    // they bend up with the lift (more in a turn and as the nose comes up at rotation), and turbulence flexes them
+    { const PW: any = P, g1 = w.onGround ? (PS.tdAt && now - PS.tdAt < 1500 ? -0.25 : -0.12) : 0.55 / Math.max(0.6, Math.cos(P.bank * D2R)) + (w.altM - ground < 60 && P.pitch > 4 ? 0.15 : 0);
+      PW.flexBase = PW.flexBase == null ? g1 : PW.flexBase + (g1 - PW.flexBase) * Math.min(1, dt * (w.onGround ? 3 : 1.2));
+      (P.model.userData as any).flex = (PW.flexBase + tm[3]) * Math.max(0.5, shapeOf(P.type).span / 30); }
     // touchdown: tyre smoke from the main wheels (left behind on the runway as the aircraft rolls on)
     if (touched) { PS.smokeUntil = now + 900; PS.smokeAt = 0; PS.smokeK = g.you && (State as any).lastTouchdown ? clamp(Math.abs((State as any).lastTouchdown.fpm || 150) / 200, 0.7, 2) : 1; }
     if (PS.smokeUntil > now && now - (PS.smokeAt || 0) > 40) {
@@ -790,7 +811,7 @@ function v3dLoop(now: number) {
     void s;
   }
   v3dSmokeStep(dt);
-  for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); delete V3d.planes[id]; }
+  for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); const PC: any = P; if (PC.ct) for (const r of PC.ct.rb) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } delete V3d.planes[id]; }
 
   // the camera follows the aircraft (or flies freely)
   const P = V3d.planes[f.id];

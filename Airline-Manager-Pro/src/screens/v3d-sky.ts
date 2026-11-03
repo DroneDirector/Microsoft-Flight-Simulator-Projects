@@ -166,6 +166,18 @@ ${SPOT_GLSL}
   // water only where the ground is water: flat, at the water's own level (never on a slope or on land)
   float wet = texture2D(uWet, vUv2).r * smoothstep(0.85, 1.0, vFlat);
   if (uMirrorPass > 0.5 && wet > 0.5) discard;
+  // cliffs and steep slopes: the ground's picture is taken from straight above, so on a near-vertical face it would
+  // smear into streaks; there the face is shaded as rock instead, in the area's own colour, lit by the sun
+  {
+    vec3 nrm = normalize(cross(dFdx(vWpos), dFdy(vWpos))); if (nrm.y < 0.0) nrm = -nrm;
+    float steep = smoothstep(0.62, 0.32, nrm.y) * (1.0 - smoothstep(0.2, 0.5, wet));
+    if (steep > 0.001) {
+      vec3 area = textureLod(map, vMapUv, 4.5).rgb;
+      float lit = 0.62 + 0.5 * max(dot(nrm, normalize(uSun)), 0.0) * uSunVis;
+      float strata = 0.9 + 0.1 * wvn(vec2(vWpos.y * 0.22, (vWpos.x + vWpos.z) * 0.035)) + 0.06 * wvn(vec2(vWpos.y * 1.3, (vWpos.x - vWpos.z) * 0.2));
+      diffuseColor.rgb = mix(diffuseColor.rgb, area * lit * strata, steep);
+    }
+  }
   vec3 cityL = vec3(0.0);
   if (uCityOn > 0.5 && uNight > 0.01) { vec3 cc = texture2D(uCity, vUv2).rgb; float lum = max(dot(cc, vec3(0.35, 0.45, 0.2)) - 0.09, 0.0) / 0.91; cityL = vec3(1.0, 0.7, 0.36) * pow(lum, 1.5) * 1.5 * uNight * (1.0 - smoothstep(0.3, 0.6, wet)); }
   if (uWater > 0.5 && wet > 0.25) {
@@ -554,6 +566,8 @@ function v3dSkyStep(now: number) {
 }
 
 /* ---------- airport lights ---------- */
+/** Glow around lights at night (Settings → Graphics: on by default on the PC, off on phones and tablets). */
+function v3dHalo(): number { const v = (State.settings as any).v3dGlow; return (v == null ? hiQ() : !!v) ? 1 : 0; }
 function v3dLightPoints(pos: number[], col: number[], size: number[], kind?: number[], dir?: number[], phase?: number[]): any {
   const T = THREE, U = v3dSkyUniforms(), geo = new T.BufferGeometry(), n = size.length;
   geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new T.Float32BufferAttribute(col, 3));
@@ -562,12 +576,12 @@ function v3dLightPoints(pos: number[], col: number[], size: number[], kind?: num
   geo.setAttribute('aDir', new T.Float32BufferAttribute(dir || new Array(n * 3).fill(0), 3));
   geo.setAttribute('aPhase', new T.Float32BufferAttribute(phase || new Array(n).fill(0), 1));
   const mat = new T.ShaderMaterial({
-    uniforms: { uOn: U.uLightsOn, uScale: U.uPxScale, uTime: U.uTime, uGlow: U.uGlow, uFlags: { value: new T.Vector4(1, 1, 1, 0) }, uFlags2: { value: new T.Vector4(0, 0, 0, 0) }, uAlways: { value: 0 } },
+    uniforms: { uOn: U.uLightsOn, uScale: U.uPxScale, uTime: U.uTime, uGlow: U.uGlow, uFlags: { value: new T.Vector4(1, 1, 1, 0) }, uFlags2: { value: new T.Vector4(0, 0, 0, 0) }, uAlways: { value: 0 }, uHalo: { value: v3dHalo() } },
     transparent: true, depthWrite: false, blending: T.AdditiveBlending, vertexColors: true, fog: false,
     vertexShader: `#include <common>
 #include <logdepthbuf_pars_vertex>
 attribute float aSize; attribute float aKind; attribute vec3 aDir; attribute float aPhase;
-uniform float uScale; uniform float uTime; uniform vec4 uFlags; uniform vec4 uFlags2; varying vec3 vCol; varying float vOn; varying float vDay;
+uniform float uScale; uniform float uHalo; uniform float uTime; uniform vec4 uFlags; uniform vec4 uFlags2; varying vec3 vCol; varying float vOn; varying float vDay;
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   float on = uFlags.x;
@@ -589,17 +603,17 @@ void main() {
   }
   vOn = on;
   vec4 mv = viewMatrix * wp;
-  gl_PointSize = clamp(aSize * (aKind > 2.5 && aKind < 4.5 ? 1.0 + on : 1.0) * uScale / max(1.0, -mv.z), 1.6, 34.0);
+  gl_PointSize = clamp(aSize * (aKind > 2.5 && aKind < 4.5 ? 1.0 + on : 1.0) * (1.0 + uHalo * 1.6) * uScale / max(1.0, -mv.z), 1.6, 34.0 * (1.0 + uHalo * 1.6));
   gl_Position = projectionMatrix * mv;
   #include <logdepthbuf_vertex>
 }`,
     fragmentShader: `#include <common>
 #include <logdepthbuf_pars_fragment>
-uniform float uOn; uniform float uGlow; uniform float uAlways; varying vec3 vCol; varying float vOn; varying float vDay;
+uniform float uOn; uniform float uGlow; uniform float uAlways; uniform float uHalo; varying vec3 vCol; varying float vOn; varying float vDay;
 void main() {
   #include <logdepthbuf_fragment>
-  float d = length(gl_PointCoord - 0.5) * 2.0;
-  float a = (exp(-d * d * 5.0) + 0.6 * exp(-d * d * 40.0)) * vOn * max(max(uOn, uAlways), vDay) * max(uGlow, vDay * 0.9);
+  float d = length(gl_PointCoord - 0.5) * 2.0 * (1.0 + uHalo * 1.6);
+  float a = (exp(-d * d * 5.0) + 0.6 * exp(-d * d * 40.0) + uHalo * 0.22 * exp(-d * d * 0.8)) * vOn * max(max(uOn, uAlways), vDay) * max(uGlow, vDay * 0.9);
   gl_FragColor = vec4(vCol * 1.4, clamp(a, 0.0, 1.0));
 }` });
   const pts = new T.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 20;
@@ -610,7 +624,8 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
   if (!skyOpt('v3dAptLights')) return null;
   const pos: number[] = [], col: number[] = [], size: number[] = [];
   const kind: number[] = [], dirs: number[] = [], phs: number[] = [];
-  const add = (x: number, z: number, h: number, c: number[], s: number, k?: number, d?: number[], ph?: number) => { pos.push(x, gy(x, z) + h, z); col.push(c[0], c[1], c[2]); size.push(s); kind.push(k || 0); dirs.push(...(d || [0, 0, 0])); phs.push(ph || 0); };
+  let rwy = true; const wp: number[] = [], wc: number[] = [], wg: number[] = [];   // runway lights, for their reflections on a wet runway
+  const add = (x: number, z: number, h: number, c: number[], s: number, k?: number, d?: number[], ph?: number) => { if (rwy && !(k > 0)) { const g0 = gy(x, z); wp.push(x, g0 + h, z); wc.push(c[0], c[1], c[2]); wg.push(g0); } pos.push(x, gy(x, z) + h, z); col.push(c[0], c[1], c[2]); size.push(s); kind.push(k || 0); dirs.push(...(d || [0, 0, 0])); phs.push(ph || 0); };
   const W = [1, 0.95, 0.85], RED = [1, 0.15, 0.1], GRN = [0.2, 1, 0.45], BLU = [0.25, 0.45, 1], AMB = [1, 0.75, 0.25], FLOOD = [1, 0.72, 0.42];
   for (const r of L.runways) {
     if (r.surf === 9) continue;
@@ -658,6 +673,7 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
       }
     }
   }
+  rwy = false;
   // taxiways: green centre line every 30 m, blue edges every 60 m
   for (const p of L.paths || []) {
     if (!(p[0] === 1 || p[0] === 4)) continue;
@@ -673,8 +689,9 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
   for (const m of masts) add(m[0], m[1], 27, FLOOD.map(v => v * 0.75), 7);
   if (!size.length) return null;
   const pts = v3dLightPoints(pos, col, size, kind, dirs, phs);
-  if (!masts.length) return pts;
-  const grp = new THREE.Group(); grp.add(pts); grp.add(v3dMastMeshes(masts, gy));
+  const wet = typeof v3dWetReflections === 'function' ? v3dWetReflections(wp, wc, wg) : null;
+  if (!masts.length && !wet) return pts;
+  const grp = new THREE.Group(); grp.add(pts); if (masts.length) grp.add(v3dMastMeshes(masts, gy)); if (wet) grp.add(wet);
   return grp;
 }
 

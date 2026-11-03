@@ -7,6 +7,9 @@ on:
     branches: [amp-0.5.1-work]
     paths: ['Airline-Manager-Pro/tools/shots/**', '.github/workflows/airline-manager-pro-shots.yml']
 
+permissions:
+  contents: write
+
 jobs:
   shots:
     runs-on: ubuntu-latest
@@ -25,6 +28,20 @@ jobs:
           sleep 2; mkdir -p /tmp/terrain
           NODE_PATH=/tmp/pw/node_modules node Airline-Manager-Pro/tools/shots/terrain-shots.js /tmp/terrain
           pip install -q pillow && python3 Airline-Manager-Pro/tools/shots/grid.py /tmp/terrain /tmp/terrain/sheets
+      - name: Put the pictures on the branch amp-shots
+        if: always()
+        run: |
+          mkdir -p /tmp/out && cp /tmp/terrain/sheets/*.jpg /tmp/out/ 2>/dev/null || true
+          python3 - <<'PY'
+          import glob, os
+          from PIL import Image
+          for f in glob.glob('/tmp/terrain/*.png'):
+              im = Image.open(f).convert('RGB'); im.thumbnail((1280, 1280)); im.save('/tmp/out/' + os.path.basename(f)[:-4] + '.jpg', quality=88)
+          PY
+          cd /tmp/out && git init -q && git checkout -q -b amp-shots
+          git config user.name "DroneDirector"; git config user.email "simon@dronedirector.fo"
+          git add . && git commit -qm "Terrain pictures from run ${{ github.run_id }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" amp-shots
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: terrain-pictures, path: /tmp/terrain, retention-days: 14 }

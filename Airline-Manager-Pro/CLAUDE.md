@@ -17,7 +17,8 @@
 - **Shape and 3D model**: every type gets an entry in `src/data/aircraft-shapes.ts` from its published
   dimensions (length, span, height, fuselage, wing position/chords/sweep, engines, tail, nose, wingtips,
   gear). The aircraft pictures and the 3D view are built from it, so a new type looks like itself.
-  Our own models only: no downloaded third-party models and no manufacturers' or airlines' logos.
+  Our own models only: no downloaded third-party models and no manufacturers' or airlines' logos. The owner may later
+  put models he has bought (with a licence for commercial sale) in `www/models/` (see the rule on replaceable models).
 - **Runways and capacity**: every type also gets its take-off and landing field lengths, minimum runway width
   and rough-strip ability (`src/core/runway-req.ts`), and its typical/all-economy/maximum seats
   (`src/data/capacity.ts`), listed in `docs/reference/runway-requirements.txt`.
@@ -47,6 +48,11 @@
 - Always build and release the phone app and the PC app together.
 - Work goes to branch `amp-0.5.1-work`; merging to `main` releases (the build runs on `Airline-Manager-Pro/**` changes on main).
 - Never put registration keys or reactivation codes in this (public) repository: only their fingerprints.
+- **Replaceable models**: every aircraft type, ground vehicle, the jet bridge and the people (per gender and group of
+  looks) have a file name in `www/models/` (`src/graphics/models.ts`; the build writes `www/models/README.md` with
+  every name). A `.glb` there is used instead of the app's own model everywhere that model appears; without it, the
+  app's own model. Anything new of these kinds (a new aircraft type, a new vehicle, new people) gets its file name
+  and goes through `Models.swap` / `modelsPeople` the same way, in the same change.
 - **The PC gets extra quality** (`hiQ()` in `src/core/util.ts`, true in the PC app): real lights and shadows instead of
   drawn ones, bigger shadow maps, a higher pixel ratio, sharper pictures and finer detail. Anything made lighter for
   phones and tablets stays full quality on the PC. Applies to everything from the seven batches of 0.9.105–0.9.111 on.

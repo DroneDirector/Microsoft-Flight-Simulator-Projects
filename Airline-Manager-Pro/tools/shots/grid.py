@@ -3,7 +3,7 @@ import sys, os
 from PIL import Image, ImageDraw, ImageFont
 src, dst = sys.argv[1], sys.argv[2]
 os.makedirs(dst, exist_ok=True)
-CF = [('before', 'Before (0.9.112)'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('veryhigh', 'Very high'), ('ultra', 'Ultra (PC)')]
+CF = [('before', 'Medium, no smoothing'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('veryhigh', 'Very high'), ('ultra', 'Ultra (PC)')]
 try: font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 30)
 except Exception: font = ImageFont.load_default()
 for look in ('map', 'sat'):

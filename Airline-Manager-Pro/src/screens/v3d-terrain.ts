@@ -44,8 +44,34 @@ function v3dSoften(H: Float32Array, size: number, step: number): Float32Array {
       for (let y = 0; y < size; y++) { a[y * size + x] = sum / n; const yo = y - rad, yi = y + rad + 1; if (yo >= 0) { sum -= b[yo * size + x]; n--; } if (yi < size) { sum += b[yi * size + x]; n++; } } }
   }
   // the sea and the shore stay as they were (soften only land that is clearly above the sea)
-  for (let i = 0; i < H.length; i++) if (H[i] <= 2) a[i] = H[i];
   return a;
+}
+/** How far each pixel is from the coast (pixels; + on land, − at sea), from the sea mask: two passes of a chamfer
+ *  distance. The ground's height near the coast follows it, so the coastline (where the ground meets the sea's
+ *  level surface) runs where the map has it, smoothly between the ground's points instead of along their grid. */
+function v3dCoastDist(size: number, sea: (i: number) => boolean): Float32Array {
+  const n = size * size, INF = 1e6, dl = new Float32Array(n), ds = new Float32Array(n), D = 1, Dg = 1.4142;
+  for (let i = 0; i < n; i++) { const s = sea(i); dl[i] = s ? 0 : INF; ds[i] = s ? INF : 0; }
+  for (const d of [dl, ds]) {
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) { const i = y * size + x; let v = d[i];
+      if (x > 0) v = Math.min(v, d[i - 1] + D); if (y > 0) { v = Math.min(v, d[i - size] + D); if (x > 0) v = Math.min(v, d[i - size - 1] + Dg); if (x < size - 1) v = Math.min(v, d[i - size + 1] + Dg); } d[i] = v; }
+    for (let y = size - 1; y >= 0; y--) for (let x = size - 1; x >= 0; x--) { const i = y * size + x; let v = d[i];
+      if (x < size - 1) v = Math.min(v, d[i + 1] + D); if (y < size - 1) { v = Math.min(v, d[i + size] + D); if (x < size - 1) v = Math.min(v, d[i + size + 1] + Dg); if (x > 0) v = Math.min(v, d[i + size - 1] + Dg); } d[i] = v; }
+  }
+  const out = new Float32Array(n); for (let i = 0; i < n; i++) out[i] = dl[i] > 0 ? dl[i] - 0.5 : -(ds[i] - 0.5);
+  return out;
+}
+/** The sea's level surface under the whole view (curving with the earth), with the living water on it. */
+function v3dSeaPlane(x0: number, z0: number, x1: number, z1: number) {
+  const T = THREE, n = 96, geo = new T.PlaneGeometry(1, 1, n, n); geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, flat = new Float32Array(pos.count).fill(1);
+  for (let k = 0; k < pos.count; k++) { const x = x0 + (pos.getX(k) + 0.5) * (x1 - x0), z = z0 + (pos.getZ(k) + 0.5) * (z1 - z0); pos.setXYZ(k, x, -v3dCurve(x, z), z); }
+  pos.needsUpdate = true; geo.setAttribute('aFlat', new T.BufferAttribute(flat, 1)); geo.computeBoundingSphere();
+  const one = (r: number, g: number, b: number) => { const c = document.createElement('canvas'); c.width = c.height = 2; const x = c.getContext('2d') as CanvasRenderingContext2D; x.fillStyle = `rgb(${r},${g},${b})`; x.fillRect(0, 0, 2, 2); const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; return t; };
+  const VT: any = V3dTerrain;
+  if (VT.seaPlane) { V3d.scene.remove(VT.seaPlane); VT.seaPlane.geometry.dispose(); }
+  const m = new T.Mesh(geo, v3dGroundMat(one(4, 11, 22), one(255, 255, 255))); m.renderOrder = -30; m.frustumCulled = false;
+  VT.seaPlane = m; V3d.scene.add(m);
 }
 function v3dSatQ(): number { const v = (State.settings as any).v3dSatQ; return v == null ? 1 : clamp(Math.round(+v), 0, 3); }
 
@@ -79,6 +105,7 @@ const V3dTerrain = {
     next(0);
   },
   clear() {
+    { const VT: any = V3dTerrain; if (VT.seaPlane) { V3d.scene.remove(VT.seaPlane); VT.seaPlane.geometry.dispose(); VT.seaPlane = null; VT.seaSpan = 0; } }
     for (const r of this.rings) { if (r.mesh) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } if (r.mapTex) r.mapTex.dispose(); if (r.satTex) r.satTex.dispose(); const R: any = r; if (R.wetTex) R.wetTex.dispose(); if (R.cityTex) R.cityTex.dispose(); if (r.mesh && r.mesh.material) r.mesh.material.dispose(); }
     this.rings = [];
   },
@@ -211,7 +238,7 @@ const V3dTerrain = {
         const lift = clamp(H[i] / 2200, 0, 1);
         R = 11 * shade + 16 * lift; G = 29 * shade + 24 * lift; B = 51 * shade + 30 * lift;
         // the coast, as on the map
-        if ((x > 0 && water(i - 1)) || (x < size - 1 && water(i + 1)) || (y > 0 && water(i - size)) || (y < size - 1 && water(i + size))) { R = 63; G = 208; B = 232; }
+        if (H[i] < 25 && ((x > 0 && water(i - 1)) || (x < size - 1 && water(i + 1)) || (y > 0 && water(i - size)) || (y < size - 1 && water(i + size)))) { R = 63; G = 208; B = 232; }
       }
       D[i * 4] = R; D[i * 4 + 1] = G; D[i * 4 + 2] = B; D[i * 4 + 3] = 255;
     }
@@ -221,49 +248,84 @@ const V3dTerrain = {
     // the mesh: finest near the aircraft; the part an inner ring covers is left out
     const G = Math.round((r.z >= 12 ? 220 : r.z >= 10 ? 140 : 110) * TERRAIN_DENSITY[v3dTerrainQ()]);
     const Hs = v3dTerrainSmooth() ? v3dSoften(H, size, size / G) : H;
+    // near its edge a ring takes on the coarser shape of the ring around it (which has half its detail), so the two
+    // meet at the same height instead of a step
+    const outer = this.rings.length < v3dRange(this.origin ? this.origin[1] : 50).rings.length - 1;   // rings are built finest first
+    const Hc = outer ? v3dSoften(H, size, 2 * size / G) : null;
     const lonOf = (px: number) => (r.x0 + px / 256) / n * 360 - 180;
     const latOf = (py: number) => { const k = Math.PI - 2 * Math.PI * (r.y0 + py / 256) / n; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
     const aptLL = V3d.icao ? apt(V3d.icao).pos : null, aElev = V3d.elev || 0;
+    // the ground is levelled only where the airport is (a big airport's runways reach further), blending out over
+    // a good distance beyond, so no terrace is cut into the hills around it
+    const aBig = V3d.icao && aptSize(V3d.icao) === 2, aR0 = aBig ? 2600 : 1500, aR1 = aR0 + (aBig ? 1800 : 1500);
     const pos = new Float32Array((G + 1) * (G + 1) * 3), uv = new Float32Array((G + 1) * (G + 1) * 2), idx: number[] = [], mh = new Float32Array((G + 1) * (G + 1));
     const flat = new Float32Array((G + 1) * (G + 1));   // 1 where the mesh is water: flat, at the water's level
+    // the coast: distance in metres from it (+ land, − sea), from the map's sea outline
+    const SD = v3dCoastDist(size, sea), CLIFF = 3;   // near the coast the ground rises at most 3 m for each metre inland
+    const sdAt = (px: number, py: number) => { const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
+      return (SD[i] * (1 - fx) * (1 - fy) + SD[i + 1] * fx * (1 - fy) + SD[i + size] * (1 - fx) * fy + SD[i + size + 1] * fx * fy) * mPerPx; };
     const sample = (px: number, py: number) => {
       const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
-      const h = Hs[i] * (1 - fx) * (1 - fy) + Hs[i + 1] * fx * (1 - fy) + Hs[i + size] * (1 - fx) * fy + Hs[i + size + 1] * fx * fy;
+      let h = Hs[i] * (1 - fx) * (1 - fy) + Hs[i + 1] * fx * (1 - fy) + Hs[i + size] * (1 - fx) * fy + Hs[i + size + 1] * fx * fy;
+      if (Hc) { const e = Math.max(Math.abs(px / size - 0.5), Math.abs(py / size - 0.5)) * 2, t = clamp((e - 0.8) / 0.18, 0, 1);
+        if (t > 0) { const hc = Hc[i] * (1 - fx) * (1 - fy) + Hc[i + 1] * fx * (1 - fy) + Hc[i + size] * (1 - fx) * fy + Hc[i + size + 1] * fx * fy; h += (hc - h) * t * t * (3 - 2 * t); } }
       const k = Math.round(y) * size + Math.round(x);
       return { h, wet: sea(k), lake: !sea(k) && water(k) ? H[k] : null };
     };
     for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
       const px = i / G * size, py = j / G * size, lon = lonOf(px), lat = latOf(py);
       const s = sample(px, py);
-      let h = Math.max(0, s.h), wl = -1;
-      if (s.wet) { h = 0; wl = 0; }                                  // the sea: perfectly flat, at sea level
-      else if (s.lake != null) { h = Math.max(0, s.lake); wl = h; }  // a lake: flat at its own level
-      if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
+      // the sea is a level surface of its own (v3dSeaPlane); the ground runs on beneath it, and near the coast its height
+      // follows the distance from the coast, so the two meet exactly along the map's coastline
+      const sd = sdAt(px, py);
+      let h = Math.max(0.6, s.h), wl = -1, y = 0;
+      if (s.lake != null && !s.wet) { h = Math.max(0, s.lake); wl = h; }  // a lake: flat at its own level
+      if (s.wet) { y = Math.max(-40, Math.min(sd, -0.3) * CLIFF); h = 0; }
+      else if (wl < 0) { y = h = Math.min(h, Math.max(0.6, sd * CLIFF + 0.6)); }
+      else y = h;
+      if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - aR0) / (aR1 - aR0), 0, 1); h = aElev + (h - aElev) * k; }
       const p = v3dXY(lon, lat), o = j * (G + 1) + i;
       flat[o] = wl >= 0 && Math.abs(h - wl) < 0.5 ? 1 : 0;
       // outer rings sit a little lower so the finer ring always shows where they meet
-      mh[o] = h - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0);
-      pos[o * 3] = p[0]; pos[o * 3 + 1] = mh[o] - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
+      if (aptLL && !s.wet) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - aR0) / (aR1 - aR0), 0, 1); y = aElev + (y - aElev) * k; }
+      mh[o] = h - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0);   // the surface (the sea's at sea), for what stands or floats on it
+      // land never dips under the sea's surface (the small offsets above are for where rings and the airport meet)
+      pos[o * 3] = p[0]; pos[o * 3 + 1] = (s.wet ? y : wl >= 0 ? mh[o] : Math.max(Math.min(h, 0.5), mh[o])) - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
       uv[o * 2] = i / G; uv[o * 2 + 1] = 1 - j / G;
     }
-    const inside = (lon: number, lat: number) => {
-      const q = r.inner; if (!q) return false;
-      const qn = 1 << q.z, w0 = q.x0 / qn * 360 - 180, w1 = (q.x0 + q.N) / qn * 360 - 180;
-      const lt = (y: number) => { const k = Math.PI - 2 * Math.PI * y / qn; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
-      const n0 = lt(q.y0), s0 = lt(q.y0 + q.N), padX = (w1 - w0) * 0.02, padY = (n0 - s0) * 0.02;
-      return lon > w0 + padX && lon < w1 - padX && lat < n0 - padY && lat > s0 + padY;
-    };
+    // where the finer ring lies: this ring's ground there sinks well below it (out of sight), so the two never
+    // overlap at nearly the same height (that flickered as saw teeth); the finer ring's skirt covers the step
+    const innerBox = (() => { const q = r.inner; if (!q) return null; const qn = 1 << q.z, lt = (y: number) => { const k = Math.PI - 2 * Math.PI * y / qn; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
+      return [q.x0 / qn * 360 - 180, (q.x0 + q.N) / qn * 360 - 180, lt(q.y0 + q.N), lt(q.y0)]; })();
+    const inside = (lon: number, lat: number, shrink: number) => { const B = innerBox; if (!B) return false; const px = (B[1] - B[0]) * shrink, py = (B[3] - B[2]) * shrink; return lon > B[0] + px && lon < B[1] - px && lat > B[2] + py && lat < B[3] - py; };
+    if (innerBox) for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
+      if (!inside(lonOf(i / G * size), latOf(j / G * size), 0)) continue;
+      const o = j * (G + 1) + i; const cv = v3dCurve(pos[o * 3], pos[o * 3 + 2]), y0 = pos[o * 3 + 1] + cv; if (y0 > 4) pos[o * 3 + 1] -= 3;
+    }
     for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
-      if (r.inner && inside(lonOf((i + 0.5) / G * size), latOf((j + 0.5) / G * size))) continue;
+      if (r.inner && inside(lonOf((i + 0.5) / G * size), latOf((j + 0.5) / G * size), 0.04)) continue;
       const a = j * (G + 1) + i, b = a + 1, d = a + G + 1, e = d + 1; idx.push(a, d, b, b, d, e);
     }
     (r as any).mh = mh; (r as any).G = G;
-    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setAttribute('aFlat', new T.BufferAttribute(flat, 1)); geo.setIndex(idx);
+    // a skirt round the ring's edge, hanging 60 m down: no crack shows where it meets the coarser ring around it
+    const nv = (G + 1) * (G + 1), edge: number[] = [];
+    for (let i = 0; i <= G; i++) edge.push(i);
+    for (let j = 1; j <= G; j++) edge.push(j * (G + 1) + G);
+    for (let i = G - 1; i >= 0; i--) edge.push(G * (G + 1) + i);
+    for (let j = G - 1; j >= 0; j--) edge.push(j * (G + 1));
+    const P2 = new Float32Array((nv + edge.length) * 3), U2 = new Float32Array((nv + edge.length) * 2), F2 = new Float32Array(nv + edge.length);
+    P2.set(pos); U2.set(uv); F2.set(flat);
+    edge.forEach((v, k) => { const o = nv + k; P2[o * 3] = pos[v * 3]; P2[o * 3 + 1] = pos[v * 3 + 1] - 60; P2[o * 3 + 2] = pos[v * 3 + 2]; U2[o * 2] = uv[v * 2]; U2[o * 2 + 1] = uv[v * 2 + 1]; F2[o] = flat[v]; });
+    for (let k = 0; k < edge.length - 1; k++) { const a = edge[k], b = edge[k + 1], a2 = nv + k, b2 = nv + k + 1; idx.push(a, a2, b, b, a2, b2, a, b, a2, b, b2, a2); }
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(P2, 3)); geo.setAttribute('uv', new T.BufferAttribute(U2, 2)); geo.setAttribute('aFlat', new T.BufferAttribute(F2, 1)); geo.setIndex(idx);
     // the water as its own picture (the sea and lakes; rivers half), for the living water and the coastline
     const wetTex = v3dWetTexture(size, (i: number) => water(i) ? 255 : river(i) ? 150 : 0);
     r.mesh = new T.Mesh(geo, v3dGroundMat((State.settings as any).v3dSat && r.satTex ? r.satTex : r.mapTex, wetTex));
     (r as any).wetTex = wetTex;
     r.mesh.renderOrder = -r.z;
+    // the sea's surface under this ring (the largest ring's replaces the smaller ones')
+    { const VT: any = V3dTerrain; const a = v3dXY(lonOf(0), latOf(0)), b = v3dXY(lonOf(size), latOf(size)), span = Math.abs(b[0] - a[0]);
+      if (!VT.seaPlane || span > (VT.seaSpan || 0)) { VT.seaSpan = span; v3dSeaPlane(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])); } }
     V3d.scene.add(r.mesh);
     try { v3dCityLoad(r); } catch (e) { (r as any).cityDone = true; }
   },

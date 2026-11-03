@@ -360,6 +360,7 @@ function saluteTruck(T: any): any {
   g.userData.monitor = mon;
   // the taxiway is on the truck's left (its local -z): the cannon leans that way, raised to the given angle
   mon.userData.aim = (pitch: number) => { barrel.rotation.x = -(Math.PI / 2 - pitch); };
+  try { Models.swap(g, "vehicles/fire-truck.glb"); } catch (e) { /* the app's own truck */ }
   return g;
 }
 

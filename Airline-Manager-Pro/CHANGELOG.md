@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.114 (2026-11-03)
+
+- v3d-contrails.ts (ribbons per engine), v3d-wet.ts (wet runways, reflected light streaks), v3d-ground.ts (gate vehicles, jet bridge)
+- Glow halo for light points (v3dHalo), photo depth of field (photoDof), wing bending with load
+- Terrain: coarser ring sinks under finer ring, ring skirts, cliffs shaded as rock, coast paint on low shores
+- models.ts: replaceable .glb models (aircraft, vehicles, jet bridge, people), GLTFLoader vendored (tools/vendor/make-gltf.py)
+- Office and courtroom lights cast shadows on the PC
+- Sea as a level surface (v3dSeaPlane), coast heights from a distance field (v3dCoastDist)
+- crew-start.ts: crew needs by category, free first crew on a new career
+- Gate vehicles, light aircraft models in the distance (v3d-lod.ts), joined airport buildings, heat haze on the PC
+
 ## 0.9.113 (2026-11-03)
 
 - Gfx (graphics/gfx.ts): PC graphics settings by category with presets; phones: shadows, lighting, rooms; every renderer hooked for shadow map sizes and texture filtering

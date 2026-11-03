@@ -4091,3 +4091,24 @@ html.calm .dclock b em { animation: none; }
 .al-req { color: #FF9C8F; }
 .al-req.ok { color: var(--muted); }
 .al-req em { color: #F2B544; font-style: normal; }
+/* crew to fly, and the first crew for free */
+.card.cn { padding: 14px 18px; margin-bottom: 14px; }
+.cn-h { display: flex; align-items: center; gap: 14px; }
+.cn-h > span:first-child { flex: none; }
+.cn-h small { display: block; color: var(--muted); }
+.cn-h .achv-bar { flex: 1; }
+.cn-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 8px; margin-top: 10px; }
+.cn-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: rgba(255, 255, 255, .03); }
+.cn-row > span:nth-child(2) { flex: 1; min-width: 0; }
+.cn-row small { display: block; color: var(--muted); }
+.cn-row.short { background: rgba(242, 92, 84, .08); }
+.cn-ic { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: rgba(63, 208, 160, .15); color: #3FD0A0; }
+.cn-row.short .cn-ic { background: rgba(242, 92, 84, .16); color: #FF8A80; }
+.cn-n { text-align: right; white-space: nowrap; }
+.cn-row.short .cn-n b { color: #FF8A80; }
+.cn-blocked { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(242, 181, 68, .08); display: flex; flex-direction: column; gap: 4px; }
+.cn-blocked em { font-style: normal; font-weight: 700; color: #F2C14E; margin-right: 6px; }
+.card.fc { display: flex; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 14px; border: 1px solid rgba(63, 208, 160, .45); background: linear-gradient(135deg, rgba(63, 208, 160, .1), rgba(63, 208, 232, .06)); }
+.card.fc > span:nth-child(2) { flex: 1; min-width: 0; }
+.card.fc small { display: block; color: var(--muted); margin-top: 2px; }
+.fc-ic { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: rgba(63, 208, 160, .18); color: #3FD0A0; }
