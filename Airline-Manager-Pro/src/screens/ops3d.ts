@@ -204,7 +204,7 @@ function opsMonitorDraw() {
   const t0 = _schedDay ? 300 : Math.max(0, Math.min(1440 - 720, Math.floor((nowMin - 120) / 60) * 60)), t1 = t0 + 720;
   const L = PW + 170 * s, Rr = W - 24 * s, top = hdr + 56 * s, rows = Math.max(1, fl.length), rh = Math.min(56 * s, (H - top - 14 * s) / rows), px = (m: number) => L + (Math.max(t0, Math.min(t1, m)) - t0) / (t1 - t0) * (Rr - L);
   x.font = F(600, 18); x.fillStyle = '#7F98B0';
-  for (let h = Math.ceil(t0 / 60); h * 60 <= t1; h++) { const X = px(h * 60); x.fillStyle = h % 2 ? 'rgba(127,152,176,.25)' : 'rgba(127,152,176,.55)'; x.fillRect(X, top - 8 * s, Math.max(1, s), H - top); if (h % 2 === 0 && h * 60 < t1) { x.fillStyle = '#7F98B0'; x.fillText(`${String(h % 24).padStart(2, '0')}:00`, X + 6 * s, top - 22 * s); } }
+  for (let h = Math.ceil(t0 / 60); h * 60 <= t1; h++) { const X = px(h * 60); x.fillStyle = h % 2 ? 'rgba(127,152,176,.25)' : 'rgba(127,152,176,.55)'; x.fillRect(X, top - 8 * s, Math.max(1, s), H - top); if (h % 2 === 0 && h * 60 < t1 && (_schedDay || Math.abs(X + 30 * s - px(nowMin)) > 70 * s)) { x.fillStyle = '#7F98B0'; x.fillText(`${String(h % 24).padStart(2, '0')}:00`, X + 6 * s, top - 22 * s); } }
   fl.forEach((a: any, i: number) => {
     const y = top + i * rh;
     if (i % 2) { x.fillStyle = 'rgba(255,255,255,.03)'; x.fillRect(PW + 2 * s, y, W, rh); }
