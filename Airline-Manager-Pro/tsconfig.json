@@ -148,6 +148,7 @@
     "src/screens/ops3d.ts",
     "src/screens/phone3d.ts",
     "src/screens/phone-apps.ts",
+    "src/screens/phone-talk.ts",
     "src/data/stars.ts",
     "src/screens/v3d-sky.ts",
     "src/ui/qol.ts",

@@ -8,7 +8,7 @@ const PH_APPS: [string, string, string, string][] = [
 ];
 const PhA: any = { tab: 'recents', thread: '', dial: '', calling: null as any, callT: 0 };
 
-type PhContact = { id: string; name: string; sub: string; fam: boolean; c: string };
+type PhContact = { id: string; name: string; sub: string; fam: boolean; c: string; sex?: 'm' | 'f' };
 type PhMsg = { me: boolean; t: string; at: number; read?: boolean };
 
 function phS(): any { const S: any = State; S.phoneMsgs = S.phoneMsgs || {}; S.phoneCalls = S.phoneCalls || []; S.phoneFav = S.phoneFav || null; return S; }
@@ -18,12 +18,12 @@ function phContacts(): PhContact[] {
   const out: PhContact[] = [];
   try {
     const F: any = lapFamilyNames();
-    for (const k of ['partner', 'kid1', 'kid2', 'mum', 'dad']) if (F[k]) out.push({ id: 'fam-' + k, name: F[k].name, sub: F[k].rel.replace(/^your /, '').replace(/^./, (c: string) => c.toUpperCase()), fam: true, c: '#F06A9A' });
+    for (const k of ['partner', 'kid1', 'kid2', 'mum', 'dad']) if (F[k]) out.push({ id: 'fam-' + k, name: F[k].name, sub: F[k].rel.replace(/^your /, '').replace(/^./, (c: string) => c.toUpperCase()), fam: true, c: '#F06A9A', sex: /wife|daughter|mother/.test(F[k].rel) ? 'f' : 'm' });
   } catch (e) { /* no family yet */ }
   try {
     const co: any = company(), RN: any = typeof ROLE_NAMES !== 'undefined' ? ROLE_NAMES : {};
     const st = staffOf(co.id).slice().sort((a: any, b: any) => String(a.name).localeCompare(String(b.name))).slice(0, 80);
-    for (const s of st as any[]) out.push({ id: s.id, name: s.name, sub: RN[s.role] || s.role, fam: false, c: '#3FA2F0' });
+    for (const s of st as any[]) out.push({ id: s.id, name: s.name, sub: RN[s.role] || s.role, fam: false, c: '#3FA2F0', sex: s.sex === 'f' ? 'f' : 'm' });
   } catch (e) { /* no staff */ }
   return out;
 }
@@ -58,7 +58,7 @@ function phMsgsHtml(): string {
     for (const m of L) if (!m.me) m.read = true;
     const rows = L.map((m, i) => { const prev = L[i - 1]; const gap = !prev || m.at - prev.at > 30 * 60e3; return `${gap ? `<small class="pm-day">${esc(phTime(m.at))}</small>` : ''}<div class="pm-b ${m.me ? 'me' : ''}">${esc(m.t)}</div>`; }).join('');
     const typing = PhA.typing === c.id ? '<div class="pm-b pm-typing"><i></i><i></i><i></i></div>' : '';
-    return `<div class="pm-thread"><div class="pm-th"><button class="lm-back" data-act="ph-msg-back">${icon('back')}</button>${phAvatar(c)}<span><b>${esc(c.name)}</b><small>${esc(c.sub)}</small></span><button class="pm-call" data-act="ph-call" data-id="${esc(c.id)}" aria-label="Call ${esc(c.name)}">${icon('phone')}</button></div>
+    return `<div class="pm-thread"><div class="pm-th"><button class="lm-back" data-act="ph-msg-back">${icon('back')}</button>${phAvatar(c)}<span><b>${esc(c.name)}</b><small>${esc(c.sub)} · ${esc(phRelWord(phRelOf(c.id)))}</small></span><button class="pm-call" data-act="ph-call" data-id="${esc(c.id)}" aria-label="Call ${esc(c.name)}">${icon('phone')}</button></div>
       <div class="pm-list">${rows || `<p class="muted pm-empty">Write to ${esc(c.name.split(' ')[0])}.</p>`}${typing}</div>
       <form class="pm-send" data-id="${esc(c.id)}"><input class="pm-in" type="text" maxlength="300" placeholder="Message" autocomplete="off" enterkeyhint="send"><button type="submit" class="pm-go" aria-label="Send">${icon('chevron')}</button></form></div>`;
   }
@@ -81,17 +81,17 @@ function phSend(id: string, text: string) {
   const S = phS(), L: PhMsg[] = S.phoneMsgs[id] = S.phoneMsgs[id] || [];
   L.push({ me: true, t: text, at: Date.now() }); if (L.length > 200) L.splice(0, L.length - 200);
   Store.soon(); Sound.tick();
-  // an answer after a little while: first they are typing, then the message comes
+  // they read it, start typing and answer what you wrote (one message or a few); sometimes they call you
   const c = phContact(id); if (!c) return;
-  const pool = c.fam ? PH_REPLY_FAM : PH_REPLY_STAFF, ans = /\?\s*$/.test(text) ? (c.fam ? 'Yes, of course!' : 'Yes, no problem.') : pool[Math.floor(Math.random() * pool.length)];
-  setTimeout(() => { PhA.typing = id; phRefresh(); }, 1200 + Math.random() * 1500);
-  setTimeout(() => {
-    if (PhA.typing === id) PhA.typing = '';
-    const open = Lap.phone && Lap.app === 'msgs' && PhA.thread === id && Lap.root && Lap.root.isConnected;
-    L.push({ me: false, t: ans, at: Date.now(), read: !!open }); Store.soon();
-    if (open) { Sound.tick(); phRefresh(); }
-    else { phRefresh(); phoneNote({ title: c.name, body: ans, ic: 'chat', c: '#34C759', app: 'msgs', thread: id } as any); }
-  }, 4500 + Math.random() * 5000);
+  const A = phAnswer(c, text);
+  let at = 1200 + Math.random() * 2200;
+  A.lines.forEach((line, i) => {
+    setTimeout(() => { PhA.typing = id; phRefresh(); }, at);
+    at += 1400 + Math.min(5000, line.length * 55) + Math.random() * 1200;
+    setTimeout(() => { if (PhA.typing === id && i === A.lines.length - 1) PhA.typing = ''; phTextFrom(c, line); }, at);
+    at += 400;
+  });
+  if (A.callBack) phCallBackLater(c, A.mood === 'angry' ? 'I got your message. Can we talk about it?' : phRead(text).it.callme ? 'You asked me to call?' : 'Hi, I just wanted to talk about your message.');
 }
 function phRefresh() { if (!Lap.root || !Lap.root.isConnected || !Lap.phone) return; lapRender(true); phScrollEnd(); }
 function phScrollEnd() { requestAnimationFrame(() => { const l = Lap.root && Lap.root.querySelector('.pm-list') as HTMLElement; if (l) l.scrollTop = l.scrollHeight; }); }
@@ -111,6 +111,7 @@ document.addEventListener('keydown', e => { const t = e.target as HTMLElement; i
 /* ---------- Phone ---------- */
 function phCallHtml(): string {
   const S = phS(), C = phContacts();
+  if (PhCall.c) return phCallScreenHtml();
   if (PhA.calling) {
     const c = PhA.calling as PhContact, st = PhA.callState || 'calling';
     return `<div class="pcall"><div class="pcall-who">${phAvatar(c, true)}<b>${esc(c.name)}</b><small>${st === 'calling' ? 'Calling…' : st === 'ended' ? 'Call ended' : 'Calls aren\'t available yet. They come in a later update.'}</small></div>
@@ -124,7 +125,7 @@ function phCallHtml(): string {
     body = `<div class="pa-h"><b>Favourites</b></div>${L.map(c => `<button class="pc-row" data-act="ph-call" data-id="${esc(c.id)}">${phAvatar(c)}<span><b>${esc(c.name)}</b><small>${esc(c.sub)}</small></span><em class="pc-ph">${icon('phone')}</em></button>`).join('') || '<p class="muted pa-empty">No favourites yet.</p>'}`;
   } else if (PhA.tab === 'recents') {
     const R = (S.phoneCalls as any[]).slice(0, 60);
-    body = `<div class="pa-h"><b>Recents</b></div>${R.map(r => { const c = phContact(r.id); const nm = c ? c.name : r.num || 'Unknown'; return `<button class="pc-row" data-act="ph-call" data-id="${esc(r.id || '')}" data-num="${esc(r.num || '')}">${c ? phAvatar(c) : `<span class="pa-av" style="--c:#8A94A6">#</span>`}<span><b>${esc(nm)}</b><small>Outgoing · not answered</small></span><em>${esc(phTime(r.at))}</em></button>`; }).join('') || '<p class="muted pa-empty">No calls yet.</p>'}`;
+    body = `<div class="pa-h"><b>Recents</b></div>${R.map(r => { const c = phContact(r.id); const nm = c ? c.name : r.num || 'Unknown'; return `<button class="pc-row" data-act="ph-call" data-id="${esc(r.id || '')}" data-num="${esc(r.num || '')}">${c ? phAvatar(c) : `<span class="pa-av" style="--c:#8A94A6">#</span>`}<span><b>${esc(nm)}</b><small>${r.dir === 'in' ? (r.ok ? 'Incoming' : 'Missed') : 'Outgoing'}${r.ok ? (r.dur ? ' · ' + Math.floor(r.dur / 60) + ':' + String(r.dur % 60).padStart(2, '0') : '') : r.dir === 'in' ? '' : ' · not answered'}</small></span><em>${esc(phTime(r.at))}</em></button>`; }).join('') || '<p class="muted pa-empty">No calls yet.</p>'}`;
   } else if (PhA.tab === 'contacts') {
     let letter = '';
     body = `<div class="pa-h"><b>Contacts</b></div>${C.map(c => { const l = c.fam ? 'Family' : c.name.replace(/^(Capt\.|Captain|F\/O)\s+/i, '').charAt(0).toUpperCase(); const h = l !== letter ? `<small class="pc-l">${esc(l)}</small>` : ''; letter = l;
@@ -142,12 +143,17 @@ ACTIONS['ph-dial'] = el => { const k = el.getAttribute('data-k') || ''; PhA.dial
 ACTIONS['ph-msg-to'] = el => { if (Lap.app === 'browser') lapBrowserHide(); Lap.app = 'msgs'; PhA.thread = el.getAttribute('data-id') || ''; PhA.newMsg = false; Sound.tick(); lapRender(); phScrollEnd(); };
 ACTIONS['ph-call'] = el => {
   const id = el.getAttribute('data-id') || '', num = el.getAttribute('data-num') || '';
-  const c = (id && phContact(id)) || (num ? { id: '', name: num, sub: '', fam: false, c: '#8A94A6' } : null); if (!c) return;
-  const S = phS(); S.phoneCalls.unshift({ id: c.id, num: c.id ? '' : num, at: Date.now() }); S.phoneCalls = S.phoneCalls.slice(0, 100); Store.soon();
-  Lap.app = 'call'; PhA.calling = c; PhA.callState = 'calling'; Sound.tick(); lapRender();
-  clearTimeout(PhA.callT); PhA.callT = setTimeout(() => { if (PhA.calling === c) { PhA.callState = 'later'; lapRender(true); } }, 3200);
+  const c = (id && phContact(id)) || (num ? { id: 'num-' + num, name: num, sub: 'Number', fam: false, c: '#8A94A6' } as PhContact : null); if (!c) return;
+  if (PhCall.c) return;
+  Sound.tick();
+  if (!id) {   // a number nobody in your phone has: it rings, and nobody answers
+    phCallStart(c, false); clearTimeout(PhCall.ringT);
+    PhCall.ringT = setTimeout(() => { if (PhCall.c === c && PhCall.st === 'calling') { PhCall.st = 'noanswer'; phCallRedraw(); setTimeout(() => { if (PhCall.c === c) phCallEnd(); }, 1600); } }, 5000);
+    return;
+  }
+  phCallStart(c, false);
 };
-ACTIONS['ph-call-end'] = () => { clearTimeout(PhA.callT); PhA.callState = 'ended'; lapRender(true); Sound.tick(); PhA.callT = setTimeout(() => { PhA.calling = null; PhA.callState = ''; lapRender(true); }, 700); };
+ACTIONS['ph-call-end'] = () => { Sound.tick(); if (PhCall.st === 'incoming') { const c = PhCall.c; phCallEnd(); if (c && Math.random() < 0.6) setTimeout(() => phTextFrom(c, phRelOf(c.id).hurt > 1 ? 'Fine, ignore me.' : 'Call me when you\'re free.'), 3000); return; } phCallEnd(); };
 
 /* ---------- Store ---------- */
 const PH_STORE_SOON: [string, string, string, string][] = [
@@ -157,7 +163,7 @@ function phStoreHtml(): string {
   const mine = LAP_APPS.concat(PH_APPS.filter(a => a[0] !== 'store'));
   const row = (a: [string, string, string, string], sub: string, btn: string) => `<div class="ps-row"><span class="ld-ic"><span style="--c:${a[3]}">${icon(a[2])}</span></span><span class="ps-t"><b>${esc(a[1])}</b><small>${esc(sub)}</small></span>${btn}</div>`;
   return `<div class="pstore"><div class="pa-h"><b>Store</b></div>
-    <div class="ps-hero"><small>New</small><b>Messages and Phone</b><span>Write to your family and your crew, right from your desk.</span><button class="btn sm" data-act="lap-app" data-k="msgs">Open</button></div>
+    <div class="ps-hero"><small>New</small><b>Messages and Phone</b><span>Write to and call your family and your crew. They answer what you say, and remember how you treat them.</span><button class="btn sm" data-act="lap-app" data-k="msgs">Open</button></div>
     <h4>Coming soon</h4>${PH_STORE_SOON.map(a => row(['', a[0], a[2], a[3]], a[1], '<button class="ps-get" disabled>Soon</button>')).join('')}
     <h4>On your phone</h4>${mine.map(a => row(a, 'Installed', `<button class="ps-get" data-act="lap-app" data-k="${a[0]}">Open</button>`)).join('')}</div>`;
 }
