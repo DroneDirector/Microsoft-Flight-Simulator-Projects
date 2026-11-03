@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.121 (2026-11-03)
+
+- go-hire: refresh in place and scroll to the hiring list
+- crew-lease.ts: borrowed crew (fa, mech, ground) from other airlines, 2.5–5× pay, 30-day contracts, warnings and expiry (leaseDaily), Borrowed crew card
+- Hiring market: larger targets and arrivals for fa, ground and mech
+
 ## 0.9.120 (2026-11-03)
 
 - Exit splash titles: Leaving the <size> hangar / Operations / the office / the courtroom / the 3D viewer

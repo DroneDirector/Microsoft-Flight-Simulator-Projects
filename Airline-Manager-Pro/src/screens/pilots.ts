@@ -85,7 +85,7 @@ SCREENS.pilots = {
         <div><small>Crashes on record</small><b>${State.logbook.filter(l => l.decision === 'registered').length}</b></div>
       </div>
     </div>
-    ${typeof freeCrewHtml === 'function' ? freeCrewHtml() : ''}${!coopOn() && typeof crewNeedsHtml === 'function' && (_pilotTab === 'pilots' || _pilotTab === 'hire') ? crewNeedsHtml() : ''}
+    ${typeof freeCrewHtml === 'function' ? freeCrewHtml() : ''}${!coopOn() && typeof crewNeedsHtml === 'function' && (_pilotTab === 'pilots' || _pilotTab === 'hire') ? crewNeedsHtml() : ''}${!coopOn() && typeof leasedCardHtml === 'function' && (_pilotTab === 'pilots' || _pilotTab === 'hire') ? leasedCardHtml() : ''}
     <div class="tabs big">${tabs.map(t => `<button class="tab ${_pilotTab === t[0] ? 'on' : ''}" data-act="pilot-tab" data-t="${t[0]}">${t[1]}<i>${t[2]}</i></button>`).join('')}</div>
     ${body}`;
   },

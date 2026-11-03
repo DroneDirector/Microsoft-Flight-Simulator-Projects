@@ -80,8 +80,9 @@ function poolAdvance() {
       const leave = Math.floor(Math.random() * (list.length > 6 ? 3 : 2));
       for (let i = 0; i < leave && list.length > 1; i++) { const gone = list.splice(Math.floor(Math.random() * list.length), 1)[0]; S.staffCandidates = S.staffCandidates.filter((x: Staff) => x !== gone); }
       // new ones come looking
-      const target = role === 'fa' ? 8 : 5, room = Math.max(0, target + 3 - list.length);
-      const come = Math.min(room, Math.floor(busy * (role === 'fa' ? 4 : 3) + Math.random() * 1.5));
+      // a fuller list than before: ramp teams and cabin crews are needed in numbers
+      const target = role === 'fa' ? 12 : role === 'ground' ? 12 : 8, room = Math.max(0, target + 4 - list.length);
+      const come = Math.min(room, Math.floor(busy * (role === 'fa' || role === 'ground' ? 6 : 4) + Math.random() * 2));
       for (let i = 0; i < come; i++) { S.staffCandidates.push(makePerson('cand-' + role + uid(), role, '', POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)])); arrived++; }
     }
     // captains

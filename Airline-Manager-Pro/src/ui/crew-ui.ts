@@ -92,7 +92,14 @@ function dismissStaff(id: string, incId?: string) {
   closeAll(); Haptics.pulse(30); Store.save(); refresh();
   undoToast(`${p.name} dismissed. Hire a replacement under Crew → Hire staff.`, () => { if (inStaff) S.staff.splice(Math.min(idx, S.staff.length), 0, p); else State.pilots.splice(Math.min(idx, State.pilots.length), 0, p); if (inc0) inc0.status = incSt; State.notices = State.notices.concat(goneN); }, 'warn');
 }
-ACTIONS['go-hire'] = el => { const t = el.closest('.toast'); if (t) t.remove(); _pilotTab = 'hire'; _hireRole = el.getAttribute('data-id') || 'all'; closeAll(); go('pilots'); };
+ACTIONS['go-hire'] = el => {
+  const t = el.closest('.toast'); if (t) t.remove(); _pilotTab = 'hire'; _hireRole = el.getAttribute('data-id') || 'all';
+  // already in Crew: just the hiring list (no page change, no flash); then straight down to it
+  if (State.screen === 'pilots' && !document.querySelector('.layer')) { Sound.tick(); refresh(); } else { closeAll(); go('pilots'); }
+  // (after the page has drawn the list: a second look in case it was drawn again)
+  const down = (smooth: boolean) => { const tb = document.querySelector('.tabs.big') as HTMLElement; if (!tb) return; tb.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }); tb.classList.add('hire-flash'); setTimeout(() => tb.classList.remove('hire-flash'), 1400); };
+  setTimeout(() => down(true), 150); setTimeout(() => { const tb = document.querySelector('.tabs.big') as HTMLElement; if (tb && tb.getBoundingClientRect().top > window.innerHeight * 0.5) down(false); }, 700);
+};
 
 /** Warnings so far, by severity: "2 light, 1 severe". */
 function warnSummary(p: any): string {
