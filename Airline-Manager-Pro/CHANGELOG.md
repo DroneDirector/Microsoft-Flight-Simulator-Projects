@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.96 (2026-11-03)
+
+- the career button: a canvas effect behind it (turning conic rim with a running head, flickering upscale pixels, sparkles, a scan band, a breathing glow), still with reduced motion; darker subtitle
+
 ## 0.9.95 (2026-11-03)
 
 - the guided tour starts on the "Finances are on hold" button when it is there
