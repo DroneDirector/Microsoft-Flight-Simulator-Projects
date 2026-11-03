@@ -113,7 +113,7 @@ function opsBuild(scene: any, q: number) {
     add(new T.CylinderGeometry(0.04, 0.034, 0.1, 20), M({ color: 0xF4F4F2, roughness: 0.3 }), 0.72, 0.825, -0.1); add(new T.CylinderGeometry(0.036, 0.036, 0.004, 20), M({ color: 0x3A2216 }), 0.72, 0.872, -0.1);
   }
   // your phone, on the desk to the right of the keyboard, screen on
-  phoneMesh(T, root, A, [0.5, 0.761, 0.04], -0.3);   // on the desk, right of the keyboard
+  phoneMesh(T, root, A, [0.68, 0.7875, 0.02], -0.3);   // on the desk, right of the mouse mat
   // the fancy chair: a high-backed leather chair with a headrest, stitched in the company colour, on five wheels
   { const g = new T.Group(); g.position.set(0, 0, 0.72); g.rotation.y = Math.PI; root.add(g);
     { const hit = new T.Mesh(new T.BoxGeometry(0.7, 1.5, 0.7), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0, 0.75, 0); hit.userData.act = 'sit'; g.add(hit); A.hits.push(hit); }

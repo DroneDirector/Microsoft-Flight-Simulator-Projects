@@ -133,36 +133,59 @@ const MISCONDUCT_P: { [k: string]: number } = { never: 0, rare: 0.02, normal: 0.
  * before) … 4 often; it scales the chances set for each kind of staff. */
 const CONDUCT_LEVEL_K = [0, 0.3, 0.5, 0.67, 1.2];
 function conductLevel(): number { const v = (State.settings as any).conductLevel; return v == null ? 3 : clamp(Math.round(+v), 0, 4); }
+/** How many conduct reports a day: most days none; on a day with one it is usually one or two, now and then
+ *  three; a few days pass in between. Settings → Staff → Conduct makes them rarer or more frequent. The day's
+ *  reports come at random times through the day. */
+function conductPlanToday(): any {
+  const S: any = State, day = dateStr(new Date()).slice(0, 10);
+  if (S.conductPlan && S.conductPlan.day === day) return S.conductPlan;
+  const lvl = conductLevel(), pDay = [0, 0.08, 0.17, 0.3, 0.55][lvl], r = Math.random();
+  let n = 0;
+  if (Math.random() < pDay) n = r < 0.68 ? 1 : r < 0.94 ? 2 : 3;
+  if (n && lvl >= 4 && Math.random() < 0.35) n++;
+  // never two report days in a row unless reports are set to often
+  if (n && lvl < 4 && S.conductPlan && S.conductPlan.n > 0 && S.conductPlan.day === dateStr(new Date(Date.now() - 864e5)).slice(0, 10)) n = 0;
+  const now = Date.now(), end = new Date(); end.setHours(23, 0, 0, 0);
+  const span = Math.max(30 * 60e3, end.getTime() - now), at: number[] = [];
+  for (let k = 0; k < n; k++) at.push(now + 10 * 60e3 + Math.random() * span);
+  at.sort((a, b) => a - b);
+  S.conductPlan = { day, n, at };
+  return S.conductPlan;
+}
+/** How bad it is: usually light, sometimes moderate, now and then severe. */
+function conductSeverity(): 'light' | 'moderate' | 'severe' { const r = Math.random(); return r < 0.72 ? 'light' : r < 0.94 ? 'moderate' : 'severe'; }
 function maybeIncident() {
   const S: any = State;
   if (!conductOn()) return;   // switched off in Settings: nothing new happens, nothing is removed
+  const plan = conductPlanToday(); if (!plan.at.length || Date.now() < plan.at[0]) return;
+  plan.at.shift(); Store.soon();
   const cid = State.companyId;
-  // the AI crew only: hired pilots, co-pilots, flight attendants and mechanics (never you)
+  // the AI crew only: hired pilots, co-pilots, flight attendants and mechanics (never you); who it is follows
+  // the per-kind settings (Settings → Staff), and well-rated staff are less likely to be the one
   const roles: string[] = ['fa', 'mech', 'ground', 'fo', 'pilot'];
-  const me = myPilot();
+  const me = myPilot(), cands: { r: string; who: any; w: number }[] = [];
   for (const r of roles) {
-    const p = (MISCONDUCT_P[S.settings.misconduct[r === 'pilot' ? 'fo' : r]] || 0) * CONDUCT_LEVEL_K[conductLevel()];
-    if (Math.random() >= p) continue;
+    const p = MISCONDUCT_P[S.settings.misconduct[r === 'pilot' ? 'fo' : r]] || 0; if (!p) continue;
     const pool = (r === 'fo' ? State.pilots.filter((x: any) => x.coPilotFor === cid)
       : r === 'pilot' ? State.pilots.filter((x: any) => x.companyId === cid && !x.coPilotFor && x !== me && x.id !== 'you' && x.status !== 'off')
       : staffOf(cid, r as CrewRole)).filter((x: any) => !x.suspended);
-    if (!pool.length) continue;
-    const who: any = pool[Math.floor(Math.random() * pool.length)];
-    // well-rated staff behave: the chance falls as their rating rises, and with every warning they learned from
-    if (Math.random() > conductFactor(workRating(who)) * Math.pow(0.6, who.learned || 0) * (1 + 0.5 * (who.stubborn || 0))) continue;   // unhappy people slip more
-    // very rarely it's a crime: police, the aviation authority and a court case
-    if (maybeCriminal(who, r)) return;
-    const t = INCIDENTS[r === 'pilot' ? 'fo' : r][Math.floor(Math.random() * INCIDENTS[r === 'pilot' ? 'fo' : r].length)];
-    const inc: Incident = { id: uid(), staffId: who.id, sev: (t[2] || 'moderate') as any, title: t[0], text: t[1].replace('{n}', who.name).replace('{b}', who.base), date: dateStr(new Date()).slice(0, 10), at: Date.now(), status: 'open' } as any;
-    S.incidents.unshift(inc);
-    try { Voice.prepare(inc.text, 'ops'); } catch (e) { /* not ready */ }
-    // being late, skipping work and the like costs rating (and for mechanics, the quality of their work)
-    who.rating = clamp(Math.round(((who.rating || 3.5) - 0.15) * 100) / 100, 1, 5);
-    State.notices.unshift({ id: 'n-' + inc.id, kind: 'staff' as any, title: `Conduct report: ${who.name}`, body: `${t[0]}. Discipline or dismiss.`, time: 'Now', at: Date.now(), read: false, ref: inc.id } as any);
-    renderTopbar(); Sound.chime(); Store.soon();
-    toast(`Conduct report: ${who.name}`, 'warn', { label: 'Open', act: 'open-incident', data: inc.id });
-    return;
+    for (const who of pool as any[]) cands.push({ r, who, w: p * conductFactor(workRating(who)) * Math.pow(0.6, who.learned || 0) * (1 + 0.5 * (who.stubborn || 0)) });
   }
+  const tot = cands.reduce((a, c) => a + c.w, 0); if (!tot) return;
+  let x = Math.random() * tot, pick = cands[0]; for (const c of cands) { x -= c.w; if (x <= 0) { pick = c; break; } }
+  const r = pick.r, who: any = pick.who, sev = conductSeverity();
+  // very rarely it's a crime: police, the aviation authority and a court case (only on a severe day)
+  if (sev === 'severe' && maybeCriminal(who, r)) return;
+  const list = INCIDENTS[r === 'pilot' ? 'fo' : r], same = list.filter(t => (t[2] || 'moderate') === sev), from = same.length ? same : list;
+  const t = from[Math.floor(Math.random() * from.length)];
+  const inc: Incident = { id: uid(), staffId: who.id, sev: (same.length ? sev : (t[2] || 'moderate')) as any, title: t[0], text: t[1].replace('{n}', who.name).replace('{b}', who.base), date: dateStr(new Date()).slice(0, 10), at: Date.now(), status: 'open' } as any;
+  S.incidents.unshift(inc);
+  try { Voice.prepare(inc.text, 'ops'); } catch (e) { /* not ready */ }
+  // being late, skipping work and the like costs rating (and for mechanics, the quality of their work)
+  who.rating = clamp(Math.round(((who.rating || 3.5) - (inc.sev === 'severe' ? 0.3 : inc.sev === 'moderate' ? 0.15 : 0.08)) * 100) / 100, 1, 5);
+  State.notices.unshift({ id: 'n-' + inc.id, kind: 'staff' as any, title: `Conduct report: ${who.name}`, body: `${t[0]}. Discipline or dismiss.`, time: 'Now', at: Date.now(), read: false, ref: inc.id } as any);
+  renderTopbar(); Sound.chime(); Store.soon();
+  toast(`Conduct report: ${who.name}`, 'warn', { label: 'Open', act: 'open-incident', data: inc.id });
 }
 function startConductClock() { setInterval(maybeIncident, 4 * 60 * 1000); }
 

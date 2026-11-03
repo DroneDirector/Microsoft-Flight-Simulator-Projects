@@ -3577,3 +3577,8 @@ html.calm .ph-frame, html.calm .ph-screen { transition: none; }
 .ph-os .pcall.on .ph-kb { margin: 0 -12px; padding-bottom: 6px; }
 .of-pk .of-pk-turn { display: inline-flex; gap: 4px; margin-left: 6px; }
 .of-pk .of-pk-turn .btn { min-width: 34px; padding: 0 8px; font-size: 16px; }
+/* the numbers in the small flight card stay on one line (the time to arrival never breaks over lines) */
+.flight-card .fc-mini b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.flight-card .fc-mini > span { min-width: max-content; }
+/* the flipping digits inside a number are inline (they were stacked by the label rule above) */
+.flight-card.mini .fc-mini b span:not(.fc-cs) { display: inline !important; flex-direction: row; line-height: inherit; }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.84 (2026-11-03)
+
+- conduct reports: a plan per day (conductPlanToday): most days none, usually one or two, a few days in between, at random times; severity mostly light, sometimes moderate, now and then severe (crimes only on severe ones)
+- Operations: the phone lies on the desk right of the mouse mat, at the desk's height
+- the small flight card: the time to arrival stays on one line
+
 ## 0.9.83 (2026-11-03)
 
 - SaveWatch: a summary of the saved state every 2.5 s; any change by itself (markets, prices, money in and out, flights, messages, the court) saves, at most every 8 s while changes keep running
