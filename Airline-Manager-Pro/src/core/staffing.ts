@@ -15,6 +15,7 @@ function payrollAdvance(quiet?: boolean) {
   const S: any = State, now = Date.now(), WEEK = 7 * 864e5;
   if (!S.payNext) { S.payNext = now + WEEK; return; }
   let weeks = 0;
+  if (S.finHold) return;   // a new career: no salaries until it starts
   while (S.payNext <= now && weeks < 8) {
     const d = new Date(S.payNext), day = dateStr(d).slice(0, 10);
     for (const c of State.companies) {

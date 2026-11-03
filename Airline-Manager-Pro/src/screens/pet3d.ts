@@ -29,9 +29,11 @@ function petData(): Pet {
 function petScale(P: Pet): number { return P.kind === 'cat' ? 0.95 : P.size === 's' ? 0.72 : P.size === 'l' ? 1.25 : 1; }
 
 /* ---------- in the room ---------- */
-/** The bed at pos (x, z), turned by yaw, the pet asleep in it, and the places it may wander to (walk: x, z points on
- *  the open floor, in the room's own space). Its parts in A.pet. */
-function petPlace(T: any, root: any, A: any, pos: number[], yaw: number, walk?: number[][]) {
+/** Where a pet may go: free(x, z) says whether a spot on the floor is clear of furniture; door is the spot just
+ *  in front of its bed it leaves and comes back by; box the floor's bounds [x0, z0, x1, z1]. */
+interface PetRoom { free?: (x: number, z: number) => boolean; door?: number[]; box?: number[] }
+/** The bed at pos (x, z), turned by yaw, the pet asleep in it, its bowls beside it. Its parts in A.pet. */
+function petPlace(T: any, root: any, A: any, pos: number[], yaw: number, room?: PetRoom) {
   const P = petData(); if (!P || P.kind === 'none') return;
   const cat = P.kind === 'cat', s = petScale(P);
   const g = new T.Group(); g.position.set(pos[0], 0, pos[1]); g.rotation.y = yaw; root.add(g);
@@ -41,17 +43,23 @@ function petPlace(T: any, root: any, A: any, pos: number[], yaw: number, walk?: 
   cush.position.y = 0.03; cush.receiveShadow = true; g.add(cush);
   const rim = new T.Mesh(new T.TorusGeometry(bedR * 0.9, cat ? 0.065 : 0.075 * Math.max(0.9, s), 18, 48), new T.MeshStandardMaterial({ color: bc, roughness: 0.97 }));
   rim.rotation.x = Math.PI / 2; rim.position.y = cat ? 0.07 : 0.075; rim.castShadow = true; rim.receiveShadow = true; g.add(rim);
-  // asleep, curled up on the cushion
-  const curl = petBody(T, P, s, 'curl'); curl.grp.position.y = 0.06; g.add(curl.grp);
+  // the pet: one body, lying down asleep on the cushion now, up on its legs later
+  const body = petBody(T, P, s, 'stand'); root.add(body.grp);
+  const hit = new T.Mesh(new T.BoxGeometry(0.62 * s, 0.42 * s, 0.34 * s), new T.MeshBasicMaterial({ visible: false })); hit.position.set(0.02 * s, 0.2 * s, 0); hit.userData.act = 'pet'; body.grp.add(hit);
+  A.hits = A.hits || []; A.hits.push(hit);
   // its bowls beside the bed, side by side: water, and food in a bowl with its name on
-  petBowls(T, g, P, bedR);
-  // tap it: it wakes for a moment
-  const hit = new T.Mesh(new T.CylinderGeometry(bedR + 0.05, bedR + 0.05, 0.4, 16), new T.MeshBasicMaterial({ visible: false })); hit.position.y = 0.2; hit.userData.act = 'pet'; g.add(hit); A.hits = A.hits || []; A.hits.push(hit);
-  const home = new T.Vector3(pos[0], 0, pos[1]);
-  const pts = (walk && walk.length ? walk : [[pos[0] + 0.8, pos[1] + 0.6], [pos[0] + 0.3, pos[1] + 1.2], [pos[0] - 0.4, pos[1] + 0.8]]).map(w => new T.Vector3(w[0], 0, w[1]));
-  A.pet = { T, root, g, P, s, cat, curl, stand: null, home, yaw, pts, st: 'sleep', until: 60 + Math.random() * 90, t: 0, nextEar: 4 + Math.random() * 6, nextTwitch: 8 + Math.random() * 10, ear: -1, earT: 0, tw: 0, stir: 0, pos: home.clone(), dir: yaw, path: [] as any[], ph: 0, fade: 0, turn: 0 };
+  const bowls = petBowls(T, g, P, bedR, A);
+  const home = new T.Vector3(pos[0], 0, pos[1]), toW = (x: number, z: number) => g.localToWorld(new T.Vector3(x, 0, z)).sub(root.position);
+  g.updateMatrixWorld(true);
+  const lv: any = P as any; if (lv.food == null) lv.food = 1; if (lv.water == null) lv.water = 1; bowls.food.set(lv.food); bowls.water.set(lv.water);
+  // in front of each bowl, where it stands to eat or drink (facing the bowl)
+  const bx = bowls.x, bz = bowls.gap, front = 0.2 + 0.22 * s;
+  const eatAt = { food: toW(bx, bz + front), water: toW(bx, -bz - front) }, bowlAt = { food: toW(bx, bz), water: toW(bx, -bz) };
+  A.pet = { T, root, g, P, s, cat, body, bowls, bedR, home, yaw, room: room || {}, st: 'sleep', until: 50 + Math.random() * 70, t: 0,
+    nextEar: 4 + Math.random() * 6, nextTwitch: 8 + Math.random() * 10, ear: -1, earT: 0, tw: 0, stir: 0,
+    pos: home.clone(), dir: yaw, path: [] as any[], ph: 0, lie: 1, head: -0.32, tailY: 0.95, tailW: 1.0, pitch: 0, gait: 0, eatAt, bowlAt, fill: null as any, walkT: 0, pause: 0, job: '' };
+  petPose(A.pet, 0);
 }
-
 /** A pet's body in one pose: the sculpted mesh, its fur, and its face (nose, eyes, a cat's whiskers). */
 function petBody(T: any, P: Pet, s: number, pose: 'curl' | 'stand'): any {
   const cat = P.kind === 'cat', sc = petSculpt(T, P, s, pose), coat = new T.Color(petCoatHex(P));
@@ -82,68 +90,135 @@ function petVis(B: any, v: number) { B.U.uVis.value = v; B.grp.visible = v > 0.0
 /** Eyes: 0 shut … 1 open. */
 function petEyes(B: any, open: number) { for (let i = 0; i < B.eyes.length; i++) { const ey = B.eyes[i]; ey.visible = open > 0.02; ey.scale.y = Math.max(0.0001, ey.scale.x * open); B.lids[i].visible = open < 0.3; } }
 
-/** Each frame: asleep (breathing, an ear, the tail, a paw), awake for a moment, or up and about. */
+/** The body as it is this frame: lying (lie 1) or standing (0), where it is, which way it faces, the legs (folded
+ *  under it, or in step), the head, the tail, stepping up over the rim of the bed. */
+function petPose(P: any, dt: number) {
+  const B = P.body, U = B.U, s = P.s, L = P.lie, fold = P.cat ? [1.12, 1.12, 1.38, 1.38] : [1.18, 1.18, 1.42, 1.42];
+  const a = 0.42 * P.gait * (1 - L), ph = P.ph;
+  U.uLegA.value.set(fold[0] * L + a * Math.sin(ph), fold[1] * L + a * Math.sin(ph + Math.PI), fold[2] * L + a * Math.sin(ph + Math.PI), fold[3] * L + a * Math.sin(ph));
+  // on the cushion inside the bed, on the floor outside it; a little hop up and over the rim
+  const d = Math.hypot(P.pos.x - P.home.x, P.pos.z - P.home.z), rimR = P.bedR * 0.9;
+  const onBed = 1 - _petSm((d - rimR * 0.62) / (rimR * 0.38)), hop = P.gait > 0.05 ? 0.1 * s * Math.max(0, 1 - Math.abs(d - rimR) / 0.13) : 0;
+  const drop = (P.cat ? 0.075 : 0.085) * s * 0.92 * L, bob = P.gait > 0.05 ? Math.abs(Math.sin(ph)) * 0.006 * s : 0;
+  B.grp.position.set(P.pos.x, 0.06 * onBed - drop + hop + bob, P.pos.z);
+  B.grp.rotation.set(0, P.dir, 0); B.grp.rotation.order = 'YZX'; B.grp.rotation.z = P.pitch;
+  U.uHead.value = P.head; B.headG.rotation.z = P.head;
+  U.uTailY.value = P.tailY; U.uTail.value = P.tailW;
+}
+function _petSm(x: number): number { x = x < 0 ? 0 : x > 1 ? 1 : x; return x * x * (3 - 2 * x); }
+function _petTo(cur: number, want: number, rate: number, dt: number): number { return cur + (want - cur) * Math.min(1, dt * rate); }
+
+/** Each frame: asleep (breathing, an ear, the tail, a paw), waking, getting up, about the room, eating and
+ *  drinking, back to bed, turning round and lying down again. */
 function petStep(A: any, t: number, dt: number) {
   const P = A && A.pet; if (!P) return;
-  const T = P.T, C = P.curl, per = P.cat ? 2.6 : 3.6;
+  const T = P.T, B = P.body, U = B.U, per = P.cat ? 2.6 : 3.6;
   P.t += dt;
-  // asleep: slow breathing, deeper for a moment after a tap
-  C.U.uBreath.value = Math.sin(t * 2 * Math.PI / per) * (P.stir > 0 ? 1.8 : 1);
+  // breathing: slow and deep asleep, quicker awake
+  U.uBreath.value = Math.sin(t * 2 * Math.PI / (P.st === 'sleep' ? per : per * 0.6)) * (P.st === 'sleep' ? (P.stir > 0 ? 1.8 : 1.15) : 0.6);
+  // an ear now and then
   if (t > P.nextEar) { P.ear = Math.random() < 0.5 ? 0 : 1; P.earT = 0; P.nextEar = t + 6 + Math.random() * 14; }
-  C.U.uEarL.value = 0; C.U.uEarR.value = 0;
-  if (P.ear >= 0) { P.earT += dt; const k = P.earT < 0.4 ? Math.sin(P.earT / 0.4 * Math.PI * 2) * (1 - P.earT / 0.4) : 0; (P.ear ? C.U.uEarR : C.U.uEarL).value = 0.4 * k; if (P.earT > 0.4) P.ear = -1; }
-  if (t > P.nextTwitch) { P.tw = 1.2; P.nextTwitch = t + 10 + Math.random() * 18; }
-  if (P.tw > 0) { P.tw = Math.max(0, P.tw - dt); const k = Math.sin(P.tw * 18) * Math.min(1, P.tw); if (P.cat) C.U.uTail.value = 0.25 * k; else C.U.uPaw.value = k; } else { C.U.uTail.value = 0; C.U.uPaw.value = 0; }
-  C.U.uHead.value = 0; let open = 0;
-  if (P.stir > 0) { P.stir = Math.max(0, P.stir - dt); C.U.uHead.value = 0.22 * Math.sin(Math.min(1, (2.6 - P.stir) / 2.6) * Math.PI); open = Math.min(1, (2.6 - P.stir) / 0.3, P.stir / 0.6); }
-  C.headG.rotation.z = C.U.uHead.value;
-  // up and about now and then: wakes, gets up, wanders, comes back, turns round and lies down again
+  U.uEarL.value = 0; U.uEarR.value = 0;
+  if (P.ear >= 0) { P.earT += dt; const k = P.earT < 0.4 ? Math.sin(P.earT / 0.4 * Math.PI * 2) * (1 - P.earT / 0.4) : 0; (P.ear ? U.uEarR : U.uEarL).value = 0.4 * k; if (P.earT > 0.4) P.ear = -1; }
+  petFillStep(P, dt);
+  let open = 1, wantHead = 0, wantTailY = 0, wantTailW = 0.12 * Math.sin(t * 1.3), wantLie = 0, wantPitch = 0;
   if (P.st === 'sleep') {
-    petEyes(C, open);
-    if (P.t > P.until && P.stir <= 0) {
-      if (!P.stand) { P.stand = petBody(T, P.P, P.s, 'stand'); P.root.add(P.stand.grp); petVis(P.stand, 0); }
-      P.st = 'wake'; P.t = 0;
+    // curled up, head down on the paws, the tail round its side; a dream: the paws twitch (a dog), the tail tip flicks (a cat)
+    wantLie = 1; wantHead = -0.32; wantTailY = 0.95; wantTailW = 1.0; open = 0; P.gait = 0;
+    if (t > P.nextTwitch) { P.tw = 1.2; P.nextTwitch = t + 10 + Math.random() * 18; }
+    U.uPaw.value = 0;
+    if (P.tw > 0) { P.tw = Math.max(0, P.tw - dt); const k = Math.sin(P.tw * 18) * Math.min(1, P.tw); if (P.cat) wantTailW += 0.25 * k; else U.uPaw.value = k; }
+    if (P.stir > 0) { P.stir = Math.max(0, P.stir - dt); const k = Math.sin(Math.min(1, (2.6 - P.stir) / 2.6) * Math.PI); wantHead = -0.32 + 0.4 * k; open = Math.min(1, (2.6 - P.stir) / 0.3, P.stir / 0.6); }
+    if (P.t > P.until && P.stir <= 0) { P.st = 'wake'; P.t = 0; }
+  } else if (P.st === 'wake') {   // lifts its head, opens its eyes, has a look round
+    wantLie = 1; wantHead = 0.02 + 0.08 * Math.sin(P.t * 2); wantTailY = 0.6; wantTailW = 0.7;
+    open = Math.min(1, P.t / 0.5);
+    if (P.t > 1.8) { P.st = 'rise'; P.t = 0; }
+  } else if (P.st === 'rise') {   // gets up: the front first, then the back, and gives itself a little shake
+    const k = Math.min(1, P.t / 1.4);
+    wantLie = 1 - _petSm(k * 1.1); wantPitch = 0.16 * Math.sin(Math.PI * Math.min(1, k * 1.25)) - 0.05 * Math.sin(Math.PI * Math.max(0, k * 1.6 - 0.6));
+    wantHead = 0.05; wantTailY = 0.2;
+    if (P.t >= 1.5) { P.st = 'walk'; P.t = 0; P.walkT = 0; P.job = ''; P.path = petPlan(P); }
+  } else if (P.st === 'walk') {   // about the room for about a minute, a stop here and there to sniff, a drink, a bite
+    P.walkT += dt; wantLie = 0; wantTailY = P.cat ? 0.1 : -0.1; wantTailW = P.cat ? 0.12 * Math.sin(t * 1.3) : 0.35 * Math.sin(t * 9);
+    if (P.pause > 0) {
+      P.pause -= dt; P.gait = _petTo(P.gait, 0, 6, dt);
+      wantHead = P.job === 'eat' || P.job === 'drink' ? -0.55 + 0.05 * Math.sin(t * (P.job === 'drink' ? 9 : 5)) : P.job === 'sniff' ? -0.4 + 0.06 * Math.sin(t * 7) : 0.04;
+      if (P.job && P.bowlFace) { let da = P.bowlFace - P.dir; da = Math.atan2(Math.sin(da), Math.cos(da)); P.dir += Math.max(-dt * 2, Math.min(dt * 2, da)); }
+      if ((P.job === 'eat' || P.job === 'drink') && P.pause <= 0) { const k = P.job === 'eat' ? 'food' : 'water', lv: any = P.P; lv[k] = Math.max(0, (lv[k] || 0) - 0.14); P.bowls[k].set(lv[k]); try { Store.soon(); } catch (e) { /* later */ } }
+      if (P.pause <= 0) P.job = '';
+    } else {
+      const tgt = P.path[0];
+      if (!tgt) { P.path = P.walkT > 55 ? petPathHome(P) : petPlan(P); if (!P.path.length) P.path = petPathHome(P); }
+      else {
+        const dx = tgt.x - P.pos.x, dz = tgt.z - P.pos.z, d = Math.hypot(dx, dz), want = Math.atan2(-dz, dx), speed = (P.cat ? 0.26 : 0.33) * Math.min(1.15, Math.max(0.8, P.s));
+        let da = want - P.dir; da = Math.atan2(Math.sin(da), Math.cos(da)); P.dir += Math.max(-dt * 2.6, Math.min(dt * 2.6, da));
+        const go = Math.abs(da) < 1.0 ? speed * (d < 0.2 ? Math.max(0.4, d / 0.2) : 1) : speed * 0.25;
+        P.pos.x += Math.cos(P.dir) * go * dt; P.pos.z -= Math.sin(P.dir) * go * dt;
+        P.gait = _petTo(P.gait, go / speed, 6, dt); P.ph += go * dt / (0.22 * P.s) * Math.PI;
+        wantHead = 0.04 + 0.03 * Math.sin(t * 2.2);
+        if (d < 0.07) {
+          P.path.shift();
+          if (tgt.job) { P.job = tgt.job; P.pause = tgt.job === 'sniff' ? 1.2 + Math.random() * 2 : 3.5 + Math.random() * 2; P.bowlFace = tgt.face; }
+          if (tgt.home) { P.st = 'turn'; P.t = 0; P.turnTo = P.dir + Math.PI * (1.6 + Math.random() * 0.8); }
+        }
+      }
     }
-  } else if (P.st === 'wake') {   // lifts its head and opens its eyes
-    const k = Math.min(1, P.t / 1.2); C.U.uHead.value = 0.25 * k; C.headG.rotation.z = C.U.uHead.value; petEyes(C, k);
-    if (P.t > 1.6) { P.st = 'rise'; P.t = 0; P.pos.copy(P.home); P.dir = P.yaw; petPlaceStand(P); }
-  } else if (P.st === 'rise' || P.st === 'down') {   // gets up out of its bed, or settles into it (one pose melts into the other)
-    const k = Math.min(1, P.t / 1.0), v = P.st === 'rise' ? k : 1 - k;
-    petVis(P.stand, v); petVis(C, 1 - v); petEyes(P.stand, 1); petEyes(C, P.st === 'rise' ? 1 : 0);
-    petPlaceStand(P);
-    if (P.t >= 1.0) {
-      if (P.st === 'rise') { P.st = 'walk'; P.t = 0; P.path = petWanderPath(P); P.walkFor = 20 + Math.random() * 25; }
-      else { P.st = 'sleep'; P.t = 0; P.until = 240 + Math.random() * 300; petVis(P.stand, 0); petVis(C, 1); }
-    }
-  } else if (P.st === 'walk') {   // walking about, from place to place, then home
-    const S = P.stand, speed = (P.cat ? 0.24 : 0.3) * (P.cat ? 1 : Math.min(1.15, P.s)), tgt = P.path[0];
-    if (!tgt) { P.st = 'turn'; P.t = 0; P.turn0 = P.dir; }
-    else {
-      const dx = tgt.x - P.pos.x, dz = tgt.z - P.pos.z, d = Math.hypot(dx, dz), want = Math.atan2(-dz, dx);
-      let da = want - P.dir; da = Math.atan2(Math.sin(da), Math.cos(da)); P.dir += Math.max(-dt * 2.2, Math.min(dt * 2.2, da));
-      const go = Math.abs(da) < 1.2 ? speed * (d < 0.25 ? Math.max(0.35, d / 0.25) : 1) : speed * 0.3;
-      P.pos.x += Math.cos(P.dir) * go * dt; P.pos.z -= Math.sin(P.dir) * go * dt;
-      if (d < 0.08) P.path.shift();
-      if (P.t > P.walkFor && P.path.length > 1) P.path = [P.home.clone()];
-      P.ph += go * dt / (0.22 * P.s) * Math.PI;   // the gait: diagonal pairs of legs together, a step for every stride
-      petGait(P, go / speed);
-    }
-    petPlaceStand(P); petEyes(S, 1);
-  } else if (P.st === 'turn') {   // turns round in its bed before lying down
-    P.dir += dt * 2.6; P.ph += dt * 6; petGait(P, 0.5); petPlaceStand(P);
-    if (P.t > 1.4) { P.st = 'down'; P.t = 0; petGait(P, 0); }
+  } else if (P.st === 'turn') {   // round and round in its bed before lying down
+    P.gait = _petTo(P.gait, 0.55, 6, dt); P.ph += dt * 6; wantTailY = 0; wantTailW = 0.3 * Math.sin(t * 6);
+    P.dir += Math.min(dt * 2.4, Math.max(0, P.turnTo - P.dir)); P.pos.lerp(P.home, Math.min(1, dt * 3));
+    if (P.dir >= P.turnTo - 0.01) { P.st = 'down'; P.t = 0; }
+  } else if (P.st === 'down') {   // lies down: the back first, then the front, and the head goes down on the paws
+    const k = Math.min(1, P.t / 1.5); P.gait = _petTo(P.gait, 0, 8, dt);
+    wantLie = _petSm(k * 1.05); wantPitch = -0.1 * Math.sin(Math.PI * Math.min(1, k * 1.4)); wantHead = -0.32 * _petSm((k - 0.5) * 2); wantTailY = 0.95 * k; wantTailW = 1.0 * k;
+    open = 1 - _petSm((k - 0.6) / 0.4);
+    if (P.t >= 1.7) { P.st = 'sleep'; P.t = 0; P.until = 240 + Math.random() * 300; }
   }
-  // the standing body breathes too, and a dog wags its tail as it walks
-  if (P.stand && P.st !== 'sleep') { P.stand.U.uBreath.value = Math.sin(t * 2 * Math.PI / (per * 0.6)); if (!P.cat) P.stand.U.uTail.value = P.st === 'walk' ? 0.35 * Math.sin(t * 9) : 0; else P.stand.U.uTail.value = 0.12 * Math.sin(t * 1.3); }
+  // everything eases towards where it wants to be, so nothing jumps
+  P.lie = _petTo(P.lie, wantLie, P.st === 'rise' || P.st === 'down' ? 9 : 4, dt);
+  P.head = _petTo(P.head, wantHead, 5, dt); P.tailY = _petTo(P.tailY, wantTailY, 3, dt); P.tailW = _petTo(P.tailW, wantTailW, 6, dt); P.pitch = _petTo(P.pitch, wantPitch, 8, dt);
+  petEyes(B, open);
+  petPose(P, dt);
 }
-/** The standing body where the pet is now, facing the way it goes. */
-function petPlaceStand(P: any) { if (!P.stand) return; const g = P.stand.grp; g.position.set(P.pos.x, P.st === 'walk' ? Math.abs(Math.sin(P.ph)) * 0.006 * P.s : 0, P.pos.z); g.rotation.y = P.dir; }
-/** The legs in step: front left with hind right, front right with hind left. */
-function petGait(P: any, k: number) { const a = 0.42 * k, ph = P.ph; P.stand.U.uLegA.value.set(a * Math.sin(ph), a * Math.sin(ph + Math.PI), a * Math.sin(ph + Math.PI), a * Math.sin(ph)); }
-/** Two to four places to wander to, then back home. */
-function petWanderPath(P: any): any[] {
-  const pick = P.pts.slice().sort(() => Math.random() - 0.5), n = 2 + Math.floor(Math.random() * Math.min(3, pick.length - 1));
-  return pick.slice(0, Math.max(1, n)).map((v: any) => v.clone().add(new P.T.Vector3((Math.random() - 0.5) * 0.3, 0, (Math.random() - 0.5) * 0.3))).concat([P.home.clone()]);
+
+/** Is a straight walk from a to b clear (on the open floor, or in and out of its own bed by its front)? */
+function petClear(P: any, ax: number, az: number, bx: number, bz: number): boolean {
+  const f = P.room.free; if (!f) return true;
+  const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.1));
+  for (let i = 0; i <= n; i++) { const x = ax + (bx - ax) * i / n, z = az + (bz - az) * i / n; if (Math.hypot(x - P.home.x, z - P.home.z) < P.bedR + 0.15) continue; if (!f(x, z)) return false; }
+  return true;
+}
+/** Somewhere to go next: a spot on the open floor it can walk to in a straight line, preferably not close by. */
+function petNext(P: any, from: any): any {
+  const T = P.T, b = P.room.box || [P.home.x - 2.5, P.home.z - 0.2, P.home.x + 2.5, P.home.z + 4.5]; let best: any = null, bd = 0;
+  for (let i = 0; i < 40; i++) {
+    const x = b[0] + Math.random() * (b[2] - b[0]), z = b[1] + Math.random() * (b[3] - b[1]);
+    if (P.room.free && !P.room.free(x, z)) continue;
+    const d = Math.hypot(x - from.x, z - from.z); if (d < 0.7 || !petClear(P, from.x, from.z, x, z)) continue;
+    const sc = Math.min(d, 2.6) + Math.random() * 0.8; if (sc > bd) { bd = sc; best = new T.Vector3(x, 0, z); }
+  }
+  return best;
+}
+/** A stretch of the walk: out of the bed (by its front), a drink or a bite now and then, a few places with a sniff. */
+function petPlan(P: any): any[] {
+  const T = P.T, out: any[] = [], door = P.room.door ? new T.Vector3(P.room.door[0], 0, P.room.door[1]) : P.home.clone().add(new T.Vector3(0, 0, 0.9));
+  let from = P.pos.clone();
+  const inBed = Math.hypot(P.pos.x - P.home.x, P.pos.z - P.home.z) < P.bedR + 0.1;
+  // first, now and then, the bowls (eating or drinking where it can reach without leaving the bed's side)
+  if (inBed && Math.random() < 0.6) {
+    const lv: any = P.P, k = (lv.water || 0) > 0.05 && (Math.random() < 0.5 || (lv.food || 0) <= 0.05) ? 'water' : 'food';
+    if ((lv[k] || 0) > 0.05) { const at = P.eatAt[k].clone(), to = P.bowlAt[k]; const face = Math.atan2(-(to.z - at.z), to.x - at.x); out.push(Object.assign(at, { job: k === 'food' ? 'eat' : 'drink', face })); from = at; }
+  }
+  if (inBed || out.length) { out.push(door.clone()); from = door; }
+  for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) { const n = petNext(P, from); if (!n) break; if (Math.random() < 0.45) (n as any).job = 'sniff'; out.push(n); from = n; }
+  return out;
+}
+/** Back to bed: to the front of the bed by a clear way, then in. */
+function petPathHome(P: any): any[] {
+  const T = P.T, door = P.room.door ? new T.Vector3(P.room.door[0], 0, P.room.door[1]) : P.home.clone().add(new T.Vector3(0, 0, 0.9)), out: any[] = [];
+  if (!petClear(P, P.pos.x, P.pos.z, door.x, door.z)) { const mid = petNext(P, P.pos); if (mid && petClear(P, mid.x, mid.z, door.x, door.z)) out.push(mid); }
+  out.push(door); out.push(Object.assign(P.home.clone(), { home: true }));
+  return out;
 }
 
 /** Tapped in the office: it wakes for a moment, looks at you, and sleeps on (when it is up, it just looks). */
@@ -171,7 +246,7 @@ function petFurMat(T: any, U: any, coat: any, strands: boolean): any {
   m.onBeforeCompile = (sh: any) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
-      attribute vec4 pw; attribute vec4 lw; attribute float tw; uniform float uBreath, uHead, uEarL, uEarR, uTail, uPaw; uniform vec4 uLegA; uniform vec3 uNeck, uEarPL, uEarPR, uTailP, uLeg0, uLeg1, uLeg2, uLeg3; varying vec3 vObj;
+      attribute vec4 pw; attribute vec4 lw; attribute float tw; uniform float uBreath, uHead, uEarL, uEarR, uTail, uTailY, uPaw; uniform vec4 uLegA; uniform vec3 uNeck, uEarPL, uEarPR, uTailP, uLeg0, uLeg1, uLeg2, uLeg3; varying vec3 vObj;
       mat3 rotX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
       mat3 rotY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
       mat3 rotZ(float a) { float c = cos(a), s = sin(a); return mat3(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0); }
@@ -180,6 +255,7 @@ function petFurMat(T: any, U: any, coat: any, strands: boolean): any {
         p = mix(p, uLeg2 + rotZ(uLegA.z) * (p - uLeg2), lw.z); p = mix(p, uLeg3 + rotZ(uLegA.w) * (p - uLeg3), lw.w);
         p = mix(p, uEarPL + rotX(uEarL) * (p - uEarPL), pw.y); p = mix(p, uEarPR + rotX(-uEarR) * (p - uEarPR), pw.z);
         p = mix(p, uNeck + rotZ(uHead) * (p - uNeck), pw.x);
+        p = mix(p, uTailP + rotZ(uTailY * tw) * (p - uTailP), step(0.001, tw));
         p = mix(p, uTailP + rotY(uTail * tw) * (p - uTailP), step(0.001, tw));
         p.y += pw.w * uPaw * 0.012;
         float b = smoothstep(0.03, 0.16, p.y) * (1.0 - pw.x) * (1.0 - max(max(lw.x, lw.y), max(lw.z, lw.w))); p.y += b * uBreath * 0.01;
@@ -220,49 +296,102 @@ function petEditorHtml(p: Pet): string {
 
 
 /* ---------- the bowls ---------- */
-/** Two bowls side by side next to the bed: a glazed one of water, and one of food with your pet's name painted round it. */
-function petBowls(T: any, g: any, P: Pet, bedR: number) {
+/** Two bowls side by side next to the bed: a glazed one of water, and one of food with your pet's name painted on the
+ *  side that faces the room. Each shows how full it is (set(0…1)); tap the water to fill it, pick up the food bowl. */
+function petBowls(T: any, g: any, P: Pet, bedR: number, A?: any): any {
   const cat = P.kind === 'cat', r = cat ? 0.068 : 0.088, hgt = cat ? 0.042 : 0.052, x = bedR + r + 0.07, gap = r + 0.012;
-  const bc = new T.Color((PET_BEDS[P.bed] || PET_BEDS[0])[0]);
+  const bc = new T.Color((PET_BEDS[P.bed] || PET_BEDS[0])[0]), out: any = { x, gap, r, hgt };
   for (const side of [-1, 1]) {
     const food = side > 0, b = new T.Group(); b.position.set(x, 0, side * gap); g.add(b);
-    // the bowl: a heavy glazed bowl, wider at the foot, with a rolled rim and a hollow inside
-    const pts = [[0, 0], [r * 1.0, 0], [r * 1.04, 0.006], [r * 0.98, hgt * 0.92], [r * 0.95, hgt], [r * 0.9, hgt * 0.99], [r * 0.82, hgt * 0.35], [r * 0.6, hgt * 0.22], [0, hgt * 0.2]].map(p => new T.Vector2(p[0], p[1]));
-    const glaze = new T.MeshPhysicalMaterial({ color: food ? bc.clone().offsetHSL(0, -0.05, 0.08) : 0xF1EEE8, roughness: 0.18, clearcoat: 0.8, clearcoatRoughness: 0.08 });
-    const bowl = new T.Mesh(new T.LatheGeometry(pts, 48), glaze); bowl.castShadow = true; bowl.receiveShadow = true; b.add(bowl);
-    // inside: a white glaze
-    const inner = new T.Mesh(new T.CircleGeometry(r * 0.6, 32), new T.MeshPhysicalMaterial({ color: 0xF6F3EE, roughness: 0.15, clearcoat: 0.8 })); inner.rotation.x = -Math.PI / 2; inner.position.y = hgt * 0.205; b.add(inner);
-    // the name (food) or WATER, painted big on the side facing the room, with a paw print either side
-    const lab = food ? (P.name || (cat ? 'Kitty' : 'Buddy')).toUpperCase() : 'WATER', base = food ? bc.clone().offsetHSL(0, -0.05, 0.08) : new T.Color(0xF1EEE8);
-    const ink = food ? (base.r * 0.3 + base.g * 0.59 + base.b * 0.11 > 0.45 ? '#2A2420' : '#FFFFFF') : bc.getStyle();
-    const c = document.createElement('canvas'); c.width = 2048; c.height = 96; const x2 = c.getContext('2d') as CanvasRenderingContext2D;
-    x2.fillStyle = ink; x2.textAlign = 'center'; x2.textBaseline = 'middle';
-    let fs = 72; x2.font = `800 ${fs}px "Inter", "Segoe UI", Arial, sans-serif`;
-    while (x2.measureText(lab).width > 560 && fs > 30) { fs -= 2; x2.font = `800 ${fs}px "Inter", "Segoe UI", Arial, sans-serif`; }
-    x2.fillText(lab, 1024, 52);
-    const tw2 = x2.measureText(lab).width;
-    for (const px of [1024 - tw2 / 2 - 50, 1024 + tw2 / 2 + 50]) {
-      const py = 50; x2.beginPath(); x2.ellipse(px, py + 9, 15, 12, 0, 0, Math.PI * 2); x2.fill();
-      for (const [dx, dy] of [[-17, -10], [-6, -22], [6, -22], [17, -10]]) { x2.beginPath(); x2.ellipse(px + dx, py + dy, 5.5, 7, 0, 0, Math.PI * 2); x2.fill(); }
-    }
+    const bowl = petBowlMesh(T, P, food, r, hgt, bc); b.add(bowl.grp);
     b.rotation.y = Math.PI;   // the name faces the room (+z of the bed)
-    const tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
-    const band = new T.Mesh(new T.CylinderGeometry(r * 0.987, r * 1.025, hgt * 0.5, 64, 1, true), new T.MeshPhysicalMaterial({ map: tex, transparent: true, roughness: 0.2, clearcoat: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
-    band.position.y = hgt * 0.47; b.add(band);
-    if (food) {   // a heap of kibble (a cat's is smaller)
-      const n = cat ? 140 : 110, kg = new T.DodecahedronGeometry(cat ? 0.0042 : 0.0062, 0), km = new T.MeshStandardMaterial({ roughness: 0.75 }), im = new T.InstancedMesh(kg, km, n), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), col = new T.Color();
-      let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-      for (let i = 0; i < n; i++) {
-        const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * r * 0.74, y = hgt * 0.24 + (1 - rr / (r * 0.74)) * hgt * 0.55 * rnd() + rnd() * 0.006;
-        e.set(rnd() * 6, rnd() * 6, rnd() * 6); q.setFromEuler(e); const sc = 0.8 + rnd() * 0.5;
-        m4.compose(new T.Vector3(Math.cos(a) * rr, y, Math.sin(a) * rr), q, new T.Vector3(sc, sc * 0.7, sc)); im.setMatrixAt(i, m4);
-        col.setHSL(0.07 + rnd() * 0.03, 0.55, 0.22 + rnd() * 0.12); im.setColorAt(i, col);
-      }
-      im.castShadow = true; b.add(im);
-    } else {   // still water, with a soft glint
-      const w = new T.Mesh(new T.CircleGeometry(r * 0.86, 40), new T.MeshPhysicalMaterial({ color: 0x9CC4D6, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.55, clearcoat: 1 }));
-      w.rotation.x = -Math.PI / 2; w.position.y = hgt * 0.72; b.add(w);
+    const hit = new T.Mesh(new T.CylinderGeometry(r * 1.15, r * 1.15, hgt * 1.6, 16), new T.MeshBasicMaterial({ visible: false })); hit.position.y = hgt * 0.6; hit.userData.act = food ? 'bowl-food' : 'bowl-water'; b.add(hit);
+    if (A) { A.hits = A.hits || []; A.hits.push(hit); }
+    out[food ? 'food' : 'water'] = Object.assign(bowl, { holder: b });
+  }
+  return out;
+}
+/** One bowl with what is in it: the glazed bowl, the name or WATER painted on it, kibble or water. */
+function petBowlMesh(T: any, P: Pet, food: boolean, r: number, hgt: number, bc: any): any {
+  const cat = P.kind === 'cat', grp = new T.Group();
+  // a heavy glazed bowl, wider at the foot, with a rolled rim and a hollow inside
+  const pts = [[0, 0], [r * 1.0, 0], [r * 1.04, 0.006], [r * 0.98, hgt * 0.92], [r * 0.95, hgt], [r * 0.9, hgt * 0.99], [r * 0.82, hgt * 0.35], [r * 0.6, hgt * 0.22], [0, hgt * 0.2]].map(p => new T.Vector2(p[0], p[1]));
+  const base = food ? bc.clone().offsetHSL(0, -0.05, 0.08) : new T.Color(0xF1EEE8);
+  const bowl = new T.Mesh(new T.LatheGeometry(pts, 64), new T.MeshPhysicalMaterial({ color: base, roughness: 0.18, clearcoat: 0.8, clearcoatRoughness: 0.08 })); bowl.castShadow = true; bowl.receiveShadow = true; grp.add(bowl);
+  const inner = new T.Mesh(new T.CircleGeometry(r * 0.6, 32), new T.MeshPhysicalMaterial({ color: 0xF6F3EE, roughness: 0.15, clearcoat: 0.8 })); inner.rotation.x = -Math.PI / 2; inner.position.y = hgt * 0.205; grp.add(inner);
+  // the name (food) or WATER, painted big on one side, with a paw print either side
+  const lab = food ? (P.name || (cat ? 'Kitty' : 'Buddy')).toUpperCase() : 'WATER';
+  const ink = food ? (base.r * 0.3 + base.g * 0.59 + base.b * 0.11 > 0.45 ? '#2A2420' : '#FFFFFF') : bc.getStyle();
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 128; const x2 = c.getContext('2d') as CanvasRenderingContext2D;
+  x2.fillStyle = ink; x2.textAlign = 'center'; x2.textBaseline = 'middle';
+  let fs = 96; x2.font = `800 ${fs}px "Inter", "Segoe UI", Arial, sans-serif`;
+  while (x2.measureText(lab).width > 560 && fs > 36) { fs -= 2; x2.font = `800 ${fs}px "Inter", "Segoe UI", Arial, sans-serif`; }
+  x2.fillText(lab, 1024, 68);
+  const tw2 = x2.measureText(lab).width;
+  for (const px of [1024 - tw2 / 2 - 60, 1024 + tw2 / 2 + 60]) {
+    const py = 66; x2.beginPath(); x2.ellipse(px, py + 11, 19, 15, 0, 0, Math.PI * 2); x2.fill();
+    for (const [dx, dy] of [[-21, -12], [-7, -27], [7, -27], [21, -12]]) { x2.beginPath(); x2.ellipse(px + dx, py + dy, 7, 9, 0, 0, Math.PI * 2); x2.fill(); }
+  }
+  const tex = new T.CanvasTexture(c); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
+  const band = new T.Mesh(new T.CylinderGeometry(r * 0.987, r * 1.025, hgt * 0.56, 96, 1, true), new T.MeshPhysicalMaterial({ map: tex, transparent: true, roughness: 0.2, clearcoat: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  band.position.y = hgt * 0.47; grp.add(band);
+  const o: any = { grp, r, hgt, food, level: 1 };
+  if (food) {   // kibble, heaped from the bottom up (a cat's is smaller)
+    const n = cat ? 160 : 130, kg = new T.DodecahedronGeometry(cat ? 0.0042 : 0.0062, 0), km = new T.MeshStandardMaterial({ roughness: 0.75 }), im = new T.InstancedMesh(kg, km, n), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), col = new T.Color();
+    let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const L: any[] = [];
+    for (let i = 0; i < n; i++) { const a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * r * 0.74, y = hgt * 0.24 + (1 - rr / (r * 0.74)) * hgt * 0.55 * rnd() + rnd() * 0.006; L.push([a, rr, y, rnd() * 6, rnd() * 6, rnd() * 6, 0.8 + rnd() * 0.5, 0.07 + rnd() * 0.03, 0.22 + rnd() * 0.12]); }
+    L.sort((p, q2) => p[2] - q2[2]);   // the lowest first: a part-full bowl has the bottom ones
+    L.forEach((k, i) => { e.set(k[3], k[4], k[5]); q.setFromEuler(e); m4.compose(new T.Vector3(Math.cos(k[0]) * k[1], k[2], Math.sin(k[0]) * k[1]), q, new T.Vector3(k[6], k[6] * 0.7, k[6])); im.setMatrixAt(i, m4); col.setHSL(k[7], 0.55, k[8]); im.setColorAt(i, col); });
+    im.castShadow = true; grp.add(im); o.im = im; o.n = n; o.kg = kg; o.km = km;
+    o.set = (v: number) => { o.level = Math.max(0, Math.min(1, v)); im.count = Math.round(n * o.level); im.visible = im.count > 0; };
+  } else {   // still water, with a soft glint
+    const w = new T.Mesh(new T.CircleGeometry(1, 48), new T.MeshPhysicalMaterial({ color: 0x9CC4D6, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.55, clearcoat: 1 }));
+    w.rotation.x = -Math.PI / 2; grp.add(w); o.w = w;
+    o.set = (v: number) => { o.level = Math.max(0, Math.min(1, v)); const y = hgt * (0.23 + 0.52 * o.level), rad = r * (0.6 + 0.3 * Math.min(1, (y - hgt * 0.22) / (hgt * 0.7))); w.position.y = y; w.scale.setScalar(rad); w.visible = o.level > 0.02; };
+  }
+  o.set(1);
+  return o;
+}
+
+/** Filled up (only to look at): water pours in from above and rises; kibble rains in and heaps up. */
+function petRefill(A: any, k: 'food' | 'water') {
+  const P = A && A.pet; if (!P || P.fill) return false;
+  const lv: any = P.P; if ((lv[k] || 0) > 0.97) return false;
+  P.fill = { k, t: 0, from: lv[k] || 0 }; try { Sound.tick(); } catch (e) { /* no sound */ }
+  return true;
+}
+function petFillStep(P: any, dt: number) {
+  const F = P.fill; if (!F) return;
+  const T = P.T, B = P.bowls[F.k], D = 1.8; F.t += dt;
+  const k = Math.min(1, F.t / D), lv: any = P.P;
+  if (F.k === 'water') {
+    // the stream from the jug, thinning out at the end
+    if (!F.mesh) { F.mesh = new T.Mesh(new T.CylinderGeometry(0.004, 0.0065, 1, 10, 1, true), new T.MeshPhysicalMaterial({ color: 0xBFE3F2, roughness: 0.05, transparent: true, opacity: 0.6 })); B.grp.add(F.mesh); }
+    const top = 0.45, surf = B.hgt * (0.23 + 0.52 * B.level), on = k < 0.9 ? 1 : 1 - (k - 0.9) / 0.1;
+    F.mesh.scale.set(on, top - surf, on); F.mesh.position.set(0.01, (top + surf) / 2, 0); F.mesh.visible = on > 0.02;
+    B.set(F.from + (1 - F.from) * _petSm(k * 1.1));
+    if (B.w) B.w.scale.multiplyScalar(1 + 0.03 * Math.sin(F.t * 40) * (1 - k));   // ripples
+  } else {
+    // a shower of kibble falling in, each piece landing on the heap
+    if (!F.im) {
+      F.im = new T.InstancedMesh(B.kg, B.km, 40); F.drops = []; for (let i = 0; i < 40; i++) F.drops.push([Math.random() * 0.9, (Math.random() - 0.5) * B.r * 0.9, (Math.random() - 0.5) * B.r * 0.9, Math.random() * 6]);
+      const c = new T.Color(); for (let i = 0; i < 40; i++) { c.setHSL(0.07 + Math.random() * 0.03, 0.55, 0.22 + Math.random() * 0.12); F.im.setColorAt(i, c); }
+      B.grp.add(F.im);
     }
+    const m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), heapY = B.hgt * (0.3 + 0.45 * B.level);
+    F.drops.forEach((d: number[], i: number) => {
+      const tt = F.t - d[0] * D * 0.7, y = 0.4 - 0.5 * 9.8 * Math.max(0, tt) * Math.max(0, tt);
+      const landed = y <= heapY, sc = tt < 0 || landed ? 0 : 1;
+      e.set(d[3] + F.t * 8, d[3], 0); q.setFromEuler(e); m4.compose(new T.Vector3(d[1], Math.max(heapY, y), d[2]), q, new T.Vector3(sc, sc * 0.7, sc)); F.im.setMatrixAt(i, m4);
+    });
+    F.im.instanceMatrix.needsUpdate = true;
+    B.set(F.from + (1 - F.from) * _petSm((k - 0.15) / 0.85));
+  }
+  if (F.t >= D) {
+    if (F.mesh) { B.grp.remove(F.mesh); F.mesh.geometry.dispose(); }
+    if (F.im) B.grp.remove(F.im);
+    lv[F.k] = 1; B.set(1); P.fill = null; try { Store.soon(); } catch (e) { /* later */ }
   }
 }
 
@@ -279,15 +408,24 @@ function petPreviewDraw(P: Pet) {
     const fl = new T.Mesh(new T.CircleGeometry(1.2, 48), new T.MeshStandardMaterial({ color: 0x5a3b26, roughness: 0.8 })); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; sc.add(fl);
     const S: any = State, keep = S.pet; S.pet = P; const A: any = {};
     try { petPlace(T, sc, A, [0, 0], 0); } finally { S.pet = keep; }
-    if (A.pet) { A.pet.curl.U.uBreath.value = 0; }
+    if (A.pet) { A.pet.body.U.uBreath.value = 0; }
     const cam = new T.PerspectiveCamera(32, W / H, 0.01, 20); cam.position.set(0.55, 0.62, 1.05); cam.lookAt(0.2, 0.05, 0.02);
     ren.render(sc, cam);
     const x = cv.getContext('2d') as CanvasRenderingContext2D; x.clearRect(0, 0, W, H); x.drawImage(ren.domElement, 0, 0, W, H);
-    sc.traverse((o: any) => { if (o.material && o.geometry && !o.geometry.userData.keep && o.geometry !== (A.pet && A.pet.curl.sc.geo) && o.geometry !== (A.pet && A.pet.curl.sc.strands)) o.geometry.dispose(); });
+    sc.traverse((o: any) => { if (o.material && o.geometry && !o.geometry.userData.keep && o.geometry !== (A.pet && A.pet.body.sc.geo) && o.geometry !== (A.pet && A.pet.body.sc.strands)) o.geometry.dispose(); });
   } catch (e) { /* no picture */ }
 }
 
 /* ---------- the sculpted body: shapes melted into one smooth surface, and its fur ---------- */
+/** A smooth curve (Catmull-Rom) through the points, in n pieces. */
+function petTailCurve(pts: number[][], n: number): number[][] {
+  const P = [pts[0].map((v, i) => 2 * v - pts[1][i])].concat(pts, [pts[pts.length - 1].map((v, i) => 2 * v - pts[pts.length - 2][i])]), out: number[][] = [], segs = pts.length - 1;
+  for (let k = 0; k <= n; k++) {
+    const u = k / n * segs, i = Math.min(segs - 1, Math.floor(u)), t = u - i, p0 = P[i], p1 = P[i + 1], p2 = P[i + 2], p3 = P[i + 3], t2 = t * t, t3 = t2 * t;
+    out.push([0, 1, 2].map(j => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
+  }
+  return out;
+}
 type PetPrim = { k: 'e' | 'c'; a: number[]; b?: number[]; r: number[]; part?: string; light?: number; dark?: number; paint?: boolean };
 type PetShapes = { prims: PetPrim[]; tail: number[][]; tailR: number[]; neck: number[]; earL: number[]; earR: number[]; nose: number[]; noseR: number; eyes: any[]; legs?: number[][]; fwd?: number[] };
 const _petCache: { [k: string]: any } = {};
@@ -336,7 +474,9 @@ function petStand(P: Pet, s: number): PetShapes {
 function petSculpt(T: any, P: Pet, s: number, pose: 'curl' | 'stand'): any {
   const key = JSON.stringify([P.kind, petCoatHex(P), petLightHex(P), P.size, P.ears, s, pose]); if (_petCache[key]) return _petCache[key];
   const cat = P.kind === 'cat', D = pose === 'stand' ? petStand(P, s) : petCurl(P, s), prims = D.prims.slice();
-  for (let i = 0; i < D.tail.length - 1; i++) { const f0 = i / (D.tail.length - 1), f1 = (i + 1) / (D.tail.length - 1); prims.push({ k: 'c', a: D.tail[i], b: D.tail[i + 1], r: [D.tailR[0] + (D.tailR[1] - D.tailR[0]) * f0, D.tailR[0] + (D.tailR[1] - D.tailR[0]) * f1], part: 't' + i }); }
+  // the tail: a smooth curve through its points (Catmull-Rom), in many short pieces, tapering to the tip
+  const tc = petTailCurve(D.tail, 14), nT = tc.length - 1;
+  for (let i = 0; i < nT; i++) { const f0 = i / nT, f1 = (i + 1) / nT, rr = (f: number) => D.tailR[0] + (D.tailR[1] - D.tailR[0]) * f - D.tailR[1] * 0.35 * Math.max(0, f - 0.75) / 0.25; prims.push({ k: 'c', a: tc[i], b: tc[i + 1], r: [rr(f0), rr(f1)], part: 't' + Math.floor(i * (D.tail.length - 1) / nT) }); }
   const K = 0.03 * s;
   const ell = (p: number[], c: number[], r: number[]) => { const x = (p[0] - c[0]) / r[0], y = (p[1] - c[1]) / r[1], z = (p[2] - c[2]) / r[2], k0 = Math.sqrt(x * x + y * y + z * z), k1 = Math.sqrt(x * x / (r[0] * r[0]) + y * y / (r[1] * r[1]) + z * z / (r[2] * r[2])); return k1 > 1e-9 ? k0 * (k0 - 1) / k1 : -Math.min(r[0], r[1], r[2]); };
   const cap = (p: number[], a: number[], b: number[], r: number[]) => { const ba = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], pa = [p[0] - a[0], p[1] - a[1], p[2] - a[2]], L2 = ba[0] * ba[0] + ba[1] * ba[1] + ba[2] * ba[2]; let h = (pa[0] * ba[0] + pa[1] * ba[1] + pa[2] * ba[2]) / L2; h = h < 0 ? 0 : h > 1 ? 1 : h; const dx = pa[0] - ba[0] * h, dy = pa[1] - ba[1] * h, dz = pa[2] - ba[2] * h; return Math.sqrt(dx * dx + dy * dy + dz * dz) - (r[0] + (r[1] - r[0]) * h); };
@@ -392,12 +532,14 @@ function petSculpt(T: any, P: Pet, s: number, pose: 'curl' | 'stand'): any {
     const earW = Math.max(pw[v * 4 + 1], pw[v * 4 + 2]); if (earW > 0.4 && (cat || P.ears === 'pointy')) tmp.lerp(pink, Math.min(1, (earW - 0.4) * 2.5) * Math.max(0, Math.min(1, (n[0] * fw[0] + n[2] * fw[2] - 0.1) * 2.2)));
     col[v * 3] = tmp.r; col[v * 3 + 1] = tmp.g; col[v * 3 + 2] = tmp.b;
     // how long the fur is here: short on the face and ears, long on the chest ruff and the tail
-    len[v] = (0.011 * (1 - pw[v * 4]) + 0.006 * pw[v * 4]) * (1 + 0.6 * lk * (1 - pw[v * 4])) * (1 + 1.1 * tw[v]) * (earW > 0.4 ? 0.45 : 1) * s;
+    len[v] = (0.011 * (1 - pw[v * 4]) + 0.006 * pw[v * 4]) * (1 + 0.6 * lk * (1 - pw[v * 4])) * (1 + 0.45 * tw[v]) * (earW > 0.4 ? 0.45 : 1) * s;
   }
   const geo = new T.BufferGeometry();
   geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new T.BufferAttribute(nor, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
   geo.setAttribute('pw', new T.BufferAttribute(pw, 4)); geo.setAttribute('lw', new T.BufferAttribute(lw, 4)); geo.setAttribute('tw', new T.BufferAttribute(tw, 1)); geo.setIndex(idx);
-  const strands = petStrands(T, pos, nor, col, pw, lw, tw, len, idx, cat ? 5200 : 7000, s, fw);
+  // along the tail, the fur lies towards its tip
+  const tailDir = (p: number[]) => { let bi = 0, bd = 1e9; for (let i = 0; i < nT; i++) { const m = tc[i], d2 = (p[0] - m[0]) ** 2 + (p[1] - m[1]) ** 2 + (p[2] - m[2]) ** 2; if (d2 < bd) { bd = d2; bi = i; } } const a2 = tc[bi], b2 = tc[bi + 1], d = [b2[0] - a2[0], b2[1] - a2[1], b2[2] - a2[2]], l = Math.hypot(d[0], d[1], d[2]) || 1; return [d[0] / l, d[1] / l, d[2] / l]; };
+  const strands = petStrands(T, pos, nor, col, pw, lw, tw, len, idx, cat ? 5200 : 7000, s, fw, tailDir);
   const V = (a: number[]) => new T.Vector3(a[0], a[1], a[2]);
   const legs = (D.legs || [D.neck, D.neck, D.neck, D.neck]).map(V);
   const out = { geo, strands, neck: V(D.neck), earL: V(D.earL), earR: V(D.earR), tailBase: V(D.tail[0]), nose: V(D.nose), noseR: D.noseR, legs, fwd: V(fw), eyes: D.eyes.map(x => ({ at: V(x.at), len: x.len, rx: x.rx, ry: x.ry, rz: x.rz })), verts: nV + strands.attributes.position.count };
@@ -405,7 +547,7 @@ function petSculpt(T: any, P: Pet, s: number, pose: 'curl' | 'stand'): any {
 }
 
 /** Strands of fur over the body: fine tapering hairs laid back along it (down the legs), lighter at the tips. */
-function petStrands(T: any, pos: number[], nor: Float32Array, col: Float32Array, pw: Float32Array, lw: Float32Array, tw: Float32Array, len: Float32Array, idx: number[], N: number, s: number, fw: number[]): any {
+function petStrands(T: any, pos: number[], nor: Float32Array, col: Float32Array, pw: Float32Array, lw: Float32Array, tw: Float32Array, len: Float32Array, idx: number[], N: number, s: number, fw: number[], tailDir?: (p: number[]) => number[]): any {
   const nT = idx.length / 3, cum = new Float32Array(nT); let tot = 0;
   const P = (i: number) => [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
   for (let t = 0; t < nT; t++) { const a = P(idx[t * 3]), b = P(idx[t * 3 + 1]), c = P(idx[t * 3 + 2]); const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], w = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]; tot += 0.5 * Math.hypot(u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]); cum[t] = tot; }
@@ -418,10 +560,11 @@ function petStrands(T: any, pos: number[], nor: Float32Array, col: Float32Array,
     const n = [0, 1, 2].map(j => nor[ia * 3 + j] * w0 + nor[ib * 3 + j] * u + nor[ic * 3 + j] * v); const nl = Math.hypot(n[0], n[1], n[2]) || 1; n[0] /= nl; n[1] /= nl; n[2] /= nl;
     // the way the hair lies: back along the body, down the legs
     const leg = Math.max(lw[ia * 4], lw[ia * 4 + 1], lw[ia * 4 + 2], lw[ia * 4 + 3]);
-    let d = [-fw[0] * (1 - leg), -0.35 - 0.65 * leg, -fw[2] * (1 - leg)]; const dn = d[0] * n[0] + d[1] * n[1] + d[2] * n[2]; d = [d[0] - n[0] * dn, d[1] - n[1] * dn, d[2] - n[2] * dn]; const dl = Math.hypot(d[0], d[1], d[2]) || 1; d = d.map(x => x / dl);
+    const onTail = tailDir && tw[ia] > 0.2;
+    let d = onTail ? tailDir(p) : [-fw[0] * (1 - leg), -0.35 - 0.65 * leg, -fw[2] * (1 - leg)]; const dn = d[0] * n[0] + d[1] * n[1] + d[2] * n[2]; d = [d[0] - n[0] * dn, d[1] - n[1] * dn, d[2] - n[2] * dn]; const dl = Math.hypot(d[0], d[1], d[2]) || 1; d = d.map(x => x / dl);
     const L = len[ia] * (0.7 + 0.6 * rnd()), wd = 0.0011 * s;
     const sd = [n[1] * d[2] - n[2] * d[1], n[2] * d[0] - n[0] * d[2], n[0] * d[1] - n[1] * d[0]];
-    const tip = [p[0] + d[0] * L + n[0] * L * 0.4, p[1] + d[1] * L + n[1] * L * 0.4, p[2] + d[2] * L + n[2] * L * 0.4];
+    const lift = onTail ? 0.12 : 0.4, tip = [p[0] + d[0] * L + n[0] * L * lift, p[1] + d[1] * L + n[1] * L * lift, p[2] + d[2] * L + n[2] * L * lift];
     V.push(p[0] - sd[0] * wd, p[1] - sd[1] * wd, p[2] - sd[2] * wd, p[0] + sd[0] * wd, p[1] + sd[1] * wd, p[2] + sd[2] * wd, tip[0], tip[1], tip[2]);
     for (let q = 0; q < 3; q++) { Nn.push(n[0], n[1], n[2]); const k2 = q === 2 ? 1.14 : 0.86; C.push(Math.min(1, col[ia * 3] * k2), Math.min(1, col[ia * 3 + 1] * k2), Math.min(1, col[ia * 3 + 2] * k2)); for (let j = 0; j < 4; j++) { PW.push(pw[ia * 4 + j]); LW.push(lw[ia * 4 + j]); } TW.push(tw[ia]); }
   }

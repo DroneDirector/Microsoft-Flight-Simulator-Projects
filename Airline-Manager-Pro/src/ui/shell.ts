@@ -55,6 +55,7 @@ function renderTopbar() {
       <span class="co-text"><b>${esc(c.name)}</b><small>${div ? esc(div.name) + ' division' : (c.divisions.length ? 'All divisions' : esc(myPilot().name))}</small></span>
       ${icon('down', 'co-chev')}
     </button>
+    ${finHoldHtml()}
     ${Mode.coop() ? `<button class="mode-chip" data-act="go" data-screen="coop" aria-label="Co-op mode. Open Co-op">${icon('coop')}<span>Co-op</span><em>${coopState() ? coopState().members.filter((m: any) => m.online || m.you).length : 1}</em></button>` : ''}
     <button class="link-pill ${b.pc === 'connected' ? 'ok' : 'warn'}" data-act="link-panel" aria-label="${linkTxt}. Open connection details">
       <i class="link-led"></i>${icon(st === 'connected' && Link.via !== 'wifi' ? 'cell' : 'wifi')}<span>${linkTxt}</span><em>${b.pc === 'connected' && Link.latency ? Link.latency + ' ms' : ''}</em>

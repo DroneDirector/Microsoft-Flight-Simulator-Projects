@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.93 (2026-11-03)
+
+- family photo from your look and State.family.partner (look editor: You / Your wife or husband, height sliders); room-notes.ts (court quiet, room cards, screen notifications, ask then 3D); pets: one body that lies down and gets up (fold legs, lowered), Catmull-Rom tail with fur along it, walks of about a minute with ofFree collision checks, eating and drinking, bowl levels and refill animations, food bowl picked up kneeling with aimed hands (humanHandAim, legs in selfPose); career-start.ts (finances on hold, yearly registration); delete all saves with a ten-second hold (amp-nogame); profit charts from the books for fresh games
+
 ## 0.9.92 (2026-11-03)
 
 - start screen quiet: toasts, game pop-ups (deferred until it closes), badge reveals, sounds and voices are held back while it is up unless you just tapped or pressed a key (titleQuiet); voices stop when it opens

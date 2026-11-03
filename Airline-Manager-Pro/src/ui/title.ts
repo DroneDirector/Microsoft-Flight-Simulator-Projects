@@ -89,9 +89,9 @@ function titleHtml(): string {
     <div class="ts-left">
       <div class="ts-logo" aria-label="${esc(APP.name)}"><span class="ts-l1">Airline</span><span class="ts-l2">Manager</span><span class="ts-l3">Pro</span></div>
       <nav class="ts-nav">
-        ${item('ts-continue', 'play', 'Continue', co ? esc(co.name) : 'Back into the game')}
+        ${Store.nogame() ? '' : item('ts-continue', 'play', 'Continue', co ? esc(co.name) : 'Back into the game')}
         ${item('ts-new', 'plus', 'New game', 'Create your pilot and airline')}
-        ${item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
+        ${Store.nogame() ? '' : item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
         ${item('ts-load', 'download', 'Load game', 'Pick up any save')}
         ${item('ts-options', 'gear', 'Options', 'Every setting')}
         ${item('ts-quit', 'power', 'Quit', 'Hold to close')}
@@ -339,6 +339,7 @@ function titleNewGame() {
     onAccept: (lk, idt) => {
       (window as any).__ngPilot = { look: lk, sex: lk.sex, name: (idt && idt.name) || 'Capt. New Pilot', dob: idt && idt.dob, nat: idt && idt.nat };
       setTimeout(() => {
+        _tsInput = performance.now();   // the next step of what you are doing, not a message from the game
         ACTIONS['fs-scratch'](null as any, null as any);
         const n = $('.fs-pilot') as HTMLInputElement; if (n) { n.value = (window as any).__ngPilot.name; const f = n.closest('.field') as HTMLElement; if (f) f.style.display = 'none'; }
         const d = $('.fs-modal .fs-diff') as HTMLElement; if (d) d.remove();   // chosen with the pilot
@@ -372,6 +373,7 @@ function titleSlots(mode: 'save' | 'load') {
   titlePanel(mode, `<div class="ts-ph"><h2>${mode === 'save' ? 'Save game' : 'Load game'}</h2><button class="ts-x" data-act="ts-panel-close" aria-label="Close">${icon('close')}</button></div>
     <p class="ts-p">${mode === 'save' ? 'Pick a slot. The whole airline is saved: money, staff, every aircraft, where each one is in the air or on the ground, the markets and the other airlines.' : 'Pick a save. Everything goes back to that moment: money, staff, the aircraft (in the air where they were), the markets and the other airlines.'}</p>
     <div class="ts-slots">${Array.from({ length: GameSaves.N }, (_, i) => row(i + 1)).join('')}</div>
+    ${mode === 'save' ? `<div class="ts-danger"><label class="ts-tick"><input type="checkbox" data-ts-delbk><span></span>Also delete the automatic backups</label><button class="ts-pb danger" data-act="ts-delall">${icon('trash')}Delete all saves</button></div>` : ''}
     ${mode === 'load' ? `<h3 class="ts-h3">Automatic backups</h3><div class="ts-slots auto">${auto.length ? auto.map((r: any) => `<button class="ts-slot" data-act="ts-auto-load" data-i="${r.i}"><span class="ts-sn">A${r.i}</span><span class="ts-si"><b>Backup ${r.i}</b><small>${esc(dateStr(new Date(r.at)).slice(0, 10))} ${esc(new Date(r.at).toTimeString().slice(0, 5))}</small></span></button>`).join('') : '<small class="ts-p">None yet.</small>'}</div>
       <div class="ts-row"><button class="ts-pb" data-act="backup-import">${icon('download')}Open a backup file</button></div>` : ''}`);
 }
@@ -416,6 +418,65 @@ ACTIONS['title-open'] = () => {
   try { saveNow(true); } catch (e) { /* ignore */ }
   titleOpen();
 };
+
+/* ---------- deleting every save ---------- */
+ACTIONS['ts-delall'] = () => {
+  const bk = !!(document.querySelector('[data-ts-delbk]') as HTMLInputElement || {} as any).checked; Sound.tick();
+  if (bk) {
+    titlePanel('save', `<div class="ts-ph"><h2>Delete the backups too?</h2><button class="ts-x" data-act="ts-save" aria-label="Back">${icon('close')}</button></div>
+      <p class="ts-p">Are you sure you want to delete the automatic backups as well? Your game and all your saves are deleted too, and nothing is left to go back to.</p>
+      <div class="ts-row"><button class="ts-pb danger" data-act="ts-delhold" data-bk="1">${icon('trash')}Yes, delete everything</button><button class="ts-pb" data-act="ts-save">No</button></div>`);
+    return;
+  }
+  ACTIONS['ts-delhold'](document.createElement('b'), null as any);
+};
+/** The hold-to-delete button: hold it for ten seconds (let go and nothing happens), so it never happens by mistake. */
+ACTIONS['ts-delhold'] = el => {
+  const bk = el && el.getAttribute && el.getAttribute('data-bk') === '1', r = 56, c = (2 * Math.PI * r).toFixed(1);
+  titlePanel('save', `<div class="ts-ph"><h2>Delete ${bk ? 'everything' : 'all saves'}</h2><button class="ts-x" data-act="ts-save" aria-label="Back">${icon('close')}</button></div>
+    <p class="ts-p">${bk ? 'Your game, all 20 saves and the automatic backups are deleted.' : 'Your game and all 20 saves are deleted. The automatic backups are kept: you can load one of them, or start a new game.'} Hold the button for ten seconds: let go and nothing is deleted.</p>
+    <div class="ts-holdw"><button class="ts-hold" data-ts-hold aria-label="Hold to delete"><svg viewBox="0 0 124 124" aria-hidden="true"><circle cx="62" cy="62" r="${r}" class="th-track"/><circle cx="62" cy="62" r="${r}" class="th-fill" stroke-dasharray="${c}" stroke-dashoffset="${c}" data-c="${c}"/></svg><span class="th-core">${icon('trash')}</span></button><small data-ts-hint>Press and hold</small></div>
+    <div class="ts-row"><button class="ts-pb" data-act="ts-save">Cancel</button></div>`);
+  const btn = TitleScreen.root.querySelector('[data-ts-hold]') as HTMLElement, fill = btn.querySelector('.th-fill') as SVGElement, hint = TitleScreen.root.querySelector('[data-ts-hint]') as HTMLElement, C = parseFloat(fill.getAttribute('data-c'));
+  let raf = 0, t0 = 0, last = 0;
+  const stop = () => { if (!raf) return; cancelAnimationFrame(raf); raf = 0; btn.classList.remove('holding'); btn.style.setProperty('--k', '0'); fill.setAttribute('stroke-dashoffset', String(C)); hint.textContent = 'Press and hold'; };
+  const step = (now: number) => {
+    const k = Math.min(1, (now - t0) / 10000); fill.setAttribute('stroke-dashoffset', (C * (1 - k)).toFixed(1)); btn.style.setProperty('--k', k.toFixed(3));
+    const s = Math.ceil(10 - k * 10); hint.textContent = k < 1 ? `Keep holding… ${s}` : 'Deleting…';
+    if (Math.floor(k * 10) > last) { last = Math.floor(k * 10); Haptics.pulse(8 + last * 2); }
+    if (k >= 1) { raf = 0; btn.classList.add('done'); Haptics.success(); setTimeout(() => titleDeleteAll(bk), 500); return; }
+    raf = requestAnimationFrame(step);
+  };
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); stop(); t0 = performance.now(); last = 0; btn.classList.add('holding'); raf = requestAnimationFrame(step); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(k => btn.addEventListener(k, stop));
+  btn.addEventListener('keydown', (e: KeyboardEvent) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !raf) { e.preventDefault(); t0 = performance.now(); last = 0; btn.classList.add('holding'); raf = requestAnimationFrame(step); } });
+  btn.addEventListener('keyup', stop); btn.addEventListener('contextmenu', e => e.preventDefault());
+};
+/** Delete the game and every save (and the automatic backups too, when asked); then the start screen again, with only
+ *  New game and Load game. Nothing is saved until one of them is used. */
+function titleDeleteAll(withBackups: boolean) {
+  try { localStorage.setItem('amp-nogame', '1'); } catch (e) { /* ignore */ }
+  try { (Mode as any).switching = true; clearTimeout((Store as any)._nativeTimer); (Store as any)._native = ''; } catch (e) { /* ignore */ }
+  const jobs: Promise<any>[] = [];
+  try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
+  const T = Store.native();
+  if (T && T.backupWrite) jobs.push(T.backupWrite({ data: '' }).catch(() => { /* gone */ }));   // the phone's own copy of the game
+  for (let i = 1; i <= GameSaves.N; i++) jobs.push(GameSaves.write(i, '').catch(() => { /* gone */ }));
+  try { localStorage.removeItem('amp.gameSaves'); } catch (e) { /* ignore */ }
+  if (withBackups) {
+    for (let i = 1; i <= 5; i++) {
+      if (T && T.backupWrite) jobs.push(T.backupWrite({ data: '', name: `save-${i}.json` }).catch(() => { /* gone */ }));
+      else if (DESKTOP) jobs.push(fetch('/api/saves?slot=' + i, { method: 'DELETE' }).catch(() => { /* gone */ }));
+      else { try { localStorage.removeItem('amp.save.' + i); } catch (e) { /* ignore */ } }
+    }
+    try { localStorage.removeItem('amp.saveSlots'); } catch (e) { /* ignore */ }
+  }
+  try { localStorage.removeItem('amp-resume'); localStorage.removeItem('amp-ui'); } catch (e) { /* ignore */ }
+  Promise.all(jobs).then(() => {
+    toast(withBackups ? 'Everything is deleted' : 'All saves are deleted. The backups are kept.', 'info');
+    setTimeout(() => location.reload(), 900);
+  });
+}
 
 /* ---------- twenty saves ---------- */
 // Each save is the whole airline as it was at that moment. On the phone, files in the app's own storage; on the PC,

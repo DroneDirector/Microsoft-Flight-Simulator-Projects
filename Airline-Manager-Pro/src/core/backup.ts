@@ -58,6 +58,7 @@ const Backup = {
   restore(text: string) {
     const d = this.parse(text); if (!d) { toast('That file isn\'t an Airline Manager Pro backup', 'warn'); return; }
     try { localStorage.setItem(STORE_KEY, text); } catch (e) { toast('The backup couldn\'t be stored on this phone', 'warn'); return; }
+    try { localStorage.removeItem('amp-nogame'); } catch (e) { /* ignore */ }
     // nothing may save over it now, before the app starts again from it
     try { (Mode as any).switching = true; clearTimeout((Store as any)._nativeTimer); (Store as any)._native = ''; } catch (e) { /* ignore */ }
     const T = this.tools(); if (T && T.backupWrite) T.backupWrite({ data: text }).catch(() => { /* the web copy is there */ });
@@ -117,6 +118,7 @@ const Backup = {
 
   /** First start with nothing saved (a new phone, a reinstall, cleared data): offer to bring the airline back. */
   offerRestoreOnFirstStart() {
+    if (Store.nogame()) return;   // every save was deleted: the start screen offers a new game or a backup
     if (DESKTOP && Store.wasEmpty && !Mode.coop()) {
       fetch('/api/backup').then(r => r.json()).then(r => { if (r && r.data) setTimeout(() => this.confirmRestore(r.data, 'Found in Documents\\Airline Manager Pro on this PC'), 1500); else setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600); }).catch(() => setTimeout(() => firstStartWelcome(false), SPLASH_MS + 600));
       return;

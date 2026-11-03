@@ -288,12 +288,32 @@ const PROFIT: { [period: string]: ProfitPoint[]; } = (function () {
   };
 })();
 function profitSeries(period: string): ProfitPoint[] {
+  if ((State as any).fresh) return profitFromBooks(period);   // a game of your own: from your own books, not the demo's
   const sim = State.settings.timeMode === 'sim';
   if (period === 'year') return sim ? PROFIT.yearSim : PROFIT.yearReal;
   if (period === 'month') return sim ? PROFIT.monthSim : PROFIT.month;
   return PROFIT[period];
 }
 function lastProfit(period: string): number { const s = profitSeries(period); const p = s[s.length - 1]; return p.rev - p.cost; }
+
+/** Money in and out per day (the last 14), week (12), month (12) or year, from the airline's own books. */
+function profitFromBooks(period: string): ProfitPoint[] {
+  const cid = State.companyId, now = new Date(), out: ProfitPoint[] = [], idx: { [k: string]: ProfitPoint } = {};
+  const keyOf = (d: Date) => period === 'day' ? d.toISOString().slice(0, 10) : period === 'week' ? d.getFullYear() + '-W' + Math.ceil(((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 864e5 + new Date(d.getFullYear(), 0, 1).getDay() + 1) / 7) : period === 'month' ? d.toISOString().slice(0, 7) : String(d.getFullYear());
+  const n = period === 'day' ? 14 : period === 'week' ? 12 : period === 'month' ? 12 : 5, MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now); if (period === 'day') d.setDate(d.getDate() - i); else if (period === 'week') d.setDate(d.getDate() - 7 * i); else if (period === 'month') d.setMonth(d.getMonth() - i, 1); else d.setFullYear(d.getFullYear() - i);
+    const k = keyOf(d); if (idx[k]) continue;
+    const p = { label: period === 'day' ? d.getDate() + '/' + (d.getMonth() + 1) : period === 'week' ? 'W' + k.split('-W')[1] : period === 'month' ? MON[d.getMonth()] : String(d.getFullYear()), rev: 0, cost: 0 };
+    idx[k] = p; out.push(p);
+  }
+  for (const t of State.txns as any[]) {
+    if (t.companyId !== cid || !t.date) continue;
+    const p = idx[keyOf(new Date(t.date + 'T12:00:00'))]; if (!p) continue;
+    if (t.amount >= 0) p.rev += t.amount; else p.cost -= t.amount;
+  }
+  return out;
+}
 
 // Fleet status in the three states shown everywhere: in flight, available, maintenance
 function fleetState(a: Aircraft): 'flight' | 'avail' | 'maint' {

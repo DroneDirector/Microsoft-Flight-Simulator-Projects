@@ -241,7 +241,7 @@ function ofBuild(scene: any, q: number) {
   { const px = X1 - 0.45, pz = Z0 + 0.45; add(new T.CylinderGeometry(0.22, 0.17, 0.45, 24), mat.pot, px, 0.225, pz); const r = ctRng(5);
     for (let i = 0; i < 26; i++) { const lf = new T.Mesh(new T.PlaneGeometry(0.12, 0.55), mat.plant); const a = r() * 6.3, t = 0.4 + r() * 0.7; lf.position.set(px + Math.cos(a) * 0.12, 0.45 + 0.25 + r() * 0.6, pz + Math.sin(a) * 0.12); lf.rotation.set(-t * Math.cos(a) * 0.8, a, t * 0.8 * Math.sin(a)); lf.castShadow = true; root.add(lf); } }
   // your pet, asleep in its bed by the right-hand bookshelf
-  try { petPlace(T, root, A, [1.2, -2.8], -0.5, [[1.2, -2.0], [2.1, -1.9], [2.4, -1.0], [1.6, -1.3], [0.8, -1.8]]); } catch (e) { /* no pet */ }
+  try { petPlace(T, root, A, [1.2, -2.8], -0.5, { free: (x: number, z: number) => ofFree(x, z) && !ofPetBlocked(x, z), door: [1.05, -1.85], box: [-2.9, -3.1, 2.9, 2.7] }); } catch (e) { /* no pet */ }
   // ceiling lights
   const dm = new T.MeshBasicMaterial({ color: 0xFFF1D8, toneMapped: false });
   for (const [x, z] of [[-1.6, -1.8], [1.6, -1.8], [-1.6, 1.4], [1.6, 1.4], [0, -0.2]]) { const d = new T.Mesh(new T.CircleGeometry(0.08, 20), dm); d.rotation.x = Math.PI / 2; d.position.set(x, HH - 0.005, z); root.add(d); const L = new T.SpotLight(0xFFE4C0, 5, 7, 0.9, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); root.add(L); root.add(L.target); }
@@ -315,18 +315,24 @@ function ofLaptop3d(T: any, lt: any, slab: any, bx: any, screenTex: any) {
 /** A photo of you with your family on the desk: taken once, with the figures, and kept. */
 function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   const T = THREE, R = OfficeRoom, me: any = myPilot();
-  const key = JSON.stringify(me && me.look || {});
+  const key = JSON.stringify([me && me.look || {}, (State as any).family || null]);
   if (R.photo && R.photo.key === key) { done(ctTex(R.photo.cv)); return; }
   const scene = new T.Scene(), cam = new T.PerspectiveCamera(30, 4 / 3, 0.1, 30);
   const [bg] = ctCanvas(512, 384); { const x = bg.getContext('2d') as CanvasRenderingContext2D, g = x.createLinearGradient(0, 0, 0, 384); g.addColorStop(0, '#8DB7D9'); g.addColorStop(0.55, '#DCE7E8'); g.addColorStop(0.56, '#4E7F9A'); g.addColorStop(0.7, '#5D8C5A'); g.addColorStop(1, '#3E6A3A'); x.fillStyle = g; x.fillRect(0, 0, 512, 384); }
   const bp = new T.Mesh(new T.PlaneGeometry(9, 6.75), new T.MeshBasicMaterial({ map: ctTex(bg) })); bp.position.set(0, 1.4, -3); scene.add(bp);
   scene.add(new T.HemisphereLight(0xFFF6E8, 0x6A7A5A, 1.4)); const sl = new T.DirectionalLight(0xFFF0DC, 2.2); sl.position.set(2, 4, 5); scene.add(sl);
-  const meL = me && me.look ? Object.assign({}, me.look, { civil: true, top: 'shirt', uniform: 4, hat: 'none', neck: 'open', bottom: 'trousers' }) : ctLook('me', 'm', 'public');
-  const partnerSex: 'm' | 'f' = meL.sex === 'f' ? 'm' : 'f', base = (me && me.id) || 'me';
-  const fam = [{ L: meL, x: -0.38, s: 1 }, { L: Object.assign(ctLook('partner-' + base, partnerSex, 'public'), { top: partnerSex === 'f' ? 'blouse' : 'shirt' }), x: 0.38, s: 0.97 },
+  // you, as you look (in your own clothes) and as tall as you are, and your partner as you chose them in Your pilot
+  const meL = me && me.look ? Object.assign({}, me.look, { civil: true, top: me.look.sex === 'f' ? 'blouse' : 'shirt', uniform: 4, hat: 'none', neck: 'open', bottom: 'trousers' }) : ctLook('me', 'm', 'public');
+  const base = (me && me.id) || 'me', ptL = familyPartner(meL.sex, base), H0 = 178;
+  const hOf = (L: any) => (L.height || FAM_H[L.sex === 'f' ? 'f' : 'm']) / H0;
+  // the man on the left, the woman on the right, the children in front between them
+  const meX = meL.sex === 'f' ? 0.38 : -0.38;
+  const fam = [{ L: meL, x: meX, s: hOf(meL) }, { L: ptL, x: -meX, s: hOf(ptL) },
     { L: ctLook('kid1-' + base, 'f', 'public'), x: -0.16, s: 0.62, z: 0.55 }, { L: ctLook('kid2-' + base, 'm', 'public'), x: 0.2, s: 0.54, z: 0.6 }];
+  // the children's hair and features stay the same from one photo to the next
+  let rs = 7; const rnd = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
   // the children: no beards or grey hair, and their skin between their parents'
-  for (const f of fam.slice(2)) { const L: any = f.L, a = fam[0].L.skin || 2, b = fam[1].L.skin || 2; L.facial = 'none'; L.glasses = 'none'; L.skin = Math.round((a + b) / 2 + (Math.random() - 0.5)); if (L.hairColor >= 8) L.hairColor = fam[Math.random() < 0.5 ? 0 : 1].L.hairColor < 8 ? fam[0].L.hairColor : 1; }
+  for (const f of fam.slice(2)) { const L: any = f.L, a = fam[0].L.skin || 2, b = fam[1].L.skin || 2; L.facial = 'none'; L.glasses = 'none'; L.skin = Math.round((a + b) / 2 + (rnd() - 0.5)); if (L.hairColor >= 8) L.hairColor = fam[rnd() < 0.5 ? 0 : 1].L.hairColor < 8 ? fam[0].L.hairColor : 1; }
   const built: any[] = [];   // each figure is scaled from outside: it sets its own scale as it breathes
   try {
     for (const f of fam) { const m = Human.build(f.L, 'exec', '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); g.position.set(f.x, 0, f.z || 0); g.scale.setScalar(f.s); scene.add(g); m.pose({ t: 1, yaw: 0, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) }); built.push(m); }
@@ -392,12 +398,13 @@ function ofOpen2(root: HTMLElement, q: number) {
   cv.addEventListener('pointerdown', e => {
     // walking on the PC: the view takes the mouse (no pointer, turn as far as you like); a click then uses what glows
     if (!R.seat && DESKTOP && e.pointerType === 'mouse') { drag = null; if (!aimLocked(cv)) { justLocked = true; aimLock(cv); } return; }
-    drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch, pw: R.ph && R.ph.st === 'hold' ? R.ph.want.slice() : null }; moved = 0; cv.setPointerCapture(e.pointerId); });
+    drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch, pw: R.ph && R.ph.st === 'hold' ? R.ph.want.slice() : null, bw: R.bw && R.bw.st === 'hold' ? R.bw.want.slice() : null }; moved = 0; cv.setPointerCapture(e.pointerId); });
   R.mm$ = (e: MouseEvent) => { if (R.on && !R.seat && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
   document.addEventListener('mousemove', R.mm$);
   cv.addEventListener('pointermove', e => {
     if (!drag && R.seat && !R.overlay && !R.loading) { const o = ofAimedObj(e), on = !!(o && (o.userData.act === 'laptop' || o.userData.act === 'photo' || o.userData.act === 'phone') && !(R.ph && R.ph.st !== 'idle') && !(R.pk && R.pk.st !== 'idle')); R.lapHover = on; cv.style.cursor = on ? 'pointer' : ''; if (on && R.glow) R.glow.showObj(o); }
     if (!drag) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
+    if (drag.bw && R.bw && R.bw.st === 'hold') { R.bw.want = [clamp(drag.bw[0] + (e.clientX - drag.x) * 0.006, -1.2, 1.2), clamp(drag.bw[1] + (e.clientY - drag.y) * 0.004, -0.5, 0.6)]; return; }   // the bowl: turn and tilt it
     if (drag.pw && R.ph && R.ph.st === 'hold') { R.ph.want = [clamp(drag.pw[0] + (e.clientX - drag.x) * 0.004, -0.5, 0.5), clamp(drag.pw[1] + (e.clientY - drag.y) * 0.003, -0.4, 0.4)]; return; }   /* holding the photo: tilt it */ R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); });
   cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else ofClickAt(); return; } justLocked = false; if (drag && moved < 6) ofClickAt(e); drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); });
@@ -666,6 +673,8 @@ function ofFrame() {
     const yaw = Math.PI + R.look.yaw, p = R.look.pitch, ahead = R.cam.position.clone().add(new T.Vector3(Math.sin(yaw) * Math.cos(p), Math.sin(p), Math.cos(yaw) * Math.cos(p)));
     R.cam.lookAt(ahead.lerp(c, e));
     if (S.material) S.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, lk * 1.4)));   // the screen lights up as it opens
+  } else if (R.bw) {
+    ofBowlFrame(dt, now);   // down on one knee by the bowls, the food bowl in your hands
   } else if (R.seat) {
     // you in your chair: your body (leaning in and turning to reach for the photo), your eyes where your head is
     const P = R.pk ? ofPhoneStep(dt, now) : ofPhotoStep(dt, now), ph = R.ph, S = R.me;
@@ -714,12 +723,13 @@ function ofAimedObj(e?: PointerEvent): any {
   if (e && !aimLocked()) { const r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect(); rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam); }
   else rc.setFromCamera(new T.Vector2(0, 0), R.cam);
   const h = rc.intersectObjects(R.A.hits, false)[0];
-  return h && h.distance < 2.6 ? h.object : null;
+  return h && (h.distance < 2.6 || (/^(pet|bowl)/.test(h.object.userData.act || '') && h.distance < 7)) ? h.object : null;
 }
 function ofClickAt(e?: PointerEvent) {
   const R = OfficeRoom; if (R.loading) return;
   // the laptop's screen is up: a click beside it puts it away (and on the phone, picks the phone up after)
   if (R.overlay) { if (R.overlay.classList.contains('lap-screen') && !R.lapZ) { const a = ofAimed(e); ofLaptopClose(); if (a === 'phone') setTimeout(() => { if (!R.overlay) ofPhonePick(); }, 800); } return; }
+  if (R.bw) { if (R.bw.st === 'hold') ofBowlPut(); return; }   // the food bowl in your hands: a click puts it down
   if (R.ph && R.ph.st !== 'idle') { if (R.ph.st === 'hold') ofPhotoPut(); return; }   // holding the photo: a click puts it back
   // the phone in your hand: a tap brings its screen up; a click on the laptop puts the phone down first, then opens it
   if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') { if (ofAimed(e) === 'laptop') phoneThen(R, () => ofLaptopOpen()); else ofPhoneOpen(); } return; }
@@ -728,6 +738,8 @@ function ofClickAt(e?: PointerEvent) {
   if (a === 'phone' && R.seat) { ofPhonePick(); return; }
   if (a === 'laptop') { ofLaptopOpen(); return; }
   if (a === 'pet') { petStir(R.A); return; }
+  if (a === 'bowl-water') { if (!petRefill(R.A, 'water')) toast('The water bowl is full', 'info'); return; }
+  if (a === 'bowl-food') { ofBowlPick(); return; }
   if (R.seat) return;
   if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); R.doorT = 1; setTimeout(() => ofExitToMain(), 650); }
 }
@@ -871,6 +883,118 @@ function ofSpot(k: string) {
   else { R.seat = false; const S: any = { paint: [-1.4, 0.4, Math.PI / 2 - 0.05, 0.05], window: [1.6, -0.4, -Math.PI / 2, -0.04], map: [0, -2.1, 0, 0.08] }[k]; R.free = { x: S[0], z: S[1], v: 0, bob: 0 }; R.look = { yaw: S[2], pitch: S[3] }; }
   ofVisitUi(true);
   const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = R.seat;
+}
+
+/* ---------- your pet's food bowl: down on one knee beside it, picked up, looked at, put down ---------- */
+/** Where you are in the way of the pet's walk (you walking about, the visitor). */
+function ofPetBlocked(x: number, z: number): boolean {
+  const R = OfficeRoom; if (!R.on) return false;
+  if (!R.seat && R.free && Math.hypot(x - R.free.x, z - R.free.z) < 0.55) return true;
+  if (R.bw && Math.hypot(x - R.bw.spot.x, z - R.bw.spot.z) < 0.6) return true;
+  if (R.vis && R.vis.state !== 'outside' && R.vis.state !== 'gone' && Math.hypot(x - R.vis.x, z - (R.vis.z || 0)) < 0.55) return true;
+  return false;
+}
+const OF_BW_D = { dip: 0.4, reach: 0.9, lift: 1.1, lower: 1.0, release: 0.7 };
+function ofBowlPick() {
+  const R = OfficeRoom, A = R.A, P = A && A.pet; if (!P || R.bw || (R.ph && R.ph.st !== 'idle') || (R.pk && R.pk.st !== 'idle') || ofLapK() > 0 || R.overlay) return;
+  const T = THREE, B = P.bowls.food, h = B.holder;
+  h.updateMatrixWorld(true);
+  const Bw = h.getWorldPosition(new T.Vector3()), gq = P.g.getWorldQuaternion(new T.Quaternion()), d = new T.Vector3(0, 0, 1).applyQuaternion(gq).setY(0).normalize();
+  const f = d.clone().negate(), spot = Bw.clone().add(d.clone().multiplyScalar(0.44)); spot.y = 0;
+  R.bw = { st: 'dip', t: 0, B, h, parent: h.parent, p0: h.position.clone(), q0: h.quaternion.clone(), Bw, f, spot, yaw: Math.atan2(f.x, f.z), want: [0, 0], tilt: [0, 0], a: {},
+    prev: { seat: R.seat, free: Object.assign({}, R.free), look: Object.assign({}, R.look) }, dip: 0, back: false };
+  if (R.glow) R.glow.hide(); R.lapHover = false; Sound.tick(); ofBowlUi();
+}
+function ofBowlPut() { const b = OfficeRoom.bw; if (!b || b.st !== 'hold') return; b.st = 'lower'; b.t = 0; ofBowlUi(); }
+function ofBowlUi() {
+  const R = OfficeRoom, b = R.bw, on = !!(b && b.st === 'hold'); let el = R.root && R.root.querySelector('.of-ph.of-bw') as HTMLElement;
+  if (!on) { if (el) el.remove(); return; }
+  if (el) return;
+  const nm = (petData() || {} as any).name || 'your pet';
+  el = document.createElement('div'); el.className = 'of-ph of-bw';
+  el.innerHTML = `<span>${esc(nm)}'s bowl · ${DESKTOP ? 'drag or use the arrow keys' : 'drag'} to turn it</span><button class="btn sm ghost" data-bw="fill">Fill it up</button><button class="btn sm" data-bw="put">Put it down</button>`;
+  el.addEventListener('pointerdown', e => e.stopPropagation());
+  el.addEventListener('click', e => { const t = (e.target as HTMLElement).closest('[data-bw]') as HTMLElement; if (!t) return; e.stopPropagation(); if (t.getAttribute('data-bw') === 'put') ofBowlPut(); else ofBowlFill(); });
+  R.root.appendChild(el);
+}
+/** Fill the bowl you are holding: kibble pours in from the bag. */
+function ofBowlFill() { const R = OfficeRoom; if (!petRefill(R.A, 'food')) toast('The bowl is full', 'info'); }
+/** The dip to black and back while you go over to the bowls, or back to where you were. */
+function ofBowlDip(k: number) {
+  const R = OfficeRoom; let d = R.root.querySelector('.of-dip') as HTMLElement;
+  if (k <= 0.001) { if (d) d.remove(); return; }
+  if (!d) { d = document.createElement('div'); d.className = 'of-dip'; R.root.appendChild(d); }
+  d.style.opacity = String(Math.min(1, k));
+}
+/** Each frame with the bowl: you kneel by it, reach down, lift it up in front of you (its name towards you), turn it as
+ *  you like, put it down, let go, and go back. Your hands hold it by its sides, outside the glaze. */
+function ofBowlFrame(dt: number, now: number) {
+  const R = OfficeRoom, b = R.bw, T = THREE, S = R.me, D = OF_BW_D; if (!b) return;
+  const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  b.t += dt;
+  // over there and back: a quick dip to black either way
+  if (b.st === 'dip') { ofBowlDip(b.t / D.dip); if (b.t >= D.dip) { b.st = 'rise'; b.t = 0; R.seat = true; } }
+  else if (b.st === 'rise') { ofBowlDip(1 - b.t / D.dip); if (b.t >= D.dip) { b.st = 'reach'; b.t = 0; ofBowlDip(0); } }
+  else if (b.st === 'out') { ofBowlDip(b.t / D.dip); if (b.t >= D.dip) { b.st = 'home'; b.t = 0; } }
+  else if (b.st === 'home') {
+    ofBowlDip(1 - b.t / D.dip);
+    if (!b.back) { b.back = true; b.parent.attach(b.h); b.h.position.copy(b.p0); b.h.quaternion.copy(b.q0); R.seat = b.prev.seat; R.free = b.prev.free; R.look = b.prev.look; }
+    if (b.t >= D.dip) { ofBowlDip(0); R.bw = null; ofBowlUi(); return; }
+  }
+  if (b.st === 'dip' || b.st === 'home') {
+    // still where you were for this moment: the camera stays
+    return;
+  }
+  let wL = 0, wR = 0, mv = 0;
+  if (b.st === 'reach') { wL = wR = E(b.t / D.reach); if (b.t >= D.reach) { b.st = 'lift'; b.t = 0; R.A.root.attach(b.h); } }
+  else if (b.st === 'lift') { wL = wR = 1; mv = E(b.t / D.lift); if (b.t >= D.lift) { b.st = 'hold'; b.t = 0; ofBowlUi(); } }
+  else if (b.st === 'hold') { wL = wR = 1; mv = 1; }
+  else if (b.st === 'lower') { wL = wR = 1; mv = 1 - E(b.t / D.lower); if (b.t >= D.lower) { b.st = 'release'; b.t = 0; Sound.tick(); } }
+  else if (b.st === 'release') { wL = wR = 1 - E(b.t / D.release); if (b.t >= D.release) { b.st = 'out'; b.t = 0; } }
+  else if (b.st === 'out') { wL = wR = 0; }
+  // the keys turn and tilt it too
+  const k = R.keys || {};
+  if (b.st === 'hold') { if (k.arrowleft) b.want[0] = clamp(b.want[0] - dt * 1.2, -1.2, 1.2); if (k.arrowright) b.want[0] = clamp(b.want[0] + dt * 1.2, -1.2, 1.2); if (k.arrowup) b.want[1] = clamp(b.want[1] - dt * 0.6, -0.5, 0.6); if (k.arrowdown) b.want[1] = clamp(b.want[1] + dt * 0.6, -0.5, 0.6); }
+  b.tilt[0] += (b.want[0] - b.tilt[0]) * Math.min(1, dt * 5); b.tilt[1] += (b.want[1] - b.tilt[1]) * Math.min(1, dt * 5);
+  // the bowl: from the floor up in front of you, tilted towards you so you see the name and what is in it
+  const f = b.f, right = new T.Vector3().crossVectors(f, new T.Vector3(0, 1, 0)).normalize(), hip = b.spot.clone().add(new T.Vector3(0, 0.5, 0));
+  const hold = hip.clone().add(new T.Vector3(0, 0.44, 0)).add(f.clone().multiplyScalar(0.38)), S0 = Math.sin;
+  hold.y += 0.002 * S0(now * 0.9) + 0.0015 * S0(now * 2.3); hold.addScaledVector(right, 0.0015 * S0(now * 1.1));
+  const q0w = new T.Quaternion(); if (b.st === 'reach' || (b.st !== 'lift' && b.st !== 'hold' && b.st !== 'lower' && b.h.parent === b.parent)) b.h.getWorldQuaternion(q0w); else q0w.copy(b.q0w || b.h.quaternion);
+  if (!b.q0w) { b.q0w = b.h.getWorldQuaternion(new T.Quaternion()); b.P0w = b.h.getWorldPosition(new T.Vector3()); }
+  const qh = new T.Quaternion().setFromAxisAngle(right, -(0.28 + b.tilt[1])).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), b.tilt[0] + 0.03 * S0(now * 0.8))).multiply(b.q0w);
+  if (b.h.parent !== b.parent) {
+    const pos = b.P0w.clone().lerp(hold, mv); pos.y += 0.06 * Math.sin(Math.PI * mv);
+    b.h.position.copy(pos); b.h.quaternion.copy(b.q0w).slerp(qh, mv); b.h.updateMatrixWorld(true);
+  }
+  // you: kneeling on one knee by the bowl, leaning down to it, upright with it in your hands
+  const lean = 0.62 * (1 - mv) * (b.st === 'reach' || b.st === 'release' ? Math.max(wL, 0.4) : 1) + 0.06;
+  // held by its sides: each hand flat against the outside of the bowl, the wrist at the near side, the fingers along
+  // the glaze towards the far side, the palm towards the bowl; nothing reaches over the rim or into it
+  const B = b.B, side = B.r * 1.0 + 0.034, hq = b.h.getWorldQuaternion(new T.Quaternion());
+  const left = right.clone().negate(), lx = new T.Vector3(1, 0, 0).applyQuaternion(hq).dot(left) > 0 ? 1 : -1;   // which of the bowl's own sides is on your left
+  const w: any = { L: wL, R: wR };
+  const arms = (m: any) => {
+    const res: any = { legs: [-0.3, 1.9, -1.35, 1.45], hand: {} }, rest = humanGesture(null, now);   // one knee down, the other foot forward
+    m.root.updateMatrixWorld(true); const rq = m.root.getWorldQuaternion(new T.Quaternion()).invert();
+    for (const sd of ['L', 'R'] as ('L' | 'R')[]) {
+      if (w[sd] < 0.002) { b.a[sd] = null; continue; }
+      const sx = (sd === 'L' ? lx : -lx), J = m.joints[sd];
+      const wrist = b.h.localToWorld(new T.Vector3(sx * side, B.hgt * 0.42, -B.r * 0.62));
+      const Fd = new T.Vector3(0, -0.12, 1).applyQuaternion(hq).applyQuaternion(rq).normalize();       // the fingers: away from you, along the side
+      const Nd = new T.Vector3(-sx, 0.25, 0).applyQuaternion(hq).applyQuaternion(rq).normalize();       // the palm: towards the bowl
+      const from = m.root.localToWorld(humanHandAt(m, sd, sd === 'L' ? rest.L : rest.R, undefined, J.w)), to = from.lerp(wrist, w[sd]);
+      b.a[sd] = humanReach(m, sd, m.root.worldToLocal(to), b.a[sd] || (sd === 'L' ? rest.L : rest.R), J.w); res[sd] = b.a[sd];
+      const W = humanHandAim(m, sd, b.a[sd], Fd, Nd), q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().setFromMatrix3(W)).slerp(new T.Quaternion(), 1 - Math.min(1, w[sd] * 1.2));
+      res.hand[sd] = { W: new T.Matrix3().setFromMatrix4(new T.Matrix4().makeRotationFromQuaternion(q)), curl: 0.08 * w[sd] + 0.001, th: 0, k1: 0, k2: 0 };
+    }
+    return res;
+  };
+  let eye = hip.clone().add(new T.Vector3(0, 0.62, 0));
+  if (S) { try { S.pitch = -0.6; eye = selfPose(S, hip, b.yaw, lean, 0, 0, 0, now, dt, arms); } catch (e) { R.me = null; } }
+  R.cam.position.copy(eye);
+  const look = b.h.localToWorld(new T.Vector3(0, B.hgt * 0.45, 0));
+  R.cam.lookAt(look);
 }
 
 /* ---------- the family photo: picked up, looked at, put back ---------- */
