@@ -258,6 +258,14 @@
    {
     "t": "Published departures, arrivals and approaches with their real waypoints for 2,900+ US airports (FAA), without the simulator running",
     "n": ""
+   },
+   {
+    "t": "Choose the SID, STAR and approach with their transitions per route, with their waypoints, altitude and speed limits on the map",
+    "n": ""
+   },
+   {
+    "t": "Departures, arrivals and approaches built from the real navaids around airports where none are published",
+    "n": ""
    }
   ]
  },
