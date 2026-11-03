@@ -86,7 +86,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-info"></div>
     <div class="v3d-line"></div>
     <div class="v3d-status"></div>
-    <button class="v3d-shot" data-act="v3d-shot" aria-label="Take a screenshot" title="Take a screenshot (P)">${icon('camera')}</button>
+    <button class="v3d-shot" data-act="v3d-shot" aria-label="Take a screenshot" title="Take a screenshot (P)">${icon('camera')}</button><button class="v3d-shot v3d-photo" data-act="photo-mode" aria-label="Photo mode" title="Photo mode (H)">${icon('star')}</button>
     <button class="v3d-uitog" data-act="v3d-ui" aria-label="Hide or show the controls" title="Hide or show the controls (H)">${icon('focus')}<span>Hide controls</span></button>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
     <div class="v3d-free-ui">
@@ -138,6 +138,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
 }
 
 function v3dClose() {
+  try { if (typeof Photo !== 'undefined') { Photo.on = false; if (V3d.cv) V3d.cv.style.filter = ''; } } catch (e) { /* none */ }
   if (!V3d.open) return;
   V3d.open = false; cancelAnimationFrame(V3d.raf); document.body.classList.remove('v3d-on');
   try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* ignore */ }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.111 (2026-11-03)
+
+- Museum (museum3d.ts): walkable 3D hall with every gift, award and best badges on plinths; opens the 3D viewer per piece; keys, touch pad, controller
+- Photo mode in the 3D view (photo-mode.ts): looks, wide frame, caption, saved to screenshots, photo of the day in the news
+- Controller: hands over to the 3D viewer, the salute film and the museum (gamepad.ts)
+
 ## 0.9.110 (2026-11-03)
 
 - Turnaround timeline in the Schedule with ways to buy back time (ops-decisions.ts turnaroundHtml, ta-buy); weather decisions before departure (de-icing, thunderstorms at the destination)

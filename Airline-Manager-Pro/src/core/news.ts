@@ -49,7 +49,7 @@ function crashArt(typeId: string, o: { color: string; color2: string; reg: strin
 function newsOpen(id: string) {
   const a = newsList().filter(x => x.id === id)[0]; if (!a) return;
   const d = new Date(a.at), date = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const salPh = (a.art.kind as string) === 'salute' ? salutePhoto(a.id, { typeId: a.art.typeId, cid: (a.art as any).cid, icao: (a.art as any).icao, at: a.at }) : '';
+  const salPh = (a.art.kind as string) === 'photo' ? (a.art as any).data : (a.art.kind as string) === 'salute' ? salutePhoto(a.id, { typeId: a.art.typeId, cid: (a.art as any).cid, icao: (a.art as any).icao, at: a.at }) : '';
   const art = salPh ? `<img class="np-photo" src="${salPh}" alt="The aircraft taxiing under the water salute">` : (a.art.kind as string) === 'salute' ? saluteArt(a.art.typeId || 'a320neo', { color: a.art.color || '#2C8CFF', color2: a.art.color2 || '#0B2A55', reg: a.art.reg || '' })
     : a.art.kind === 'aircraft' && a.art.crash ? crashArt(a.art.typeId || 'a320neo', { color: a.art.color || '#2C8CFF', color2: a.art.color2 || '#0B2A55', reg: a.art.reg || '' })
     : a.art.kind === 'aircraft' ? aircraftArt(a.art.typeId || 'a320neo', { color: a.art.color || '#2C8CFF', color2: a.art.color2 || '#0B2A55', reg: a.art.reg || '' })
@@ -61,7 +61,7 @@ function newsOpen(id: string) {
     <h1 class="np-h">${esc(a.headline)}</h1>
     <p class="np-sf">${esc(a.standfirst)}</p>
     <div class="np-cols">
-      <figure class="np-fig">${art}<figcaption>${(a.art.kind as string) === 'salute' ? `${esc(a.art.reg || '')} taxis in under the water salute <button class="btn sm sal-watch" data-act="sal-watch" data-id="${esc(a.id)}">${icon('play')}Watch it in 3D</button>` : esc(a.art.kind === 'aircraft' ? (a.art.reg ? a.art.reg + ', ' : '') + (acType(a.art.typeId || '') ? acType(a.art.typeId).model : '') : a.art.kind === 'person' ? 'The defendant' : 'The court')}</figcaption></figure>
+      <figure class="np-fig">${art}<figcaption>${(a.art.kind as string) === 'photo' ? esc(a.headline) : (a.art.kind as string) === 'salute' ? `${esc(a.art.reg || '')} taxis in under the water salute <button class="btn sm sal-watch" data-act="sal-watch" data-id="${esc(a.id)}">${icon('play')}Watch it in 3D</button>` : esc(a.art.kind === 'aircraft' ? (a.art.reg ? a.art.reg + ', ' : '') + (acType(a.art.typeId || '') ? acType(a.art.typeId).model : '') : a.art.kind === 'person' ? 'The defendant' : 'The court')}</figcaption></figure>
       <p class="np-by">By ${esc(a.byline)} · ${esc(a.place)}</p>
       ${a.body.map((p, i) => `<p class="${i === 0 ? 'np-lead' : ''}">${esc(p)}</p>`).join('')}
       ${a.quote ? `<blockquote>“${esc(a.quote[0])}”<cite>${esc(a.quote[1])}</cite></blockquote>` : ''}

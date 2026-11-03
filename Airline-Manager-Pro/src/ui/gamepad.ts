@@ -136,6 +136,10 @@ function padLoop() {
     const hit = (i: number) => B[i] && !Pad.prev[i], rel = (i: number) => !B[i] && Pad.prev[i];
     const any = lx || ly || rx || ry || l2 > 0.05 || r2 > 0.05 || B.some(Boolean);
     if (any) Pad.last = now;
+    // the 3D object viewer (gifts, plaques, badges) reads the controller itself; the water salute film closes on Circle
+    if (typeof V3V !== 'undefined' && V3V.on) { Pad.prev = B; try { padCursor(false); } catch (e) { /* none */ } return; }
+    if (typeof Salute !== 'undefined' && Salute.on) { if (hit(1)) { try { saluteClose(); } catch (e) { /* none */ } } Pad.prev = B; return; }
+    if (typeof Museum !== 'undefined' && Museum.on) { try { museumPad(lx, ly, rx, ry, l2, r2, B, hit, dt); } catch (e) { /* none */ } Pad.prev = B; return; }
     const v3 = typeof V3d !== 'undefined' && V3d.open, op = typeof OpsRoom !== 'undefined' && OpsRoom.on && !OpsRoom.overlay, of = (typeof OfficeRoom !== 'undefined' && OfficeRoom.on && !OfficeRoom.overlay) || op, ct = typeof CourtRoom !== 'undefined' && CourtRoom.on;
     const sens = +padOpt('padSpeed', 1) || 1;
     // ---- the world views: the sticks move and look ----

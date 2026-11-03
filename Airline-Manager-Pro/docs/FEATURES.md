@@ -233,6 +233,8 @@ Only damage the simulator can actually detect.
 | Phone notifications for the same steps, also with the app closed (Android) | Built |
 | Digital clock in the top bar, with the game date | Built |
 | Morning briefing once a day: yesterday's result, today's flights, weather, crew and aircraft, and special days coming up (setting) | Built |
+| Your museum: a walkable 3D hall with every gift, award and your best badges on display | Built |
+| Photo mode in the 3D view: looks, wide frame, caption; saved with your screenshots, and the papers' photo of the day | Built |
 | Gifts, plaques and badges as 3D models you turn freely with mouse, touch, keyboard or a game controller (PlayStation, Xbox, Switch Pro), with the controls of the device you use | Built |
 
 ## Crew

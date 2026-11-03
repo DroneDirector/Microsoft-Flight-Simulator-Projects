@@ -244,7 +244,7 @@ function giftMedal(T: any, it: GiftItem): any { return badgeMedal(T, { id: 'm', 
 let _giftCat = 'aviation';
 function giftsHtml(): string {
   const all = giftsAll().filter(g => g.cat === _giftCat && (!g.cid || g.cid === State.companyId || (company(g.cid) as any)));
-  const cats = `<div class="seg gift-cats"><button class="${_giftCat === 'aviation' ? 'on' : ''}" data-act="gift-cat" data-c="aviation">Aviation Gifts</button><button class="${_giftCat === 'career' ? 'on' : ''}" data-act="gift-cat" data-c="career">Career Milestones</button></div>`;
+  const cats = `<div class="gift-top"><div class="seg gift-cats"><button class="${_giftCat === 'aviation' ? 'on' : ''}" data-act="gift-cat" data-c="aviation">Aviation Gifts</button><button class="${_giftCat === 'career' ? 'on' : ''}" data-act="gift-cat" data-c="career">Career Milestones</button></div><button class="btn sm primary" data-act="mus-open">${icon('star')}Walk through your museum</button></div>`;
   if (_giftCat === 'career') {
     if (!all.length) return `${cats}<div class="card gift-empty">${icon('star')}<span><b>No milestones yet</b><small>Your type ratings and career milestones (hours, landings, your first widebody, promotions) are awarded here: a certificate, a plaque or a medal, each one in 3D.</small></span></div>`;
     return `${cats}<div class="card"><div class="gift-row career">${all.map(ex => { const it = ex.received[0], th = viewerThumb(ex.id + 'received0', T => giftBuild(T, it, ex), 280);
