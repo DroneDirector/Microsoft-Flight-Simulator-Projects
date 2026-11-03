@@ -58,6 +58,7 @@
     "src/data/licence-hashes.ts",
     "src/core/licence.ts",
     "src/core/desktop.ts",
+    "src/graphics/gfx.ts",
     "src/ui/exit.ts",
     "src/ui/look-editor.ts",
     "src/ui/crew-ui.ts",
@@ -172,6 +173,9 @@
     "src/ui/flight-pops.ts",
     "src/ui/briefing.ts",
     "src/core/airline-life.ts",
+    "src/core/loyalty.ts",
+    "src/core/goals.ts",
+    "src/core/alliances.ts",
     "src/core/career-rides.ts",
     "src/core/ops-decisions.ts",
     "src/main.ts"

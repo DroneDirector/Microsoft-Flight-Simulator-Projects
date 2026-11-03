@@ -10,6 +10,7 @@ interface SetSection { id: string; title: string; icon: string; items: SetItem[]
 
 const SETTINGS: SetSection[] = [
   { id: 'general', title: 'General', icon: 'sliders', items: [
+    { type: 'html', html: () => soloMode() ? `<div class="set-card"><span><b>Your first week</b><small>The guided checklist for a new airline in the Overview: aircraft, crew, the first route and flight, a job and a frequent-flyer programme.</small></span><button class="btn ghost sm" data-act="fw-show">Show it</button></div>` : '' },
     { type: 'toggle', key: 'morningBrief', label: 'Morning briefing', hint: 'Once a day in the Overview: yesterday\'s result, today\'s flights, weather, crew and aircraft, and the special days coming up on your routes. Also opens from the Overview any time.' },
     { type: 'html', html: () => `<div class="set-card"><span class="brand-lg">${brandMark()}</span><span><b>${esc(APP.name)}</b><small>Version ${esc(APP.version)}</small></span><button class="btn ghost sm" data-act="whats-new">${icon('star')}What's new</button></div>` },
     { type: 'choice', key: 'units', label: 'Units', options: [['imperial', 'Feet, knots, nm'], ['metric', 'Metres, km/h, km']] },
@@ -30,6 +31,7 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'aiNotify', label: 'Notify me when my pilots land', hint: 'A phone notification when a hired pilot reaches the gate, even when the app is closed.' },
   ] },
   { id: 'view3d', title: 'Graphics', icon: 'map', items: [
+    ...(DESKTOP ? [{ type: 'group', title: 'PC graphics' } as SetItem, { type: 'html', html: () => gfxSettingsHtml() } as SetItem] : []),
     { type: 'group', title: 'Distance and clouds' },
     { type: 'html', html: () => {
       const km = v3dKm();
@@ -38,6 +40,16 @@ const SETTINGS: SetSection[] = [
       return `<div class="set-card col"><div class="sc-h">${icon('map')}<span><b>View distance: ${km} km</b><small>How far you see in the 3D view. Further shows more mountains, coastlines and sea towards the horizon.</small></span></div>
         <input type="range" class="v3d-range" min="20" max="800" step="10" value="${km}" aria-label="View distance in kilometres">
         <div class="v3d-scale"><span>20 km</span><span>150</span><span>400</span><span>800 km</span></div>${note}</div>`;
+    } },
+    { type: 'html', html: () => {
+      const q = v3dTerrainQ(), top = DESKTOP ? 4 : 3, G = Math.round(220 * TERRAIN_DENSITY[q]);
+      const note = q >= 3 ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: ${q >= 4 ? 'a finer ring of heights around you and three times the points everywhere' : 'twice the points in the ground'}, more memory and a warmer ${DESKTOP ? 'graphics card' : 'device'}.</p>`
+        : q === 0 ? `<p class="v3d-note ok">${icon('info')}Low settings might improve performance on slower ${DESKTOP ? 'PCs' : 'phones'}.</p>` : '';
+      const S: any = State.settings, sm = v3dTerrainSmooth();
+      return `<div class="set-card col"><div class="sc-h">${icon('map')}<span><b class="tq-h">Terrain detail: ${TERRAIN_Q_NAMES[q]}</b><small>How finely mountains, valleys and coastlines are shaped in the 3D view, near you and towards the horizon (now ${G} × ${G} points around you${q >= 4 ? ', and heights about 19 m apart nearest you' : ''}). Higher gives sharper ridges and smoother slopes; lower is quicker.${DESKTOP ? ' Ultra is for the PC.' : ''} Applies the next time the 3D view opens.</small></span></div>
+        <input type="range" class="v3d-tq" min="0" max="${top}" step="1" value="${q}" aria-label="Terrain detail">
+        <div class="v3d-scale">${TERRAIN_Q_NAMES.slice(0, top + 1).map(n => `<span>${n}</span>`).join('')}</div>${note}
+        <label class="tg-row"><span><b>Smooth mountain ridges</b><small>Averages the heights between the ground's points, so ridges, peaks and coastlines don't break into spikes and saw teeth. Off: every point takes the exact height found there.</small></span><button class="tg ${sm ? 'on' : ''}" role="switch" aria-checked="${sm}" data-act="v3d-opt" data-key="v3dTerrainSmooth"><i></i></button></label></div>`;
     } },
     { type: 'html', html: () => {
       const km = cloudKm(), d = cloudDetail();
@@ -62,6 +74,7 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => cabinSettingsHtml() },
     { type: 'html', html: () => animSettingsHtml() },
     { type: 'html', html: () => perfSettingsHtml() },
+    ...(DESKTOP ? [] : [{ type: 'group', title: 'Light and shadow' } as SetItem, { type: 'html', html: () => gfxPhoneHtml() } as SetItem]),
     { type: 'group', title: 'Sky and water' },
     { type: 'html', html: () => {
       const S: any = State.settings, wm = v3dWaterMode();
@@ -686,3 +699,7 @@ ACTIONS['perf-set'] = el => {
   Store.save(); Sound.tick(); rerenderSettingsBody();
 };
 ACTIONS['framegen-set'] = el => { const S: any = State.settings; S.frameGen = el.getAttribute('data-v'); Store.save(); Sound.tick(); rerenderSettingsBody(); };
+
+// the terrain detail slider: the name shows while dragging, it's kept when let go
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-tq')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.tq-h'); if (h) h.textContent = 'Terrain detail: ' + TERRAIN_Q_NAMES[+el.value]; });
+document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-tq')) return; (State.settings as any).v3dTerrainQ = +el.value; Store.save(); rerenderSettingsBody(); });

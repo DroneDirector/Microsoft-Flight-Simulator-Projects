@@ -33,7 +33,7 @@ ACTIONS['photo-shoot'] = () => {
   if (!V3d.open || !V3d.r || !V3d.cv) return;
   try {
     V3d.r.render(V3d.scene, V3d.cam);
-    const src = V3d.cv, k = Math.min(1, (hiQ() ? 3840 : 2560) / Math.max(src.width, src.height)), W = Math.round(src.width * k), H0 = Math.round(src.height * k);
+    const src = V3d.cv, k = Math.min(1, Gfx.pic([2560, 3840, 7680]) / Math.max(src.width, src.height)), W = Math.round(src.width * k), H0 = Math.round(src.height * k);
     const bars = Photo.bars ? Math.round(Math.max(0, H0 - W / 2.39) / 2) : 0, H = H0 - bars * 2;
     const big = document.createElement('canvas'); big.width = W; big.height = H; const g = big.getContext('2d') as CanvasRenderingContext2D;
     g.filter = photoFilter() || 'none'; g.drawImage(src, 0, bars / k, src.width, src.height - bars * 2 / k, 0, 0, W, H); g.filter = 'none';
@@ -43,9 +43,9 @@ ACTIONS['photo-shoot'] = () => {
     const f: any = State.live.filter(x => x.id === V3d.target)[0], cap = Photo.cap || `3D view${f ? ` · ${f.reg}, ${f.from} to ${f.to}` : V3d.icao ? ` · ${V3d.icao}` : ''}`;
     const flash = document.createElement('div'); flash.className = 'v3d-flash'; V3d.root.appendChild(flash); setTimeout(() => flash.remove(), 600);
     try { Sound.tick(); } catch (e) { /* quiet */ }
-    const small = document.createElement('canvas'), s2 = (hiQ() ? 1400 : 960) / Math.max(W, H); small.width = Math.round(W * s2); small.height = Math.round(H * s2); (small.getContext('2d') as CanvasRenderingContext2D).drawImage(big, 0, 0, small.width, small.height);
+    const small = document.createElement('canvas'), s2 = Gfx.pic([960, 1400, 2000]) / Math.max(W, H); small.width = Math.round(W * s2); small.height = Math.round(H * s2); (small.getContext('2d') as CanvasRenderingContext2D).drawImage(big, 0, 0, small.width, small.height);
     Photo.last = { data: small.toDataURL('image/jpeg', 0.8), cap, reg: f ? f.reg : '', from: f ? f.from : '', to: f ? f.to : '' };
-    PhotoDb.put({ id: uid(), log: '3d', at: Date.now(), data: big.toDataURL('image/jpeg', hiQ() ? 0.96 : 0.92), thumb: th.toDataURL('image/jpeg', 0.75), w: W, h: H, cap, mode: Mode.coop() ? 'coop' : 'solo' })
+    PhotoDb.put({ id: uid(), log: '3d', at: Date.now(), data: big.toDataURL('image/jpeg', Gfx.pics() >= 1 ? 0.96 : 0.92), thumb: th.toDataURL('image/jpeg', 0.75), w: W, h: H, cap, mode: Mode.coop() ? 'coop' : 'solo' })
       .then(() => toast('Photo saved with your screenshots', 'ok', { label: 'To the papers', act: 'photo-news' })).catch(() => toast('The photo could not be saved', 'warn'));
   } catch (e) { toast('The photo could not be taken', 'warn'); }
 };

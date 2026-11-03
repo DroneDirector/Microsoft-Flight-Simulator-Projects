@@ -20,7 +20,7 @@ SCREENS.routes = {
       <button class="btn primary" data-act="new-route">${icon('plus')}New route</button>
     </div>
     ${hubCardHtml()}
-    ${soloMode() ? partnersHtml() : ''}
+    ${soloMode() ? partnersHtml() + loungesCardHtml() + alliancesHtml() + slotsSpareHtml() : ''}
     ${sortBar('routes', ROUTE_SORTS, 'Find a route')}
     <div class="route-list">${sortList('routes', rs, ROUTE_SORTS, (r: any) => `${r.code} ${r.legs.join(' ')} ${acType(r.typeId).model}`).map((r, i) => {
       const t = acType(r.typeId), p = r.pilotId ? pilot(r.pilotId) : null;
@@ -123,7 +123,7 @@ ACTIONS['nr-save'] = () => {
 let _rdId = '';
 function routeDetailHtml(): string {
   const r = State.routes.filter(x => x.id === _rdId)[0]; if (!r) return '';
-  const t = acType(r.typeId), f = routeFares(r), spd = seatsPerDay(r), boost = marketingBoost(r.companyId, r.id);
+  const t = acType(r.typeId), fb: any = (r as any).fares || {}, f = { y: fb.y || 1, j: fb.j || 1, f: fb.f || 1 }, spd = seatsPerDay(r), boost = marketingBoost(r.companyId, r.id);
   const legs = r.legs.slice(1).map((to, i) => ({ from: r.legs[i], to }));
   const fr = legs.length ? classFares(r.typeId, legs[0].from, legs[0].to, r) : { y: 0, j: 0, f: 0 };
   const step = (k: 'y' | 'j' | 'f', label: string, val: number) => `<div class="fare-row"><span><b>${label}</b><small>${money(val)} on ${esc(legs[0].from)}–${esc(legs[0].to)}</small></span>
@@ -134,6 +134,7 @@ function routeDetailHtml(): string {
     ${bizRouteInfo(r)}
     <h3>Your fares</h3>
     <p class="fine-print">${icon('info')}100% is the usual market fare. Lower fares win passengers from your rivals and bring extra travellers; higher fares earn more per seat but fill fewer.</p>
+    <label class="tg-row"><span><b>Flexible fares</b><small>${(r as any).flex ? `Today your fares are at ${Math.round(flexK(r) * 100)}% of what you set below. ` : ''}Fares rise as flights fill and drop when seats stay empty, every day, with the seasons and special days. Up to 30% dearer on full flights, down to 25% cheaper on empty ones.</small></span><button class="tg ${(r as any).flex ? 'on' : ''}" role="switch" aria-checked="${!!(r as any).flex}" data-act="rd-flex"><i></i></button></label>
     ${step('y', 'Economy', fr.y)}${prem ? step('j', 'Business', fr.j) + step('f', 'First', fr.f) : ''}
     <h3>Legs</h3>
     <div class="rd-legs">${legs.map(l => {
@@ -168,4 +169,5 @@ ACTIONS['rd-fare'] = el => {
   r.fares[k] = Math.round(clamp(r.fares[k] + d, 0.6, 1.6) * 100) / 100;
   Sound.tick(); Store.soon(); rerenderRd();
 };
+ACTIONS['rd-flex'] = () => { const r: any = State.routes.filter(x => x.id === _rdId)[0]; if (!r) return; r.flex = !r.flex; r._flexDay = ''; Sound.tick(); Store.soon(); rerenderRd(); };
 ACTIONS['rd-tanker'] = () => { const r: any = State.routes.filter(x => x.id === _rdId)[0]; if (!r) return; r.tanker = !r.tanker; Sound.tick(); Store.soon(); rerenderRd(); };

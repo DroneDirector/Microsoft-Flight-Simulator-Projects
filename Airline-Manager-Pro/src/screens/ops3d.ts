@@ -25,7 +25,7 @@ OpsRoom.open = function () {
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   try { if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) OfficeRoom.close(true); } catch (e) { /* none */ }
   R.on = true; R.pct = 0; R.loading = true; R.overlay = null; R.keys = {}; R.last = 0; R.loadT0 = performance.now(); R.tab = 'schedule'; R.seat = true; R.free = { x: 0.3, z: 1.3, v: 0, bob: 0 }; R.stick = [0, 0]; R.doorT = 0; R.doorK = 0;
-  const q = typeof cabinQ === 'function' ? cabinQ() : 2, co = company();
+  const q = Gfx.roomQ(), co = company();
   const root = document.createElement('div'); root.className = 'court3d office3d ops3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
     <div class="ct-top"><div><small>${esc(co.name)}</small><b>Operations</b></div></div>
@@ -163,7 +163,7 @@ function opsBuild(scene: any, q: number) {
     for (let i = 0; i < 24; i++) { const lf = new T.Mesh(new T.PlaneGeometry(0.11, 0.5), mat.plant); const a = r() * 6.3, t = 0.4 + r() * 0.7; lf.position.set(px + Math.cos(a) * 0.1, 0.42 + 0.25 + r() * 0.55, pz + Math.sin(a) * 0.1); lf.rotation.set(-t * Math.cos(a) * 0.8, a, t * 0.8 * Math.sin(a)); root.add(lf); } }
   // the lights: linear ceiling lights, cool white
   for (const z of [-1.6, 0.2, 1.6]) { const ln = new T.Mesh(new T.BoxGeometry(2.6, 0.02, 0.08), mat.glow); ln.position.set(0, HH - 0.012, z); root.add(ln); }
-  for (const [x, z] of [[-1.3, -1.6], [1.3, -1.6], [-1.3, 1.0], [1.3, 1.0], [0, -0.3]]) { const L = new T.SpotLight(0xF2F6FF, 4.5, 7, 0.95, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); if (q >= 2 && x === 0) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); } root.add(L); root.add(L.target); }
+  for (const [x, z] of [[-1.3, -1.6], [1.3, -1.6], [-1.3, 1.0], [1.3, 1.0], [0, -0.3]]) { const L = new T.SpotLight(0xF2F6FF, 4.5, 7, 0.95, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); if (q >= 2 && x === 0 && (!DESKTOP || Gfx.lights() >= 2)) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); } root.add(L); root.add(L.target); }
   return A;
 }
 
@@ -232,7 +232,7 @@ function opsMonitorDraw() {
 function opsOpen2(root: HTMLElement, q: number) {
   const R = OpsRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement;
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
-  ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1)); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
+  ren.setPixelRatio(Gfx.pr(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
   ren.shadowMap.enabled = q >= 2; ren.shadowMap.type = T.PCFSoftShadowMap;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
   const cam = new T.PerspectiveCamera(56, 1, 0.03, 30); R.cam = cam;

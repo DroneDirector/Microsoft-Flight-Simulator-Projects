@@ -92,6 +92,7 @@ ACTIONS['rd-close'] = () => {
     closeTop();
     const ri = State.routes.indexOf(r);
     State.routes = State.routes.filter(x => x !== r);
+    try { slotsToSpare(r.id, r.companyId); } catch (e) { /* none */ }
     // legs not yet flown are cancelled; a flight in the air lands as planned
     const S: any = State, gone = (S.aiNext || []).filter((n: any) => n.pilotId === r.pilotId && !n.job && !n.jobNext && !n.ferry), pst = p ? p.status : '';
     S.aiNext = (S.aiNext || []).filter((n: any) => gone.indexOf(n) < 0);

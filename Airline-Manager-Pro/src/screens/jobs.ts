@@ -12,7 +12,7 @@ function jobCard(j: Job, i: number): string {
   const st = j.status;
   return `<div class="job-card ${j.kind} st-${st}" style="--i:${Math.min(i, 20)}">
     <span class="job-ic">${icon(j.kind === 'cargo' ? 'fleet' : 'pax')}</span>
-    <span class="job-main"><b>${esc(j.title)}</b><small>${esc(j.client)}</small>
+    <span class="job-main"><b>${esc(j.title)}${specialCargo(j) ? ` <i class="job-sp sp-${(j as any).special}">${esc(specialCargo(j).chip)}</i>` : ''}</b><small>${esc(j.client)}</small>
       <span class="chain"><b>${esc(j.from)}</b><i></i><b>${esc(j.to)}</b></span><small>${num(j.nm)} nm · ${j.kind === 'cargo' ? num(j.kg) + ' kg' : j.pax + ' passengers'}</small></span>
     <span class="job-k"><small>Pays</small><b class="green">${money(j.pay, { compact: true })}</b></span>
     <span class="job-k"><small>${st === 'open' ? 'Take it within' : st === 'accepted' || st === 'flying' ? 'Deliver within' : 'Finished'}</small><b>${st === 'open' ? untilTxt(j.expires) : st === 'accepted' || st === 'flying' ? untilTxt(j.due) : esc(dateStr(new Date(j.doneAt || Date.now())).slice(5, 16))}</b></span>

@@ -129,6 +129,7 @@ SCREENS.ops = {
     return `
     <div class="ov">
       <button class="bf-open" data-act="briefing">${icon('sun') || icon('star')}Morning briefing</button>
+      ${typeof firstWeekHtml === 'function' ? firstWeekHtml() : ''}
       <div class="w-row">
         ${widget('fleet', 'Fleet size', `<span class="w-big">${fl.length}<small>aircraft owned</small></span>
           <span class="w-stack"><i class="flight" style="width:${pct(nFlight)}%"></i><i class="avail" style="width:${pct(nAvail)}%"></i><i class="maint" style="width:${pct(nMaint)}%"></i></span>

@@ -101,7 +101,7 @@ function viewer3dOpen(o: { title: string; sub?: string; info?: string; build: (T
   document.body.appendChild(host);
   const cv = host.querySelector('canvas') as HTMLCanvasElement;
   let R: any; try { R = new T.WebGLRenderer({ canvas: cv, antialias: true, alpha: true }); } catch (e) { host.remove(); toast('3D is not available on this device', 'warn'); return; }
-  R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); R.outputColorSpace = T.SRGBColorSpace; R.toneMapping = T.ACESFilmicToneMapping; R.toneMappingExposure = 1.1;
+  R.setPixelRatio(Gfx.pr(Math.min(2, window.devicePixelRatio || 1))); R.outputColorSpace = T.SRGBColorSpace; R.toneMapping = T.ACESFilmicToneMapping; R.toneMappingExposure = 1.1;
   R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap;
   const sc = new T.Scene(); v3vStudio(T, R, sc);
   const cam = new T.PerspectiveCamera(32, 1, 0.05, 100);
@@ -109,7 +109,7 @@ function viewer3dOpen(o: { title: string; sub?: string; info?: string; build: (T
   let obj: any = null; try { obj = o.build(T); } catch (e) { obj = null; }
   if (!obj) { obj = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshStandardMaterial({ color: 0x888888 })); }
   obj.traverse((m: any) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-  const shine = { value: 0 }; v3vShine(obj, shine);
+  const shine = { value: 0 }; if (Gfx.shine()) v3vShine(obj, shine);
   const hgt = v3vFit(T, obj); pivot.add(obj);
   const st = { yaw: -0.5, pitch: 0.12, dist: 6.2, vy: 0, vp: 0, spin: o.spin !== false, tYaw: -0.5, tPitch: 0.12, tDist: 6.2 };
   const reset = () => { st.tYaw = -0.5; st.tPitch = 0.12; st.tDist = 6.2; };

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.113 (2026-11-03)
+
+- Gfx (graphics/gfx.ts): PC graphics settings by category with presets; phones: shadows, lighting, rooms; every renderer hooked for shadow map sizes and texture filtering
+- Terrain detail (v3dTerrainQ, 5 levels, z13 ring at Ultra) and smooth ridges (v3dSoften)
+- Android: highest refresh rate, largeHeap, renderer priority important
+- tools/shots: terrain comparison pictures in CI
+- loyalty.ts: frequent-flyer programme, fuel hedging (hedgeFactor in fuelPrice), flexible fares (flexK in routeFares), lounges (loungePull in aiLoad)
+- alliances.ts, goals.ts (achievements, first week), special cargo (jobs.ts), spare slots (biz-more.ts)
+
 ## 0.9.112 (2026-11-03)
 
 - hiQ() (util.ts): full quality on the PC: museum real spotlights with shadows, 4096 shadow map, pixel ratio 2; photo mode 3840 px; award renders larger

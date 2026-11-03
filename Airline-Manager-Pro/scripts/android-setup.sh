@@ -32,6 +32,8 @@ mkdir -p "$RES/layout" "$RES/xml" "$RES/drawable"
 cp scripts/android/res/layout/amp_widget.xml "$RES/layout/"; cp scripts/android/res/xml/amp_widget*_info.xml "$RES/xml/"; cp scripts/android/res/drawable/amp_widget_*.xml "$RES/drawable/"
 # a game: Android's game mode (Android 12+) and the phone's own game booster recognise it and remember its mode
 cp scripts/android/res/xml/game_mode_config.xml "$RES/xml/"
+# more memory for the app (big airports, the cabin and satellite imagery)
+grep -q 'largeHeap' "$MAN" || sed -i 's/<application/<application android:largeHeap="true"/' "$MAN"
 grep -q 'appCategory' "$MAN" || sed -i 's/<application/<application android:appCategory="game" android:isGame="true"/' "$MAN"
 grep -q 'android.game_mode_config' "$MAN" || sed -i 's|</application>|    <meta-data android:name="android.game_mode_config" android:resource="@xml/game_mode_config" />\n    </application>|' "$MAN"
 grep -q 'amp_widget_desc' "$RES/values/strings.xml" || sed -i 's|</resources>|    <string name="amp_widget_desc">Your airline and your tablet: the bigger you make it, the more it shows</string>\n</resources>|' "$RES/values/strings.xml"

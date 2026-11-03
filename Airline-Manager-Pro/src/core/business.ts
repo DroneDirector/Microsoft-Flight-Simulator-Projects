@@ -62,7 +62,8 @@ function fuelPrice(icao: string, d?: Date): number {
   const size = aptSize(icao), remote = REMOTE_AIRPORTS.indexOf(icao) >= 0 ? 1.1 : 1;
   const wobble = 1 + (((hashMix(icao[0] + day) % 1000) / 1000) - 0.5) * 0.08 + (((hashMix(icao + day) % 1000) / 1000) - 0.5) * 0.03;
   const mk = typeof marketIdx === 'function' ? marketIdx('fuel') : 1;
-  return Math.round(base * (size === 2 ? 1 : size === 1 ? 1.04 : 1.13) * remote * wobble * mk * 1000) / 1000;
+  const hedge = typeof hedgeFactor === 'function' ? hedgeFactor(State.companyId, mk) : 1;   // your fuel bought ahead (loyalty.ts)
+  return Math.round(base * (size === 2 ? 1 : size === 1 ? 1.04 : 1.13) * remote * wobble * mk * hedge * 1000) / 1000;
 }
 
 /* ---------- Airport charges ---------- */
@@ -128,7 +129,7 @@ function routeOf(cid: string, from: string, to: string): RouteDef {
   for (const r of rs) if (r.legs.indexOf(from) >= 0 && r.legs.indexOf(to) >= 0) return r;
   return null;
 }
-function routeFares(r: RouteDef): { y: number; j: number; f: number } { const f: any = r && (r as any).fares; return { y: f ? f.y : 1, j: f ? f.j : 1, f: f ? f.f : 1 }; }
+function routeFares(r: RouteDef): { y: number; j: number; f: number } { const f: any = r && (r as any).fares, k = typeof flexK === 'function' ? flexK(r) : 1; return { y: (f ? f.y : 1) * k, j: (f ? f.j : 1) * k, f: (f ? f.f : 1) * k }; }
 
 /** Marketing that runs now for a route (or the whole airline): extra demand, 0.1 = 10%. */
 function marketingBoost(cid: string, routeId?: string): number {
@@ -144,7 +145,7 @@ function routeOutlook(cid: string, from: string, to: string, seatsPerDay?: numbe
   const pop = (c && c.reputation != null ? c.reputation : 60) / 100;
   const boost = marketingBoost(cid, r ? r.id : null);
   const att = (q: number, fi: number) => (0.45 + q) * Math.pow(fi, -1.7);
-  const you = att(pop, fareIdx) * (1 + boost);
+  const you = att(pop, fareIdx) * (1 + boost) * (1 + (typeof ffPull === 'function' ? ffPull(cid) : 0));
   const them = comp.reduce((t, x) => t + att(x.quality / 100, x.fare), 0);
   // dearer fares also put some people off flying at all; cheaper ones bring extra travellers
   const total = market * Math.pow(fareIdx, -0.7) * (1 + boost * 0.5);
@@ -230,9 +231,11 @@ function aiLoad(reg: string, from: string, to: string, leg: number): { pax: numb
   const big = (aptSize(from) + aptSize(to)) / 4, fares = routeFares(r);
   const jDemand = (nm > 1500 ? 0.12 : nm > 500 ? 0.07 : 0.04) * (0.7 + big * 0.6) * Math.pow(fares.j, -1.4);
   const fDemand = (nm > 3000 ? 0.025 : 0.008) * Math.pow(fares.f, -1.3);
+  // your lounges at either end, and your frequent flyers, bring more premium travellers
+  const prem = 1 + (typeof loungePull === 'function' ? loungePull(a.companyId, from, to) : 0) + (typeof ffPull === 'function' ? ffPull(a.companyId) : 0);
   const total = cab.y + cab.j + cab.f || 1;
-  const paxJ = cab.j ? Math.min(cab.j, Math.round(total * lf * jDemand * (0.85 + rnd('j') * 0.3))) : 0;
-  const paxF = cab.f ? Math.min(cab.f, Math.round(total * lf * fDemand * (0.8 + rnd('f') * 0.4))) : 0;
+  const paxJ = cab.j ? Math.min(cab.j, Math.round(total * lf * jDemand * prem * (0.85 + rnd('j') * 0.3))) : 0;
+  const paxF = cab.f ? Math.min(cab.f, Math.round(total * lf * fDemand * prem * (0.8 + rnd('f') * 0.4))) : 0;
   const paxY = Math.min(cab.y, Math.round(cab.y * lf));
   return { pax: paxY + paxJ + paxF, paxJ, paxF, cargoKg: Math.round(cap * cargoLf * (nm > 2000 ? 1 : 0.7)) };
 }

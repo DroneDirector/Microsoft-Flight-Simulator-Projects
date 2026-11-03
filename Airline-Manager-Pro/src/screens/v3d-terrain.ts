@@ -22,6 +22,31 @@ function v3dTexCap(): number {
   const cap = DESKTOP ? (mem >= 8 ? 8192 : 4096) : mem <= 3 ? 2048 : 4096;
   return Math.min(gl, cap);
 }
+/** Terrain detail (Settings → Graphics): 0 low … 3 very high on phones and tablets, 4 ultra on the PC.
+ *  It sets how many points the ground's mesh has in every ring (Medium is the standard), and at Ultra adds a
+ *  finer ring of heights around you (about 19 m apart). */
+const TERRAIN_Q_NAMES = ['Low', 'Medium', 'High', 'Very high', 'Ultra'];
+const TERRAIN_DENSITY = [0.6, 1, 1.5, 2, 3];
+function v3dTerrainQ(): number { const v = (State.settings as any).v3dTerrainQ; return v == null ? 1 : clamp(Math.round(+v), 0, DESKTOP ? 4 : 3); }
+/** Smooth mountain ridges: the heights between the mesh's points are averaged instead of picked one by one, so
+ *  ridges and coastlines don't turn into spikes and saw teeth. */
+function v3dTerrainSmooth(): boolean { return (State.settings as any).v3dTerrainSmooth !== false; }
+/** A softened copy of the heights for a mesh whose points are `step` pixels apart (two box passes each way). */
+function v3dSoften(H: Float32Array, size: number, step: number): Float32Array {
+  const rad = Math.floor(step / 2); if (rad < 1) return H;
+  let a = Float32Array.from(H), b = new Float32Array(H.length);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 0; y < size; y++) { const o = y * size; let sum = 0, n = 0;
+      for (let x = -rad; x <= rad; x++) if (x >= 0 && x < size) { sum += a[o + x]; n++; }
+      for (let x = 0; x < size; x++) { b[o + x] = sum / n; const xo = x - rad, xi = x + rad + 1; if (xo >= 0) { sum -= a[o + xo]; n--; } if (xi < size) { sum += a[o + xi]; n++; } } }
+    for (let x = 0; x < size; x++) { let sum = 0, n = 0;
+      for (let y = -rad; y <= rad; y++) if (y >= 0 && y < size) { sum += b[y * size + x]; n++; }
+      for (let y = 0; y < size; y++) { a[y * size + x] = sum / n; const yo = y - rad, yi = y + rad + 1; if (yo >= 0) { sum -= b[yo * size + x]; n--; } if (yi < size) { sum += b[yi * size + x]; n++; } } }
+  }
+  // the sea and the shore stay as they were (soften only land that is clearly above the sea)
+  for (let i = 0; i < H.length; i++) if (H[i] <= 2) a[i] = H[i];
+  return a;
+}
 function v3dSatQ(): number { const v = (State.settings as any).v3dSatQ; return v == null ? 1 : clamp(Math.round(+v), 0, 3); }
 
 interface V3dRing { z: number; x0: number; y0: number; N: number; size: number; H: Float32Array; mask: Uint8ClampedArray; mesh: any; mapTex: any; satTex: any; inner: V3dRing; ok: boolean }
@@ -30,7 +55,7 @@ interface V3dRing { z: number; x0: number; y0: number; N: number; size: number; 
  *  Fog starts at a quarter of the distance and closes at the distance; the camera sees a little further. */
 function v3dRange(lat?: number): { rings: number[]; fog: number[]; far: number } {
   const km = v3dKm(), k = Math.cos(((lat == null ? 50 : lat)) * D2R), rings: number[] = [];
-  for (const z of [12, 10, 8, 7, 6, 5]) { rings.push(z); if (2.5 * 40075 / (1 << z) * k >= km) break; }
+  for (const z of (v3dTerrainQ() >= 4 ? [13, 12, 10, 8, 7, 6, 5] : [12, 10, 8, 7, 6, 5])) { rings.push(z); if (2.5 * 40075 / (1 << z) * k >= km) break; }
   return { rings, fog: [km * 250, km * 1000], far: km * 1300 };
 }
 /** How far below the flat plane the ground lies at a distance (m), from the earth's curvature. */
@@ -194,7 +219,8 @@ const V3dTerrain = {
     r.mapTex = new T.CanvasTexture(cv); r.mapTex.colorSpace = T.SRGBColorSpace; r.mapTex.anisotropy = 8; r.mapTex.generateMipmaps = true;
 
     // the mesh: finest near the aircraft; the part an inner ring covers is left out
-    const G = r.z >= 12 ? 220 : r.z >= 10 ? 140 : 110;
+    const G = Math.round((r.z >= 12 ? 220 : r.z >= 10 ? 140 : 110) * TERRAIN_DENSITY[v3dTerrainQ()]);
+    const Hs = v3dTerrainSmooth() ? v3dSoften(H, size, size / G) : H;
     const lonOf = (px: number) => (r.x0 + px / 256) / n * 360 - 180;
     const latOf = (py: number) => { const k = Math.PI - 2 * Math.PI * (r.y0 + py / 256) / n; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
     const aptLL = V3d.icao ? apt(V3d.icao).pos : null, aElev = V3d.elev || 0;
@@ -202,7 +228,7 @@ const V3dTerrain = {
     const flat = new Float32Array((G + 1) * (G + 1));   // 1 where the mesh is water: flat, at the water's level
     const sample = (px: number, py: number) => {
       const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
-      const h = H[i] * (1 - fx) * (1 - fy) + H[i + 1] * fx * (1 - fy) + H[i + size] * (1 - fx) * fy + H[i + size + 1] * fx * fy;
+      const h = Hs[i] * (1 - fx) * (1 - fy) + Hs[i + 1] * fx * (1 - fy) + Hs[i + size] * (1 - fx) * fy + Hs[i + size + 1] * fx * fy;
       const k = Math.round(y) * size + Math.round(x);
       return { h, wet: sea(k), lake: !sea(k) && water(k) ? H[k] : null };
     };
