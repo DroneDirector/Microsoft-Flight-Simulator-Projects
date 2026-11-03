@@ -37,7 +37,30 @@ function mailAdd(m: Partial<LapMail> & { from: string; subject: string; body: st
   S.mail.unshift(full); S.mail = S.mail.slice(0, 300);
   try { renderTopbar(); } catch (e) { /* not ready */ }
   lapRefresh();
+  phoneNote({ title: full.from, body: full.subject, ic: 'mail', c: '#2C8CFF', app: 'mail', id: full.id });
   return full;
+}
+/** A notification sliding down from the top of the phone while you are using it (new mail, messages from the
+ *  bell). Tap it to open what it is about; it goes up again after a few seconds, or swipe it up. */
+function phoneNote(n: { title: string; body?: string; ic?: string; c?: string; app?: string; id?: string; notice?: string }) {
+  const R = Lap.root as HTMLElement; if (!Lap.phone || !R || !R.isConnected) return;
+  const os = R.querySelector('.ph-os') as HTMLElement; if (!os) return;
+  os.querySelectorAll('.ph-note').forEach(o => o.remove());
+  const d = lapGameNow(), el = document.createElement('button');
+  el.className = 'ph-note'; el.type = 'button';
+  el.innerHTML = `<span class="pn-ic" style="--c:${n.c || '#3FD0E8'}">${icon(n.ic || 'bell')}</span><span class="pn-t"><span class="pn-h"><b>${esc(n.title)}</b><small>${d.toTimeString().slice(0, 5)}</small></span>${n.body ? `<span class="pn-b">${esc(n.body)}</span>` : ''}</span>`;
+  const gone = () => { el.classList.remove('show'); setTimeout(() => el.remove(), 350); };
+  el.addEventListener('click', e => {
+    e.stopPropagation(); gone();
+    if (n.notice) { const b = document.createElement('b'); b.setAttribute('data-id', n.notice); try { ACTIONS['open-notice'](b, null); } catch (er) { /* gone */ } return; }
+    if (n.app) { if (Lap.app === 'browser') lapBrowserHide(); Lap.app = n.app; if (n.app === 'mail' && n.id) { Lap.mailId = n.id; const m = lapMail().filter(x => x.id === n.id)[0]; if (m && !m.read) { m.read = true; Store.soon(); } } Sound.tick(); lapRender(); }
+  });
+  let y0 = 0; el.addEventListener('pointerdown', e => { y0 = e.clientY; });
+  el.addEventListener('pointermove', e => { if (y0 && y0 - e.clientY > 24) { y0 = 0; gone(); } });
+  os.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  try { if (!quietAt(Date.now())) Sound.chime(); } catch (e) { /* no sound */ }
+  setTimeout(() => { if (el.isConnected) gone(); }, 5500);
 }
 /** Every minute (with the court's clock): new mail from the court and the investigators, lease requests, the family,
  *  and the calendar's reminders. */

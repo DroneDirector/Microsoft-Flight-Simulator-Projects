@@ -33,6 +33,8 @@ function alertsTick() {
     const n = list[i]; if (_alertSeen.has(n.id)) continue;
     _alertSeen.add(n.id);
     if (!n.at) n.at = Date.now();   // the moment it was received
+    // on the phone in your hand: every new message (the court's and the investigators' come as mail instead)
+    if (!/^(inv|case)-/.test(String(n.ref || '')) && ntRule(n.kind) !== 'off') { try { phoneNote({ title: n.title, body: String(n.body || '').slice(0, 140), ic: 'bell', c: '#F2A93B', notice: n.id }); } catch (e) { /* no phone */ } }
     if (!alertWorthy(n) || ntRule(n.kind) !== 'show') continue;
     const quiet = quietAt(Date.now());
     // in the app: a toast, unless the message brought its own
