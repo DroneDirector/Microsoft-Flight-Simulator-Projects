@@ -434,7 +434,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
           col = mix(col, col * vec3(1.08, 0.86, 0.84), clamp(0.55 * cheek + 0.4 * nose + 0.3 * ear, 0.0, 1.0) * (1.0 - tx));
           float tz = headW > 0.5 ? exp(-pow(abs(R.x) / 0.03, 2.0)) * smoothstep(E.y - 0.06, E.y - 0.03, R.y) * step(E.z - 0.02, R.z) : 0.0;
           rough = 0.56 - 0.14 * tz;
-          rough = mix(rough, clamp(rough - fH * 0.5, 0.3, 0.7), tx);   // the photograph's highlights: oilier where it shines
+          rough = mix(rough, clamp(rough - fH * 0.3, 0.36, 0.7), tx);   // the photograph's highlights: oilier where it shines
           vec2 ml = (R.xy - uMouth.xy) / vec2(0.024, 0.0105);
           float lip = (headW > 0.5 && R.z > uMouth.z - 0.03) ? smoothstep(1.05, 0.8, length(ml)) : 0.0;
           col = mix(col, uLip, lip * (1.0 - 0.7 * tx)); rough = mix(rough, 0.38, lip);
@@ -554,7 +554,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
             if (isSkin > 0.5) {
               float pd = pores(vRest * 1100.0);
               hgt = (smoothstep(0.05, 0.45, pd) * 0.00006 + (fbm(vRest * 160.0) - 0.5) * 0.00012) * fade * (1.0 - 0.6 * tx);
-              hgt += fH * 0.00028 * tx;   // the face's own relief, from the photograph: pores, lines, the folds of the ears
+              hgt += fH * 0.00018 * tx;   // the face's own relief, from the photograph: pores, lines, the folds of the ears
             } else {
               vec3 n0 = normalize(vON);
               float w = 0.0;
