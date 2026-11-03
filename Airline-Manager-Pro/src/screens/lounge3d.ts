@@ -155,8 +155,9 @@ function lgBuild(scene: any, q: number): any {
     for (const [w, x, z, ry] of [[W, 0, z1, Math.PI], [D, x0, 0, Math.PI / 2], [D, x1, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, H), wallM); p.position.set(x, H / 2, z); p.rotation.y = ry; p.receiveShadow = true; root.add(p); }
     if (lv === 2) for (const [w, x, z, ry] of [[W, 0, z1 - 0.02, Math.PI], [D, x0 + 0.02, 0, Math.PI / 2], [D, x1 - 0.02, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, 1.1), marble); p.position.set(x, 0.55, z); p.rotation.y = ry; root.add(p); const t = new T.Mesh(new T.BoxGeometry(w, 0.04, 0.03), gold); t.position.set(x, 1.12, z); t.rotation.y = ry; root.add(t); }
     // the carpet (its own model file per level)
-    const cw = W * 0.62, cd = D * 0.55;
-    prop(['carpet-lounge', 'carpet-business', 'carpet-flagship'][lv], 0, 0.6, 0, () => { const cp = new T.Mesh(new T.BoxGeometry(cw, 0.012, cd), M({ map: ctTex(lgCarpet(lv)), roughness: 1 })); cp.position.set(0, 0.006, 0.6); cp.receiveShadow = true; root.add(cp); });
+    // under the seating (the groups of armchairs start 2.6 m from the windows, one or two rows of them)
+    const rows = lv === 0 ? 1 : 2, cw = W * 0.7, cd = rows * 3.3 + 1.4, cz = z0 + 2.6 + (rows - 1) * 1.65;
+    prop(['carpet-lounge', 'carpet-business', 'carpet-flagship'][lv], 0, cz, 0, () => { const cp = new T.Mesh(new T.BoxGeometry(cw, 0.012, cd), M({ map: ctTex(lgCarpet(lv)), roughness: 1 })); cp.position.set(0, 0.006, cz); cp.receiveShadow = true; root.add(cp); });
   }
   // the window wall onto the apron (−z): tall panes, mullions, the view beyond
   { const view = new T.Mesh(new T.PlaneGeometry(W * 2.4, W * 0.6), new T.MeshBasicMaterial({ map: ctTex(lgView(hgSun(R.k))), toneMapped: false })); view.position.set(0, W * 0.15 - 2, z0 - 14); root.add(view); A.view = view;
