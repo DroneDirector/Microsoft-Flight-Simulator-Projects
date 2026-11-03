@@ -492,7 +492,7 @@ OpsRoom.close = function (quiet?: boolean) {
 /** Out of Operations: its own loading screen while the room is cleared from memory and the app comes back. */
 function opsLeave(toOverview?: boolean | string) {
   if (!OpsRoom.on || ExitSplash.on) return;
-  exitSplash('ops', 'Operations', [
+  exitSplash('ops', 'Leaving Operations', [
     { pct: 30, step: 'Switching off the screens…', run: () => OpsRoom.close(true) },
     { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
     { pct: 85, step: toOverview ? 'On your way…' : 'Loading your airline…', run: () => { if (toOverview) { try { roomGoTo(typeof toOverview === 'string' ? toOverview : 'overview'); } catch (e) { refresh(); } } else refresh(); } },

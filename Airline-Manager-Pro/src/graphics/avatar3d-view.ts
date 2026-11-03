@@ -322,6 +322,8 @@ function av3Tick(now: number) {
     const [w, h] = av3Size(el); if (!w || !h) continue;
     const pk = key + '|' + view + '|' + w + 'x' + h;
     let pic = Av3.pics.get(pk);
+    // a window that has just opened slides into view first; its figure is built right after (never in the way of it)
+    if (!pic && performance.now() - ((window as any).__layerAt || 0) < 380) { Av3.queue.unshift(el); setTimeout(av3Loop, 400); return; }
     if (!pic) {
       // small pictures are built with less hair, which looks the same at that size and is much quicker
       const model = av3Model(key, el.clientHeight < 230 ? 0.3 : 1); if (!model) continue;

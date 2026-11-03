@@ -4,6 +4,7 @@ const _layers: HTMLElement[] = [];
 
 function openLayer(kind: 'modal' | 'drawer' | 'pop', html: string, opts?: { cls?: string; onClose?: () => void; anchor?: HTMLElement }): HTMLElement {
   const root = $('#overlay-root');
+  (window as any).__layerAt = performance.now();   // a window is sliding in: heavy drawing waits until it is in view
   const wrap = document.createElement('div');
   wrap.className = `layer layer-${kind} ${opts && opts.cls ? opts.cls : ''}`;
   wrap.innerHTML = `<div class="scrim" data-act="close-layer"></div><div class="panel" role="dialog" aria-modal="true">${html}</div>`;

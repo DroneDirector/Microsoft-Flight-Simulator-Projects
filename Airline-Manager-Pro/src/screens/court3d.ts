@@ -822,7 +822,7 @@ function ctPayLeave() {
 /** Out of the courtroom: the court's loading screen while the room is cleared from memory and the app comes back. */
 function ctExitToMain() {
   const R = CourtRoom; if (!R.on) return; const c = R.c;
-  exitSplash('court', 'The courtroom', [
+  exitSplash('court', 'Leaving the courtroom', [
     { pct: 30, step: 'The court rises…', run: () => CourtRoom.close(true) },
     { pct: 55, step: 'Clearing the courtroom from memory…', run: exitFreeMemory },
     { pct: 85, step: 'Loading your airline…', run: () => refresh() },
