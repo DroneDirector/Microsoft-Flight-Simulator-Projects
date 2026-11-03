@@ -48,6 +48,8 @@ Legend: **Built** = in the app now (on demo data where it needs the simulator). 
 | You fly one aircraft at a time, chosen from your fleet | Built |
 | A water salute the first time your airline lands at an airport: two fire trucks spray an arch of water over the aircraft, at the real airport, with a newspaper story and photo | Built |
 | Gifts and commemorative plaques exchanged with the airport on a first visit, kept under Ranking → Gifts → Aviation Gifts | Built |
+| Your own check rides for a new type, graded live from the simulator: stable approach, speeds below 10,000 ft, the landing, an engine failure | Built |
+| Career milestones (hours, landings, promotions, first widebody, type ratings) celebrated with a certificate, plaque or medal in 3D and the newspaper | Built |
 | Your office: your own pet (corgi or kitten) with its own coat, food and water bowls you fill, and a family photo from your look and your partner | Built |
 | Office laptop and Operations computer with their own desktop and apps, full screen | Built |
 | A new career starts with finances on hold until you register the company | Built |
@@ -99,6 +101,9 @@ Each widget opens its own page.
 | Fuel prices per airport and day; tankering | Built |
 | Job board: charters and cargo jobs, flown by you or a hired pilot | Built |
 | Tours and a weekly challenge | Built |
+| Airline events that need a decision: a part stuck at an outstation, a VIP charter, a mistake fare gone viral, a fixed fuel price | Built |
+| Rivals answer your new routes with more flights or lower fares, and try to hire your best people | Built |
+| Codeshare partners: their passengers connect onto your flights at their hub, for a monthly fee | Built |
 | Special days: holidays, festivals and events with their real dates fill aircraft to and from where they happen (Christmas, Easter, Thanksgiving, Lunar New Year, Eid, Ólavsøka, Oktoberfest, Carnival and more) | Built |
 | Schedule refreshes by itself every 30 seconds, with a Refresh button and a countdown | Built |
 | Force departure for a delayed flight at your home hub once the cause is fixed (crew assigned, enough crew, the fault repaired) | Built |

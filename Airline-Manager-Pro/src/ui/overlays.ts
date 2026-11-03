@@ -180,6 +180,7 @@ ACTIONS['open-notice'] = el => {
   else if (n.ref && /^va-/.test(String(n.ref))) vaNoticeOpen(String(n.ref));
   else if (n.ref && /^case-/.test(String(n.ref))) courtPopup(String(n.ref));
   else if (n.ref && /^gift-/.test(String(n.ref))) giftOpenRef(String(n.ref));
+  else if (n.ref && /^life-/.test(String(n.ref))) lifeOpen(String(n.ref));
   else if (n.ref && /^inv-/.test(String(n.ref))) invPopup(String(n.ref));
   else if (n.kind === 'mechanic' && n.ref) mechanicPopup(n.ref);
   else if (n.kind === 'authority' && n.ref) finePopup(n.ref);

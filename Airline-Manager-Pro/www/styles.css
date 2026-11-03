@@ -3961,3 +3961,26 @@ html.calm .dclock b em { animation: none; }
 .bf-row span { display: grid; gap: 2px; } .bf-row b { font-size: 13.5px; } .bf-row small { font-size: 12px; color: var(--ink-2); line-height: 1.4; }
 .bf-row.ok .ic { color: var(--green, #3DDC84); } .bf-row.bad .ic, .bf-row.warn .ic { color: var(--amber, #FFB020); } .bf-row.hi .ic { color: #FFD34D; }
 @media (max-width: 760px) { .bf-grid { grid-template-columns: 1fr; } }
+/* Airline life: decision cards, partners */
+.life-h { display: flex; gap: 12px; align-items: center; } .life-h > .ic { width: 34px; height: 34px; padding: 7px; border-radius: 11px; background: rgba(255,176,32,.14); color: var(--amber, #FFB020); flex: none; }
+.life-h small { color: var(--ink-3); font-size: 11px; } .life-h h2 { margin: 2px 0 0; font-size: 19px; }
+.life .lede { margin: 12px 0; }
+.life-opts .btn { height: auto; min-height: 54px; white-space: normal; line-height: 1.3; justify-content: flex-start; text-align: left; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; }
+.life-opts .btn small { font-weight: 500; opacity: .8; font-size: 12px; }
+.life-done { display: flex; gap: 8px; align-items: center; color: var(--green, #3DDC84); }
+.pt .pt-card { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.pt-logo { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: var(--panel-3, #1B2633); font: 800 13px Inter, sans-serif; color: var(--cyan, #3FD0E8); }
+.pt-card.mine .pt-logo { background: rgba(61,220,132,.15); color: var(--green, #3DDC84); }
+.pt-t { flex: 1; display: grid; gap: 2px; } .pt-t small { color: var(--ink-2); font-size: 12px; }
+.life-opts .btn.primary small { color: rgba(6,16,30,.78); opacity: 1; }
+/* Check rides */
+.ride-box { display: grid; gap: 6px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+.ride-box > b { display: flex; gap: 6px; align-items: center; font-size: 13px; } .ride-box > b .ic { width: 16px; height: 16px; color: var(--amber, #FFB020); }
+.ride-box small { color: var(--ink-2); font-size: 12px; line-height: 1.45; }
+.ride-row { display: flex; gap: 8px; } .ride-row select { flex: 1; min-width: 0; }
+.ride-res h2 { display: flex; gap: 8px; align-items: center; font-size: 19px; } .ride-res h2 .ic { width: 22px; height: 22px; }
+.ride-tasks { display: grid; gap: 8px; margin: 12px 0; }
+.ride-task { display: flex; gap: 10px; padding: 9px 11px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); }
+.ride-task .ic { flex: none; width: 18px; height: 18px; } .ride-task span { display: grid; gap: 2px; } .ride-task small { color: var(--ink-2); font-size: 12px; }
+.ride-task.ok .ic { color: var(--green, #3DDC84); } .ride-task.bad .ic { color: var(--red, #FF5A5A); } .ride-task.na .ic { color: var(--ink-3); }
+.gift-row.career { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }

@@ -169,6 +169,8 @@
     "src/ui/quit-save.ts",
     "src/ui/flight-pops.ts",
     "src/ui/briefing.ts",
+    "src/core/airline-life.ts",
+    "src/core/career-rides.ts",
     "src/main.ts"
   ]
 }
