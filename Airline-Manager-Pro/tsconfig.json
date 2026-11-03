@@ -173,6 +173,7 @@
     "src/ui/flight-pops.ts",
     "src/ui/briefing.ts",
     "src/core/airline-life.ts",
+    "src/core/loyalty.ts",
     "src/core/career-rides.ts",
     "src/core/ops-decisions.ts",
     "src/main.ts"

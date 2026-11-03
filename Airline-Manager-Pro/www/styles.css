@@ -4025,3 +4025,24 @@ html.calm .dclock b em { animation: none; }
 .ch-row.col input[type=range] { width: 100%; }
 .ch-row.col > * { flex: none; }
 .cab-opts .ch-row.col > span { flex: none; }
+/* frequent flyers, fuel hedging, lounges */
+.loy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.card.loy .kv-row { margin: 10px 0; }
+.loy-row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+.loy-row .le-in { flex: 1; }
+.loy-opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.loy-opts .btn { flex-direction: column; height: auto; padding: 8px; }
+.loy-opts .btn small { opacity: .7; font-weight: 500; }
+.lg-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.lg-row > span:nth-child(2) { flex: 1; min-width: 0; }
+.lg-row small { display: block; color: var(--muted); }
+.lg-row .btn { flex-direction: column; height: auto; padding: 6px 12px; }
+.lg-row .btn small { opacity: .75; font-weight: 500; }
+.lg-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: rgba(242, 181, 68, .14); color: #F2B544; }
+.ff-chip { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px; font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; vertical-align: 2px; background: rgba(140, 170, 200, .18); color: #B8CBE0; }
+.ff-chip.ff-silver, .ff-t-silver { color: #D2DCE6; }
+.ff-chip.ff-silver { background: rgba(200, 212, 225, .18); }
+.ff-chip.ff-gold, .ff-t-gold { color: #F2C14E; }
+.ff-chip.ff-gold { background: rgba(242, 193, 78, .16); }
+.ff-chip.ff-platinum, .ff-t-platinum { color: #9FE7F5; }
+.ff-chip.ff-platinum { background: linear-gradient(90deg, rgba(159, 231, 245, .2), rgba(196, 160, 255, .2)); }
