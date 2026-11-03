@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.95 (2026-11-03)
+
+- the guided tour starts on the "Finances are on hold" button when it is there
+
 ## 0.9.94 (2026-11-03)
 
 - the office laptop and the Operations computer fill the screen and close by their power button; the Operations computer mounts the laptop OS (Lap.ops) with the operations screens as apps (scr:ops, scr:schedule, scr:dispatch, scr:planner); lapDeskApps puts the phone apps on the desktop and taskbar too
