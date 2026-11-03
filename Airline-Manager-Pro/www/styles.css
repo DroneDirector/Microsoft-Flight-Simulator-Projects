@@ -3901,3 +3901,13 @@ html.calm .dclock b em { animation: none; }
 .force-dep { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 6px; }
 .force-dep small { font-size: 11px; color: var(--ink-3); } .force-dep.ok small { color: var(--green, #3DDC84); }
 .force-dep .btn[disabled] { opacity: .55; cursor: not-allowed; }
+/* a gift or plaque revealed on its own: no card, just the object with the beams, sparks and confetti */
+.bdr.gift .bdr-card { aspect-ratio: 3 / 4; width: min(380px, calc(80 * var(--vw, 1vw))); }
+.bdr.gift .bdr-back { display: none; }
+.bdr.gift .bdr-front { background: none; border: 0; box-shadow: none; overflow: visible; color: #fff; gap: 6px; }
+.bdr.gift .bdr-shine { display: none; }
+.bdr.gift .bdr-ic.bdr-img { width: 100%; background: none; border-radius: 0; box-shadow: none; overflow: visible; filter: drop-shadow(0 0 26px var(--g)) drop-shadow(0 10px 18px rgba(0,0,0,.5)); }
+.bdr.gift .bdr-rank { color: var(--c); opacity: 1; text-shadow: 0 0 12px var(--g); }
+.bdr.gift .bdr-title { color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.7); }
+.bdr.gift .bdr-desc { color: rgba(235,242,250,.92); text-shadow: 0 1px 8px rgba(0,0,0,.8); max-width: 320px; }
+.bdr.gift .bdr-date { color: #fff; opacity: .8; }

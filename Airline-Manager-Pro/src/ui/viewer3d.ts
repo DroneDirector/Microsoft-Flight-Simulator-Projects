@@ -7,11 +7,11 @@
 //    a controller, and they light up as you press them.
 // Thumbnails for lists are rendered once with the same lighting (viewerThumb).
 
-const V3V: any = { on: false };
+const V3V: any = { on: false, mode: 'kb' };   // mode: the last device used, 'kb' (keyboard, mouse, touch) or 'pad'
 let V3V_ROT = Math.PI / 2;   // the medal's face lettering upright on the disc
 
 /** The studio: soft light all round, a key light, a rim light and a reflection map for metal and glass. */
-function v3vStudio(T: any, R: any, sc: any) {
+function v3vStudio(T: any, R: any, sc: any, bare?: boolean) {
   sc.add(new T.HemisphereLight(0xF4F7FF, 0x30343C, 0.9));
   const key = new T.DirectionalLight(0xFFF4E6, 2.4); key.position.set(3, 5, 4); key.castShadow = true; key.shadow.mapSize.set(1024, 1024);
   Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 20 }); key.shadow.bias = -0.0006; sc.add(key);
@@ -26,6 +26,7 @@ function v3vStudio(T: any, R: any, sc: any) {
     const pm = new T.PMREMGenerator(R); sc.environment = pm.fromEquirectangular(tex).texture; pm.dispose(); tex.dispose();
   } catch (e) { /* no reflections */ }
   // a dark round plinth with a soft shadow on it
+  if (bare) return { key };
   const pl = new T.Mesh(new T.CylinderGeometry(1.6, 1.7, 0.12, 64), new T.MeshStandardMaterial({ color: 0x15181D, roughness: 0.55, metalness: 0.3 }));
   pl.position.y = -0.06; pl.receiveShadow = true; sc.add(pl);
   return { key };
@@ -45,17 +46,17 @@ function v3vPadKind(): { kind: string; pad: any } {
   let pads: any[] = []; try { pads = Array.from((navigator as any).getGamepads ? (navigator as any).getGamepads() : []).filter(Boolean); } catch (e) { pads = []; }
   const p = pads[0]; if (!p) return { kind: '', pad: null };
   const id = String(p.id || '').toLowerCase();
-  const kind = /dualsense|dualshock|playstation|wireless controller|054c/.test(id) ? 'ps' : /xbox|xinput|045e/.test(id) ? 'xbox' : /pro controller|joy-con|nintendo|057e/.test(id) ? 'switch' : 'pad';
+  const kind = /xbox|xinput|045e/.test(id) ? 'xbox' : /dualsense|dualshock|playstation|wireless controller|054c/.test(id) ? 'ps' : /pro controller|joy-con|nintendo|057e/.test(id) ? 'switch' : 'pad';
   return { kind, pad: p };
 }
 
 /** The keyboard and mouse help, and the controller drawing with its buttons, for the popup. */
-function v3vHelpHtml(kind: string): string {
+function v3vHelpHtml(kind: string, mode?: string): string {
   const k = (s: string) => `<kbd>${s}</kbd>`;
   const keys = `<div class="v3v-keys"><span>${k('←')}${k('→')}${k('↑')}${k('↓')}<em>or</em>${k('W')}${k('A')}${k('S')}${k('D')}<small>Turn</small></span>
     <span>${k('+')}${k('−')}<em>or</em>${k('Wheel')}<small>Zoom</small></span><span>${k('Space')}<small>Spin</small></span><span>${k('R')}<small>Reset</small></span><span>${k('Esc')}<small>Close</small></span>
     <span class="v3v-touch">${icon('hand') || ''}<small>Drag to turn · pinch to zoom</small></span></div>`;
-  if (!kind) return keys;
+  if (!kind || mode !== 'pad') return keys;
   // face buttons by controller: bottom, right, left, top
   const F: any = {
     ps: [['✕', '#7FB2FF'], ['○', '#FF6B7A'], ['□', '#E58BFF'], ['△', '#3FE0B5']],
@@ -84,7 +85,7 @@ function v3vHelpHtml(kind: string): string {
       <path d="M329 128 L370 146"/><text x="374" y="152">Spin</text>
       <path d="M76 105 L40 105"/><text x="36" y="109" text-anchor="end">Turn</text></g>
   </svg>`;
-  return `<div class="v3v-help2">${keys}<div class="v3v-padwrap"><b>${name}</b>${svg}</div></div>`;
+  return `<div class="v3v-help2"><div class="v3v-padwrap"><b>${name}</b>${svg}</div></div>`;
 }
 
 /** Open the viewer. build() makes the object (any size; it is fitted on the plinth). */
@@ -136,9 +137,17 @@ function viewer3dOpen(o: { title: string; sub?: string; info?: string; build: (T
   const ku = (e: KeyboardEvent) => { delete held[e.key.toLowerCase()]; };
   window.addEventListener('keydown', kd, true); window.addEventListener('keyup', ku, true);
   // the help: keyboard always, the controller when one is connected (checked as it is plugged in or out)
-  let padKind = '-';
+  // one set of help at a time: the keyboard's or the controller's, whichever you used last (switching as you change)
+  let padKind = '-', shown = '';
   const helpEl = host.querySelector('.v3v-help') as HTMLElement;
-  const helpUpdate = () => { const k = v3vPadKind().kind; if (k !== padKind) { padKind = k; helpEl.innerHTML = v3vHelpHtml(k); helpEl.classList.toggle('pad', !!k); } };
+  const helpUpdate = () => {
+    const k = v3vPadKind().kind, mode = k && V3V.mode === 'pad' ? 'pad' : 'kb', sig = mode + k;
+    if (sig === shown && k === padKind) return; padKind = k; shown = sig;
+    helpEl.innerHTML = v3vHelpHtml(k, mode); helpEl.classList.toggle('pad', mode === 'pad');
+    const xs = host.querySelector('.v3v-x small'); if (xs) xs.textContent = mode === 'pad' ? ({ ps: '○', xbox: 'B', switch: 'A' } as any)[k] || '2' : 'Esc';
+  };
+  const useKb = () => { if (V3V.mode !== 'kb') { V3V.mode = 'kb'; helpUpdate(); } };
+  host.addEventListener('pointerdown', useKb, true); host.addEventListener('wheel', useKb, { capture: true, passive: true }); window.addEventListener('keydown', useKb, true);
   helpUpdate();
   let prevB: boolean[] = [];
   const frame = () => {
@@ -154,6 +163,7 @@ function viewer3dOpen(o: { title: string; sub?: string; info?: string; build: (T
       const dz = (v: number) => Math.abs(v) < 0.12 ? 0 : v;
       const lx = dz(ax[0] || 0), ly = dz(ax[1] || 0), rx = dz(ax[2] || 0), ry = dz(ax[3] || 0);
       if (lx || ly || rx || ry) st.spin = false;
+      if ((lx || ly || rx || ry || bt.some((x: boolean) => x)) && V3V.mode !== 'pad') { V3V.mode = 'pad'; helpUpdate(); }
       st.tYaw += (lx * 2.6 + rx * 1.0) * dt; st.tPitch = clamp(st.tPitch + (ly * 1.8 + ry * 0.7) * dt, -1.2, 1.35);
       const lt = P.pad.buttons[6] ? P.pad.buttons[6].value || (P.pad.buttons[6].pressed ? 1 : 0) : 0, rt = P.pad.buttons[7] ? P.pad.buttons[7].value || (P.pad.buttons[7].pressed ? 1 : 0) : 0;
       st.tDist = clamp(st.tDist * (1 + (lt - rt) * 1.4 * dt), 2.6, 12);
@@ -178,7 +188,7 @@ function viewer3dOpen(o: { title: string; sub?: string; info?: string; build: (T
   window.addEventListener('gamepadconnected', onPad); window.addEventListener('gamepaddisconnected', onPad);
   const padPoll = setInterval(helpUpdate, 1500);
   V3V.on = true; V3V.host = host; V3V.R = R; V3V.sc = sc;
-  V3V.off = () => { window.removeEventListener('resize', resize); window.removeEventListener('keydown', kd, true); window.removeEventListener('keyup', ku, true); window.removeEventListener('gamepadconnected', onPad); window.removeEventListener('gamepaddisconnected', onPad); clearInterval(padPoll); };
+  V3V.off = () => { window.removeEventListener('resize', resize); window.removeEventListener('keydown', kd, true); window.removeEventListener('keydown', useKb, true); window.removeEventListener('keyup', ku, true); window.removeEventListener('gamepadconnected', onPad); window.removeEventListener('gamepaddisconnected', onPad); clearInterval(padPoll); };
   Sound.tick();
   frame();
 }
@@ -195,14 +205,14 @@ ACTIONS['v3v-close'] = () => viewer3dClose();
 /** A still of an object for a list, rendered once with the viewer's lighting (kept for the session). */
 const _v3vThumbs: { [k: string]: string } = {};
 let _v3vThumbR: any = null;
-function viewerThumb(key: string, build: (T: any) => any, size?: number): string {
+function viewerThumb(key: string, build: (T: any) => any, size?: number, bare?: boolean): string {
   if (_v3vThumbs[key] !== undefined) return _v3vThumbs[key];
   const T = typeof THREE !== 'undefined' ? THREE : null; if (!T) return (_v3vThumbs[key] = '');
   try {
     const S = size || 320;
     if (!_v3vThumbR) { const c = document.createElement('canvas'); _v3vThumbR = new T.WebGLRenderer({ canvas: c, antialias: true, alpha: true, preserveDrawingBuffer: true }); _v3vThumbR.outputColorSpace = T.SRGBColorSpace; _v3vThumbR.toneMapping = T.ACESFilmicToneMapping; _v3vThumbR.toneMappingExposure = 1.1; _v3vThumbR.shadowMap.enabled = true; _v3vThumbR.setClearColor(0x000000, 0); }
     const R = _v3vThumbR; R.setPixelRatio(1); R.setSize(S, S, false);
-    const sc = new T.Scene(); v3vStudio(T, R, sc);
+    const sc = new T.Scene(); v3vStudio(T, R, sc, bare);
     const obj = build(T); obj.traverse((m: any) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     const hgt = v3vFit(T, obj); obj.rotation.y = -0.5; sc.add(obj);
     const cam = new T.PerspectiveCamera(32, 1, 0.05, 100), d = 5.6; cam.position.set(0, hgt * 0.45 + Math.sin(0.2) * d, Math.cos(0.2) * d); cam.lookAt(0, hgt * 0.45, 0);

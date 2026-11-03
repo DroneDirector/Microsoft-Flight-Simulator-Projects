@@ -68,7 +68,7 @@ function giftReveal(ex: GiftEx, again: boolean) {
   ex.received.forEach((it, i) => {
     const key = it.kind + '|' + it.name; if (seen[key] && !again) return; seen[key] = ex.at;
     list.push({ id: ex.id + '-' + i, group: 'airline', cat: 'Gifts', title: it.name, desc: it.desc, tier: it.kind === 'plaque' ? 3 : 2, metric: '', need: 0, icon: 'star',
-      img: viewerThumb(ex.id + 'received' + i, T => giftBuild(T, it, ex), 280), rankText: it.kind === 'plaque' ? 'Commemorative plaque' : 'Aviation gift', dateText: `From ${A.name} · ${dateStr(new Date(ex.at)).slice(0, 10)}` });
+      img: viewerThumb(ex.id + 'received' + i + 'bare', T => giftBuild(T, it, ex), 420, true), gift: true, rankText: it.kind === 'plaque' ? 'Commemorative plaque' : 'Aviation gift', dateText: `From ${A.name} · ${dateStr(new Date(ex.at)).slice(0, 10)}` });
   });
   Store.soon();
   if (list.length) badgeReveal(list as any);
