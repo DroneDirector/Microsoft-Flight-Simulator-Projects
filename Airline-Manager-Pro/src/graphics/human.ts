@@ -293,6 +293,10 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       uShL: { value: v3(I.J['upperarm01.L']) }, uShR: { value: v3(I.J['upperarm01.R']) },
       uElL: { value: v3(I.J['upperarm01.L']).lerp(v3(I.J['wrist.L']), 0.56 / 0.97) }, uElR: { value: v3(I.J['upperarm01.R']).lerp(v3(I.J['wrist.R']), 0.56 / 0.97) },
       uArmL: { value: new THREE.Matrix3() }, uArmR: { value: new THREE.Matrix3() }, uElbL: { value: new THREE.Matrix3() }, uElbR: { value: new THREE.Matrix3() }, uFlush: { value: 0 },
+      // the hands: a turn at the wrist, and the fingers closing at the knuckles and the middle joints (thumb apart)
+      uWrL: { value: new THREE.Matrix3() }, uWrR: { value: new THREE.Matrix3() }, uWrPL: { value: v3(I.J['wrist.L']) }, uWrPR: { value: v3(I.J['wrist.R']) },
+      uC1L: { value: new THREE.Matrix3() }, uC1R: { value: new THREE.Matrix3() }, uC2L: { value: new THREE.Matrix3() }, uC2R: { value: new THREE.Matrix3() },
+      uFgL: { value: new THREE.Vector3(0, -1, 0) }, uFgR: { value: new THREE.Vector3(0, -1, 0) }, uPnL: { value: new THREE.Vector3(-1, 0, 0) }, uPnR: { value: new THREE.Vector3(1, 0, 0) }, uThL: { value: new THREE.Matrix3() }, uThR: { value: new THREE.Matrix3() }, uCurlL: { value: 0 }, uCurlR: { value: 0 }, uHandK: { value: new THREE.Vector3(I.armLen, I.armLen + 0.1, I.armLen + 0.14) },
       // legs: hip and knee turns (walking, sitting)
       uHipL: { value: v3(I.J['upperleg01.L']) }, uHipR: { value: v3(I.J['upperleg01.L']).multiply(new THREE.Vector3(-1, 1, 1)) },
       uLegL: { value: new THREE.Matrix3() }, uLegR: { value: new THREE.Matrix3() }, uKneeL: { value: new THREE.Matrix3() }, uKneeR: { value: new THREE.Matrix3() },
@@ -307,7 +311,8 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     m.userData.U = U;
     m.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, U);
-      const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR,uHipL,uHipR; uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR,uLegL,uLegR,uKneeL,uKneeR; uniform float uFlush;
+      const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR,uHipL,uHipR; uniform mat3 uWrL,uWrR,uC1L,uC1R,uC2L,uC2R; uniform vec3 uWrPL,uWrPR,uFgL,uFgR,uHandK,uPnL,uPnR; uniform mat3 uThL,uThR; uniform float uCurlL,uCurlR;
+        uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR,uLegL,uLegR,uKneeL,uKneeR; uniform float uFlush;
         uniform vec3 uAnkPL,uAnkPR,uSpineP,uFaceAvg; uniform sampler2D tFace,tDetail; uniform vec4 uFaceU,uFaceY,uFaceV,uEarZY,uEarTex; uniform vec2 uFaceTop; uniform float uFaceOn,uFaceC; uniform mat3 uAnkL,uAnkR,uSpine; uniform float uPress,uLipLow,uLipUp,uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink,uJaw,uLipR,uMouthIn;
         varying vec3 vRest; varying vec3 vF; varying vec3 vON; varying vec4 vA; varying vec4 vB; varying float vBeard;
         float hairlineAt(float az){ float a = abs(az);
@@ -321,6 +326,11 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
           objectNormal = normalize(mix(objectNormal, uHeadRot * objectNormal, smoothstep(0.15, 0.85, fa.w)));
           if (fa.y > 0.5) { bool lf = rest.x > 0.0; float ke = smoothstep(uElbowS - 0.03, uElbowS + 0.03, fa.x), ks = smoothstep(0.0, 0.06, fa.x);
+            if ((lf ? uCurlL : uCurlR) > 0.0) { vec3 dv = position - (lf ? uWrPL : uWrPR); float df = dot(dv, lf ? uFgL : uFgR), kl = (uHandK.y - uHandK.x); float tw = smoothstep(0.012, 0.03, dot(dv, lf ? uPnL : uPnR)) * smoothstep(kl + 0.022, kl + 0.006, df) * smoothstep(0.004, 0.02, df) * step(uHandK.x - 0.01, fa.x);
+              objectNormal = normalize(mix(objectNormal, (lf ? uThL : uThR) * objectNormal, tw));
+              objectNormal = normalize(mix(objectNormal, (lf ? uC2L : uC2R) * objectNormal, smoothstep(uHandK.z - 0.012, uHandK.z + 0.012, fa.x) * (1.0 - tw)));
+              objectNormal = normalize(mix(objectNormal, (lf ? uC1L : uC1R) * objectNormal, smoothstep(uHandK.y - 0.012, uHandK.y + 0.012, fa.x) * (1.0 - tw))); }
+            objectNormal = normalize(mix(objectNormal, (lf ? uWrL : uWrR) * objectNormal, smoothstep(uHandK.x - 0.012, uHandK.x + 0.008, fa.x)));
             objectNormal = normalize(mix(objectNormal, (lf ? uElbL : uElbR) * objectNormal, ke)); objectNormal = normalize(mix(objectNormal, (lf ? uArmL : uArmR) * objectNormal, ks)); }
           if (fa.z > 0.02 && fa.y < 0.5) { bool ll = rest.x > 0.0; float kw = smoothstep(uKneeY + 0.03, uKneeY - 0.03, rest.y);
             float aw = smoothstep((ll ? uAnkPL.y : uAnkPR.y) + 0.025, (ll ? uAnkPL.y : uAnkPR.y) - 0.015, rest.y);
@@ -365,6 +375,16 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
           // arms: the forearm turns at the elbow, then the whole arm at the shoulder
           if (fa.y > 0.5) { bool lf = rest.x > 0.0; vec3 sp = lf ? uShL : uShR, ep = lf ? uElL : uElR;
             float ke = smoothstep(uElbowS - 0.03, uElbowS + 0.03, fa.x), ks = smoothstep(0.0, 0.06, fa.x);
+            // the hand: the fingers close (the middle joints, then the knuckles), then the hand turns at the wrist
+            vec3 wp = lf ? uWrPL : uWrPR, fg = lf ? uFgL : uFgR;
+            if ((lf ? uCurlL : uCurlR) > 0.0) { vec3 p2 = wp + fg * (uHandK.z - uHandK.x), p1 = wp + fg * (uHandK.y - uHandK.x), pn = lf ? uPnL : uPnR;
+              // the thumb (standing out to the palm side, below the knuckles) turns at its root, the fingers close
+              vec3 dv = transformed - wp; float df = dot(dv, fg), kl = uHandK.y - uHandK.x; float tw = smoothstep(0.012, 0.03, dot(dv, pn)) * smoothstep(kl + 0.022, kl + 0.006, df) * smoothstep(0.004, 0.02, df) * step(uHandK.x - 0.01, fa.x);
+              vec3 pt = wp + fg * 0.025 + pn * 0.018;
+              transformed = mix(transformed, pt + (lf ? uThL : uThR) * (transformed - pt), tw);
+              transformed = mix(transformed, p2 + (lf ? uC2L : uC2R) * (transformed - p2), smoothstep(uHandK.z - 0.012, uHandK.z + 0.012, fa.x) * (1.0 - tw));
+              transformed = mix(transformed, p1 + (lf ? uC1L : uC1R) * (transformed - p1), smoothstep(uHandK.y - 0.012, uHandK.y + 0.012, fa.x) * (1.0 - tw)); }
+            transformed = mix(transformed, wp + (lf ? uWrL : uWrR) * (transformed - wp), smoothstep(uHandK.x - 0.012, uHandK.x + 0.008, fa.x));
             transformed = mix(transformed, ep + (lf ? uElbL : uElbR) * (transformed - ep), ke);
             transformed = mix(transformed, sp + (lf ? uArmL : uArmR) * (transformed - sp), ks); }
           // legs: the lower leg turns at the knee, then the whole leg at the hip
@@ -1425,6 +1445,22 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     const jv = (k) => new THREE.Vector3(I.J[k][0], I.J[k][1], I.J[k][2]);
     const joints: any = {};
     for (const sd of ['L', 'R']) { const sh = jv('upperarm01.' + sd), wr = jv('wrist.' + sd), el = sh.clone().lerp(wr, 0.56 / 0.97); joints[sd] = { s: sh, e: el, w: wr, palm: wr.clone().add(wr.clone().sub(el).normalize().multiplyScalar(0.075)) }; }
+    // the hands at rest: which way the fingers point (F), the palm faces (N, towards the body) and the thumb (T);
+    // the knuckles and the middle joints, as distances along the arm (the same measure the shader bends by)
+    {
+      const PA = geo.attributes.position.array, FA = b.A, n = PA.length / 3; let top = 0;
+      for (let i = 0; i < n; i++) if (FA[i * 4 + 1] > 0.5) top = Math.max(top, FA[i * 4]);
+      const hl = Math.max(0.12, top - I.armLen); U.uHandK.value.set(I.armLen, I.armLen + 0.53 * hl, I.armLen + 0.76 * hl);
+      for (const sd of ['L', 'R']) {
+        const J = joints[sd], c = new THREE.Vector3(); let k = 0;
+        for (let i = 0; i < n; i++) if (FA[i * 4 + 1] > 0.5 && FA[i * 4] > top - 0.1 * hl && (PA[i * 3] > 0) === (sd === 'L')) { c.x += PA[i * 3]; c.y += PA[i * 3 + 1]; c.z += PA[i * 3 + 2]; k++; }
+        const F = k ? c.multiplyScalar(1 / k).sub(J.w).normalize() : new THREE.Vector3(0, -1, 0);
+        const Tt = new THREE.Vector3(0, 0, 1); Tt.sub(F.clone().multiplyScalar(Tt.dot(F))).normalize();
+        const N = sd === 'R' ? Tt.clone().cross(F) : F.clone().cross(Tt);
+        J.F = F; J.N = N.normalize(); J.T = Tt; J.ax = F.clone().cross(J.N).normalize(); J.hl = hl;
+        U['uFg' + sd].value.copy(F); U['uPn' + sd].value.copy(J.N);
+      }
+    }
     return {
       root, joints, headPivot, top: box.max.y, width: Math.max(box.max.x - box.min.x, 0.5), bustBottom: I.neckY - 0.3, headY: I.headC[1],
       /** Breathing, a gentle sway, head and eye movement, blinking. */
@@ -1439,6 +1475,14 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         const arm = (a, sd) => { const m = new THREE.Matrix4().makeRotationY(sd * -a[2]).multiply(new THREE.Matrix4().makeRotationZ(sd * a[1])).multiply(new THREE.Matrix4().makeRotationX(-a[0])); return new THREE.Matrix3().setFromMatrix4(m); };
         const elb = (b) => new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(-b));
         U.uArmL.value.copy(arm(g.L, 1)); U.uArmR.value.copy(arm(g.R, -1)); U.uElbL.value.copy(elb(g.L[3])); U.uElbR.value.copy(elb(g.R[3])); U.uFlush.value = g.flush;
+        // the hands: g.hand = { L/R: { W: the wrist's turn (Matrix3, at rest), curl: 0 open … 1 closed round something } }
+        for (const sd of ['L', 'R']) {
+          const h = g.hand && g.hand[sd], cu = h ? Math.max(0, Math.min(1.2, h.curl || 0)) : 0;
+          if (h && h.W) U['uWr' + sd].value.copy(h.W); else U['uWr' + sd].value.identity();
+          U['uCurl' + sd].value = cu;
+          if (cu > 0) { const ax = joints[sd].ax; U['uC1' + sd].value.setFromMatrix4(m4.makeRotationAxis(ax, cu * (h.k1 || 1.15))); U['uC2' + sd].value.setFromMatrix4(m4.makeRotationAxis(ax, cu * (h.k2 || 1.25)));
+            U['uTh' + sd].value.setFromMatrix4(m4.makeRotationAxis(joints[sd].T, (sd === 'R' ? 1 : -1) * (h.th || 0))); }
+        }
         const lg = g.legs || [0, 0, 0, 0], rx = (a) => new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(a));
         U.uLegL.value.copy(rx(lg[0])); U.uKneeL.value.copy(rx(lg[1])); U.uLegR.value.copy(rx(lg[2])); U.uKneeR.value.copy(rx(lg[3]));
         const an = g.ank || [0, 0]; U.uAnkL.value.copy(rx(an[0])); U.uAnkR.value.copy(rx(an[1]));
@@ -1526,21 +1570,21 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
 })();
 
 /** Where the hand (the palm) is, in the figure's own space, for an arm pose [forward, out, turn, elbow]. */
-function humanHandAt(m: any, sd: 'L' | 'R', a: number[], out?: any): any {
+function humanHandAt(m: any, sd: 'L' | 'R', a: number[], out?: any, pt?: any): any {
   const T = THREE, J = m.joints[sd], k = sd === 'L' ? 1 : -1;
   const M = new T.Matrix4().makeRotationY(k * -a[2]).multiply(new T.Matrix4().makeRotationZ(k * a[1])).multiply(new T.Matrix4().makeRotationX(-a[0]));
-  const v = J.palm.clone().sub(J.e).applyMatrix4(new T.Matrix4().makeRotationX(-a[3])).add(J.e).sub(J.s).applyMatrix4(M).add(J.s);
+  const v = (pt || J.palm).clone().sub(J.e).applyMatrix4(new T.Matrix4().makeRotationX(-a[3])).add(J.e).sub(J.s).applyMatrix4(M).add(J.s);
   return out ? out.copy(v) : v;
 }
 /** The arm pose that puts the hand at a point (in the figure's own space): the elbow bends to the distance and
  *  points down and out (as a real elbow does), then the arm turns there, starting from the last pose so it moves
  *  smoothly. Out of reach, the arm stretches towards it. */
-function humanReach(m: any, sd: 'L' | 'R', target: any, prev?: number[]): number[] {
-  const J = m.joints[sd], T = THREE, k = sd === 'L' ? 1 : -1;
-  const l1 = J.e.distanceTo(J.s), l2 = J.palm.distanceTo(J.e), full = J.palm.distanceTo(J.s);
+function humanReach(m: any, sd: 'L' | 'R', target: any, prev?: number[], pt?: any): number[] {
+  const J = m.joints[sd], T = THREE, k = sd === 'L' ? 1 : -1, H = pt || J.palm;
+  const l1 = J.e.distanceTo(J.s), l2 = H.distanceTo(J.e), full = H.distanceTo(J.s);
   const to = target.clone().sub(J.s), d = Math.max(0.05, Math.min(to.length(), full * 0.998)), u = to.clone().normalize();
   // the elbow: from the distance shoulder to hand
-  const reachAt = (b: number) => J.palm.clone().sub(J.e).applyMatrix4(new T.Matrix4().makeRotationX(-b)).add(J.e).distanceTo(J.s);
+  const reachAt = (b: number) => H.clone().sub(J.e).applyMatrix4(new T.Matrix4().makeRotationX(-b)).add(J.e).distanceTo(J.s);
   let lo = 0, hi = 2.6; for (let i = 0; i < 22; i++) { const mid = (lo + hi) / 2; if (reachAt(mid) > d) lo = mid; else hi = mid; }
   const b = (lo + hi) / 2;
   // where the elbow goes: down and a little out from the line shoulder → hand
@@ -1550,7 +1594,7 @@ function humanReach(m: any, sd: 'L' | 'R', target: any, prev?: number[]): number
   const handT = J.s.clone().add(u.clone().multiplyScalar(d));
   const elbowAt = (q: number[]) => { const M = new T.Matrix4().makeRotationY(k * -q[2]).multiply(new T.Matrix4().makeRotationZ(k * q[1])).multiply(new T.Matrix4().makeRotationX(-q[0])); return J.e.clone().sub(J.s).applyMatrix4(M).add(J.s); };
   const a = prev ? prev.slice() : [0.6, 0.15, 0.1, b]; a[3] = b;
-  const cost = (q: number[]) => humanHandAt(m, sd, q).distanceToSquared(handT) + 0.5 * elbowAt(q).distanceToSquared(elbow);
+  const cost = (q: number[]) => humanHandAt(m, sd, q, undefined, H).distanceToSquared(handT) + 0.5 * elbowAt(q).distanceToSquared(elbow);
   let c = cost(a), st = 0.3;
   for (let it = 0; it < 90 && st > 0.0006; it++) {
     let better = false;
@@ -1558,6 +1602,19 @@ function humanReach(m: any, sd: 'L' | 'R', target: any, prev?: number[]): number
     if (!better) st *= 0.5;
   }
   return a;
+}
+
+/** The wrist's turn that points a hand's fingers along Fd with its palm facing Nd (both in the figure's own
+ *  space), for the arm pose a (from humanReach): for g.hand[sd].W. */
+function humanHandAim(m: any, sd: 'L' | 'R', a: number[], Fd: any, Nd: any): any {
+  const T = THREE, J = m.joints[sd], k = sd === 'L' ? 1 : -1;
+  const M = new T.Matrix4().makeRotationY(k * -a[2]).multiply(new T.Matrix4().makeRotationZ(k * a[1])).multiply(new T.Matrix4().makeRotationX(-a[0])).multiply(new T.Matrix4().makeRotationX(-a[3]));
+  const f = Fd.clone().normalize(), nn = Nd.clone().sub(f.clone().multiplyScalar(Nd.dot(f))).normalize();
+  const sg = J.T.dot(J.F.clone().cross(J.N)) >= 0 ? 1 : -1, td = f.clone().cross(nn).multiplyScalar(sg);
+  const B = new T.Matrix4().makeBasis(J.F, J.N, J.T), Bd = new T.Matrix4().makeBasis(f, nn, td);
+  const Q = Bd.multiply(B.clone().transpose());
+  const W = M.transpose().multiply(Q);
+  return new T.Matrix3().setFromMatrix4(W);
 }
 
 /* ---------- you, seen from your own eyes ---------- */
@@ -1588,7 +1645,7 @@ function selfPose(S: any, hip: any, yaw: number, lean: number, sit: number, v: n
   const g = Object.assign({}, S.G); g.lean = 0; g.nod = 0; g.shake = 0; g.tilt = 0;
   // sitting and leaning in: the legs stay where they were
   if (g.legs && sit > 0) g.legs = [g.legs[0] + lean * sit, g.legs[1], g.legs[2] + lean * sit, g.legs[3]];
-  if (arms) { m.root.rotation.set(0, 0, 0); m.root.position.set(0, 0, 0); S.g.updateMatrixWorld(true); const a = arms(m); if (a) { if (a.L) g.L = a.L; if (a.R) g.R = a.R; } }
+  if (arms) { m.root.rotation.set(0, 0, 0); m.root.position.set(0, 0, 0); S.g.updateMatrixWorld(true); const a: any = arms(m); if (a) { if (a.L) g.L = a.L; if (a.R) g.R = a.R; if (a.hand) g.hand = a.hand; } }
   m.pose({ t, yaw: 0, gaze: [0, 0], blink: 0, g, noHead: true });
   // the head bows to look down (S.pitch, the view's): the eyes go forward and down a little, so you see your feet
   const eye = hip.clone().add(selfEyeOff(S, yaw, lean)), dn = Math.max(0, -(S.pitch || 0));

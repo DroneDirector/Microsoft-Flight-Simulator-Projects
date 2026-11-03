@@ -95,16 +95,42 @@ function phoneStep(R: any, dt: number, t: number): { lean: number; turn: number;
   A.phoneAt.position.copy(pos); A.phoneAt.quaternion.copy(pk.q0).slerp(qh, mv); A.phoneAt.updateMatrixWorld(true);
   out.at = A.phoneAt.localToWorld(new T.Vector3(0, 0, 0));
   out.lookK = pk.st === 'reach' || pk.st === 'release' ? 0.85 * w : 0.9 + 0.1 * mv;
-  // the right hand round its right edge, from behind
-  const grip = A.phoneAt.localToWorld(new T.Vector3(0.05, -0.022, -0.034));
+  // the right hand: from above while it lies on the desk, then holding it from behind, fingers round its left edge
+  const gk = pk.st === 'reach' ? 0 : pk.st === 'lift' ? E(pk.t / D.lift * 1.6) : pk.st === 'lower' ? 1 - E((pk.t / D.lower - 0.4) / 0.6) : pk.st === 'release' ? 0 : 1;
   out.arms = (m: any) => {
-    const res: any = {}, rest = humanGesture({ kind: 'sit', v: 0 }, t);
-    if (w < 0.002) { pk.a.R = null; return res; }
-    const from = m.root.localToWorld(humanHandAt(m, 'R', rest.R)), to = from.lerp(grip, w);
-    pk.a.R = humanReach(m, 'R', m.root.worldToLocal(to), pk.a.R || rest.R); res.R = pk.a.R;
-    return res;
+    const rest = humanGesture({ kind: 'sit', v: 0 }, t);
+    if (w < 0.002) { pk.a.R = null; return {}; }
+    const g = phoneGrip(m, A.phoneAt, gk, w, rest.R, pk.a.R); pk.a.R = g.R;
+    return g;
   };
   return out;
+}
+/** Where the right hand holds the phone, in the phone's own space: the wrist, the way the fingers point and the
+ *  palm faces, and how far the fingers close. On the desk the hand comes from above, thumb on the near edge and the
+ *  fingers over the far one; held, the phone lies in the palm, the fingers wrap its left edge and the thumb rests
+ *  on the right edge. */
+const PH_GRIP = {
+  desk: { w: [0.078, -0.03, 0.034], F: [-1, -0.08, -0.42], N: [0, 0, -1], curl: 0.5, th: 0, k1: 1.15, k2: 1.25 },
+  hold: { w: [0.052, -0.05, -0.025], F: [-1, -0.12, 0], N: [0, 0, 1], curl: 0.85, th: -0.7, k1: 1.6, k2: 0.65 },
+};
+/** The right arm and hand on the phone: k 0 the desk grip … 1 the hold, w how far the hand has come (0 at rest). */
+function phoneGrip(m: any, ph: any, k: number, w: number, restR: number[], prev?: number[]): any {
+  const T = THREE, G0 = PH_GRIP.desk, G1 = PH_GRIP.hold, V = (a: number[]) => new T.Vector3(a[0], a[1], a[2]);
+  ph.updateMatrixWorld(true); m.root.updateMatrixWorld(true);
+  const toRoot = new T.Matrix4().copy(m.root.matrixWorld).invert().multiply(ph.matrixWorld), rot = new T.Matrix3().setFromMatrix4(toRoot);
+  const wl = V(G0.w).lerp(V(G1.w), k).applyMatrix4(toRoot);
+  // from one grip to the other the hand turns (the two frames blended as turns, so it never folds through itself)
+  const frame = (G: any) => { const f = V(G.F).normalize(), n = V(G.N).sub(f.clone().multiplyScalar(V(G.N).dot(f))).normalize(); return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(f, n, f.clone().cross(n))); };
+  const qf = frame(G0).slerp(frame(G1), k), Mf = new T.Matrix4().makeRotationFromQuaternion(qf);
+  const Fd = new T.Vector3(1, 0, 0).applyMatrix4(Mf).applyMatrix3(rot).normalize(), Nd = new T.Vector3(0, 1, 0).applyMatrix4(Mf).applyMatrix3(rot).normalize();
+  // the wrist on its way from where it rests to the grip
+  const J = m.joints.R, from = humanHandAt(m, 'R', restR, undefined, J.w), to = from.lerp(wl, w);
+  const R = humanReach(m, 'R', to, prev || restR, J.w);
+  const W = humanHandAim(m, 'R', R, Fd, Nd), q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().setFromMatrix3(W));
+  q.slerp(new T.Quaternion(), 1 - Math.min(1, w * 1.25));
+  const curl = (G0.curl + (G1.curl - G0.curl) * k) * Math.max(0, Math.min(1, (w - 0.55) / 0.45));
+  const th = (G0.th + (G1.th - G0.th) * k) * Math.min(1, w);
+  return { R, hand: { R: { W: new T.Matrix3().setFromMatrix4(new T.Matrix4().makeRotationFromQuaternion(q)), curl: Math.max(curl, 0.001), th, k1: G0.k1 + (G1.k1 - G0.k1) * k, k2: G0.k2 + (G1.k2 - G0.k2) * k } } };
 }
 /** The phone's screen on your screen, as it is held now. */
 function phoneRect(R: any): { x: number; y: number; w: number; h: number } {
