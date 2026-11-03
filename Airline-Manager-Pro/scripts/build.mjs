@@ -88,7 +88,7 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   }
   const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
   const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
-  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES');
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES');
   const have = f => files.includes(f) ? ' (in use)' : '';
   const md = [
     '# Replaceable models', '',
@@ -121,6 +121,12 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     'own (`vehicles/pushback-tug.glb`).', '',
     '| File | What |', '|---|---|',
     ...hpr.map(([f, n]) => `| \`hangar-props/${f}.glb\`${have('hangar-props/' + f + '.glb')} | ${n} |`), '',
+    '## Lounge furniture and equipment (`lounge-props/`)', '',
+    'One file for each kind, used for every one of that kind in your lounges. Where the levels differ (Lounge, Business',
+    'lounge, Flagship lounge) each level has its own file: the carpets, armchairs, sofas and coffee tables. Metres, front',
+    'towards +Z (where you sit or stand to use it), standing on the floor; fitted to the size of the app\'s own.', '',
+    '| File | What |', '|---|---|',
+    ...lpr.map(([f, n]) => `| \`lounge-props/${f}.glb\`${have('lounge-props/' + f + '.glb')} | ${n} |`), '',
     '## The vending machine\'s parts (`items/vending-machine.glb`)', '',
     'Name these parts (nodes or meshes) in your file and the machine works with them; any part left out stays the app\'s own.',
     'Rows are A (top), B, C; columns 1 (left), 2, 3: nine products, as in the app.', '',

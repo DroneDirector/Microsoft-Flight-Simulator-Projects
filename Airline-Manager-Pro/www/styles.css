@@ -4196,3 +4196,14 @@ html.calm .dclock b em { animation: none; }
 .crew-need:hover { color: #fff; }
 .acd-live { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 12px; padding: 10px 12px; border-radius: 12px; background: rgba(47,180,232,.1); border: 1px solid rgba(47,180,232,.35); }
 .acd-live > span { flex: 1; min-width: 140px; display: flex; flex-direction: column; } .acd-live small { color: var(--muted, #8FA6BD); }
+/* the lounges */
+.places-card .place.lounge > svg:first-child { color: #D4AF37; }
+.lg3d .ct-top { background: linear-gradient(180deg, rgba(32,14,18,.86), rgba(20,10,12,.76)); border-color: rgba(212,175,55,.45); }
+.lg3d .ct-top small { color: #D4AF37; } .lg3d .ct-top b { font-family: Georgia, serif; }
+.lg3d .ct-loader, .exit-lounge .ct-loader { background: radial-gradient(ellipse at 50% 42%, #2A1418 0%, #140A0C 60%, #070304 100%); }
+.lg3d .ctl-glow, .exit-lounge .ctl-glow { background: radial-gradient(circle, rgba(212,175,55,.22), rgba(212,175,55,0) 65%); }
+.lg3d .ctl-rings i, .exit-lounge .ctl-rings i { border-color: rgba(212,175,55,.18); border-top-color: #D4AF37; }
+.lg3d .ctl-name b, .exit-lounge .ctl-name b { color: #F6E3A8; font-family: Georgia, serif; letter-spacing: .06em; }
+.lg3d .ctl-fill, .exit-lounge .ctl-fill { background: linear-gradient(90deg, #7A5A12, #D4AF37, #FFF0C8); }
+.lg3d .ctl-tip, .exit-lounge .ctl-tip, .lg3d .ctl-info b, .exit-lounge .ctl-info b { color: #F6E3A8; }
+.lg-emb .lg-steam { animation: lgSteam 3s ease-in-out infinite; } @keyframes lgSteam { 0%, 100% { opacity: .2; transform: translateY(4px); } 50% { opacity: .9; transform: translateY(-4px); } }

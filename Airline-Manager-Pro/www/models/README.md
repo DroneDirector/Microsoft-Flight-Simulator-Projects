@@ -105,6 +105,50 @@ own (`vehicles/pushback-tug.glb`).
 | `hangar-props/break-room-table.glb` | Break room table |
 | `hangar-props/break-room-chair.glb` | Break room chair |
 
+## Lounge furniture and equipment (`lounge-props/`)
+
+One file for each kind, used for every one of that kind in your lounges. Where the levels differ (Lounge, Business
+lounge, Flagship lounge) each level has its own file: the carpets, armchairs, sofas and coffee tables. Metres, front
+towards +Z (where you sit or stand to use it), standing on the floor; fitted to the size of the app's own.
+
+| File | What |
+|---|---|
+| `lounge-props/carpet-lounge.glb` | Carpet, Lounge |
+| `lounge-props/carpet-business.glb` | Carpet, Business lounge |
+| `lounge-props/carpet-flagship.glb` | Carpet, Flagship lounge (the finest) |
+| `lounge-props/armchair-fabric.glb` | Armchair, fabric (Lounge) |
+| `lounge-props/armchair-leather.glb` | Armchair, leather (Business lounge) |
+| `lounge-props/armchair-velvet.glb` | Armchair, velvet on gold legs (Flagship lounge) |
+| `lounge-props/sofa-fabric.glb` | Sofa, fabric |
+| `lounge-props/sofa-leather.glb` | Sofa, leather |
+| `lounge-props/sofa-velvet.glb` | Sofa, velvet |
+| `lounge-props/coffee-table-oak.glb` | Coffee table, oak |
+| `lounge-props/coffee-table-walnut.glb` | Coffee table, walnut |
+| `lounge-props/coffee-table-marble.glb` | Coffee table, marble and gold |
+| `lounge-props/floor-lamp.glb` | Floor lamp |
+| `lounge-props/potted-plant.glb` | Potted plant |
+| `lounge-props/magazine-rack.glb` | Magazine rack |
+| `lounge-props/reception-desk.glb` | Reception desk |
+| `lounge-props/buffet-counter.glb` | Refreshment counter |
+| `lounge-props/espresso-machine.glb` | Espresso machine |
+| `lounge-props/tea-urn.glb` | Tea urn (samovar) |
+| `lounge-props/teapot.glb` | Teapot |
+| `lounge-props/coffee-cup-and-saucer.glb` | Coffee cup and saucer |
+| `lounge-props/teacup-and-saucer.glb` | Teacup and saucer |
+| `lounge-props/napkin-stack.glb` | Napkins |
+| `lounge-props/fruit-bowl.glb` | Fruit bowl |
+| `lounge-props/drinks-fridge.glb` | Glass-fronted fridge (the drinks and snacks in it are the items/ files) |
+| `lounge-props/bar-counter.glb` | Bar counter (Business and Flagship) |
+| `lounge-props/bar-stool.glb` | Bar stool |
+| `lounge-props/bottle-shelf.glb` | Shelf of bottles behind the bar |
+| `lounge-props/pendant-light.glb` | Pendant light (Business) |
+| `lounge-props/chandelier.glb` | Chandelier (Flagship) |
+| `lounge-props/fireplace.glb` | Fireplace (Flagship) |
+| `lounge-props/grand-piano.glb` | Grand piano (Flagship) |
+| `lounge-props/wall-art.glb` | Framed art (Flagship) |
+| `lounge-props/champagne-bucket.glb` | Champagne bucket (Flagship) |
+| `lounge-props/departures-screen.glb` | Departures screen frame (the list is drawn by the app) |
+
 ## The vending machine's parts (`items/vending-machine.glb`)
 
 Name these parts (nodes or meshes) in your file and the machine works with them; any part left out stays the app's own.

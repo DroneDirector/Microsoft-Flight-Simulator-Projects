@@ -36,6 +36,20 @@ const HANGAR_PROP_FILES: [string, string][] = [
   ['kitchen-counter', 'Break room counter with cupboards'], ['sink', 'Sink and tap'], ['coffee-machine', 'Coffee machine'], ['coffee-mug', 'Coffee mug'], ['drinking-glass', 'Drinking glass'],
   ['break-room-table', 'Break room table'], ['break-room-chair', 'Break room chair'],
 ];
+/** Equipment and furniture in the lounges, one file each (front towards +Z, standing on the floor). */
+const LOUNGE_PROP_FILES: [string, string][] = [
+  ['carpet-lounge', 'Carpet, Lounge'], ['carpet-business', 'Carpet, Business lounge'], ['carpet-flagship', 'Carpet, Flagship lounge (the finest)'],
+  ['armchair-fabric', 'Armchair, fabric (Lounge)'], ['armchair-leather', 'Armchair, leather (Business lounge)'], ['armchair-velvet', 'Armchair, velvet on gold legs (Flagship lounge)'],
+  ['sofa-fabric', 'Sofa, fabric'], ['sofa-leather', 'Sofa, leather'], ['sofa-velvet', 'Sofa, velvet'],
+  ['coffee-table-oak', 'Coffee table, oak'], ['coffee-table-walnut', 'Coffee table, walnut'], ['coffee-table-marble', 'Coffee table, marble and gold'],
+  ['floor-lamp', 'Floor lamp'], ['potted-plant', 'Potted plant'], ['magazine-rack', 'Magazine rack'], ['reception-desk', 'Reception desk'],
+  ['buffet-counter', 'Refreshment counter'], ['espresso-machine', 'Espresso machine'], ['tea-urn', 'Tea urn (samovar)'], ['teapot', 'Teapot'],
+  ['coffee-cup-and-saucer', 'Coffee cup and saucer'], ['teacup-and-saucer', 'Teacup and saucer'], ['napkin-stack', 'Napkins'], ['fruit-bowl', 'Fruit bowl'],
+  ['drinks-fridge', 'Glass-fronted fridge (the drinks and snacks in it are the items/ files)'],
+  ['bar-counter', 'Bar counter (Business and Flagship)'], ['bar-stool', 'Bar stool'], ['bottle-shelf', 'Shelf of bottles behind the bar'],
+  ['pendant-light', 'Pendant light (Business)'], ['chandelier', 'Chandelier (Flagship)'], ['fireplace', 'Fireplace (Flagship)'], ['grand-piano', 'Grand piano (Flagship)'],
+  ['wall-art', 'Framed art (Flagship)'], ['champagne-bucket', 'Champagne bucket (Flagship)'], ['departures-screen', 'Departures screen frame (the list is drawn by the app)'],
+];
 /** The hangar's vending machine and what it sells (no real brands). Cans and bars stand upright: the top towards +Y. */
 const ITEM_FILES: [string, string][] = [
   ['vending-machine', 'Vending machine (the hangar break room)'],
