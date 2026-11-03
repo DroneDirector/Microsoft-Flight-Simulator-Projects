@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.94 (2026-11-03)
+
+- the office laptop and the Operations computer fill the screen and close by their power button; the Operations computer mounts the laptop OS (Lap.ops) with the operations screens as apps (scr:ops, scr:schedule, scr:dispatch, scr:planner); lapDeskApps puts the phone apps on the desktop and taskbar too
+
 ## 0.9.93 (2026-11-03)
 
 - family photo from your look and State.family.partner (look editor: You / Your wife or husband, height sliders); room-notes.ts (court quiet, room cards, screen notifications, ask then 3D); pets: one body that lies down and gets up (fold legs, lowered), Catmull-Rom tail with fur along it, walks of about a minute with ofFree collision checks, eating and drinking, bowl levels and refill animations, food bowl picked up kneeling with aimed hands (humanHandAim, legs in selfPose); career-start.ts (finances on hold, yearly registration); delete all saves with a ten-second hold (amp-nogame); profit charts from the books for fresh games

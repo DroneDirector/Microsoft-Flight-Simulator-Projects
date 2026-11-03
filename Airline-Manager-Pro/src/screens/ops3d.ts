@@ -387,7 +387,7 @@ function opsClickAt(e?: PointerEvent) {
 }
 
 /* ---------- the buttons below, the screens over the room ---------- */
-const OPS_TABS: [string, string, string][] = [['ops', 'Operations', 'ops'], ['schedule', 'Schedule', 'clock'], ['dispatch', 'Dispatch', 'routes'], ['planner', 'Flight planner', 'routes']];
+const OPS_TABS: [string, string, string][] = [['ops', 'Operations', 'ops'], ['schedule', 'Schedule', 'clock'], ['dispatch', 'Dispatch', 'routes'], ['planner', 'Flight planner', 'map']];
 function opsUi() {
   const R = OpsRoom; if (!R.on) return;
   const sp = R.root.querySelector('.op-spots') as HTMLElement; sp.hidden = false;
@@ -424,10 +424,11 @@ function opsScreenOpen(key: string) {
   if (R.overlay) { opsScreenSwitch(key); return; }
   R.tab = key;
   for (const sel of ['.op-spots', '.op-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
-  const ov = document.createElement('div'); ov.className = 'of-planner op-screen'; ov.setAttribute('data-screen', key);
-  ov.innerHTML = `<div class="of-pl-head"><div class="op-tabs">${OPS_TABS.filter(t => SCREENS[t[0]]).map(t => `<button class="${t[0] === key ? 'on' : ''}" data-op="tab" data-k="${t[0]}">${icon(t[2])}${t[1]}</button>`).join('')}</div><button class="btn ghost sm" data-op="close">${icon('close')}Back to the desk</button></div><div class="of-pl-body"></div>`;
+  // the computer: the same desktop as your laptop (mail, calendar, bank, the markets, the browser…) with the operations
+  // screens as apps of their own; it opens on the one you chose, the taskbar below
+  const ov = document.createElement('div'); ov.className = 'of-planner op-screen lap-screen'; ov.setAttribute('data-screen', key);
   R.root.appendChild(ov); R.overlay = ov; document.body.classList.add('of-over');
-  opsScreenFill(key);
+  try { lapMount(ov); (Lap as any).ops = true; Lap.app = 'scr:' + key; lapRender(); } catch (e) { ov.innerHTML = '<p class="muted">The computer could not start.</p>'; }
   if (opsReduced()) return;
   // the screen grows out of the monitor while you lean in towards it
   const m = opsMonRect(), W = ov.offsetWidth || R.root.clientWidth, H = ov.offsetHeight || R.root.clientHeight;
@@ -439,7 +440,8 @@ function opsScreenOpen(key: string) {
   requestAnimationFrame(() => { ov.classList.add('op-zoom-go'); ov.style.transform = 'translate(0px, 0px) scale(1, 1)'; ov.style.opacity = '1'; fx.classList.add('go'); setTimeout(() => fx.remove(), 900); });
 }
 function opsScreenFill(key: string) {
-  const R = OpsRoom, body = R.overlay && R.overlay.querySelector('.of-pl-body') as HTMLElement; if (!body) return;
+  const R = OpsRoom; if (R.overlay && Lap.root === R.overlay) { R.tab = key; R.overlay.setAttribute('data-screen', key); Lap.app = 'scr:' + key; lapRender(); return; }
+  const body = R.overlay && R.overlay.querySelector('.of-pl-body') as HTMLElement; if (!body) return;
   R.tab = key; R.overlay.setAttribute('data-screen', key);
   R.overlay.querySelectorAll('.op-tabs button').forEach((b: any) => b.classList.toggle('on', b.getAttribute('data-k') === key));
   body.innerHTML = `<section class="screen screen-${key}">${SCREENS[key].render()}</section>`;
@@ -450,7 +452,7 @@ function opsScreenSwitch(key: string) { Sound.tick(); opsScreenFill(key); }
 function opsScreenClose() {
   const R = OpsRoom; if (!R.overlay || R.zoomAnim) return;
   const ov = R.overlay; Sound.tick(); opsMonitorDraw();
-  const finish = () => { ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); opsUi(); };
+  const finish = () => { try { if (Lap.root === ov) lapUnmount(); } catch (e) { /* closed */ } ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); opsUi(); };
   if (opsReduced()) { finish(); return; }
   // back into the monitor while you sit back in your chair, and the office comes into view around it
   const m = opsMonRect(), W = ov.offsetWidth || R.root.clientWidth, H = ov.offsetHeight || R.root.clientHeight;
@@ -464,6 +466,7 @@ function opsRefresh() {
   try { opsMonitorDraw(); } catch (e) { /* next time */ }
   if (!R.overlay) return;
   const key = R.overlay.getAttribute('data-screen'); if (!key || key === 'planner' || !SCREENS[key]) return;   // the planner redraws itself
+  if (Lap.root === R.overlay) { try { lapRefresh(); } catch (e) { /* next time */ } return; }
   const sec = R.overlay.querySelector('.of-pl-body .screen') as HTMLElement; if (sec) patchHtml(sec, SCREENS[key].render());
 }
 function opsClick(b: HTMLElement) {
