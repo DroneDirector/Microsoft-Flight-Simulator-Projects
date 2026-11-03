@@ -137,3 +137,15 @@ SCREENS.schedule = {
     </div>`;
   },
 };
+
+/** The "now" line on every schedule that is open (the app, the laptop, the Operations computer) moves on and shows
+ *  the time, every second, without drawing the whole schedule again. */
+setInterval(() => {
+  if (document.hidden) return;
+  const ls = document.querySelectorAll('.g-now'); if (!ls.length) return;
+  const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60, p = (n: number) => String(n).padStart(2, '0'), t = p(now.getHours()) + ':' + p(now.getMinutes());
+  ls.forEach((el: any) => {
+    el.style.left = `calc(var(--g-label) + (100% - var(--g-label)) * ${(nowMin / 1440).toFixed(5)})`;
+    const i = el.querySelector('i'); if (i && i.textContent !== t) i.textContent = t;
+  });
+}, 1000);

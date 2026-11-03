@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.97 (2026-11-03)
+
+- top bar: a digital clock after the battery (dclockHtml, ticking every second, the game date from companyDate); the Schedule's now line (.g-now) moves and updates its time every second on every open schedule
+
 ## 0.9.96 (2026-11-03)
 
 - the career button: a canvas effect behind it (turning conic rim with a running head, flickering upscale pixels, sparkles, a scan band, a breathing glow), still with reduced motion; darker subtitle
