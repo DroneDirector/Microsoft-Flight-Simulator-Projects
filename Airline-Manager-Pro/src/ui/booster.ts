@@ -130,20 +130,20 @@ function boostSample() {
 /** The charts: [key, title, unit, fixed top of the scale or 0 for automatic]. */
 function boostCharts(): [string, string, string, number][] {
   return boostIsPc()
-    ? [['cpu', 'Processor', '%', 100], ['ram', 'Memory (RAM)', '%', 100], ['gpu', 'Graphics card', '%', 100], ['vram', 'Graphics memory', 'GB', 0], ['disk', 'Disk', '%', 100], ['fps', 'Frame rate, 3D view', 'fps', 60], ['heap', 'App memory', 'MB', 0]]
-    : [['mem', 'Memory (RAM)', '%', 100], ['cpuSpeed', 'Processor speed', '%', 100], ['temp', 'Temperature', '°C', 0], ['fps', 'Frame rate, 3D view', 'fps', 60], ['appMb', 'App memory', 'MB', 0]];
+    ? [['cpu', 'Processor', '%', 100], ['ram', 'Memory (RAM)', 'GB', 0], ['gpu', 'Graphics card', '%', 100], ['vram', 'Graphics memory', 'GB', 0], ['disk', 'Disk', '%', 100], ['fps', 'Frame rate, 3D view', 'fps', 60], ['heap', 'App memory', 'MB', 0]]
+    : [['mem', 'Memory (RAM)', 'GB', 0], ['cpuSpeed', 'Processor speed', '%', 100], ['temp', 'Temperature', '°C', 0], ['fps', 'Frame rate, 3D view', 'fps', 60], ['appMb', 'App memory', 'MB', 0]];
 }
 
 /** One chart's readings, oldest first: [time, value or null]. */
 function boostSeries(k: string): [number, number][] {
   const out: [number, number][] = [];
   if (boostIsPc() && /^(cpu|ram|gpu|vram|disk)$/.test(k)) {
-    for (const h of (BoostLive.pc && BoostLive.pc.hist) || []) out.push([h.t, k === 'vram' ? (h.vramMb == null ? null : Math.round(h.vramMb / 102.4) / 10) : h[k]]);
+    for (const h of (BoostLive.pc && BoostLive.pc.hist) || []) out.push([h.t, k === 'vram' ? (h.vramMb == null ? null : Math.round(h.vramMb / 102.4) / 10) : k === 'ram' ? (h.ramUsedMb == null ? null : h.ramUsedMb / 1024) : h[k]]);
     return out;
   }
   for (const h of BoostLive.hist) {
     let v: number = null;
-    if (k === 'mem') v = h.memTotalMb ? Math.round(100 * (h.memTotalMb - h.memAvailMb) / h.memTotalMb) : null;
+    if (k === 'mem') v = h.memTotalMb ? (h.memTotalMb - h.memAvailMb) / 1024 : null;
     else if (k === 'temp') v = h.battTemp != null ? h.battTemp : null;
     else v = h[k] == null ? null : h[k];
     out.push([h.t, v]);
@@ -154,13 +154,13 @@ function boostSeries(k: string): [number, number][] {
 function boostSub(k: string, last: any): string {
   const pc = BoostLive.pc, ph = BoostLive.hist[BoostLive.hist.length - 1] || {};
   if (k === 'cpu' && pc) return `${pc.cores} cores${pc.cpuName ? ' · ' + pc.cpuName : ''}`;
-  if (k === 'ram' && pc && pc.hist.length) { const h = pc.hist[pc.hist.length - 1]; return `${(h.ramUsedMb / 1024).toFixed(1)} of ${(h.ramTotalMb / 1024).toFixed(1)} GB in use`; }
+  if (k === 'ram' && pc && pc.hist.length) { const h = pc.hist[pc.hist.length - 1]; return `${Math.round(100 * h.ramUsedMb / Math.max(1, h.ramTotalMb))}% in use · ${((h.ramTotalMb - h.ramUsedMb) / 1024).toFixed(1)} GB free`; }
   if (k === 'gpu') return 'Drawing (3D) across all programs';
   if (k === 'vram') return 'In use on the graphics card';
   if (k === 'disk') return 'Time the disks are busy';
   if (k === 'fps') return (typeof V3d !== 'undefined' && V3d.open) ? 'While the 3D view is open' : 'Shown while the 3D view is open';
   if (k === 'heap' || k === 'appMb') return 'Used by this app';
-  if (k === 'mem' && ph.memTotalMb) return `${((ph.memTotalMb - ph.memAvailMb) / 1024).toFixed(1)} of ${(ph.memTotalMb / 1024).toFixed(1)} GB in use${ph.lowMem ? ' · memory is low' : ''}`;
+  if (k === 'mem' && ph.memTotalMb) return `${Math.round(100 * (ph.memTotalMb - ph.memAvailMb) / ph.memTotalMb)}% in use · ${(ph.memAvailMb / 1024).toFixed(1)} GB free${ph.lowMem ? ' · memory is low' : ''}`;
   if (k === 'cpuSpeed') return ph.cores ? `${ph.cores} cores, against their top speed` : 'Against the top speed';
   if (k === 'temp') { const th = ['Cool', 'Light warming', 'Warm', 'Hot: the phone slows down', 'Very hot', 'Critical', 'Shutting down'][ph.thermal]; return `Battery${th ? ' · ' + th : ''}${ph.headroom != null ? ` · ${ph.headroom}% to the slow-down point` : ''}`; }
   return '';
@@ -183,6 +183,12 @@ function boostSvg(d: [number, number][], top: number): string {
     <i class="bs-dot" style="left:${(X(z[0]) / W * 100).toFixed(2)}%;top:${(Y(z[1]) / H * 100).toFixed(2)}%"></i>`;
 }
 
+/** All the memory there is (GB), for the memory chart: its top is the whole of it. */
+function boostRamTotal(k: string): number {
+  if (k === 'ram') { const pc = BoostLive.pc, h = pc && pc.hist && pc.hist[pc.hist.length - 1]; return h && h.ramTotalMb ? h.ramTotalMb / 1024 : 0; }
+  if (k === 'mem') { const h = BoostLive.hist.filter((x: any) => x.memTotalMb).pop(); return h ? h.memTotalMb / 1024 : 0; }
+  return 0;
+}
 function boostVal(v: number, unit: string): string { return v == null ? '–' : `${unit === 'GB' || unit === '°C' ? v.toFixed(1) : Math.round(v)}${unit === '%' ? '%' : ' ' + unit}`; }
 
 /** Bars: programs closed each minute over the last 15 minutes (PC). */
@@ -218,10 +224,11 @@ function boostStatsHtml(): string {
 
 function boostDraw() {
   const root = document.querySelector('.boost-stats'); if (!root) return;
-  for (const [k, , unit, top] of boostCharts()) {
+  for (let [k, , unit, top] of boostCharts()) {
     const card = root.querySelector(`.bs-card[data-k="${k}"]`) as HTMLElement; if (!card) continue;
-    const d = boostSeries(k), last = d.filter(p => p[1] != null).pop();
-    (card.querySelector('.bs-v') as HTMLElement).textContent = boostVal(last ? last[1] : null, unit);
+    const d = boostSeries(k), last = d.filter(p => p[1] != null).pop(), tot = boostRamTotal(k);
+    (card.querySelector('.bs-v') as HTMLElement).textContent = tot && last ? `${last[1].toFixed(1)} of ${tot.toFixed(1)} GB` : boostVal(last ? last[1] : null, unit);
+    if (tot) top = tot;
     (card.querySelector('.bs-sub') as HTMLElement).textContent = boostSub(k, last);
     const plot = card.querySelector('.bs-plot') as HTMLElement; plot.innerHTML = boostSvg(d, top); (plot as any)._d = d; (plot as any)._u = unit;
     card.classList.toggle('bs-none', !last);
