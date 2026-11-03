@@ -99,6 +99,8 @@ function lifeDecide(evId: string, opt: string) {
     const p: any = (((State as any).staff || []) as any[]).concat(State.pilots as any[]).filter(x => x.id === d.pid)[0];
     if (p && opt === 'match') { const add = Math.round(p.salary * 0.12 / 10) * 10; p.salary += add; out = `${p.name} stays, at ${money(p.salary)} a month.`; }
     else if (p) { p.left = true; if (p.status !== undefined && !p.role) p.status = 'off'; out = `${p.name} leaves for ${d.rival}.`; try { Progress.popularity(-0.2, 'Lost staff to a rival'); } catch (er) { /* none */ } }
+  } else if (e.kind === 'wx-ice' || e.kind === 'wx-ts') {
+    out = wxDecide(e, opt);
   } else if (e.kind === 'partner-trouble') {
     const P = L.partners.filter(x => x.id === d.pid)[0];
     if (opt === 'stay') { try { Progress.popularity(-0.8, `Stood by ${d.name}`); } catch (er) { /* none */ } out = `You stand by ${d.name}. Some passengers are unhappy.`; }
@@ -112,7 +114,7 @@ function lifeDecide(evId: string, opt: string) {
 
 function lifeOpen(id: string) {
   const e = lifeState().ev.filter(x => x.id === id)[0]; if (!e) return;
-  const icons: any = { aog: 'wrench', vip: 'star', viral: 'bell', fuel: 'finance', poach: 'pilots', 'partner-trouble': 'alert' };
+  const icons: any = { aog: 'wrench', vip: 'star', viral: 'bell', fuel: 'finance', poach: 'pilots', 'partner-trouble': 'alert', 'wx-ice': 'cloud', 'wx-ts': 'cloud' };
   openLayer('modal', `<div class="life">
     <div class="life-h">${icon(icons[e.kind] || 'bell')}<span><small>${esc(dateStr(new Date(e.at)).slice(0, 16).replace('T', ' '))}</small><h2>${esc(e.title)}</h2></span></div>
     <p class="lede">${esc(e.text)}</p>

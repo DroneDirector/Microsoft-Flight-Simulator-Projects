@@ -106,6 +106,8 @@ Each widget opens its own page.
 | Codeshare partners: their passengers connect onto your flights at their hub, for a monthly fee | Built |
 | Special days: holidays, festivals and events with their real dates fill aircraft to and from where they happen (Christmas, Easter, Thanksgiving, Lunar New Year, Eid, Ólavsøka, Oktoberfest, Carnival and more) | Built |
 | Schedule refreshes by itself every 30 seconds, with a Refresh button and a countdown | Built |
+| The turnaround live in the Schedule: passengers, cleaning, catering, fuel, bags, boarding, push-back and de-icing, with ways to buy time back when late | Built |
+| Weather decisions before departure: priority de-icing or the queue; thunderstorms at the destination: wait, extra fuel, or go | Built |
 | Force departure for a delayed flight at your home hub once the cause is fixed (crew assigned, enough crew, the fault repaired) | Built |
 | Who is missing: for a delay for want of people, the pilot, cabin crew, mechanics and ground crew needed, available and why not | Built |
 | Flight planner: the take-off and landing runway for every flight on a route, by the wind or assigned, with the wind on each runway | Built |

@@ -3984,3 +3984,17 @@ html.calm .dclock b em { animation: none; }
 .ride-task .ic { flex: none; width: 18px; height: 18px; } .ride-task span { display: grid; gap: 2px; } .ride-task small { color: var(--ink-2); font-size: 12px; }
 .ride-task.ok .ic { color: var(--green, #3DDC84); } .ride-task.bad .ic { color: var(--red, #FF5A5A); } .ride-task.na .ic { color: var(--ink-3); }
 .gift-row.career { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+/* Turnaround timeline */
+.ta { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+.ta-h { display: grid; gap: 2px; margin-bottom: 8px; } .ta-h b { display: flex; gap: 6px; align-items: center; font-size: 13px; } .ta-h b .ic { width: 15px; height: 15px; color: var(--cyan, #3FD0E8); }
+.ta-h small { color: var(--ink-2); font-size: 12px; } .ta-h em { color: var(--amber, #FFB020); font-style: normal; font-weight: 600; }
+.ta-tl { position: relative; display: grid; gap: 4px; }
+.ta-s { display: grid; grid-template-columns: 170px 1fr; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); }
+.ta-s span { display: flex; gap: 6px; align-items: center; } .ta-s span .ic { width: 13px; height: 13px; }
+.ta-trk { position: relative; display: block; height: 10px; border-radius: 5px; background: rgba(147,169,193,.08); }
+.ta-trk u { position: absolute; top: 0; bottom: 0; border-radius: 5px; background: rgba(147,169,193,.22); overflow: hidden; }
+.ta-trk u em { position: absolute; left: 0; top: 0; bottom: 0; background: var(--cyan, #3FD0E8); }
+.ta-trk .ta-now { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #FFB020; }
+.ta-s.done { color: var(--ink-2); } .ta-s.now { color: var(--ink); font-weight: 600; }
+.ta-buy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; } .ta-buy > small { width: 100%; color: var(--ink-2); display: flex; gap: 6px; align-items: center; } .ta-buy > small .ic { width: 14px; height: 14px; }
+.ta-buy .btn { flex-direction: column; align-items: flex-start; gap: 1px; height: auto; padding: 6px 10px; } .ta-buy .btn small { font-size: 11px; font-weight: 500; opacity: .8; }
