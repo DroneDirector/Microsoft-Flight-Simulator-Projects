@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.87 (2026-11-03)
+
+- pets sculpted as one smooth body (a distance field of blended shapes, meshed with surface nets, about 12,000 to 22,000 points), with fur (strand shading, sheen and two fur shells), coat shading (light chest, muzzle and paws, darker back), and the head, ears, tail and paws animated by painted weights
+
 ## 0.9.86 (2026-11-03)
 
 - phone on the screen laid out at 400 by 858 and zoomed to fit (phoneFitScreen); the laptop laid out at least 1000 by 640 and zoomed on small screens (lapFit); a closed laptop window no longer shows its empty frame
