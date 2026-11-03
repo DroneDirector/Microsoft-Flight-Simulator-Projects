@@ -3431,3 +3431,21 @@ html.calm .ph-frame, html.calm .ph-screen { transition: none; }
 .ph-os .lk-mr select, .ph-os .lk-mr input { flex: 0 0 auto; }
 .ph-os .lap-win[hidden] { display: none !important; }
 .ph-os .ld-widget { display: block !important; position: relative; left: auto; right: auto; top: auto; bottom: auto; }
+/* the phone's home screen: the apps in the middle, clear of the screen's rounded edges */
+.ph-os .lap-desk { padding: 4px 22px 30px; }
+.ph-os .ld-icons { grid-template-columns: repeat(4, 66px); justify-content: center; justify-items: center; gap: 16px 12px; margin: 0 auto; width: max-content; max-width: 100%; }
+.ph-os .ld-ic { width: 66px; align-items: center; text-align: center; }
+.ph-os .ld-ic b { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; max-width: 70px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* a notification sliding down from the top while the phone is in use */
+.ph-os .ph-note { position: absolute; left: 10px; right: 10px; top: 50px; z-index: 8; display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border: 0; border-radius: 20px; text-align: left; color: #fff; cursor: pointer;
+  background: rgba(28,32,40,.82); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); box-shadow: 0 10px 30px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.08);
+  transform: translateY(-140%); opacity: 0; transition: transform .38s cubic-bezier(.2,.9,.25,1.15), opacity .25s; touch-action: none; font: inherit; }
+.ph-os .ph-note.show { transform: none; opacity: 1; }
+.ph-os .pn-ic { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: linear-gradient(160deg, color-mix(in srgb, var(--c) 92%, #fff), color-mix(in srgb, var(--c) 70%, #000)); }
+.ph-os .pn-ic svg { width: 19px; height: 19px; fill: none; stroke: #fff; stroke-width: 2; }
+.ph-os .pn-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ph-os .pn-h { display: flex; gap: 8px; align-items: baseline; }
+.ph-os .pn-h b { flex: 1; min-width: 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-os .pn-h small { font-size: 11px; opacity: .6; }
+.ph-os .pn-b { font-size: 12.5px; opacity: .85; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .ph-os .ph-note { transition: opacity .2s; transform: none; } }

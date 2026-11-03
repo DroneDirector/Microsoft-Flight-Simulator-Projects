@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.75 (2026-11-03)
+
+- phone home screen: icons centred in a fixed 4-column grid, labels on two lines
+- phoneNote: notification banners on the phone in use, from mailAdd and from new notices (alertsTick); tap opens the mail or the notice, swipe up dismisses
+
 ## 0.9.74 (2026-11-03)
 
 - phone (phone3d.ts, shared by the office and Operations): model with lock screen and glass, pick-up with the right hand (selfPose arms), screen brought up in its frame (FLIP from the held phone), laptop OS in phone mode (lapMount(root, true)), glare; mail one column at a time on the phone
