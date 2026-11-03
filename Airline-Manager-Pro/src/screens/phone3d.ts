@@ -96,7 +96,7 @@ function phoneStep(R: any, dt: number, t: number): { lean: number; turn: number;
   out.at = A.phoneAt.localToWorld(new T.Vector3(0, 0, 0));
   out.lookK = pk.st === 'reach' || pk.st === 'release' ? 0.85 * w : 0.9 + 0.1 * mv;
   // the right hand round its right edge, from behind
-  const grip = A.phoneAt.localToWorld(new T.Vector3(0.046, -0.02, -0.022));
+  const grip = A.phoneAt.localToWorld(new T.Vector3(0.05, -0.022, -0.034));
   out.arms = (m: any) => {
     const res: any = {}, rest = humanGesture({ kind: 'sit', v: 0 }, t);
     if (w < 0.002) { pk.a.R = null; return res; }
@@ -138,6 +138,7 @@ function phoneOpen(R: any) {
   fr.style.transform = `translate(${from.x - tx.x}px, ${from.y - tx.y}px) scale(${from.w / tx.w}, ${from.h / tx.h})`; ov.classList.add('in');
   void fr.offsetWidth;
   requestAnimationFrame(() => { fr.style.transition = ''; fr.classList.add('go'); fr.style.transform = 'none'; });
+  setTimeout(() => { if (fr.isConnected && !ov.classList.contains('out')) fr.style.transform = 'none'; }, 700);   // in any case, in its place
 }
 function phoneClose(R: any) {
   const ov = R.overlay; if (!ov || !ov.classList.contains('ph-screen') || ov.classList.contains('out')) return;
