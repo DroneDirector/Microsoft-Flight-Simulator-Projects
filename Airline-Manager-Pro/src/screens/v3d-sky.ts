@@ -166,6 +166,18 @@ ${SPOT_GLSL}
   // water only where the ground is water: flat, at the water's own level (never on a slope or on land)
   float wet = texture2D(uWet, vUv2).r * smoothstep(0.85, 1.0, vFlat);
   if (uMirrorPass > 0.5 && wet > 0.5) discard;
+  // cliffs and steep slopes: the ground's picture is taken from straight above, so on a near-vertical face it would
+  // smear into streaks; there the face is shaded as rock instead, in the area's own colour, lit by the sun
+  {
+    vec3 nrm = normalize(cross(dFdx(vWpos), dFdy(vWpos))); if (nrm.y < 0.0) nrm = -nrm;
+    float steep = smoothstep(0.62, 0.32, nrm.y) * (1.0 - smoothstep(0.2, 0.5, wet));
+    if (steep > 0.001) {
+      vec3 area = textureLod(map, vMapUv, 4.5).rgb;
+      float lit = 0.62 + 0.5 * max(dot(nrm, normalize(uSun)), 0.0) * uSunVis;
+      float strata = 0.9 + 0.1 * wvn(vec2(vWpos.y * 0.22, (vWpos.x + vWpos.z) * 0.035)) + 0.06 * wvn(vec2(vWpos.y * 1.3, (vWpos.x - vWpos.z) * 0.2));
+      diffuseColor.rgb = mix(diffuseColor.rgb, area * lit * strata, steep);
+    }
+  }
   vec3 cityL = vec3(0.0);
   if (uCityOn > 0.5 && uNight > 0.01) { vec3 cc = texture2D(uCity, vUv2).rgb; float lum = max(dot(cc, vec3(0.35, 0.45, 0.2)) - 0.09, 0.0) / 0.91; cityL = vec3(1.0, 0.7, 0.36) * pow(lum, 1.5) * 1.5 * uNight * (1.0 - smoothstep(0.3, 0.6, wet)); }
   if (uWater > 0.5 && wet > 0.25) {

@@ -277,7 +277,7 @@ function ctBuild(scene: any, judges: number, q: number) {
       add(new T.CylinderGeometry(0.035, 0.03, 0.04, 10), mat.brass, cx, 5.39, cz, 0, g);
       add(new T.CylinderGeometry(0.018, 0.018, 0.14, 8), mat.paper, cx, 5.48, cz, 0, g);
       const b = new T.Mesh(new T.SphereGeometry(0.03, 10, 8), bulbMat); b.scale.y = 1.6; b.position.set(cx, 5.58, cz); g.add(b); }
-    const L = new T.PointLight(0xFFCF96, q >= 2 ? 26 : 20, 16, 1.6); L.position.set(x, 5.2, z); root.add(L); lights.push(L);
+    const L = new T.PointLight(0xFFCF96, q >= 2 ? 26 : 20, 16, 1.6); L.position.set(x, 5.2, z); if (DESKTOP && Gfx.lights() >= 2 && Gfx.shadow() !== 0 && q >= 2 && lights.length < 2) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); L.shadow.bias = -0.002; L.shadow.radius = 3; } root.add(L); lights.push(L);   // on the PC the chandeliers cast shadows too
   }
   // the bench: a dais with a panelled front, the emblem above, the judges' high-backed chairs
   const dais = 0.75, bw = judges > 3 ? 9.8 : 7.4, bz = -6.6;
