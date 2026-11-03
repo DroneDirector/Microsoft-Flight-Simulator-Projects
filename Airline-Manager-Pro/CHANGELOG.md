@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.73 (2026-11-03)
+
+- faceSculpt: nose and mouth widths fitted to the face photograph's proportions (head space moves with them, so the projection stays put)
+- softer relief glints
+
 ## 0.9.72 (2026-11-03)
 
 - faces: photographic face textures (assets/faces) mapped by per-head landmarks (eyes, nose, mouth, chin, ears) and tinted to the skin; ear photograph mapped onto the ear; finer pore layer close up; skin detail on hands and arms

@@ -161,8 +161,8 @@ const Human = (function () {
   // the picture (as fractions of its width and height): the centre line, the eyes, the ears, and rows for the top of
   // the face, the eyes, the tip of the nose, the line between the lips and the chin.
   const FACE_SET = [
-    { file: 'assets/faces/face-a.jpg', avg: [0.4544, 0.161, 0.0831], c: 0.4990, eye: 0.0852, ear: 0.3512, top: 0.205, eyeV: 0.4205, nose: 0.586, mouth: 0.708, chin: 0.873, earBox: [0.112, 0.19, 0.36, 0.578] },
-    { file: 'assets/faces/face-b.jpg', avg: [0.1105, 0.0354, 0.0191], c: 0.4990, eye: 0.0852, ear: 0.3483, top: 0.24, eyeV: 0.4316, nose: 0.586, mouth: 0.698, chin: 0.862, earBox: [0.114, 0.192, 0.38, 0.586] },
+    { file: 'assets/faces/face-a.jpg', avg: [0.4544, 0.161, 0.0831], c: 0.4990, eye: 0.0852, ear: 0.3512, top: 0.205, eyeV: 0.4205, nose: 0.586, mouth: 0.708, chin: 0.873, earBox: [0.112, 0.19, 0.36, 0.578], noseW: 0.56, mouthW: 0.77 },
+    { file: 'assets/faces/face-b.jpg', avg: [0.1105, 0.0354, 0.0191], c: 0.4990, eye: 0.0852, ear: 0.3483, top: 0.24, eyeV: 0.4316, nose: 0.586, mouth: 0.698, chin: 0.862, earBox: [0.114, 0.192, 0.38, 0.586], noseW: 0.64, mouthW: 0.8 },
   ];
   let FACES: any[] = null, DETAIL = null;
   function loadFaces() {
@@ -434,7 +434,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
           col = mix(col, col * vec3(1.08, 0.86, 0.84), clamp(0.55 * cheek + 0.4 * nose + 0.3 * ear, 0.0, 1.0) * (1.0 - tx));
           float tz = headW > 0.5 ? exp(-pow(abs(R.x) / 0.03, 2.0)) * smoothstep(E.y - 0.06, E.y - 0.03, R.y) * step(E.z - 0.02, R.z) : 0.0;
           rough = 0.56 - 0.14 * tz;
-          rough = mix(rough, clamp(rough - fH * 0.5, 0.3, 0.7), tx);   // the photograph's highlights: oilier where it shines
+          rough = mix(rough, clamp(rough - fH * 0.3, 0.36, 0.7), tx);   // the photograph's highlights: oilier where it shines
           vec2 ml = (R.xy - uMouth.xy) / vec2(0.024, 0.0105);
           float lip = (headW > 0.5 && R.z > uMouth.z - 0.03) ? smoothstep(1.05, 0.8, length(ml)) : 0.0;
           col = mix(col, uLip, lip * (1.0 - 0.7 * tx)); rough = mix(rough, 0.38, lip);
@@ -554,7 +554,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
             if (isSkin > 0.5) {
               float pd = pores(vRest * 1100.0);
               hgt = (smoothstep(0.05, 0.45, pd) * 0.00006 + (fbm(vRest * 160.0) - 0.5) * 0.00012) * fade * (1.0 - 0.6 * tx);
-              hgt += fH * 0.00028 * tx;   // the face's own relief, from the photograph: pores, lines, the folds of the ears
+              hgt += fH * 0.00018 * tx;   // the face's own relief, from the photograph: pores, lines, the folds of the ears
             } else {
               vec3 n0 = normalize(vON);
               float w = 0.0;
@@ -1348,6 +1348,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     const L = dressed(look, role), b = makeBody(L, style), I = b.info, c = outfit(L, role, accent, I);
     t0 = tick('body', t0);
     const root = new THREE.Group();
+    try { faceSculpt(b, I, outfitSkin(L, c)); } catch (e) { /* the face as it was */ }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
     geo.setAttribute('rest', new THREE.Float32BufferAttribute(b.rest, 3));
@@ -1472,6 +1473,32 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     };
   }
 
+  function outfitSkin(L, c) { return c; }
+  /** The face shaped to the photograph it wears: the nose and the mouth as wide as in the photograph (against the
+   *  eyes), so its nostrils and lips sit on the nose and lips; the head space moves with them, so the picture stays
+   *  where the photograph has it. */
+  function faceSculpt(b, I, c) {
+    if (!FACES || !FACES.length || (window as any).__noFaceTex) return;
+    const sk = new THREE.Color(c.skin), lum = 0.3 * sk.r + 0.59 * sk.g + 0.11 * sk.b, F = FACE_SET[lum < 0.12 && FACES[1] ? 1 : 0];
+    const P = b.pos, R = b.rest, A = b.A, B = b.B, n = R.length / 3, E = I.eyeL, M = c.mouth; if (!M) return;
+    // this nose: its tip, and how wide its wings are at the nostrils
+    let tip = -1, tz = -1e9;
+    for (let i = 0; i < n; i++) { if (A[i * 4 + 3] < 0.5) continue; const x = R[i * 3], y = R[i * 3 + 1], z = R[i * 3 + 2]; if (Math.abs(x) < 0.004 && y < E[1] - 0.01 && y > M[1] + 0.008 && z > tz) { tz = z; tip = i; } }
+    if (tip < 0) return;
+    const ny = R[tip * 3 + 1] - 0.006; let nw = 0;
+    for (let i = 0; i < n; i++) { if (A[i * 4 + 3] < 0.5) continue; const x = R[i * 3], y = R[i * 3 + 1], z = R[i * 3 + 2]; if (Math.abs(y - ny) < 0.006 && z > tz - 0.03 && Math.abs(x) < 0.03) nw = Math.max(nw, Math.abs(x)); }
+    const eh = Math.abs(E[0]); if (!nw || !eh) return;
+    const fn = clamp(F.noseW * eh / nw, 0.85, 1.55), fm = clamp(F.mouthW * eh / 0.024, 0.85, 1.4);
+    for (let i = 0; i < n; i++) {
+      if (A[i * 4 + 3] < 0.3) continue;
+      const x = R[i * 3], y = R[i * 3 + 1], z = R[i * 3 + 2];
+      const wn = Math.exp(-Math.pow((y - ny) / 0.018, 2)) * Math.exp(-Math.pow(x / (nw * 1.9), 2)) * clamp((z - (tz - 0.05)) / 0.025, 0, 1);
+      const wm = Math.exp(-Math.pow((y - M[1]) / 0.014, 2)) * Math.exp(-Math.pow(x / 0.045, 2)) * clamp((z - (M[2] - 0.035)) / 0.02, 0, 1);
+      const k = (1 + (fn - 1) * wn) * (1 + (fm - 1) * wm); if (Math.abs(k - 1) < 1e-4) continue;
+      R[i * 3] = x * k; P[i * 3] = P[i * 3] * k; B[i * 4] = B[i * 4] * k;
+    }
+    c.mouthK = fm;
+  }
   /** Line the face texture up with this head: where its eyes, nose, mouth, chin and ears are, in its own head space. */
   function faceFit(U, b, I, c) {
     if (!FACES || !FACES.length) return;
