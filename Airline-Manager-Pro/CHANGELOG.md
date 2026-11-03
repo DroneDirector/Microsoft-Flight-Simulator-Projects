@@ -3,6 +3,7 @@
 ## 0.9.102 (2026-11-03)
 
 - Gift reveal without the card (.bdr.gift; viewerThumb bare render without the plinth)
+- 3D viewer: keyboard or controller help, one at a time, by the device used last (V3V.mode); Xbox detected before PlayStation
 
 ## 0.9.101 (2026-11-03)
 
