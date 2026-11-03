@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.123 (2026-11-03)
+
+- CRASH_FILES and CRASH_FX_FILES (models/crash/); Models.tex for pictures; index.json lists .png/.jpg/.webp too, only .glb are loaded as models
+- crashSwap for vehicles (front to +X), broken-off parts and rotor blades; crashDebrisGeo for the instanced debris; uMap in the fire, smoke and glow shaders; soot and oil pictures
+- Helicopter crash sites: their own fire positions (the third wreck piece was missing)
+
 ## 0.9.122 (2026-11-03)
 
 - Helicopters: 16 types (aircraft.ts cls helicopter, helicopter-model.ts, speeds, capacity, FIELD, WX_LIMITS, engines, flight-configs, docs/reference/helicopters.txt)

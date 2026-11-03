@@ -221,7 +221,8 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
       crashSwap(w, ['crash/' + name + '.glb'], false);
     }
   }
-  const fireAt: number[][] = dmg ? (has('fire') ? [[len * 0.05, -s.span * 0.22, 3]] : []) : [[0, 0, 9], [len * 0.05, -s.span * 0.22, 8], [len * 0.05, s.span * 0.22, 8], [lay[0][0], lay[0][1], 6], [-len * 0.2, s.span * 0.35, 5], [lay[2][0] * 0.5, 4, 4]];
+  const fireAt: number[][] = dmg ? (has('fire') ? [[len * 0.05, -s.span * 0.22, 3]] : []) : heli ? [[len * 0.05, 0, 7], [len * 0.15, 1.5, 5], [lay[1][0] * 0.6, lay[1][1] * 0.5, 3]]   // a helicopter: the engine deck over the cabin, and fuel along the way to the tail
+    : [[0, 0, 9], [len * 0.05, -s.span * 0.22, 8], [len * 0.05, s.span * 0.22, 8], [lay[0][0], lay[0][1], 6], [-len * 0.2, s.span * 0.35, 5], [lay[2][0] * 0.5, 4, 4]];
   if (dmg && !fireAt.length) fireAt.push([len * 0.05, s.span * 0.2, 1.2]);   // a little smoke where it was hurt
   for (const [al, sd, sz] of fireAt) {
     const q = at(al, sd); src.push([q[0], gy(q[0], q[1]) + 0.5, q[1], sz * Math.max(0.6, len / 40)]);
