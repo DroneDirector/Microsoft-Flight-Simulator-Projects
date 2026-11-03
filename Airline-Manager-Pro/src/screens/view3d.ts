@@ -307,7 +307,7 @@ function v3dShowInfo() {
   const f: any = v3dTargetFlight();
   const box = V3d.root.querySelector('.v3d-info') as HTMLElement, name = V3d.root.querySelector('.v3d-name') as HTMLElement;
   if (name) name.textContent = f ? f.callsign : '';
-  if (box) box.innerHTML = f ? `<div class="sel-pop">${flightCard(f)}</div>` : '';
+  if (box) box.innerHTML = f ? `<div class="sel-pop">${f.tfc ? trafficCardHtml(f, true) : flightCard(f)}</div>` : '';
   const ln = V3d.root.querySelector('.v3d-line') as HTMLElement; if (ln) ln.innerHTML = f ? v3dLineHtml(f) : '';
 }
 /** Inside the aircraft (cabin, walking, window seats): the flight in one line along the bottom instead of the
@@ -651,7 +651,7 @@ function v3dLoop(now: number) {
   for (const g of (State.live as any[]).concat(tfcNear, parked ? [f] : [])) {
     const w = g.id === f.id ? w0 : v3dWhere(g);
     const q = v3dXY(w.lon, w.lat); if (Math.hypot(q[0], q[1]) > 40000 && g.id !== f.id) continue;
-    if ((g as any).tfc) {
+    if ((g as any).tfc && g.id !== f.id) {   // the one you follow is always drawn (the camera is placed from it)
       const inView = fr.containsPoint(new T.Vector3(q[0], w.altM, q[1])) || fr.intersectsSphere(new T.Sphere(new T.Vector3(q[0], w.altM, q[1]), 80));
       if (!inView) { const P0 = V3d.planes[g.id]; if (P0) { seen[g.id] = true; P0.model.visible = false; P0.label.style.display = 'none'; } continue; }
     }

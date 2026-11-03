@@ -22,6 +22,18 @@ const SPECIAL_CARGO: { id: string; title: string; client: string; chip: string; 
   { id: 'oversize', title: 'A helicopter in a crate', client: 'Helicopter operator', chip: 'Oversized', needText: 'a freighter or a widebody', need: (a, t) => !!cabinOf(a).freighter || t.cls === 'widebody', mult: 2.4 },
   { id: 'aog', title: 'An engine part for a grounded airliner (AOG)', client: 'Another airline', chip: 'Urgent: AOG', needText: '', need: () => true, mult: 3, dueH: 10 },
 ];
+/** Helicopter missions: who asks, where to, what for. Only helicopters fly them. */
+const HELI_MISSIONS: { id: string; chip: string; role: string[]; to: string; titles: string[][]; pax: [number, number]; kg?: [number, number]; rate: number; dueH: number; back?: boolean }[] = [
+  { id: 'hems', chip: 'Air ambulance', role: ['hems'], to: 'h', titles: [['Patient transfer to a specialist hospital', 'Regional hospital'], ['Trauma patient from a road accident', 'Air ambulance service'], ['Newborn intensive-care transfer', 'Children\'s hospital'], ['Organ for a transplant', 'Transplant coordinator']], pax: [1, 3], rate: 95, dueH: 3 },
+  { id: 'sar', chip: 'Search and rescue', role: ['sar'], to: 'any', titles: [['Hoist rescue: an injured walker on a mountain', 'Rescue coordination centre'], ['Search for a missing fishing boat', 'Coastguard'], ['Medical evacuation from a ship', 'Maritime rescue centre'], ['Rescue from a flooded farm', 'Emergency services']], pax: [1, 4], rate: 110, dueH: 2, back: true },
+  { id: 'offshore', chip: 'Offshore', role: ['offshore'], to: 'o', titles: [['Offshore crew change', 'Oil and gas operator'], ['Wind-farm technicians to a platform', 'Offshore wind operator'], ['Supplies to a helideck', 'Platform logistics']], pax: [6, 19], rate: 70, dueH: 18, back: true },
+  { id: 'vip', chip: 'VIP', role: ['vip', 'passenger', 'corporate'], to: 'c', titles: [['Executive shuttle to a city heliport', 'Corporate travel office'], ['Wedding couple to their venue', 'A family'], ['Guests to a race meeting', 'Event agency'], ['Business leaders to a summit', 'Conference organiser']], pax: [2, 8], rate: 55, dueH: 20 },
+  { id: 'tour', chip: 'Sightseeing', role: ['sightseeing', 'passenger', 'vip'], to: 'c', titles: [['Sightseeing flight over the coast', 'Tour operator'], ['Glacier and fjord tour', 'Adventure travel'], ['Photo flight for a property agent', 'Estate agent']], pax: [2, 6], rate: 45, dueH: 30, back: true },
+  { id: 'sling', chip: 'Sling load', role: ['utility', 'cargo', 'firefighting'], to: 'c', titles: [['Sling load: building materials to a mountain hut', 'Contractor'], ['Sling load: a power-line pylon section', 'Power company'], ['Water bucket for a forest fire', 'Fire service']], pax: [0, 0], kg: [300, 1800], rate: 4.2, dueH: 24 },
+];
+/** What a helicopter can lift on its cargo hook (about 55% of the difference between its maximum and empty weights). */
+function slingLimitKg(t: AircraftType): number { const S = speedSpec(t.id); return Math.round(Math.max(0, (S.mtow - S.oew) * 1000 * 0.55) / 50) * 50; }
+function heliMission(j: Job): typeof HELI_MISSIONS[0] { const k = (j as any).heli; return k ? HELI_MISSIONS.filter(x => x.id === k)[0] || null : null; }
 function specialCargo(j: Job): typeof SPECIAL_CARGO[0] { const k = (j as any).special; return k ? SPECIAL_CARGO.filter(x => x.id === k)[0] || null : null; }
 interface Tour { id: string; name: string; desc: string; legs: string[]; reward: number; bush?: boolean }
 interface JobsState { list: Job[]; next: { [cid: string]: number }; tours: { [id: string]: { start: number; idx: number; done?: number } }; weekly: { [week: string]: number } }
@@ -65,7 +77,11 @@ function jobPayFor(id: string): { pay: number; title: string } { const j = jobBy
 function jobFits(j: Job, a: Aircraft): string {
   const t = acType(a.typeId);
   if (j.kind === 'pax' && cabinSeats(t, a) < j.pax) return `${cabinSeats(t, a)} seats, needs ${j.pax}`;
-  if (j.kind === 'cargo' && cargoCapacity(a) < j.kg) return `${num(cargoCapacity(a))} kg of cargo room, needs ${num(j.kg)} kg`;
+  if (heliMission(j) && heliMission(j).id === 'sling') { const lim = slingLimitKg(t); if (lim < j.kg) return `${num(lim)} kg on the hook, the load is ${num(j.kg)} kg`; }
+  else if (j.kind === 'cargo' && cargoCapacity(a) < j.kg) return `${num(cargoCapacity(a))} kg of cargo room, needs ${num(j.kg)} kg`;
+  if (heliMission(j) && t.cls !== 'helicopter') return 'a helicopter mission';
+  if (heliMission(j) && heliMission(j).id === 'sar' && !hoistHeli(t)) return 'search and rescue needs a helicopter with a rescue hoist';
+  if (heliMission(j) && heliMission(j).id === 'hems' && ((t as any).roles || []).indexOf('hems') < 0) return 'an air-ambulance helicopter';
   const sp = specialCargo(j); if (sp && !sp.need(a, t, j.nm)) return `${sp.chip.toLowerCase()}: needs ${sp.needText}`;
   if (j.nm > usableRange(t)) return `range ${num(usableRange(t))} nm, the job is ${num(j.nm)} nm`;
   const rc = legRunwayCheck(t.id, j.from, j.to, j.kind === 'pax' ? j.pax : 0);
@@ -119,6 +135,7 @@ noticesAt(Date.now());
     const fl = fleetOf(c.id); if (!fl.length) return null;
     const bush = c.kind === 'bush';
     const a = fl[Math.floor(Math.random() * fl.length)], t = acType(a.typeId);
+    if (t.cls === 'helicopter') return this.makeHeli(c, a, t);
     const starts = [c.hub].concat(fl.map(x => x.base), fl.map(x => x.location)).filter(x => !!apt(x));
     const from = starts[Math.floor(Math.random() * starts.length)]; if (!from) return null;
     const A = apt(from), max = usableRange(t) * 0.9, min = bush ? 15 : 90;
@@ -152,6 +169,30 @@ noticesAt(Date.now());
       if (sp.dueH) { job.expires = now + 2 * 3600e3; job.due = now + (sp.dueH + Math.round(nm / 400)) * 3600e3; }
     }
     return job;
+  },
+
+  /** A helicopter mission from where the helicopter is based: hospitals, helidecks, heliports nearby. */
+  makeHeli(c: Company, a: Aircraft, t: AircraftType): Job {
+    const roles: string[] = (t as any).roles || ['passenger'];
+    const ms = HELI_MISSIONS.filter(m => m.role.some(r => roles.indexOf(r) >= 0) && (m.id !== 'sar' || hoistHeli(t)));
+    const from = apt(a.location) ? a.location : apt(a.base) ? a.base : c.hub, A = apt(from); if (!A) return null;
+    const list = (ms.length ? ms : HELI_MISSIONS.filter(x => x.id === 'vip')).slice().sort(() => Math.random() - 0.5);
+    let m = list[0], pool: string[] = [], max = 0;
+    for (const mm of list) {   // the first mission that has somewhere to go from here (no helidecks inland, say)
+      m = mm; max = Math.min(usableRange(t) * (m.back ? 0.42 : 0.85), 160);
+      pool = World.helisNear(A.pos, max, m.to === 'any' || m.to === 'c' ? undefined : m.to).filter(w => w.icao !== from && gcDistanceNm(A.pos, w.pos) >= 6).map(w => w.icao);
+      if (m.to === 'c' || m.to === 'any') pool = pool.concat((World.list as any[]).filter(w => Math.abs(w.pos[1] - A.pos[1]) < max / 60 && gcDistanceNm(A.pos, w.pos) <= max && gcDistanceNm(A.pos, w.pos) >= 10).map(w => w.icao).slice(0, 200));
+      if (pool.length) break;
+    }
+    if (!pool.length) return null;
+    const to = pool[Math.floor(Math.random() * Math.min(pool.length, 40))]; registerWorldAirport(to);
+    const nm = Math.max(5, Math.round(gcDistanceNm(A.pos, apt(to).pos))), [title, client] = m.titles[Math.floor(Math.random() * m.titles.length)];
+    const seats = Math.max(1, cabinSeats(t, a)), pax = m.pax[1] ? Math.min(seats, m.pax[0] + Math.floor(Math.random() * (m.pax[1] - m.pax[0] + 1))) : 0;
+    const kg = m.kg ? Math.max(100, Math.min(slingLimitKg(t), Math.round((m.kg[0] + Math.random() * (m.kg[1] - m.kg[0])) / 10) * 10)) : 0;
+    const legs = m.back ? 2 : 1, now = Date.now();
+    const pay = Math.round(((kg ? kg * m.rate : 0) + t.costPerHr * (nm * legs / Math.max(80, t.cruiseKt)) * 1.9 + nm * legs * m.rate + (m.id === 'sar' || m.id === 'hems' ? 6500 : 1800)) / 10) * 10;
+    return { id: 'job-' + uid(), companyId: c.id, kind: kg ? 'cargo' : 'pax', title, client, from, to, pax, kg, pay, nm, posted: now, expires: now + (m.dueH <= 3 ? 1.5 : 8) * 3600e3,
+      due: now + (m.dueH + nm / 100) * 3600e3, status: 'open', heli: m.id, back: !!m.back } as any;
   },
 
   /** You fly it yourself. */

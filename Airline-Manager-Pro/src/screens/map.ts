@@ -236,16 +236,20 @@ function aptWxHtml(icao: string): string {
 /** Another airline's aircraft, tapped on the map: the basics only (they are not yours). */
 function trafficCard(f: any) {
   const box = $(State.screen === 'map' ? '#map-detail' : '#ops-sel'); if (!box || !f || !f.tfc) return;
+  box.innerHTML = `<div class="sel-pop">${trafficCardHtml(f)}</div>`;
+}
+/** The card itself (also shown in the 3D view, without its 3D button). */
+function trafficCardHtml(f: any, in3d?: boolean): string {
   const now = Date.now(), t: any = acType(f.typeId) || {};
   let q: any = null; try { q = profileAt(flightProfile(f.typeId, f.from, f.to, f.depAt), flightEl(f, now).el); } catch (e) { /* no profile */ }
   const eta = f.depAt + (f.durMs || 0), A = apt(f.from), B = apt(f.to);
   const row = (k: string, v: string) => `<div><small>${k}</small><b>${v}</b></div>`;
-  box.innerHTML = `<div class="sel-pop"><div class="card apt-card tfc-card">
+  return `<div class="card apt-card tfc-card">
     <div class="card-h"><b><i class="tfc-dot" style="background:${esc(f.tfc.color)}"></i>${esc(tfcLabel(f.tfc))} <small>${esc(f.callsign)}</small></b><button class="icon-btn" data-act="map-unmark" aria-label="Close">${icon('close')}</button></div>
     <div class="apt-name">${esc(f.from)} → ${esc(f.to)}</div><small class="muted">${esc([A ? A.city || A.name : '', B ? B.city || B.name : ''].filter(Boolean).join(' to '))}</small>
-    <div class="kv-row">${row('Aircraft', esc(t.name || f.typeId))}${row('Registration', esc(f.tfc.reg || '—'))}${row('Phase', esc(q ? q.ph : f.phase || '—'))}
+    <div class="kv-row">${row('Aircraft', esc(t.model ? t.maker + ' ' + t.model : f.typeId))}${row('Registration', esc(f.tfc.reg || '—'))}${row('Phase', esc(q ? q.ph : f.phase || '—'))}
       ${row('Altitude', q && q.alt > 0 ? num(Math.round(q.alt / 100) * 100) + ' ft' : 'On the ground')}${row('Speed', q && q.gs ? Math.round(q.gs) + ' kt' : '—')}${row('Arrives', eta > now ? new Date(eta).toTimeString().slice(0, 5) : 'Landed')}</div>
-    <div class="btn-row"><button class="btn ghost sm" data-act="tfc-3d" data-id="${esc(f.id)}"><b>3D</b>Follow in 3D</button></div>
-  </div></div>`;
+    ${in3d ? '' : `<div class="btn-row"><button class="btn ghost sm" data-act="tfc-3d" data-id="${esc(f.id)}"><b>3D</b>Follow in 3D</button></div>`}
+  </div>`;
 }
 ACTIONS['tfc-3d'] = el => { const id = el.getAttribute('data-id'), m = _curMap(); if (!id || !m) return; ACTIONS['map-unmark'](el, null); v3dOpen(id, m); };

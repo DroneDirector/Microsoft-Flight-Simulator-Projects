@@ -27,7 +27,7 @@ function newsMode(): string { return (State.settings as any).newsMode || 'popup'
 let _crashSeq = 0;
 function crashArt(typeId: string, o: { color: string; color2: string; reg: string }): string {
   const svg = aircraftArt(typeId, o); if (!svg) return '';
-  const inner = svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>')), id = 'cr' + (++_crashSeq);
+  const inner = svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>')), id = 'cr' + (++_crashSeq), heli = typeof isHeli === 'function' && isHeli(typeId);   // a helicopter: on its side, tail boom torn off, broken blades
   const cut = '238,0 232,40 246,62 234,86 250,112 240,150';   // the jagged line where it broke
   const rnd = (k: number) => { const x = Math.sin(k * 127.1 + _crashSeq * 3.7) * 43758.5453; return x - Math.floor(x); };
   const smoke = [0, 1, 2, 3, 4, 5, 6].map(k => `<circle cx="${(232 + (rnd(k) - 0.5) * 40 + k * 6).toFixed(0)}" cy="${(110 - k * 15).toFixed(0)}" r="${(14 + k * 5).toFixed(0)}" fill="#5A5650" opacity="${(0.5 - k * 0.05).toFixed(2)}"/>`).join('');
@@ -39,8 +39,9 @@ function crashArt(typeId: string, o: { color: string; color2: string; reg: strin
       <radialGradient id="${id}fire" cx=".5" cy=".6" r=".5"><stop offset="0" stop-color="#FFE38A"/><stop offset=".45" stop-color="#FF8A2B"/><stop offset="1" stop-color="#C2361A" stop-opacity="0"/></radialGradient></defs>
     <ellipse cx="225" cy="142" rx="170" ry="10" fill="url(#${id}g)"/>
     <g filter="url(#${id}b)">${smoke}</g>
-    <g clip-path="url(#${id}f)" transform="rotate(-6 236 140) translate(-10 7)">${inner}</g>
-    <g clip-path="url(#${id}r)" transform="rotate(7 244 140) translate(14 5)">${inner}</g>
+    <g clip-path="url(#${id}f)" transform="${heli ? 'rotate(-17 236 140) translate(-4 16)' : 'rotate(-6 236 140) translate(-10 7)'}">${inner}</g>
+    <g clip-path="url(#${id}r)" transform="${heli ? 'rotate(13 244 140) translate(30 8)' : 'rotate(7 244 140) translate(14 5)'}">${inner}</g>
+    ${heli ? [0, 1, 2, 3].map(k => { const x = 120 + rnd(k + 80) * 220, y = 128 + rnd(k + 90) * 14, l = 30 + rnd(k + 100) * 45, a = (rnd(k + 110) - 0.5) * 40; return `<rect x="${x.toFixed(0)}" y="${y.toFixed(0)}" width="${l.toFixed(0)}" height="3.2" rx="1.4" fill="#22262C" transform="rotate(${a.toFixed(0)} ${x.toFixed(0)} ${y.toFixed(0)})"/>`; }).join('') : ''}
     <ellipse cx="240" cy="122" rx="20" ry="16" fill="url(#${id}fire)" opacity=".95"/>
     <ellipse cx="226" cy="128" rx="11" ry="9" fill="url(#${id}fire)" opacity=".85"/>
     ${debris}

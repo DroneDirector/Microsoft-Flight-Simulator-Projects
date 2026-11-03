@@ -2,9 +2,9 @@
 // engine, you choose when you buy it new; used and leased aircraft come with the engine they have.
 // The engine changes the fuel burn, the maintenance cost, how often engine problems turn up, and the price.
 //   burn: fuel burn against the type's usual figure; mx: maintenance cost; rel: engine problems (above 1 = more);
-//   price: list price against the type's usual price.
+//   price: list price against the type's usual price; perf: take-off performance on hot and high airports (needs less runway).
 
-interface EngineOpt { id: string; name: string; maker: string; burn: number; mx: number; rel: number; price: number; note: string }
+interface EngineOpt { id: string; name: string; maker: string; burn: number; mx: number; rel: number; price: number; note: string; perf?: number }   // perf: take-off thrust on hot and high airports (1.03 = 3% better)
 const ENGINES: { [typeId: string]: EngineOpt[] } = {
   'a320-fenix': [
     { id: 'cfm56-5b', name: 'CFM56-5B4', maker: 'CFM International', burn: 1, mx: 1, rel: 1, price: 1, note: 'The most common A320 engine: dependable, long time between shop visits.' },
@@ -34,6 +34,57 @@ const ENGINES: { [typeId: string]: EngineOpt[] } = {
   'kodiak': [{ id: 'pt6a-34-k', name: 'Pratt & Whitney Canada PT6A-34', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '' }],
   'pc12': [{ id: 'pt6a-67p', name: 'Pratt & Whitney Canada PT6A-67P', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '' }],
   'c172': [{ id: 'io360', name: 'Lycoming IO-360-L2A', maker: 'Lycoming', burn: 1, mx: 1, rel: 1, price: 1, note: '' }],
+  'a319neo': [
+    { id: 'cfm-leap-1a', name: 'CFM LEAP-1A', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Baseline. Mature, high dispatch reliability; some early fuel-nozzle coking and HPT blade durability fixes, no fleet-wide groundings.' },
+    { id: 'pratt-whitney-pw1100g-jm', name: 'Pratt & Whitney PW1100G-JM GTF', maker: 'Pratt & Whitney', burn: 0.99, mx: 1.12, rel: 1.4, price: 0.99, note: 'Geared turbofan, roughly 1% lower burn than LEAP-1A, but the 2023 powder-metal (HPT disk) recall forced accelerated inspections and long AOG groundings into 2025-26; higher shop-visit cost.' }],
+  'a321ceo': [
+    { id: 'cfm56-5b3', name: 'CFM56-5B3', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Baseline. Very mature, highest dispatch reliability in the family; cheaper shop visits.' },
+    { id: 'iae-v2533-a5', name: 'IAE V2533-A5', maker: 'International Aero Engines (IAE)', burn: 0.985, mx: 1.04, rel: 1.01, price: 1.0, perf: 1.03, note: 'About 1.5% lower fuel burn and better hot-and-high/field performance thanks to higher thrust rating; slightly higher maintenance cost.' }],
+  'a321neo': [
+    { id: 'cfm-leap-1a', name: 'CFM LEAP-1A', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Baseline. Mature, high dispatch reliability; some early fuel-nozzle coking and HPT blade durability fixes, no fleet-wide groundings.' },
+    { id: 'pratt-whitney-pw1100g-jm', name: 'Pratt & Whitney PW1100G-JM GTF', maker: 'Pratt & Whitney', burn: 0.99, mx: 1.12, rel: 1.4, price: 0.99, note: 'Geared turbofan, roughly 1% lower burn than LEAP-1A, but the 2023 powder-metal (HPT disk) recall forced accelerated inspections and long AOG groundings into 2025-26; higher shop-visit cost.' }],
+  'a321lr': [
+    { id: 'cfm-leap-1a', name: 'CFM LEAP-1A', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Baseline. Mature, high dispatch reliability; some early fuel-nozzle coking and HPT blade durability fixes, no fleet-wide groundings.' },
+    { id: 'pratt-whitney-pw1100g-jm', name: 'Pratt & Whitney PW1100G-JM GTF', maker: 'Pratt & Whitney', burn: 0.99, mx: 1.12, rel: 1.4, price: 0.99, note: 'Geared turbofan, roughly 1% lower burn than LEAP-1A, but the 2023 powder-metal (HPT disk) recall forced accelerated inspections and long AOG groundings into 2025-26; higher shop-visit cost.' }],
+  'a321xlr': [
+    { id: 'cfm-leap-1a', name: 'CFM LEAP-1A', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Baseline. Mature, high dispatch reliability; some early fuel-nozzle coking and HPT blade durability fixes, no fleet-wide groundings.' },
+    { id: 'pratt-whitney-pw1100g-jm', name: 'Pratt & Whitney PW1100G-JM GTF', maker: 'Pratt & Whitney', burn: 0.99, mx: 1.12, rel: 1.4, price: 0.99, note: 'Geared turbofan, roughly 1% lower burn than LEAP-1A, but the 2023 powder-metal (HPT disk) recall forced accelerated inspections and long AOG groundings into 2025-26; higher shop-visit cost.' }],
+  'a330-800neo': [
+    { id: 'rolls-royce-trent-7000', name: 'Rolls-Royce Trent 7000', maker: 'Rolls-Royce', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Sole engine (68,000-72,000 lbf). Derived from Trent 1000 TEN; early HPT/IP compressor durability issues inherited from the Trent 1000 required extra inspections.' }],
+  'a330-900neo': [
+    { id: 'rolls-royce-trent-7000', name: 'Rolls-Royce Trent 7000', maker: 'Rolls-Royce', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Sole engine (68,000-72,000 lbf). Derived from Trent 1000 TEN; early HPT/IP compressor durability issues inherited from the Trent 1000 required extra inspections.' }],
+  'b737-max7': [
+    { id: 'cfm-leap-1b', name: 'CFM LEAP-1B', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Sole engine. About 14% better than CFM56-7B; good reliability, anti-ice limitation (nacelle overheat) pending fix on MAX 7/10 certification.' }],
+  'b737-max8': [
+    { id: 'cfm-leap-1b', name: 'CFM LEAP-1B', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Sole engine. About 14% better than CFM56-7B; good reliability, anti-ice limitation (nacelle overheat) pending fix on MAX 7/10 certification.' }],
+  'b737-max9': [
+    { id: 'cfm-leap-1b', name: 'CFM LEAP-1B', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Sole engine. About 14% better than CFM56-7B; good reliability, anti-ice limitation (nacelle overheat) pending fix on MAX 7/10 certification.' }],
+  'b737-max10': [
+    { id: 'cfm-leap-1b', name: 'CFM LEAP-1B', maker: 'CFM International', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Sole engine. About 14% better than CFM56-7B; good reliability, anti-ice limitation (nacelle overheat) pending fix on MAX 7/10 certification.' }],
+  'b787-8': [
+    { id: 'ge-genx-1b', name: 'GE GEnx-1B', maker: 'GE Aerospace', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Baseline. Majority of 787 orders; generally better on-wing time than the Trent 1000 (some icing/ice-crystal and HPT shroud issues).' },
+    { id: 'rolls-royce-trent-1000-t', name: 'Rolls-Royce Trent 1000 (TEN)', maker: 'Rolls-Royce', burn: 1.005, mx: 1.12, rel: 1.3, price: 1.0, note: 'Fuel burn on par after the TEN upgrade, but well-known IP compressor/turbine blade durability problems (2016-2020) caused ETOPS restrictions, frequent inspections and groundings.' }],
+  'b787-9': [
+    { id: 'ge-genx-1b', name: 'GE GEnx-1B', maker: 'GE Aerospace', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Baseline. Majority of 787 orders; generally better on-wing time than the Trent 1000 (some icing/ice-crystal and HPT shroud issues).' },
+    { id: 'rolls-royce-trent-1000-t', name: 'Rolls-Royce Trent 1000 (TEN)', maker: 'Rolls-Royce', burn: 1.005, mx: 1.12, rel: 1.3, price: 1.0, note: 'Fuel burn on par after the TEN upgrade, but well-known IP compressor/turbine blade durability problems (2016-2020) caused ETOPS restrictions, frequent inspections and groundings.' }],
+  'b777-9': [
+    { id: 'ge9x-105b1a', name: 'GE9X-105B1A', maker: 'GE Aerospace', burn: 1.0, mx: 1.0, rel: 1.0, price: 1.0, note: 'Sole engine (105,000 lbf class, largest fan in service). 2019 HPC stator durability issue delayed flight test; 2024 thrust-link crack paused testing.' }],
+  'h125': [{ id: 'arriel-2d', name: 'Arriel 2D', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '1 × 710 kW' }],
+  'h130': [{ id: 'arriel-2d', name: 'Arriel 2D', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '1 × 710 kW' }],
+  'h135': [{ id: 'arrius-2b2-or-pw206b3', name: 'Arrius 2B2 (or PW206B3)', maker: 'Safran Helicopter Engines / Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 528 kW' }],
+  'h145': [{ id: 'arriel-2e', name: 'Arriel 2E', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 667 kW' }],
+  'h160': [{ id: 'arrano-1a', name: 'Arrano 1A', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 955 kW' }],
+  'h175': [{ id: 'pt6c-67e', name: 'PT6C-67E', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1324 kW' }],
+  'bell407': [{ id: 'm250-c47e-4', name: 'M250-C47E/4', maker: 'Rolls-Royce', burn: 1, mx: 1, rel: 1, price: 1, note: '1 × 503 kW' }],
+  'bell429': [{ id: 'pw207d1', name: 'PW207D1', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 466 kW' }],
+  'bell505': [{ id: 'arrius-2r', name: 'Arrius 2R', maker: 'Safran Helicopter Engines', burn: 1, mx: 1, rel: 1, price: 1, note: '1 × 376 kW' }],
+  'bell525': [{ id: 'ct7-2f1', name: 'CT7-2F1', maker: 'GE Aerospace', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1342 kW' }],
+  'aw109': [{ id: 'pw207c', name: 'PW207C', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 548 kW' }],
+  'aw139': [{ id: 'pt6c-67c', name: 'PT6C-67C', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1142 kW' }],
+  'aw169': [{ id: 'pw210a', name: 'PW210A', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 746 kW' }],
+  'aw189': [{ id: 'ct7-2e1', name: 'CT7-2E1', maker: 'GE Aerospace', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1490 kW' }],
+  's76d': [{ id: 'pw210s', name: 'PW210S', maker: 'Pratt & Whitney Canada', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 800 kW' }],
+  's92': [{ id: 'ct7-8a6', name: 'CT7-8A6', maker: 'GE Aerospace', burn: 1, mx: 1, rel: 1, price: 1, note: '2 × 1005 kW' }],
 };
 function engineOptions(typeId: string): EngineOpt[] { return ENGINES[typeId] || []; }
 /** The engine an aircraft has (the type's first option when not set). */

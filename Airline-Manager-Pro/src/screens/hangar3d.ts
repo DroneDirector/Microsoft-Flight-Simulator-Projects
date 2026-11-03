@@ -1342,7 +1342,7 @@ function hgLeave(to?: string) {
 /* ---------- the door: where to next ---------- */
 // The doors of your office, the Operations office and the hangars ask where you are going: the Overview, the hangars,
 // your office or Operations (all at the airport), or the courtroom (in the city). The room you are in isn't offered.
-const ROOM_EXITS: [string, string, string][] = [['overview', 'The Overview', 'ops'], ['hangars', 'The hangars', 'wrench'], ['office', 'My office', 'jobs'], ['ops', 'Operations', 'clock'], ['court', 'The courtroom (in the city)', 'shield']];
+const ROOM_EXITS: [string, string, string][] = [['overview', 'The Overview', 'ops'], ['hangars', 'The hangars', 'wrench'], ['office', 'My office', 'jobs'], ['ops', 'Operations', 'clock'], ['lounges', 'The lounges', 'star'], ['court', 'The courtroom (in the city)', 'shield']];
 function roomExitMenu(root: HTMLElement, here: string, leave: (to: string) => void, stay?: () => void) {
   if (!root || root.querySelector('.room-exit')) return;
   try { aimUnlock(); } catch (e) { /* not locked */ }
@@ -1359,6 +1359,8 @@ function roomGoTo(to: string) {
   try { closeAll(); } catch (e) { /* nothing open */ }
   if (to.indexOf('visit:') === 0) { const v = to.slice(6).split('|'); go('hangars'); setTimeout(() => HangarRoom.open(v[0], v[1], v[2]), 60); }
   else if (to === 'hangars') go('hangars');
+  else if (to === 'lounges') go('lounges');
+  else if (to.indexOf('lvisit:') === 0) { go('lounges'); setTimeout(() => LoungeRoom.open(to.slice(7)), 60); }
   else if (to === 'office') { go('ops'); setTimeout(() => ACTIONS['office-open'](null, null), 60); }
   else if (to === 'ops') { go('ops'); setTimeout(() => ACTIONS['ops-room'](null, null), 60); }
   else if (to === 'court') { go('ops'); setTimeout(() => ACTIONS['court-enter'](null, null), 60); }
@@ -1369,10 +1371,12 @@ function roomGoTo(to: string) {
  *  room through its own loading screen, and the place opens. The room you are in just shows itself again. */
 function roomLeaveFor(dest: string): boolean {
   const H: any = typeof HangarRoom !== 'undefined' ? HangarRoom : null, O: any = typeof OpsRoom !== 'undefined' ? OpsRoom : null, F: any = typeof OfficeRoom !== 'undefined' ? OfficeRoom : null;
-  const here = H && H.on ? 'hangars' : O && O.on ? 'ops' : F && F.on ? 'office' : ''; if (!here) return false;
+  const LR: any = typeof LoungeRoom !== 'undefined' ? LoungeRoom : null;
+  const here = H && H.on ? 'hangars' : O && O.on ? 'ops' : F && F.on ? 'office' : LR && LR.on ? 'lounges' : ''; if (!here) return false;
   if (dest === here) { if (here === 'hangars' && H.overlay) hgScreenClose(); else if (here === 'ops' && O.overlay) opsScreenClose(); else if (here === 'office') { try { closeAll(); } catch (e) { /* none */ } try { if (F.overlay && typeof ofLaptopClose === 'function') ofLaptopClose(); } catch (e) { /* none */ } } return true; }
   try { if (Lap.root) lapUnmount(); } catch (e) { /* closed */ }
   try { closeAll(); } catch (e) { /* none */ }
+  if (here === 'lounges') { lgLeave(dest); return true; }
   if (here === 'hangars') { if (H.overlay) { H.overlay.remove(); H.overlay = null; document.body.classList.remove('of-over'); } hgLeave(dest); }
   else if (here === 'ops') { if (O.overlay) { O.overlay.remove(); O.overlay = null; document.body.classList.remove('of-over'); } opsLeave(dest); }
   else ofExitToMain('', dest);
@@ -1384,5 +1388,5 @@ function roomLeaveFor(dest: string): boolean {
 })();
 
 ACTIONS['hangar-visit'] = el => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; const to = 'visit:' + [g('data-reg'), g('data-base'), g('data-size')].join('|');
-  if ((HangarRoom.on || (typeof OpsRoom !== 'undefined' && OpsRoom.on) || (typeof OfficeRoom !== 'undefined' && OfficeRoom.on)) && roomLeaveFor(to)) return;
+  if ((HangarRoom.on || (typeof OpsRoom !== 'undefined' && OpsRoom.on) || (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) || (typeof LoungeRoom !== 'undefined' && LoungeRoom.on)) && roomLeaveFor(to)) return;
   closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };

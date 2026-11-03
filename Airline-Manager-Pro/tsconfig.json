@@ -29,6 +29,7 @@
     "src/data/capacity.ts",
     "src/data/engines.ts",
     "src/graphics/aircraft-model.ts",
+    "src/graphics/helicopter-model.ts",
     "src/data/flight-configs.ts",
     "src/graphics/avatar.ts",
     "src/graphics/human.ts",
@@ -186,6 +187,7 @@
     "src/core/career-rides.ts",
     "src/core/ops-decisions.ts",
     "src/screens/hangar3d.ts",
+    "src/screens/lounge3d.ts",
     "src/main.ts"
   ]
 }

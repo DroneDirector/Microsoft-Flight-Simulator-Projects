@@ -17,6 +17,13 @@ water salute, the museum. Remove the file and the app's own model comes back. Th
 |---|---|
 | `aircraft/airbus-a320.glb` | Airbus A320 |
 | `aircraft/airbus-a320neo.glb` | Airbus A320neo |
+| `aircraft/airbus-a319neo.glb` | Airbus A319neo |
+| `aircraft/airbus-a321.glb` | Airbus A321 |
+| `aircraft/airbus-a321neo.glb` | Airbus A321neo |
+| `aircraft/airbus-a321lr-neo.glb` | Airbus A321LR neo |
+| `aircraft/airbus-a321xlr-neo.glb` | Airbus A321XLR neo |
+| `aircraft/airbus-a330-800neo.glb` | Airbus A330-800neo |
+| `aircraft/airbus-a330-900neo.glb` | Airbus A330-900neo |
 | `aircraft/airbus-a350-900.glb` | Airbus A350-900 |
 | `aircraft/airbus-a310-300.glb` | Airbus A310-300 |
 | `aircraft/boeing-737-800.glb` | Boeing 737-800 |
@@ -24,6 +31,13 @@ water salute, the museum. Remove the file and the app's own model comes back. Th
 | `aircraft/boeing-777-300er.glb` | Boeing 777-300ER |
 | `aircraft/boeing-787-10.glb` | Boeing 787-10 |
 | `aircraft/boeing-747-8.glb` | Boeing 747-8 |
+| `aircraft/boeing-737-max-7.glb` | Boeing 737 MAX 7 |
+| `aircraft/boeing-737-max-8.glb` | Boeing 737 MAX 8 |
+| `aircraft/boeing-737-max-9.glb` | Boeing 737 MAX 9 |
+| `aircraft/boeing-737-max-10.glb` | Boeing 737 MAX 10 |
+| `aircraft/boeing-787-8.glb` | Boeing 787-8 |
+| `aircraft/boeing-787-9.glb` | Boeing 787-9 |
+| `aircraft/boeing-777-9.glb` | Boeing 777-9 |
 | `aircraft/bombardier-crj900.glb` | Bombardier CRJ900 |
 | `aircraft/bombardier-crj700.glb` | Bombardier CRJ700 |
 | `aircraft/atr-72-600.glb` | ATR ATR 72-600 |
@@ -33,6 +47,30 @@ water salute, the museum. Remove the file and the app's own model comes back. Th
 | `aircraft/daher-kodiak-100.glb` | Daher Kodiak 100 |
 | `aircraft/pilatus-pc-12.glb` | Pilatus PC-12 |
 | `aircraft/cessna-172-skyhawk.glb` | Cessna 172 Skyhawk |
+
+## Helicopters (`helicopters/`)
+
+Each helicopter type, named so it is clear it is a helicopter and which one. Metres, +Y up, the nose towards +Z; the
+rotor is shown as it is in the file (the app's own model turns its rotors).
+
+| File | Helicopter |
+|---|---|
+| `helicopters/helicopter-airbus-h125.glb` | Airbus Helicopters H125 |
+| `helicopters/helicopter-airbus-h130.glb` | Airbus Helicopters H130 |
+| `helicopters/helicopter-airbus-h135.glb` | Airbus Helicopters H135 |
+| `helicopters/helicopter-airbus-h145.glb` | Airbus Helicopters H145 |
+| `helicopters/helicopter-airbus-h160.glb` | Airbus Helicopters H160 |
+| `helicopters/helicopter-airbus-h175.glb` | Airbus Helicopters H175 |
+| `helicopters/helicopter-bell-407gxi.glb` | Bell Bell 407GXi |
+| `helicopters/helicopter-bell-429.glb` | Bell Bell 429 |
+| `helicopters/helicopter-bell-505.glb` | Bell Bell 505 |
+| `helicopters/helicopter-bell-525-relentless.glb` | Bell Bell 525 Relentless |
+| `helicopters/helicopter-leonardo-aw109-trekker.glb` | Leonardo AW109 Trekker |
+| `helicopters/helicopter-leonardo-aw139.glb` | Leonardo AW139 |
+| `helicopters/helicopter-leonardo-aw169.glb` | Leonardo AW169 |
+| `helicopters/helicopter-leonardo-aw189.glb` | Leonardo AW189 |
+| `helicopters/helicopter-sikorsky-s-76d.glb` | Sikorsky S-76D |
+| `helicopters/helicopter-sikorsky-s-92a.glb` | Sikorsky S-92A |
 
 ## Ground vehicles (`vehicles/`)
 
@@ -104,6 +142,50 @@ own (`vehicles/pushback-tug.glb`).
 | `hangar-props/drinking-glass.glb` | Drinking glass |
 | `hangar-props/break-room-table.glb` | Break room table |
 | `hangar-props/break-room-chair.glb` | Break room chair |
+
+## Lounge furniture and equipment (`lounge-props/`)
+
+One file for each kind, used for every one of that kind in your lounges. Where the levels differ (Lounge, Business
+lounge, Flagship lounge) each level has its own file: the carpets, armchairs, sofas and coffee tables. Metres, front
+towards +Z (where you sit or stand to use it), standing on the floor; fitted to the size of the app's own.
+
+| File | What |
+|---|---|
+| `lounge-props/carpet-lounge.glb` | Carpet, Lounge |
+| `lounge-props/carpet-business.glb` | Carpet, Business lounge |
+| `lounge-props/carpet-flagship.glb` | Carpet, Flagship lounge (the finest) |
+| `lounge-props/armchair-fabric.glb` | Armchair, fabric (Lounge) |
+| `lounge-props/armchair-leather.glb` | Armchair, leather (Business lounge) |
+| `lounge-props/armchair-velvet.glb` | Armchair, velvet on gold legs (Flagship lounge) |
+| `lounge-props/sofa-fabric.glb` | Sofa, fabric |
+| `lounge-props/sofa-leather.glb` | Sofa, leather |
+| `lounge-props/sofa-velvet.glb` | Sofa, velvet |
+| `lounge-props/coffee-table-oak.glb` | Coffee table, oak |
+| `lounge-props/coffee-table-walnut.glb` | Coffee table, walnut |
+| `lounge-props/coffee-table-marble.glb` | Coffee table, marble and gold |
+| `lounge-props/floor-lamp.glb` | Floor lamp |
+| `lounge-props/potted-plant.glb` | Potted plant |
+| `lounge-props/magazine-rack.glb` | Magazine rack |
+| `lounge-props/reception-desk.glb` | Reception desk |
+| `lounge-props/buffet-counter.glb` | Refreshment counter |
+| `lounge-props/espresso-machine.glb` | Espresso machine |
+| `lounge-props/tea-urn.glb` | Tea urn (samovar) |
+| `lounge-props/teapot.glb` | Teapot |
+| `lounge-props/coffee-cup-and-saucer.glb` | Coffee cup and saucer |
+| `lounge-props/teacup-and-saucer.glb` | Teacup and saucer |
+| `lounge-props/napkin-stack.glb` | Napkins |
+| `lounge-props/fruit-bowl.glb` | Fruit bowl |
+| `lounge-props/drinks-fridge.glb` | Glass-fronted fridge (the drinks and snacks in it are the items/ files) |
+| `lounge-props/bar-counter.glb` | Bar counter (Business and Flagship) |
+| `lounge-props/bar-stool.glb` | Bar stool |
+| `lounge-props/bottle-shelf.glb` | Shelf of bottles behind the bar |
+| `lounge-props/pendant-light.glb` | Pendant light (Business) |
+| `lounge-props/chandelier.glb` | Chandelier (Flagship) |
+| `lounge-props/fireplace.glb` | Fireplace (Flagship) |
+| `lounge-props/grand-piano.glb` | Grand piano (Flagship) |
+| `lounge-props/wall-art.glb` | Framed art (Flagship) |
+| `lounge-props/champagne-bucket.glb` | Champagne bucket (Flagship) |
+| `lounge-props/departures-screen.glb` | Departures screen frame (the list is drawn by the app) |
 
 ## The vending machine's parts (`items/vending-machine.glb`)
 

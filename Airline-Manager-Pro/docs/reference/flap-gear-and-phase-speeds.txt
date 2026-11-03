@@ -1337,3 +1337,91 @@ MACHINE-READABLE SUMMARY
   "descIas": 120
  }
 }
+
+
+PART 2: TYPES ADDED 3 NOVEMBER 2026
+(C) = worked out, not published. Sources per type below each row.
+
+Airbus A319neo   (app type a319neo)
+  Flaps: 1 230, 2 200, 3 185, FULL 177 kt (VFE); take-off 1+F/2/3, landing 3/FULL
+  Gear: extend 250, retract 220, extended 280 kt; selected on the approach at 1 205, 2 180, 3 160, FULL 145 kt (C)
+  VMO 350 kt / MMO 0.82; climb 300 kt / M0.78, descent 300 kt / M0.78
+  Sources: Airbus A319neo product page <https://www.aircraft.airbus.com/en/aircraft/a320-family/a319neo>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A321   (app type a321ceo)
+  Flaps: 1 235, 2 215, 3 195, FULL 190 kt (VFE); take-off 1+F/2/3, landing 3/FULL
+  Gear: extend 250, retract 220, extended 280 kt; selected on the approach at 1 215, 2 190, 3 170, FULL 150 kt (C)
+  VMO 350 kt / MMO 0.82; climb 300 kt / M0.78, descent 300 kt / M0.78
+  Sources: Airbus A321 Aircraft Characteristics - Airport and Maintenance Planning (AC_A321, rev. 03/2022) <https://aviation.hawaii.gov/wp-content/uploads/2025/06/Airbus-techdata-AC_A321_0322-2.pdf>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A321neo   (app type a321neo)
+  Flaps: 1 235, 2 215, 3 195, FULL 190 kt (VFE); take-off 1+F/2/3, landing 3/FULL
+  Gear: extend 250, retract 220, extended 280 kt; selected on the approach at 1 215, 2 190, 3 170, FULL 150 kt (C)
+  VMO 350 kt / MMO 0.82; climb 300 kt / M0.78, descent 300 kt / M0.78
+  Sources: Airbus A321 Aircraft Characteristics - Airport and Maintenance Planning (AC_A321, rev. 03/2022) <https://aviation.hawaii.gov/wp-content/uploads/2025/06/Airbus-techdata-AC_A321_0322-2.pdf>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A321LR neo   (app type a321lr)
+  Flaps: 1 235, 2 215, 3 195, FULL 190 kt (VFE); take-off 1+F/2/3, landing 3/FULL
+  Gear: extend 250, retract 220, extended 280 kt; selected on the approach at 1 215, 2 190, 3 170, FULL 150 kt (C)
+  VMO 350 kt / MMO 0.82; climb 300 kt / M0.78, descent 300 kt / M0.78
+  Sources: Airbus A321 Aircraft Characteristics - Airport and Maintenance Planning (AC_A321, rev. 03/2022) <https://aviation.hawaii.gov/wp-content/uploads/2025/06/Airbus-techdata-AC_A321_0322-2.pdf>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A321XLR neo   (app type a321xlr)
+  Flaps: 1 235, 2 215, 3 195, FULL 190 kt (VFE); take-off 1+F/2/3, landing 3/FULL
+  Gear: extend 250, retract 220, extended 280 kt; selected on the approach at 1 215, 2 190, 3 170, FULL 150 kt (C)
+  VMO 350 kt / MMO 0.82; climb 300 kt / M0.78, descent 300 kt / M0.78
+  Sources: Airbus A321 Aircraft Characteristics - Airport and Maintenance Planning (AC_A321, rev. 03/2022) <https://aviation.hawaii.gov/wp-content/uploads/2025/06/Airbus-techdata-AC_A321_0322-2.pdf>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>; Airbus A321XLR product page <https://aircraft.airbus.com/en/aircraft/a320-family/a321XLR>
+
+Airbus A330-800neo   (app type a330-800neo)
+  Flaps: 1 240, 2 196, 3 186, FULL 180 kt (VFE); take-off 1+F/2/3, landing 3/FULL
+  Gear: extend 250, retract 250, extended 250 kt; selected on the approach at 1 225, 2 185, 3 170, FULL 155 kt (C)
+  VMO 330 kt / MMO 0.86; climb 300 kt / M0.8, descent 300 kt / M0.82
+  Sources: EASA TCDS A.004 Airbus A330 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A330neo (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A330neo.html>; Airbus - EASA approves increased take-off weight variant of the A330-900 (251 t) <https://www.airbus.com/en/newsroom/news/2020-10-easa-approves-increased-take-off-weight-variant-of-the-a330-900>; FlightGlobal - EASA certifies A330-800 with 251t take-off weight <https://flightglobal.com/air-transport/easa-certifies-a330-800-with-251t-take-off-weight/148282.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A330-900neo   (app type a330-900neo)
+  Flaps: 1 240, 2 196, 3 186, FULL 180 kt (VFE); take-off 1+F/2/3, landing 3/FULL
+  Gear: extend 250, retract 250, extended 250 kt; selected on the approach at 1 225, 2 185, 3 170, FULL 155 kt (C)
+  VMO 330 kt / MMO 0.86; climb 300 kt / M0.8, descent 300 kt / M0.82
+  Sources: EASA TCDS A.004 Airbus A330 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A330neo (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A330neo.html>; Airbus - EASA approves increased take-off weight variant of the A330-900 (251 t) <https://www.airbus.com/en/newsroom/news/2020-10-easa-approves-increased-take-off-weight-variant-of-the-a330-900>; FlightGlobal - EASA certifies A330-800 with 251t take-off weight <https://flightglobal.com/air-transport/easa-certifies-a330-800-with-251t-take-off-weight/148282.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Boeing 737 MAX 7   (app type b737-max7)
+  Flaps: 1 250, 2 250, 5 250, 10 210, 15 200, 25 190, 30 175, 40 162 kt (VFE); take-off 1/5/10/15/25, landing 15/30/40
+  Gear: extend 270, retract 235, extended 320 kt; selected on the approach at 1 210, 2 200, 5 190, 10 180, 15 170, 25 160, 30 150, 40 145 kt (C)
+  VMO 340 kt / MMO 0.82; climb 280 kt / M0.78, descent 280 kt / M0.78
+  Sources: Boeing 737 MAX Airplane Characteristics for Airport Planning (D6-38A004, Rev K) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/737MAX_RevK.pdf>; Boeing 737 MAX ACAP brochure (737-7 / 737-9) <https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/737MaxBrochure.pdf>; FAA TCDS A16WE Boeing 737 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 737 MAX 8   (app type b737-max8)
+  Flaps: 1 250, 2 250, 5 250, 10 210, 15 200, 25 190, 30 175, 40 162 kt (VFE); take-off 1/5/10/15/25, landing 15/30/40
+  Gear: extend 270, retract 235, extended 320 kt; selected on the approach at 1 210, 2 200, 5 190, 10 180, 15 170, 25 160, 30 150, 40 145 kt (C)
+  VMO 340 kt / MMO 0.82; climb 280 kt / M0.78, descent 280 kt / M0.78
+  Sources: Boeing 737 MAX Airplane Characteristics for Airport Planning (D6-38A004, Rev K) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/737MAX_RevK.pdf>; Boeing 737 MAX ACAP brochure (737-7 / 737-9) <https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/737MaxBrochure.pdf>; FAA TCDS A16WE Boeing 737 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 737 MAX 9   (app type b737-max9)
+  Flaps: 1 250, 2 250, 5 250, 10 210, 15 200, 25 190, 30 175, 40 162 kt (VFE); take-off 1/5/10/15/25, landing 15/30/40
+  Gear: extend 270, retract 235, extended 320 kt; selected on the approach at 1 210, 2 200, 5 190, 10 180, 15 170, 25 160, 30 150, 40 145 kt (C)
+  VMO 340 kt / MMO 0.82; climb 280 kt / M0.78, descent 280 kt / M0.78
+  Sources: Boeing 737 MAX Airplane Characteristics for Airport Planning (D6-38A004, Rev K) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/737MAX_RevK.pdf>; Boeing 737 MAX ACAP brochure (737-7 / 737-9) <https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/737MaxBrochure.pdf>; FAA TCDS A16WE Boeing 737 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 737 MAX 10   (app type b737-max10)
+  Flaps: 1 250, 2 250, 5 250, 10 210, 15 200, 25 190, 30 175, 40 162 kt (VFE); take-off 1/5/10/15/25, landing 15/30/40
+  Gear: extend 270, retract 235, extended 320 kt; selected on the approach at 1 210, 2 200, 5 190, 10 180, 15 170, 25 160, 30 150, 40 145 kt (C)
+  VMO 340 kt / MMO 0.82; climb 280 kt / M0.78, descent 280 kt / M0.78
+  Sources: Boeing 737 MAX Airplane Characteristics for Airport Planning (D6-38A004, Rev K) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/737MAX_RevK.pdf>; Boeing 737 MAX ACAP brochure (737-7 / 737-9) <https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/737MaxBrochure.pdf>; FAA TCDS A16WE Boeing 737 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 787-8   (app type b787-8)
+  Flaps: 1 250, 5 230, 15 200, 20 190, 25 180, 30 175 kt (VFE); take-off 5/15/20, landing 25/30
+  Gear: extend 270, retract 270, extended 270 kt; selected on the approach at 1 220, 5 200, 15 180, 20 170, 25 160, 30 150 kt (C)
+  VMO 350 kt / MMO 0.9; climb 310 kt / M0.85, descent 290 kt / M0.85 (C)
+  Sources: Boeing 787 Airplane Characteristics for Airport Planning (D6-58333, Rev Q, Oct 2025) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/787_ACAP_Rev_Q.pdf>; FAA TCDS T00021SE Boeing 787 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 787-9   (app type b787-9)
+  Flaps: 1 250, 5 230, 15 200, 20 190, 25 180, 30 175 kt (VFE); take-off 5/15/20, landing 25/30
+  Gear: extend 270, retract 270, extended 270 kt; selected on the approach at 1 220, 5 200, 15 180, 20 170, 25 160, 30 150 kt (C)
+  VMO 350 kt / MMO 0.9; climb 310 kt / M0.85, descent 290 kt / M0.85 (C)
+  Sources: Boeing 787 Airplane Characteristics for Airport Planning (D6-58333, Rev Q, Oct 2025) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/787_ACAP_Rev_Q.pdf>; FAA TCDS T00021SE Boeing 787 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>; Boeing - FAA clears higher takeoff weight for 787-9 and 787-10 (Mar 2026) <https://www.boeing.com/content/theboeingcompany/us/en/features/2026/03/faa-clears-higher-takeoff-weight-for-787-9-and-787-10.html>
+
+Boeing 777-9   (app type b777-9)
+  Flaps: 1 255, 5 235, 15 215, 20 195, 25 185, 30 170 kt (VFE); take-off 5/15/20, landing 25/30
+  Gear: extend 270, retract 270, extended 270 kt; selected on the approach at 1 230, 5 210, 15 190, 20 180, 25 170, 30 155 kt (C)
+  VMO 330 kt / MMO 0.89; climb 310 kt / M0.84, descent 290 kt / M0.84 (C)
+  Sources: Boeing 777X Airplane Characteristics for Airport Planning (D6-86073, Rev G) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/777X_Rev_G.pdf>; FAA TCDS T00001SE Boeing 777 <https://drs.faa.gov/browse/TCDSModel>; AeroCorner - Boeing 777-9 specifications <https://aerocorner.com/aircraft/boeing-777-9/>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>

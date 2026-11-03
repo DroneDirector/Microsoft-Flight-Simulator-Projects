@@ -21,7 +21,7 @@ const Traffic = {
   on(): boolean { return !Mode.coop() && (State.settings as any).otherTraffic !== false; },
   /** The airlines and their fleets: the same every day for the same home base of yours. */
   airlines(): TrafficAirline[] {
-    const real = tfcRealNames(), hub = company() ? company().hub : 'EKVG', key = hub + ':' + (World.ready ? World.list.length : 0) + (real ? ':real' : '');
+    const real = tfcRealNames(), hub = company() ? company().hub : 'EKVG', key = hub + ':' + (World.ready ? World.list.length : 0) + ':' + World.helis.length + (real ? ':real' : '');
     if (this.lines && this._key === key) return this.lines;
     this._key = key; this._pools = {}; this._days.clear();
     const H = apt(hub), big = (World.ready ? World.list : []).filter((w: any) => w.size === 2 && w.sched && w.pos && /^[A-Z]{4}$/.test(w.icao));
@@ -48,7 +48,7 @@ const Traffic = {
       let longHaul = r() < 0.4, regional = r() < 0.5;
       const rTypes = R ? R.fleet.filter(t => !!acType(t) && acType(t).cls !== 'bush' && acType(t).cls !== 'ga') : [];
       for (let k = 0; k < n; k++) {
-        const x = r(), typeId = longHaul && x < 0.25 ? ['b78x', 'a350-ini', 'b77w-pmdg'][Math.floor(r() * 3)] : regional && x < 0.45 ? (r() < 0.6 ? 'atr72' : 'crj9-aero') : ['a320neo', 'b738-pmdg', 'a320-fenix', 'b736-pmdg'][Math.floor(r() * 4)];
+        const x = r(), typeId = longHaul && x < 0.25 ? ['b78x', 'a350-ini', 'b77w-pmdg', 'b787-9', 'a330-900neo', 'b787-8'][Math.floor(r() * 6)] : regional && x < 0.45 ? (r() < 0.6 ? 'atr72' : 'crj9-aero') : ['a320neo', 'b738-pmdg', 'a320-fenix', 'b736-pmdg', 'a321neo', 'b737-max8', 'a321ceo', 'b737-max9'][Math.floor(r() * 8)];
         const tId = rTypes.length ? rTypes[Math.floor(r() * rTypes.length)] : typeId;
         if (!acType(tId)) continue;
         const c: TrafficCraft = { id: `tfc-${i}-${k}`, airline: al, code, color: R ? R.color : col[0], color2: R ? '#14233A' : col[1], typeId: tId, reg: code.slice(0, 2) + '-' + String.fromCharCode(65 + Math.floor(r() * 26), 65 + Math.floor(r() * 26), 65 + Math.floor(r() * 26)), hub: home.icao, seats: acType(tId).seats || 180 };
@@ -57,6 +57,22 @@ const Traffic = {
       }
       out.push(A);
     });
+    // helicopter operators near your home base: air ambulance, offshore and charter, flying between helipads
+    for (const [hi, [hn, hcode, kind, types]] of ([['Northern Air Ambulance', 'NAA', 'h', ['h145', 'h135', 'aw169', 'h145']], ['Coastline Offshore Helicopters', 'COH', 'o', ['aw189', 's92', 'h175', 'aw139']], ['Skyline Heli Charter', 'SHC', 'c', ['h125', 'bell407', 'bell505', 'h130']]] as any[]).entries()) {
+      // based where its kind of work is: the airport near you with the most hospital pads, helidecks or heliports around it
+      const homes: any[] = [Object.assign({}, H, { icao: hub })].concat(near.slice().sort((a: any, b: any) => gcDistanceNm(H.pos, a.pos) - gcDistanceNm(H.pos, b.pos)).slice(0, 10));
+      const score = (w: any) => World.helisNear(w.pos, kind === 'o' ? 140 : 90, kind === 'c' ? undefined : kind).length;
+      const home: any = homes.map(w => ({ w, n: score(w) })).sort((a, b) => b.n - a.n)[0].w;
+      const col = TRAFFIC_COLORS[(_hashStr(hn) + 3) % TRAFFIC_COLORS.length];
+      const A: TrafficAirline = { name: hn, code: hcode, color: kind === 'h' ? '#D7263D' : col[0], color2: kind === 'h' ? '#FFD23F' : col[1], hub: home.icao, quality: 0.85, fleet: [] };
+      (A as any).heli = kind;
+      for (let k = 0; k < 4 + Math.floor(r() * 3); k++) {
+        const tId = types[k % types.length]; if (!acType(tId)) continue;
+        const c: TrafficCraft = { id: `tfc-h${hi}-${k}`, airline: hn, code: hcode, color: A.color, color2: A.color2, typeId: tId, reg: hcode.slice(0, 2) + '-H' + String.fromCharCode(65 + Math.floor(r() * 26), 65 + Math.floor(r() * 26)), hub: home.icao, seats: acType(tId).seats };
+        (c as any).heli = kind; A.fleet.push(c); fleet.push(c);
+      }
+      out.push(A);
+    }
     // airlines you took over fly under your name now
     const taken: string[] = ((State as any).biz && (State as any).biz.taken) || [];
     const keep = out.filter(A => taken.indexOf(A.name) < 0);
@@ -65,9 +81,13 @@ const Traffic = {
   build(): TrafficCraft[] { this.airlines(); return this.fleet || []; },
   /** Destinations an aircraft type can fly from its hub. */
   pool(c: TrafficCraft): any[] {
-    const t = acType(c.typeId), cls = t.cls, k = c.hub + ':' + cls;
+    const t = acType(c.typeId), cls = t.cls, k = c.hub + ':' + cls + ((c as any).heli ? ':' + (c as any).heli : '');
     if (this._pools[k]) return this._pools[k];
     const H = apt(c.hub) || (World.list as any[]).filter((w: any) => w.icao === c.hub)[0]; if (!H) return (this._pools[k] = []);
+    if (cls === 'helicopter') {   // helipads of its kind (hospitals, helidecks) and heliports near its base
+      const kind = (c as any).heli, hp = World.helisNear(H.pos, kind === 'o' ? 140 : 90, kind === 'c' ? undefined : kind).filter(w => gcDistanceNm(H.pos, w.pos) > 8);
+      return (this._pools[k + ':' + kind] = this._pools[k] = hp.slice(0, 60));
+    }
     const [mn, mx] = cls === 'widebody' ? [2600, 6500] : cls === 'turboprop' || cls === 'regional' ? [90, 450] : [200, 1900];
     const list = (World.list as any[]).filter((w: any) => w.size === 2 && w.sched && w.pos && /^[A-Z]{4}$/.test(w.icao) && w.icao !== c.hub).filter((w: any) => { const d = gcDistanceNm(H.pos, w.pos); return d >= mn && d <= mx; });
     return (this._pools[k] = list);
@@ -80,17 +100,18 @@ const Traffic = {
     const r = seeded('tday:' + key), pool = this.pool(c), out: TrafficLeg[] = []; if (!pool.length) { this._days.set(key, out); return out; }
     const H: any = apt(c.hub) || (World.list as any[]).filter((w: any) => w.icao === c.hub)[0], tz = Math.round((H ? H.pos[0] : 0) / 15);
     const day0 = D * 864e5 - tz * 3600e3, long = acType(c.typeId).cls === 'widebody';
-    let t = day0 + (long ? 9 + r() * 5 : 5.5 + r() * 2.5) * 3600e3, late = 0, num = 100 + Math.floor(r() * 700) * 2;
+    const heli = acType(c.typeId).cls === 'helicopter';
+    let t = day0 + (long ? 9 + r() * 5 : heli ? 6 + r() * 6 : 5.5 + r() * 2.5) * 3600e3, late = 0, num = 100 + Math.floor(r() * 700) * 2;
     const end = day0 + 22 * 3600e3;
-    for (let rot = 0; rot < (long ? 1 : 4) && t < end; rot++) {
+    for (let rot = 0; rot < (long ? 1 : heli ? 3 + Math.floor(r() * 3) : 4) && t < end; rot++) {
       const B: any = pool[Math.floor(r() * pool.length)];
       for (const [from, to] of [[c.hub, B.icao], [B.icao, c.hub]]) {
         const dur = this.estMin(c.typeId, from, to) * 60e3, sched = t, d = r() > (1 - quality) * 0.55 ? Math.floor(r() * 9) : 15 + Math.floor(r() * 60);
         late = Math.max(0, late * 0.35 - 10 * 60e3) + d * 60e3; const dep = sched + late;
         out.push({ craft: c, from, to, sched, dep, arr: dep + dur, num: num++, delayMin: Math.round(late / 60e3) });
-        t = sched + dur + (long ? 120 : 35 + r() * 20) * 60e3;
+        t = sched + dur + (long ? 120 : heli ? 15 + r() * 25 : 35 + r() * 20) * 60e3;
       }
-      if (!long) t += r() * 90 * 60e3;
+      if (!long) t += r() * (heli ? 150 : 90) * 60e3;
     }
     this._days.set(key, out); return out;
   },

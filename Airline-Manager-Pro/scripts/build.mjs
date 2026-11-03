@@ -82,13 +82,15 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   // slots in src/graphics/models.ts), written on every build so a new aircraft type appears in it straight away
   const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const acSrc = readFileSync(join(root, 'src/data/aircraft.ts'), 'utf8'), ac = [], seen = {};
-  for (const m of acSrc.matchAll(/\{ id: '([^']+)', maker: '([^']+)', model: '([^']+)'/g)) {
+  const helis = [];
+  for (const m of acSrc.matchAll(/\{ id: '([^']+)', maker: '([^']+)', model: '([^']+)'[^\n]*/g)) {
+    if (/cls: 'helicopter'/.test(m[0])) { { const hm = slug(m[2].replace(/ Helicopters?$/i, '')), hd = slug(m[3]); helis.push([`helicopter-${hd.startsWith(hm + '-') ? hd : hm + '-' + hd}.glb`, `${m[2]} ${m[3]}`]); } continue; }
     const mk = slug(m[2]), md = slug(m[3]), f = (md.startsWith(mk + '-') ? md : mk + '-' + md) + '.glb';
     if (seen[f]) { seen[f].push(m[1]); continue; } seen[f] = [m[1]]; ac.push([f, `${m[2]} ${m[3]}`]);
   }
   const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
   const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
-  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES');
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES');
   const have = f => files.includes(f) ? ' (in use)' : '';
   const md = [
     '# Replaceable models', '',
@@ -102,6 +104,11 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     '- Licences of bought models must allow commercial sale (see CLAUDE.md).', '',
     '## Aircraft (`aircraft/`)', '', '| File | Aircraft |', '|---|---|',
     ...ac.map(([f, n]) => `| \`aircraft/${f}\`${have('aircraft/' + f)} | ${n} |`), '',
+    '## Helicopters (`helicopters/`)', '',
+    'Each helicopter type, named so it is clear it is a helicopter and which one. Metres, +Y up, the nose towards +Z; the',
+    'rotor is shown as it is in the file (the app\'s own model turns its rotors).', '',
+    '| File | Helicopter |', '|---|---|',
+    ...helis.map(([f, n]) => `| \`helicopters/${f}\`${have('helicopters/' + f)} | ${n} |`), '',
     '## Ground vehicles (`vehicles/`)', '', '| File | Vehicle |', '|---|---|',
     ...veh.map(([f, n]) => `| \`vehicles/${f}.glb\`${have('vehicles/' + f + '.glb')} | ${n} |`), '',
     '## Jet bridges (`jetways/`)', '', '| File | What |', '|---|---|',
@@ -121,6 +128,12 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     'own (`vehicles/pushback-tug.glb`).', '',
     '| File | What |', '|---|---|',
     ...hpr.map(([f, n]) => `| \`hangar-props/${f}.glb\`${have('hangar-props/' + f + '.glb')} | ${n} |`), '',
+    '## Lounge furniture and equipment (`lounge-props/`)', '',
+    'One file for each kind, used for every one of that kind in your lounges. Where the levels differ (Lounge, Business',
+    'lounge, Flagship lounge) each level has its own file: the carpets, armchairs, sofas and coffee tables. Metres, front',
+    'towards +Z (where you sit or stand to use it), standing on the floor; fitted to the size of the app\'s own.', '',
+    '| File | What |', '|---|---|',
+    ...lpr.map(([f, n]) => `| \`lounge-props/${f}.glb\`${have('lounge-props/' + f + '.glb')} | ${n} |`), '',
     '## The vending machine\'s parts (`items/vending-machine.glb`)', '',
     'Name these parts (nodes or meshes) in your file and the machine works with them; any part left out stays the app\'s own.',
     'Rows are A (top), B, C; columns 1 (left), 2, 3: nine products, as in the app.', '',
@@ -163,7 +176,7 @@ const humans = join(root, 'assets/humans.bin');
 copyFileSync(humans, join(root, 'www/humans.bin'));
 
 // Every airport and runway in the world (OurAirports, public domain; see tools/airports)
-for (const f of ['airports-world.json', 'runways-world.json', 'navaids-world.json']) copyFileSync(join(root, 'assets', f), join(root, 'www', f));
+for (const f of ['airports-world.json', 'heliports-world.json', 'runways-world.json', 'navaids-world.json']) copyFileSync(join(root, 'assets', f), join(root, 'www', f));
 // Published procedures for US airports (FAA CIFP, public domain; fetched by the build, see tools/navdata)
 const navSrc = join(root, 'assets/navdata/cifp');
 if (existsSync(navSrc)) {

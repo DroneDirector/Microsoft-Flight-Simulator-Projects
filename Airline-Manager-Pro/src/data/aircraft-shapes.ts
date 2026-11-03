@@ -281,11 +281,43 @@ const SHAPES: { [typeId: string]: ShapeSpec } = {
   },
 };
 
+/** A type from a close relative's shape: the fuselage lengthened or shortened at the real plugs (fwd metres ahead of
+ *  the wing, the rest behind it), with its own span, height, wing, engines and gear. */
+function shapeStretch(b: ShapeSpec, o: any): ShapeSpec {
+  const s: ShapeSpec = JSON.parse(JSON.stringify(b)), aft = o.L - b.L - o.fwd, wx = b.wing.x, wEnd = wx + b.wing.root;
+  const mv = (x: number) => x < wx - 0.5 ? x : x <= wEnd + 0.5 ? x + o.fwd : x + o.fwd + aft;
+  s.L = o.L; s.wing.x = wx + o.fwd + (o.wingX || 0); s.fin.x += o.fwd + aft; s.stab.x += o.fwd + aft;
+  s.eng = s.eng.map(e => Object.assign(e, { x: e.x + o.fwd + (o.wingX || 0) }));
+  s.gear.main += o.fwd + (o.wingX || 0); s.win.to += o.fwd + aft; s.doors = s.doors.map(mv);
+  if (o.span) { s.span = o.span; s.eng.forEach(e => { e.y = Math.max(e.y, b.eng[0].y * o.span / b.span * 0.95); }); }
+  if (o.H) s.H = o.H; if (o.tipDev) s.wing.tipDev = o.tipDev; if (o.sweep) s.wing.sweep = o.sweep;
+  if (o.root) s.wing.root = Math.max(b.wing.root * 0.9, o.root); if (o.tip) s.wing.tip = o.tip; if (o.stab) s.stab.span = o.stab;
+  if (o.engD) s.eng.forEach(e => { e.d = o.engD; e.z = Math.max(e.z, b.eng[0].z + (o.engD - b.eng[0].d) * 0.45); });
+  if (o.engL) s.eng.forEach(e => { e.l = o.engL * 1.12; });
+  if (o.track) s.gear.track = o.track; if (o.wheels) s.gear.wheels = o.wheels; if (o.ground) s.ground = o.ground;
+  return s;
+}
+SHAPES['a319neo'] = shapeStretch(SHAPES['a320neo'], {L: 33.84, fwd: -2.13, span: 35.8, H: 11.76, tipDev: 'sharklet', wheels: 2, track: 7.59, sweep: 27.0, root: 7.1979999999999995, tip: 1.5, stab: 12.45, engD: 2.38, engL: 4.0});
+SHAPES['a321ceo'] = shapeStretch(SHAPES['a320-fenix'], {L: 44.51, fwd: 4.27, span: 35.8, H: 11.76, tipDev: 'sharklet', wheels: 2, track: 7.59, sweep: 27.0, root: 7.1979999999999995, tip: 1.5, stab: 12.45, engD: 2.08, engL: 4.0});
+SHAPES['a321neo'] = shapeStretch(SHAPES['a320neo'], {L: 44.51, fwd: 4.27, span: 35.8, H: 11.76, tipDev: 'sharklet', wheels: 2, track: 7.59, sweep: 27.0, root: 7.1979999999999995, tip: 1.5, stab: 12.45, engD: 2.38, engL: 4.0});
+SHAPES['a321lr'] = shapeStretch(SHAPES['a320neo'], {L: 44.51, fwd: 4.27, span: 35.8, H: 11.76, tipDev: 'sharklet', wheels: 2, track: 7.59, sweep: 27.0, root: 7.1979999999999995, tip: 1.5, stab: 12.45, engD: 2.38, engL: 4.0});
+SHAPES['a321xlr'] = shapeStretch(SHAPES['a320neo'], {L: 44.51, fwd: 4.27, span: 35.8, H: 11.76, tipDev: 'sharklet', wheels: 2, track: 7.59, sweep: 27.0, root: 7.1979999999999995, tip: 1.5, stab: 12.45, engD: 2.38, engL: 4.0});
+SHAPES['a330-800neo'] = shapeStretch(SHAPES['a310-ini'], {L: 58.82, fwd: 6.6, span: 64.0, H: 17.39, tipDev: 'sharklet', wheels: 4, track: 10.69, sweep: 32.0, root: 12.508, tip: 2.0, stab: 19.4, engD: 3.41, engL: 5.6, wingX: 1.2});
+SHAPES['a330-900neo'] = shapeStretch(SHAPES['a310-ini'], {L: 63.66, fwd: 9.2, span: 64.0, H: 16.79, tipDev: 'sharklet', wheels: 4, track: 10.69, sweep: 32.0, root: 12.508, tip: 2.0, stab: 19.4, engD: 3.41, engL: 5.6, wingX: 1.2});
+SHAPES['b737-max7'] = shapeStretch(SHAPES['b738-pmdg'], {L: 35.56, fwd: -2.03, span: 35.92, H: 12.29, tipDev: 'blended', wheels: 2, track: 5.72, sweep: 27.0, root: 8.613999999999999, tip: 1.25, stab: 14.35, engD: 2.11, engL: 3.9});
+SHAPES['b737-max8'] = shapeStretch(SHAPES['b738-pmdg'], {L: 39.52, fwd: 0.0, span: 35.92, H: 12.29, tipDev: 'blended', wheels: 2, track: 5.72, sweep: 27.0, root: 8.613999999999999, tip: 1.25, stab: 14.35, engD: 2.11, engL: 3.9});
+SHAPES['b737-max9'] = shapeStretch(SHAPES['b738-pmdg'], {L: 42.11, fwd: 1.42, span: 35.92, H: 12.29, tipDev: 'blended', wheels: 2, track: 5.72, sweep: 27.0, root: 8.613999999999999, tip: 1.25, stab: 14.35, engD: 2.11, engL: 3.9});
+SHAPES['b737-max10'] = shapeStretch(SHAPES['b738-pmdg'], {L: 43.8, fwd: 2.3, span: 35.92, H: 12.5, tipDev: 'blended', wheels: 2, track: 5.72, sweep: 27.0, root: 8.613999999999999, tip: 1.25, stab: 14.35, engD: 2.11, engL: 3.9, ground: 1.4});
+SHAPES['b787-8'] = shapeStretch(SHAPES['b78x'], {L: 56.72, fwd: -6.1, span: 60.12, H: 16.92, tipDev: 'raked', wheels: 4, track: 9.8, sweep: 34.2, root: 13.569999999999999, tip: 1.8, stab: 19.8, engD: 3.38, engL: 5.5});
+SHAPES['b787-9'] = shapeStretch(SHAPES['b78x'], {L: 62.81, fwd: -3.0, span: 60.12, H: 17.02, tipDev: 'raked', wheels: 4, track: 9.8, sweep: 34.2, root: 13.569999999999999, tip: 1.8, stab: 19.8, engD: 3.38, engL: 5.5});
+SHAPES['b777-9'] = shapeStretch(SHAPES['b77w-pmdg'], {L: 76.73, fwd: 1.5, span: 71.76, H: 19.53, tipDev: 'raked', wheels: 6, track: 10.97, sweep: 34.0, root: 16.52, tip: 2.0, stab: 21.5, engD: 4.08, engL: 7.0});
+
 /** The shape for a type; aircraft from the simulator that the app doesn't list use the closest type of their class. */
 /** Metres from the middle of the fuselage forward to the nose wheel. On the ground an aircraft is placed by
  *  its nose wheel (on the taxiway line, on the stand's stop mark), as pilots steer it. */
 function noseWheelAhead(typeId: string): number { const S = shapeOf(typeId); return S && S.gear && S.gear.nose < S.L / 2 ? S.L / 2 - S.gear.nose : 0; }
 function shapeOf(typeId: string): ShapeSpec {
+  if (typeof isHeli === 'function' && isHeli(typeId)) return heliShape(typeId);
   if (SHAPES[typeId]) return SHAPES[typeId];
   const t = acType(typeId) || AIRCRAFT[0];
   const by: { [c: string]: string } = { widebody: 'b78x', airliner: 'a320neo', regional: 'crj9-aero', turboprop: 'atr72', bush: 'c208', ga: 'c172' };

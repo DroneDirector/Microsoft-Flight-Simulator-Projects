@@ -49,7 +49,9 @@ function newsDivision(c: Company, name: string) {
 
 /* ---------- aircraft ---------- */
 function newsDelivery(c: Company, typeId: string, regs: string[], firstEver: boolean, newType: boolean) {
-  const t = acType(typeId); if (!t || !(firstEver || newType)) return;
+  const t = acType(typeId); if (!t) return;
+  if (t.cls === 'helicopter') { newsHeliDelivery(c, t, regs, firstEver); return; }
+  if (!(firstEver || newType)) return;
   if (!newsOnce('dlv:' + c.id + ':' + typeId, 'dlv', 0)) return;
   newsPost(c, c.hub, { section: 'Aviation', art: newsPlaneArt(c, typeId, regs[0]),
     headline: firstEver ? `${c.name}'s first aircraft arrives` : `First ${t.model} arrives in ${newsCity(c.hub)}`,
@@ -57,6 +59,23 @@ function newsDelivery(c: Company, typeId: string, regs: string[], firstEver: boo
     body: [`The ${t.model} seats about ${t.seats} passengers and flies up to ${num(t.rangeNm)} nautical miles. ${firstEver ? 'It is the first aircraft in the airline\'s fleet.' : `It is the first of its type for ${c.name}.`}`,
       `Spotters lined the fence to see it arrive, and the airport's fire crews gave it a water-cannon welcome.`],
     quote: [`A new aircraft is always a big day for the whole team.`, `${newsSpokes(c)}, ${c.name}`] });
+}
+
+/** A helicopter joins the fleet: news when it is the airline's first helicopter ever, or its first from that maker. */
+function newsHeliDelivery(c: Company, t: AircraftType, regs: string[], firstEver: boolean) {
+  const others = fleetOf(c.id).filter(a => regs.indexOf(a.reg) < 0 && acType(a.typeId) && acType(a.typeId).cls === 'helicopter');
+  const firstHeli = !others.length, firstBrand = !others.some(a => acType(a.typeId).maker === t.maker);
+  if (!firstHeli && !firstBrand) return;
+  if (!newsOnce('heli:' + c.id + ':' + (firstHeli ? 'first' : t.maker), 'dlv', 0)) return;
+  const roles: string[] = (t as any).roles || [], job = roles.indexOf('hems') >= 0 ? 'air ambulance and medical flights' : roles.indexOf('offshore') >= 0 ? 'offshore crew changes' : roles.indexOf('sar') >= 0 ? 'search and rescue' : 'charter and sightseeing flights';
+  const where = newsCity(c.hub);
+  newsPost(c, c.hub, { section: 'Aviation', art: newsPlaneArt(c, t.id, regs[0]),
+    headline: firstHeli ? (firstEver ? `${c.name} starts out with a helicopter` : `${c.name} takes to the air with its first helicopter`) : `${c.name}'s first ${t.maker} helicopter arrives`,
+    standfirst: `${regs[0]}, a ${t.maker} ${t.model}, landed at ${where} in ${c.name} colours${regs.length > 1 ? `, with ${regs.length - 1} more to follow` : ''}.`,
+    body: [firstHeli ? `It is the first helicopter in the company's history, and it opens a new kind of work for it: ${job}, landing on hospital pads, helidecks and heliports as well as at airports.` : `The company already flies helicopters, but this is its first from ${t.maker}. It will be used for ${job}.`,
+      `The ${t.model} seats up to ${t.seats} and cruises at about ${t.cruiseKt} knots. Its pilots hold helicopter licences, and ${hoistHeli(t) ? 'fitted with a rescue hoist, it flies with a winch operator as a third crew member' : 'it flies with two pilots'}.`,
+      `A small crowd watched it hover over the apron before it set down.`],
+    quote: [firstHeli ? 'Helicopters take us places no runway reaches. It is a proud day for everyone here.' : `We have wanted the ${t.model} for a long time. It suits the work we do.`, `${newsSpokes(c)}, ${c.name}`] });
 }
 
 /* ---------- strikes ---------- */
@@ -78,12 +97,12 @@ function newsStrike(cid: string, g: PayGroup, why: string, stage: 'start' | 'end
 function newsCrash(o: { key: string; c: Company; typeId: string; reg: string; callsign?: string; from?: string; to: string; pax?: number; dead?: boolean; cause?: string }) {
   try { crashSiteAdd(o); } catch (e) { /* no crash site */ }
   if (!o.c || !newsOnce('crash:' + o.key, 'crash', 0)) return;
-  const t = acType(o.typeId), model = t ? t.model : 'aircraft', at = newsCity(o.to), fl = o.callsign ? `flight ${o.callsign}` : o.reg;
+  const t = acType(o.typeId), heli = !!t && t.cls === 'helicopter', model = t ? (heli ? `${t.model} helicopter` : t.model) : 'aircraft', at = newsCity(o.to), fl = o.callsign ? `flight ${o.callsign}` : o.reg;
   const onBoard = o.pax ? `On board were ${num(o.pax)} passengers and the crew.` : '';
   const art = newsPlaneArt(o.c, o.typeId, o.reg); art.crash = true;
   newsPost(o.c, o.to, { section: 'News', art,
     headline: o.dead ? `Deaths as ${o.c.name} ${model} crashes at ${at}` : `${o.c.name} ${model} crashes at ${at}: everyone survives`,
-    standfirst: `${o.c.name} ${fl}, a ${model} (${o.reg})${o.from ? ` from ${newsCity(o.from)}` : ''}, crashed on arrival at ${at}. ${o.dead ? 'There are fatalities.' : 'Everyone on board got out, some with injuries.'}`,
+    standfirst: `${o.c.name} ${fl}, a ${model} (${o.reg})${o.from ? ` from ${newsCity(o.from)}` : ''}, ${heli ? `came down as it approached ${at}` : `crashed on arrival at ${at}`}. ${o.dead ? 'There are fatalities.' : 'Everyone on board got out, some with injuries.'}`,
     body: [
       `${onBoard} Emergency services were at the scene within minutes${o.dead ? ', and hospitals in the area were put on alert' : ' and took the injured to hospital'}.`,
       o.cause ? `Investigators say: ${o.cause}` : `The accident investigation board has opened an inquiry. The flight recorders have been recovered and will be read out in the coming days.`,

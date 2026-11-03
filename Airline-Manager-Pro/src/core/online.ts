@@ -392,6 +392,7 @@ const AC_MATCH: { [id: string]: RegExp } = {
   'a320-fenix': /fenix.*a32|a32.*fenix/i, 'a350-ini': /inibuilds.*a350|a350.*inibuilds/i, 'a310-ini': /inibuilds.*a310|a310.*inibuilds/i,
   'b738-pmdg': /pmdg.*(738|737-800|b738)/i, 'b736-pmdg': /pmdg.*(736|737-600|b736)/i, 'b77w-pmdg': /pmdg.*(77w|777-300|777w)/i,
   'crj9-aero': /(aerosoft|crj).*(crj.?900|crj9)|crj.?900/i, 'crj7-aero': /(aerosoft|crj).*(crj.?700|crj7)|crj.?700/i, 'dhc6-aero': /(aerosoft.*twin.?otter|dhc.?6)/i, kodiak: /kodiak/i,
+  'a321lr': /inibuilds.*a321|a321.*inibuilds/i, 'b737-max8': /ifly.*(max|38m|7m8)|(max|38m).*ifly/i,
 };
 const InstalledAircraft = {
   list: [] as SimPackage[], at: 0, error: '',

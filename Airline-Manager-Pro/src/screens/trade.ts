@@ -21,23 +21,24 @@ function canTrade(): boolean {
 /** This week's used aircraft (the same list all week, less the ones you bought). */
 function usedList(): UsedAc[] {
   const S: any = State, wk = weekKey(new Date()), c = company();
-  if (S.usedMarket && S.usedMarket.wk === wk && S.usedMarket.cid === c.id) return S.usedMarket.items;
+  if (S.usedMarket && S.usedMarket.wk === wk && S.usedMarket.cid === c.id && S.usedMarket.v === 2) return S.usedMarket.items;
   const types = AIRCRAFT.filter(t => t.installed && (c.kind === 'bush' ? t.cls === 'bush' || t.cls === 'ga' || t.cls === 'turboprop' : t.cls !== 'bush' && t.cls !== 'ga'));
   const near = Object.keys(AIRPORTS).filter(k => k !== 'DEP' && (c.kind === 'bush' ? bushApt(k) : airlineApt(k)));
   const items: UsedAc[] = [];
-  for (let i = 0; i < 12 && types.length; i++) {
-    const h = hashMix(wk + c.id + i), t = types[h % types.length];
-    const perYear = ({ widebody: 4300, airliner: 3000, regional: 2600, turboprop: 2200, bush: 700, ga: 300 } as any)[t.cls] || 2500;
+  const helis = c.kind === 'bush' ? [] : AIRCRAFT.filter(t => t.cls === 'helicopter');   // two used helicopters every week as well
+  for (let i = 0; i < 14 && types.length; i++) {
+    const h = hashMix(wk + c.id + i), t = i >= 12 ? helis[h % Math.max(1, helis.length)] : types[h % types.length]; if (!t) continue;
+    const perYear = ({ widebody: 4300, airliner: 3000, regional: 2600, turboprop: 2200, bush: 700, ga: 300, helicopter: 650 } as any)[t.cls] || 2500;
     const ageY = 2 + (h >>> 5) % 20 + ((h >>> 9) % 10) / 10, hrs = Math.round(ageY * perYear * (0.8 + ((h >>> 3) % 40) / 100));
     const cond = 60 + (h >>> 11) % 36;
     const pseudo: any = { typeId: t.id, hoursMin: hrs * 60, condition: cond, ageY, delivered: '' };
     const value = aircraftValue(pseudo), price = Math.round(value * (0.95 + ((h >>> 15) % 14) / 100) / 10000) * 10000;
     const pre = FOREIGN_REGS[(h >>> 7) % FOREIGN_REGS.length], L = 'ABCDEFGHJKLMNPRSTUVWXYZ';
     const was = pre === 'N' ? 'N' + (100 + (h % 899)) + L[(h >>> 2) % L.length] + L[(h >>> 4) % L.length] : pre + L[(h >>> 2) % L.length] + L[(h >>> 4) % L.length] + L[(h >>> 6) % L.length];
-    items.push({ id: 'u' + wk + i, typeId: t.id, ageY: Math.round(ageY * 10) / 10, hoursMin: hrs * 60, cycles: Math.round(hrs / (t.cls === 'widebody' ? 6 : t.cls === 'bush' || t.cls === 'ga' ? 0.8 : 1.6)), condition: cond,
+    items.push({ id: 'u' + wk + i, typeId: t.id, ageY: Math.round(ageY * 10) / 10, hoursMin: hrs * 60, cycles: Math.round(hrs / (t.cls === 'widebody' ? 6 : t.cls === 'bush' || t.cls === 'ga' || t.cls === 'helicopter' ? 0.8 : 1.6)), condition: cond,
       location: near[(h >>> 13) % near.length], seller: USED_SELLERS[(h >>> 17) % USED_SELLERS.length], price, was: was.replace(/-$/, '') });
   }
-  S.usedMarket = { wk, cid: c.id, items };
+  S.usedMarket = { wk, cid: c.id, items, v: 2 };
   return items;
 }
 

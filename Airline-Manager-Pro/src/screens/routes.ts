@@ -61,7 +61,7 @@ function newRouteHtml(): string {
         ? `${bad.map(l => `${l.from} to ${l.to} is ${num(l.d)} nm`).join(', ')}: too far for the ${esc(t.model)} (${num(max)} nm with fuel reserves). Add a fuel stop or pick a longer-range aircraft.`
         : `${esc(t.model)}: up to ${num(max)} nm per leg with fuel reserves (range ${num(t.rangeNm)} nm).${crewMax > 2 ? ` The longest leg needs ${crewMax} pilots.` : ''}`}</span></div>` : ''}
       <h3>${_nr.test ? 'Airport' : 'Add a stop'}</h3>
-      <label class="apt-search">${icon('pin')}<input id="nr-q" type="search" placeholder="Search ${World.ready ? num(World.list.length + Object.keys(AIRPORTS).length) : ''} airports by ICAO, IATA, name or city" value="${esc(_nr.q)}" autocomplete="off"></label>
+      <label class="apt-search">${icon('pin')}<input id="nr-q" type="search" placeholder="Search ${World.ready ? num(World.list.length + Object.keys(AIRPORTS).length + (_nr.typeId && acType(_nr.typeId).cls === 'helicopter' ? World.helis.length : 0)) : ''} ${_nr.typeId && acType(_nr.typeId).cls === 'helicopter' ? 'airports and helipads' : 'airports'} by ICAO, IATA, name or city" value="${esc(_nr.q)}" autocomplete="off"></label>
       <div class="apt-grid" id="nr-grid">${nrGridHtml()}</div>
       <h3>Aircraft</h3>
       <div class="seg wrap">${fleetTypes.map(id => `<button class="${_nr.typeId === id ? 'on' : ''}" data-act="nr-type" data-t="${id}">${esc(acType(id).model)} <small>${num(usableRange(acType(id)))} nm</small></button>`).join('')}</div>
@@ -79,13 +79,15 @@ function rerenderNr() { const p = $('.nr-pop .panel'); if (p) patchHtml(p, newRo
 function nrGridHtml(): string {
   const c = company(), last = _nr.stops[_nr.stops.length - 1], t = _nr.typeId ? acType(_nr.typeId) : null, max = t ? usableRange(t) : 99999;
   const L = apt(last);
-  let list: Airport[] = _nr.q.trim() ? World.search(_nr.q, 36, a => _nr.test || a.icao !== last)
-    : Object.keys(AIRPORTS).map(k => AIRPORTS[k]).filter(a => a.icao !== 'DEP' && (_nr.test || a.icao !== last) && (c.kind === 'bush' ? bushApt(a.icao) : airlineApt(a.icao)));
+  const heli = !!t && t.cls === 'helicopter';
+  let list: Airport[] = _nr.q.trim() ? World.search(_nr.q, 36, a => _nr.test || a.icao !== last, heli)
+    : Object.keys(AIRPORTS).map(k => AIRPORTS[k]).filter(a => a.icao !== 'DEP' && (_nr.test || a.icao !== last) && (heli || !isHelipad(a.icao)) && (c.kind === 'bush' ? bushApt(a.icao) : airlineApt(a.icao)));
+  if (heli && !_nr.q.trim() && L) list = list.concat(World.helisNear(L.pos, 60).filter(a => a.icao !== last).slice(0, 30));   // hospitals, helidecks and heliports nearby
   if (!_nr.q.trim() && L) list = list.slice().sort((a, b) => gcDistanceNm(L.pos, a.pos) - gcDistanceNm(L.pos, b.pos));
   if (!_nr.q.trim()) list = list.slice(0, 60);   // the nearest ones; the search finds the rest
   return list.map(a => {
     const d = L ? gcDistanceNm(L.pos, a.pos) : 0, far = !!t && d > max && !_nr.test;
-    return `<button class="apt-btn ${far ? 'far' : ''}" data-act="nr-add" data-icao="${esc(a.icao)}" ${far ? 'disabled' : ''}><b>${esc(a.icao)}</b><small>${esc(a.name !== a.icao ? a.name : a.city)}${a.country ? ', ' + esc(a.country) : ''}</small><small class="d">${_nr.test ? '' : num(d) + ' nm' + (far ? ', too far' : '')}</small></button>`;
+    return `<button class="apt-btn ${far ? 'far' : ''}" data-act="nr-add" data-icao="${esc(a.icao)}" ${far ? 'disabled' : ''}><b>${esc(a.icao)}${isHelipad(a.icao) ? ` <em class="hp-chip">${helipadKind(a.icao)}</em>` : ''}</b><small>${esc(a.name !== a.icao ? a.name : a.city)}${a.country ? ', ' + esc(a.country) : ''}</small><small class="d">${_nr.test ? '' : num(d) + ' nm' + (far ? ', too far' : '')}</small></button>`;
   }).join('') || `<p class="fine-print">No airport matches "${esc(_nr.q)}".</p>`;
 }
 document.addEventListener('input', e => {

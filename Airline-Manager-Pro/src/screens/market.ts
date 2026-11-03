@@ -1,4 +1,5 @@
-// Aircraft market: buy or lease one or several aircraft of any type the simulator has installed.
+// Aircraft market: buy or lease one or several aircraft of any type. Types not in your simulator are flown by your
+// hired pilots (you fly only what you have installed).
 let _mkMaker = 'All';
 let _mkMode: 'buy' | 'lease' | 'used' = 'buy';
 let _mkInstalled = true;
@@ -28,7 +29,7 @@ SCREENS.market = {
           <div class="mk-foot">
             ${_mkMode === 'lease' ? `<b class="mk-price"><small>from </small>${money(leaseMonthly(t.price, 6), { compact: true })}<small> /month</small></b>` : `<b class="mk-price">${money(t.price, { compact: true })}</b>`}
             ${owned ? `<small class="owned">You have ${owned}</small>` : ''}
-            ${t.installed ? (_mkMode === 'lease' ? `<button class="btn primary" data-act="lease" data-id="${t.id}">Lease</button>` : `<button class="btn primary" data-act="buy" data-id="${t.id}">Buy</button>`) : `<small class="muted">Not installed in your sim</small>`}
+            ${t.installed ? '' : `<small class="muted" title="You can't fly it yourself until it is in your simulator; your hired pilots fly it">Not in your sim: your pilots fly it</small>`}${_mkMode === 'lease' ? `<button class="btn primary" data-act="lease" data-id="${t.id}">Lease</button>` : `<button class="btn primary" data-act="buy" data-id="${t.id}">Buy</button>`}
           </div>
         </div>
       </div>`;

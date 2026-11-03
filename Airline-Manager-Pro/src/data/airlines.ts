@@ -8,10 +8,10 @@ interface RealAirline { name: string; icao: string; iata: string; callsign: stri
 const REAL_AIRLINES: RealAirline[] = ([
   // Nordic and North Atlantic
   ['Atlantic Airways', 'FLI', 'RC', 'FAROELINE', 'Faroe Islands', 'EKVG', '#1F4E9C', 'major', 'Nordic and North Atlantic', 'a320neo,a320-fenix', 'The Faroe Islands\' own airline, flying from Vágar to Scandinavia, Iceland and the UK.'],
-  ['Icelandair', 'ICE', 'FI', 'ICEAIR', 'Iceland', 'BIKF', '#1B3B6F', 'major', 'Nordic and North Atlantic', 'b738-pmdg,a320neo,b78x', 'Transatlantic hub at Keflavík between Europe and North America.'],
-  ['PLAY', 'FPY', 'OG', 'PLAY', 'Iceland', 'BIKF', '#E3002B', 'major', 'Nordic and North Atlantic', 'a320neo', 'Low-cost flights over the North Atlantic through Keflavík.'],
+  ['Icelandair', 'ICE', 'FI', 'ICEAIR', 'Iceland', 'BIKF', '#1B3B6F', 'major', 'Nordic and North Atlantic', 'b737-max8,b737-max9,a321lr,b738-pmdg,b78x', 'Transatlantic hub at Keflavík between Europe and North America.'],
+  ['PLAY', 'FPY', 'OG', 'PLAY', 'Iceland', 'BIKF', '#E3002B', 'major', 'Nordic and North Atlantic', 'a320neo,a321neo', 'Low-cost flights over the North Atlantic through Keflavík.'],
   ['Air Greenland', 'GRL', 'GL', 'GREENLAND', 'Greenland', 'BGSF', '#C8102E', 'regional', 'Nordic and North Atlantic', 'dhc6-aero,atr72', 'Short runways, ice and long distances across Greenland.'],
-  ['SAS Scandinavian Airlines', 'SAS', 'SK', 'SCANDINAVIAN', 'Denmark', 'EKCH', '#00205B', 'major', 'Nordic and North Atlantic', 'a320neo,a350-ini,crj9-aero,atr72', 'Scandinavia\'s network airline, with hubs in Copenhagen, Oslo and Stockholm.'],
+  ['SAS Scandinavian Airlines', 'SAS', 'SK', 'SCANDINAVIAN', 'Denmark', 'EKCH', '#00205B', 'major', 'Nordic and North Atlantic', 'a320neo,a321lr,a350-ini,crj9-aero,atr72', 'Scandinavia\'s network airline, with hubs in Copenhagen, Oslo and Stockholm.'],
   ['Norwegian', 'NOZ', 'DY', 'NOR SHUTTLE', 'Norway', 'ENGM', '#D81939', 'major', 'Nordic and North Atlantic', 'b738-pmdg', 'All-737 low-cost airline across Norway and Europe.'],
   ['Widerøe', 'WIF', 'WF', 'WIDEROE', 'Norway', 'ENBO', '#2D8C3C', 'regional', 'Nordic and North Atlantic', 'atr72,dhc6-aero', 'Short-field turboprops up and down the Norwegian coast.'],
   ['Finnair', 'FIN', 'AY', 'FINNAIR', 'Finland', 'EFHK', '#0B1560', 'major', 'Nordic and North Atlantic', 'a320neo,a350-ini,atr72', 'Helsinki hub between Europe and Asia.'],

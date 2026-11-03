@@ -395,6 +395,7 @@ function cabinPeopleOn(): boolean { return (State.settings as any).v3dCabinPax !
 function cabinBlocks(abreast: number): number[] { return abreast >= 10 ? [3, 4, 3] : abreast === 9 ? [3, 3, 3] : abreast === 8 ? [2, 4, 2] : abreast === 7 ? [2, 3, 2] : abreast === 6 ? [3, 3] : abreast === 5 ? [2, 3] : abreast === 4 ? [2, 2] : abreast === 3 ? [1, 2] : [1, 1]; }
 
 function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
+  if (typeof isHeli === 'function' && isHeli(P.type)) return heliCabinBuild(P.type);
   const T = THREE, g = new T.Group(), st = cabinStyle(s), t: any = acType(P.type) || {};
   const abreast = (t.seats || 150) > 250 ? 9 : (t.seats || 150) > 100 ? 6 : (t.seats || 150) > 40 ? 4 : (t.seats || 150) > 12 ? 3 : 2, blocks = cabinBlocks(abreast), letters = 'ABCDEFGHJK'.slice(0, abreast);
   const zc = s.ground + s.h / 2, ri = Math.min(s.w, s.h) / 2 - 0.12, zf = zc - ri * 0.55, x0 = Math.max(s.nose * 0.7, s.win.from - 0.6), x1 = s.win.to + 0.4, len = x1 - x0;
@@ -923,4 +924,59 @@ function cabinRowLabels(rowX: { [r: number]: number }, blocks: number[], letters
   const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
   const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, side: T.DoubleSide, fog: false })); m.material.userData.noDim = true;
   return m;
+}
+
+/* ---------- a helicopter's cabin ---------- */
+// Built to each type's own cabin (length, width and height from docs/reference/helicopters.txt): the cockpit with
+// its two seats and instrument panel under the big windscreen, then the cabin's seats in rows (or a stretcher and
+// the medical crew's seats in an air ambulance), big side windows and the sliding doors. Model axes: x aft from
+// the nose, y up, z sideways.
+function heliCabinBuild(typeId: string): any {
+  const T = THREE, h: any = HELI_SPECS[typeId], t: any = acType(typeId) || {}, g = new T.Group();
+  const gearH = h.gear === 'skids' ? 0.45 : 0.6, fusH = h.cabinH + 0.55, cy = gearH + fusH / 2, fy = cy - fusH / 2 + 0.24, top = fy + h.cabinH + 0.12;
+  const x0 = 0.35, x1 = 1.3 + h.cabinL, len = x1 - x0, W = h.cabinW, hw = W / 2;
+  const m = (c: number, o?: any) => cabinMat(c, Object.assign({ side: T.DoubleSide }, o || {}));
+  const mWall = m(0xD9DCDF), mTrim = m(0x5B636D), mFloor = m(0x3C424B, { map: cabinCarpetTex() }), mSeat = m(roles(t).indexOf('vip') >= 0 && t.seats <= 8 ? 0x6B4A32 : 0x2E3A4C), mPanel = m(0x1E2227), mScreen = new T.MeshBasicMaterial({ color: 0x2D7DB8 });
+  mScreen.userData.noDim = true;
+  const box = (w: number, hh: number, d: number, mat: any, x: number, y: number, z: number) => { const o = new T.Mesh(new T.BoxGeometry(w, hh, d), mat); o.position.set(x, y, z); g.add(o); return o; };
+  // floor, ceiling and the walls below and above the windows (the windows themselves are open to the view)
+  box(len, 0.04, W, mFloor, x0 + len / 2, fy - 0.02, 0);
+  box(len, 0.04, W, m(0xEDEFF1), x0 + len / 2, top, 0);
+  for (const sd of [-1, 1]) {
+    box(len, 0.42, 0.04, mWall, x0 + len / 2, fy + 0.21, sd * hw);                      // below the windows
+    box(len, 0.22, 0.04, mWall, x0 + len / 2, top - 0.11, sd * hw);                     // above them
+    for (let x = 1.3; x < x1; x += Math.max(0.9, h.cabinL / 3)) box(0.07, top - fy - 0.6, 0.05, mTrim, x, fy + 0.42 + (top - fy - 0.64) / 2, sd * hw);   // window frames
+  }
+  box(0.04, top - fy, W, mWall, x1, fy + (top - fy) / 2, 0);                            // the back wall (baggage bay behind)
+  // the cockpit: instrument panel with its screens, the centre console, two pilots' seats
+  box(0.32, 0.36, W * 0.9, mPanel, 0.62, fy + 0.62, 0);
+  for (const k of [-0.32, -0.11, 0.11, 0.32]) box(0.02, 0.16, 0.17, mScreen, 0.79, fy + 0.66, k * W);
+  box(0.6, 0.3, 0.22, mPanel, 0.95, fy + 0.3, 0);
+  const seat = (x: number, z: number, face: number, mat?: any) => {
+    const sm = mat || mSeat; box(0.46, 0.08, 0.44, sm, x, fy + 0.42, z); box(0.08, 0.62, 0.44, sm, x + face * 0.22, fy + 0.72, z);
+    box(0.08, 0.36, 0.06, mTrim, x, fy + 0.2, z - 0.18); box(0.08, 0.36, 0.06, mTrim, x, fy + 0.2, z + 0.18);
+  };
+  seat(1.25, -hw * 0.5, 1, m(0x22262C)); seat(1.25, hw * 0.5, 1, m(0x22262C));
+  // the cabin: an air ambulance has a stretcher and the medical crew's seats; others their passenger rows
+  const pax = Math.max(1, t.seats || 4), from = 1.95, room = Math.max(0.6, x1 - 0.8 - from);   // the last half metre stays clear: you sit there
+  if (roles(t).indexOf('hems') >= 0 && roles(t).indexOf('offshore') < 0) {
+    box(Math.min(2.0, room), 0.1, 0.56, m(0xEEF2F5), from + Math.min(2.0, room) / 2, fy + 0.62, -hw + 0.36);       // the stretcher
+    box(Math.min(1.9, room - 0.1), 0.05, 0.5, m(0x3E7CC4), from + Math.min(2.0, room) / 2, fy + 0.69, -hw + 0.36);  // its blanket
+    box(0.4, 0.3, 0.3, m(0xF2C230), from + 0.3, fy + 0.85, hw - 0.25);                                               // the medical bag
+    seat(from + room * 0.75, hw - 0.3, 1);
+  } else {
+    const ab = W >= 2.0 ? 4 : W >= 1.7 ? 3 : 2, rows = Math.max(1, Math.min(Math.ceil(pax / ab), Math.floor(room / 0.78) + 1));
+    for (let r = 0; r < rows; r++) for (let k = 0; k < ab; k++) {
+      const z = -hw + 0.3 + k * (W - 0.6) / Math.max(1, ab - 1), x = from + 0.25 + r * Math.min(0.8, room / Math.max(1, rows));
+      if (r * ab + k < pax - 1) seat(Math.min(x, x1 - 0.8), z, 1);
+    }
+  }
+  if (h.hoist) box(0.5, 0.04, 0.3, m(0xF2C230), 1.3 + h.cabinL * 0.3, top - 0.04, -hw + 0.2);   // the hoist's mount above the right-hand door
+  // a soft cabin light
+  const lamp = box(len * 0.6, 0.015, 0.12, new T.MeshBasicMaterial({ color: 0xFFF3DD }), x0 + len / 2 + 0.3, top - 0.03, 0); lamp.material.userData.noDim = true;
+  g.traverse((o: any) => { o.renderOrder = 40; o.frustumCulled = false; });
+  g.userData.eye = [x1 - 0.12, hw * 0.35, fy + 0.95]; g.userData.look = [0.2, 0, fy + 0.6];   // aircraft axes: from the back of the cabin forward
+  g.userData.heli = true;
+  return g;
+  function roles(tt: any): string[] { return tt.roles || []; }
 }
