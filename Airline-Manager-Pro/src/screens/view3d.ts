@@ -753,6 +753,7 @@ function v3dLoop(now: number) {
     if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI, amphib: PA.amph } as any);
     try { v3dEmergencyStep(P, g, fireI, feI, now, ground, w); } catch (e) { /* no effects */ }
     try { v3dContrailStep(P, g, w, now); } catch (e) { /* no trail */ }
+    try { v3dGroundStep(P, g, w, now); } catch (e) { /* no vehicles */ }
     // the air blown forward out of the open reversers kicks up spray and dust from the runway
     if (PR.rev > 0.6 && now - (PR.revAt || 0) > 90) {
       PR.revAt = now; const body = P.model.userData.body; body.updateMatrixWorld();

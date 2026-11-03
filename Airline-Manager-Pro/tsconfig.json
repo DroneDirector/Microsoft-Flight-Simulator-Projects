@@ -166,6 +166,7 @@
     "src/screens/v3d-terrain.ts",
     "src/screens/v3d-contrails.ts",
     "src/screens/v3d-wet.ts",
+    "src/screens/v3d-ground.ts",
     "src/screens/view3d.ts",
     "src/ui/gamepad.ts",
     "src/ui/exit-splash.ts",
