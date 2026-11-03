@@ -1,4 +1,4 @@
-// Pictures of the 3D view's ground at every terrain detail setting, for comparing them side by side (cliffs shaded as rock).
+// Pictures of the 3D view's ground at the terrain detail settings, for comparing them side by side.
 // Run with the app served at http://localhost:47610/ (as the PC app, so Ultra is offered):
 //   node tools/shots/terrain-shots.js <output folder>
 // Two places on the Faroe Islands (steep mountains straight out of the sea): over the sea west of Vágar looking
@@ -6,11 +6,9 @@
 const { chromium } = require('playwright');
 const out = process.argv[2] || '.';
 const CONFIGS = [
-  ['before', 'Before (0.9.112)', { v3dTerrainQ: 1, v3dTerrainSmooth: false }],
-  ['low', 'Low', { v3dTerrainQ: 0 }],
+  ['before', 'Medium, no smoothing', { v3dTerrainQ: 1, v3dTerrainSmooth: false }],
   ['medium', 'Medium', { v3dTerrainQ: 1 }],
   ['high', 'High', { v3dTerrainQ: 2 }],
-  ['veryhigh', 'Very high', { v3dTerrainQ: 3 }],
   ['ultra', 'Ultra (PC)', { v3dTerrainQ: 4 }],
 ];
 const VIEWS = [
@@ -31,7 +29,7 @@ const VIEWS = [
   await p.waitForTimeout(3000);
   await p.evaluate(() => { const x = document.querySelector('[data-act="fs-demo"]'); if (x) x.click(); });
   await p.waitForTimeout(2000);
-  for (const sat of [false, true]) {
+  for (const sat of [false]) {
     for (const [key, label, cfg] of CONFIGS) {
       await p.evaluate(([cfg, sat]) => {
         try { closeAll(); } catch (e) {}

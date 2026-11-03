@@ -236,7 +236,11 @@ const V3dTerrain = {
       const px = i / G * size, py = j / G * size, lon = lonOf(px), lat = latOf(py);
       const s = sample(px, py);
       let h = Math.max(0, s.h), wl = -1;
-      if (s.wet) { h = 0; wl = 0; }                                  // the sea: perfectly flat, at sea level
+      // the sea: perfectly flat, at sea level; but a point of the sea next to the land (the coast runs between the
+      // ground's points) takes a height between the two, so the coastline doesn't zig-zag along the grid
+      const cs = size / G, coastLand = s.wet ? [[cs, 0], [-cs, 0], [0, cs], [0, -cs]].map(d => sample(px + d[0], py + d[1])).filter(q => !q.wet && q.lake == null) : [];
+      if (s.wet && coastLand.length) { h = Math.max(0, Math.min(...coastLand.map(q => q.h))) * 0.45; }
+      else if (s.wet) { h = 0; wl = 0; }
       else if (s.lake != null) { h = Math.max(0, s.lake); wl = h; }  // a lake: flat at its own level
       if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
       const p = v3dXY(lon, lat), o = j * (G + 1) + i;
@@ -253,7 +257,7 @@ const V3dTerrain = {
     const inside = (lon: number, lat: number, shrink: number) => { const B = innerBox; if (!B) return false; const px = (B[1] - B[0]) * shrink, py = (B[3] - B[2]) * shrink; return lon > B[0] + px && lon < B[1] - px && lat > B[2] + py && lat < B[3] - py; };
     if (innerBox) for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
       if (!inside(lonOf(i / G * size), latOf(j / G * size), 0)) continue;
-      const o = j * (G + 1) + i; pos[o * 3 + 1] -= 40;
+      const o = j * (G + 1) + i; pos[o * 3 + 1] -= 3;
     }
     for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
       if (r.inner && inside(lonOf((i + 0.5) / G * size), latOf((j + 0.5) / G * size), 0.04)) continue;
