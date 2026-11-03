@@ -28,6 +28,14 @@ const HANGAR_FILES: [string, string][] = [
   ['hangar-large', 'Large hangar: 82 × 94 m, 25 m high, doors 21.5 m (767, 787, A330, A350, 777)'],
   ['hangar-very-large', 'Very large hangar: 96 × 100 m, 30 m high, doors 26.5 m (747, 777-9, A380)'],
 ];
+/** Equipment and furniture in the hangar and its rooms, one file each (used for every one of that kind). Front towards +Z. */
+const HANGAR_PROP_FILES: [string, string][] = [
+  ['tool-trolley', 'Red rolling tool chest (tools on top)'], ['work-stand', 'Yellow work platform with steps (at the engine)'], ['traffic-cone', 'Traffic cone on its base'],
+  ['workbench', 'Workbench with pegboard and vice (along the back wall)'], ['fire-extinguisher', 'Fire extinguisher on its stand'], ['waste-bin', 'Waste bin (hangar, office, break room)'],
+  ['office-desk', 'Work table in the maintenance office (the monitor, keyboard and mouse stand on it)'], ['office-chair', 'Office chair'], ['keyboard', 'Computer keyboard'], ['computer-mouse', 'Computer mouse'], ['bookshelf', 'Shelf of manuals'],
+  ['kitchen-counter', 'Break room counter with cupboards'], ['sink', 'Sink and tap'], ['coffee-machine', 'Coffee machine'], ['coffee-mug', 'Coffee mug'], ['drinking-glass', 'Drinking glass'],
+  ['break-room-table', 'Break room table'], ['break-room-chair', 'Break room chair'],
+];
 /** The hangar's vending machine and what it sells (no real brands). Cans and bars stand upright: the top towards +Y. */
 const ITEM_FILES: [string, string][] = [
   ['vending-machine', 'Vending machine (the hangar break room)'],

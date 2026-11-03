@@ -479,12 +479,12 @@ function ofLeave() {
   ofExitToMain(msg);
 }
 /** Out of the office: the office's loading screen while the room is cleared from memory and the app comes back. */
-function ofExitToMain(msg?: string) {
+function ofExitToMain(msg?: string, to?: string) {
   if (!OfficeRoom.on) return;
   exitSplash('office', 'Your office', [
     { pct: 30, step: 'Closing the office…', run: () => OfficeRoom.close(true) },
     { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
-    { pct: 85, step: 'Loading your airline…', run: () => refresh() },
+    { pct: 85, step: to === 'hangars' ? 'Loading your hangars…' : 'Loading your airline…', run: () => { if (to) { try { closeAll(); go(to); } catch (e) { refresh(); } } else refresh(); } },
   ], () => { if (msg) toast(msg, 'info'); });
 }
 
@@ -762,7 +762,7 @@ function ofVisitUi(afterInterview?: boolean) {
   if (!afterInterview) { box.hidden = true; ofTopState(); }
   sp.hidden = false;
   const nRep = ofOpenReports().length;
-  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['laptop', 'My laptop'], ['planner', 'Flight planner'], ['schedule', 'Schedule'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
+  sp.innerHTML = (nRep ? [['reports', `Conduct reports (${nRep})`]] : []).concat([['laptop', 'My laptop'], ['planner', 'Flight planner'], ['schedule', 'Schedule'], ['sit', 'Sit in my chair'], ['paint', 'The paintings'], ['window', 'The window'], ['map', 'The route map'], ['photo', 'The family photo'], ['hangars', 'The hangars'], ['free', 'Free mode']]).map(x => `<button data-of="spot" data-k="${x[0]}" class="${(x[0] === 'free' && !R.seat) || (x[0] === 'sit' && R.seat && R.view !== 'photo') ? 'on' : ''}">${x[1]}</button>`).join('');
   pad.hidden = R.seat;
   if (!R.seat) { hint.hidden = false; hint.classList.remove('fade'); hint.textContent = DESKTOP ? 'W A S D to walk · the mouse looks around, all the way round · click what glows · H hides the controls · Esc for the menu' : 'Stick to walk · drag to look · tap your chair to sit · tap the door to leave'; setTimeout(() => hint.classList.add('fade'), 6000); }
   else hint.hidden = true;
@@ -1367,7 +1367,7 @@ function ofClick(b: HTMLElement) {
   else if (k === 'ask') { Voice.stop(); ofAsk(b.getAttribute('data-k')); }
   else if (k === 'dec') ofDecide(b.getAttribute('data-k'));
   else if (k === 'end') ofEnd();
-  else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else ofSpot(s); }
+  else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else if (s === 'hangars') { Sound.tick(); ofExitToMain('', 'hangars'); } else ofSpot(s); }
   else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
   else if (k === 'back') { Sound.tick(); ofVisitUi(); }
   else if (k === 'boxclose') ofBoxClose();

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.116 (2026-11-03)
+
+- Hangars page (SCREENS.hangars) from the Overview places card and the office; hgHangars per base and size, in-work aircraft only (hgInWork), hgCrewFor keeps mechIds on scheduled jobs
+- Empty hangars (no aircraft, no mechanics); entry splash at least 5 s; exit back to the Hangars page
+- HANGAR_PROP_FILES (hangar-props/*.glb) through hgPropSwap; surfaces raycast on all layers; hangar tug from GV_BUILD
+- Held items: drinking and biting positions in view
+
 ## 0.9.115 (2026-11-03)
 
 - hangar3d.ts: walkable hangar per aircraft size (HG_SIZES), sun/sky from astroSun at the base, sliding door leaves (hgDoors), mechanics (Human.build, humanTalk), ops monitor (opsMonitorDraw(A)), vending machine, held items (phoneGrip), placed items per size (State.hangarItems, 48 h)

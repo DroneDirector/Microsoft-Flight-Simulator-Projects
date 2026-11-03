@@ -42,26 +42,79 @@ function hgShellFile(sz: HgSize): string {
 }
 function hgSizeK(k: string): HgSize { return HG_SIZES.filter(s => s.k === k)[0] || HG_SIZES[1]; }
 
-/** Your hangars: one of each size your fleet needs at each base, with the aircraft that use it. */
-function hgHangars(): { base: string; sz: HgSize; regs: string[] }[] {
-  const co: any = company(), out: { base: string; sz: HgSize; regs: string[] }[] = [];
-  for (const a of fleetOf()) {
-    const base = (a as any).base || co.hub, sz = hgSizeFor(a.typeId);
-    let h = out.filter(x => x.base === base && x.sz.k === sz.k)[0]; if (!h) out.push(h = { base, sz, regs: [] });
-    h.regs.push(a.reg);
-  }
-  return out.sort((a, b) => a.base === b.base ? HG_SIZES.indexOf(b.sz) - HG_SIZES.indexOf(a.sz) : a.base < b.base ? -1 : 1);
+/** Is this aircraft in a hangar now? Only while its repairs are being done (booked and paid, on the ground). */
+function hgInWork(a: any): boolean {
+  if (!a || a.status === 'flying') return false;
+  return a.status === 'maintenance' || ((State.issues || []) as any[]).some(i => i.reg === a.reg && i.status === 'scheduled');
 }
+/** Where an aircraft in for work is: the airport it stands at. */
+function hgWhere(a: any): string { return a.location || a.base || company().hub; }
+/** The mechanics working on an aircraft: chosen when its work starts (the ones based where it is, each on one aircraft
+ *  at a time, as many as its size needs), and kept on its jobs until they are done. */
+function hgCrewFor(reg: string): any[] {
+  const a: any = plane(reg); if (!a || !hgInWork(a)) return [];
+  const jobs = ((State.issues || []) as any[]).filter(i => i.reg === reg && i.status === 'scheduled');
+  const alive = (id: string) => { const p: any = (State as any).staff.filter((x: any) => x.id === id)[0]; return p && !p.left ? p : null; };
+  const kept = jobs.length && Array.isArray(jobs[0].mechIds) ? jobs[0].mechIds.map(alive).filter(Boolean) : [];
+  if (kept.length) return kept;
+  const where = hgWhere(a), busy: any = {};
+  for (const i of (State.issues || []) as any[]) if (i.status === 'scheduled' && i.reg !== reg && Array.isArray(i.mechIds)) for (const id of i.mechIds) busy[id] = 1;
+  const free = (staffOf(a.companyId, 'mech') as any[]).filter(p => !p.left && p.base === where && !busy[p.id]).sort((x, y) => (y.rating || 0) - (x.rating || 0));
+  const want = Math.max(1, Math.min(3, Math.ceil((MECH_RATIO as any)[acType(a.typeId).cls] || 1)));
+  const crew = free.slice(0, want);
+  if (jobs.length && crew.length) { for (const j of jobs) j.mechIds = crew.map(p => p.id); try { Store.soon(); } catch (e) { /* saved later */ } }
+  return crew;
+}
+interface HgHangar { base: string; sz: HgSize; n: number; reg: string }
+/** Your hangars, base by base: one of every size always ready to walk into; an aircraft in for work stands in a
+ *  hangar of its size, one aircraft to a hangar, and when more of a size are in, there are more of that size. */
+function hgHangars(): HgHangar[] {
+  const co: any = company(), out: HgHangar[] = [];
+  const inWork = fleetOf().filter(hgInWork) as any[];
+  const bases: string[] = []; const addB = (b: string) => { if (b && bases.indexOf(b) < 0) bases.push(b); };
+  try { for (const b of companyBases(co.id)) addB(b); } catch (e) { addB(co.hub); }
+  for (const a of inWork) addB(hgWhere(a));
+  for (const b of bases) for (const sz of HG_SIZES) {
+    const here = inWork.filter(a => hgWhere(a) === b && hgSizeFor(a.typeId).k === sz.k).sort((x, y) => x.reg < y.reg ? -1 : 1);
+    if (!here.length) out.push({ base: b, sz, n: 1, reg: '' });
+    else here.forEach((a, k) => out.push({ base: b, sz, n: k + 1, reg: a.reg }));
+  }
+  return out;
+}
+function hgName(h: { sz: HgSize; n: number }, many: boolean): string { return `${h.sz.name}${many ? ' ' + h.n : ''}`; }
 function hgFixList(reg: string): any[] { return ((State.issues || []) as any[]).filter(i => i.reg === reg && (i.status === 'open' || i.status === 'scheduled')); }
-/** The list in Maintenance: which hangar to visit, the aircraft in it and what needs fixing. */
+function hgLeftMin(reg: string): number { const s: any = ((State.issues || []) as any[]).filter(i => i.reg === reg && i.status === 'scheduled' && i.startedAt && i.durMin)[0]; return s ? Math.max(1, Math.round((s.startedAt + s.durMin * 60000 - Date.now()) / 60000)) : 0; }
+/** The list in Maintenance: every base's hangars, which aircraft is in each, what is being fixed and by whom. */
 function hgListHtml(): string {
   const H = hgHangars();
-  if (!H.length) return `<p class="muted hg-none">${icon('info')}Your hangars open when you have an aircraft.</p>`;
-  return `<div class="hg-list">${H.map(h => `<div class="card hg-card"><div class="hg-card-h">${icon('wrench')}<span><b>${esc(h.sz.name)} at ${esc(h.base)}</b><small>${h.sz.W} × ${h.sz.D} m inside, doors ${h.sz.door} m high</small></span></div>
-    ${h.regs.map(reg => { const a = plane(reg), t = acType(a.typeId), fx = hgFixList(reg);
-      return `<div class="hg-ac"><span><b>${esc(reg)}</b><small>${esc(t.model)} · ${Math.round(a.condition)}%${a.status === 'maintenance' ? ' · in for work' : ''}</small><em class="${fx.length ? 'bad' : 'ok'}">${fx.length ? `${fx.length} to fix: ${esc(fx.map(i => i.title).slice(0, 3).join(', '))}${fx.length > 3 ? '…' : ''}` : 'Nothing to fix'}</em></span>
-        <button class="btn sm primary" data-act="hangar-visit" data-reg="${esc(reg)}">${icon('wrench')}Walk in</button></div>`; }).join('')}</div>`).join('')}</div>`;
+  if (!H.length) return `<p class="muted hg-none">${icon('info')}Your hangars open when you have a base.</p>`;
+  const bases = H.map(h => h.base).filter((b, i, l) => l.indexOf(b) === i);
+  return `<div class="hg-list">${bases.map(b => { const hs = H.filter(h => h.base === b), busy = hs.filter(h => h.reg).length;
+    return `<div class="card hg-card"><div class="hg-card-h">${icon('wrench')}<span><b>Hangars at ${esc(b)}</b><small>${busy ? `${busy} aircraft in for work` : 'All empty: nothing is in for work here'}</small></span></div>
+    ${hs.map(h => { const many = hs.filter(x => x.sz.k === h.sz.k).length > 1;
+      if (!h.reg) return `<div class="hg-ac empty"><span><b>${esc(hgName(h, many))}</b><small>${h.sz.W} × ${h.sz.D} m · doors ${h.sz.door} m · empty</small></span><button class="btn sm ghost" data-act="hangar-visit" data-base="${esc(b)}" data-size="${h.sz.k}">${icon('wrench')}Walk in</button></div>`;
+      const a = plane(h.reg), t = acType(a.typeId), fx = hgFixList(h.reg), crew = hgCrewFor(h.reg), left = hgLeftMin(h.reg);
+      return `<div class="hg-ac"><span><b>${esc(hgName(h, many))} · ${esc(h.reg)}</b><small>${esc(t.model)} · ${Math.round(a.condition)}%${left ? ` · ready in ${left > 90 ? Math.round(left / 60) + ' h' : left + ' min'}` : ''}</small>
+        <em class="bad">${fx.length ? esc(fx.map(i => i.title).slice(0, 3).join(', ')) + (fx.length > 3 ? '…' : '') : 'General check'}</em>
+        <em class="${crew.length ? 'ok' : 'bad'}">${crew.length ? 'Mechanics: ' + esc(crew.map((p: any) => p.name).join(', ')) : `No mechanics free at ${esc(b)}`}</em></span>
+        <button class="btn sm primary" data-act="hangar-visit" data-reg="${esc(h.reg)}">${icon('wrench')}Walk in</button></div>`; }).join('')}</div>`; }).join('')}</div>`;
 }
+
+/** The line under Hangars on the Overview: how many aircraft are in for work. */
+function hgBusyLine(): string {
+  let n = 0; try { n = fleetOf().filter(hgInWork).length; } catch (e) { n = 0; }
+  return n ? `${n} aircraft in for work: walk in and see them` : 'Every hangar is empty: walk in and look around';
+}
+/** The Hangars page (from the Overview): every hangar at every base, empty or with an aircraft in for work. */
+SCREENS.hangars = {
+  title: 'Hangars', icon: 'wrench', nav: false,
+  render() {
+    const n = fleetOf().filter(hgInWork).length;
+    return `<div class="screen-head"><div><button class="back-btn" data-act="go" data-screen="ops">${icon('chevron', 'flip')}<span>Overview</span></button>
+      <h1>Hangars</h1><p class="sub">${n ? `${n} aircraft in for work` : 'No aircraft in for work right now'} · one hangar of every size at each base, more when more aircraft are in</p></div></div>
+      ${hgListHtml()}`;
+  },
+};
 
 /* ---------- what the vending machine sells (made-up products, no brands) ---------- */
 interface HgProd { k: string; name: string; type: 'can' | 'bar'; c1: string; c2: string; inner?: string; file: string }
@@ -167,20 +220,21 @@ const HG_EMBLEM = `<svg class="ctl-scales hg-emb" viewBox="0 0 200 200" aria-hid
 const HG_SCENE = `<svg class="ctl-house hg-scene" viewBox="0 0 560 260" aria-hidden="true"><rect x="0" y="236" width="560" height="24"/>
   <path d="M120 236 V120 Q280 50 440 120 V236 Z"/><rect x="40" y="170" width="70" height="66"/><rect x="450" y="186" width="80" height="50"/></svg>`;
 
-HangarRoom.open = function (reg: string) {
+HangarRoom.open = function (reg: string, base?: string, sizeK?: string) {
   const R = HangarRoom; if (R.on) return;
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
-  const a = reg ? plane(reg) : fleetOf()[0]; if (!a) { toast('Your hangars open when you have an aircraft.', 'info'); return; }
+  // an aircraft stands in a hangar only while it is in for work; otherwise it is an empty hangar of that size
+  const a0: any = reg ? plane(reg) : null, a: any = a0 && hgInWork(a0) ? a0 : null;
   try { if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) OfficeRoom.close(true); } catch (e) { /* none */ }
   try { if (typeof OpsRoom !== 'undefined' && OpsRoom.on) OpsRoom.close(true); } catch (e) { /* none */ }
-  const co: any = company(), sz = hgSizeFor(a.typeId);
-  R.on = true; R.loading = true; R.reg = a.reg; R.sz = sz; R.base = (a as any).base || co.hub; R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now();
+  const co: any = company(), sz = a ? hgSizeFor(a.typeId) : a0 ? hgSizeFor(a0.typeId) : hgSizeK(sizeK || 'm');
+  R.on = true; R.loading = true; R.reg = a ? a.reg : ''; R.sz = sz; R.base = a ? hgWhere(a) : base || (a0 ? hgWhere(a0) : co.hub); R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now();
   R.overlay = null; R.hold = null; R.vend = null; R.talk = -1; R.hover = null;
   if (hgClean()) hgSave();
   const q = Gfx.roomQ();
   const root = document.createElement('div'); root.className = 'court3d office3d ops3d hg3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
-    <div class="ct-top"><div><small>${esc(co.name)} · ${esc(R.base)}</small><b>${esc(sz.name)} · ${esc(a.reg)}</b></div></div>
+    <div class="ct-top"><div><small>${esc(co.name)} · ${esc(R.base)}</small><b>${esc(sz.name)} · ${a ? esc(a.reg) : 'empty'}</b></div></div>
     <button class="ct-leave" data-op="leave">${icon('close')}<span>Leave the hangar</span><kbd>Esc</kbd></button>
     <div class="ct-spots of-spots op-spots hg-spots" hidden></div><div class="of-aim op-aim" hidden></div><div class="walk-pad ct-pad op-pad" hidden><i></i></div><div class="of-aim op-dot" hidden>+</div>
     <div class="hg-hand" hidden></div><div class="hg-panel" hidden></div><div class="hg-fade"></div>
@@ -207,6 +261,7 @@ function hgFloorTex(): HTMLCanvasElement {
 function hgBoard(reg: string): HTMLCanvasElement {
   const [c, x] = ctCanvas(1024, 640), a: any = plane(reg), fx = hgFixList(reg);
   x.fillStyle = '#F4F5F2'; x.fillRect(0, 0, 1024, 640); x.strokeStyle = '#C9CDD2'; x.lineWidth = 10; x.strokeRect(5, 5, 1014, 630);
+  if (!a) { x.fillStyle = '#1F3550'; x.font = '700 46px "Comic Sans MS", "Segoe Print", cursive'; x.fillText('Hangar free', 40, 80); x.fillStyle = '#334'; x.font = '600 32px "Comic Sans MS", "Segoe Print", cursive'; x.fillText('No aircraft in for work.', 40, 150); x.fillStyle = '#B22222'; x.font = '700 28px "Comic Sans MS", cursive'; x.fillText('SAFETY FIRST · FOD WALK EVERY SHIFT', 40, 600); return c; }
   x.fillStyle = '#1F3550'; x.font = '700 46px "Comic Sans MS", "Segoe Print", cursive'; x.fillText(`Work on ${reg}`, 40, 80);
   x.fillStyle = '#334'; x.font = '600 30px "Comic Sans MS", "Segoe Print", cursive';
   try { x.fillText(`${acType(a.typeId).model} · condition ${Math.round(a.condition)}%`, 40, 130); } catch (e) { /* none */ }
@@ -241,6 +296,15 @@ function hgBuild(scene: any, q: number): any {
   const quad = (w: number, h: number, m: any, x: number, y: number, z: number, ry: number, rx = 0, cast = true) => { const o = new T.Mesh(new T.PlaneGeometry(w, h), m); o.position.set(x, y, z); o.rotation.set(rx, ry, 0, 'YXZ'); o.receiveShadow = true; o.castShadow = cast && shadow; root.add(o); return o; };
   const surf = (o: any) => { A.surfs.push(o); return o; };
   const block = (x0: number, z0: number, x1: number, z1: number) => A.blocks.push([Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1)]);
+  /** One piece of equipment or furniture: what build() adds becomes one group at (x, z) turned ry (its front along +z
+   *  before turning), and a model file hangar-props/<name>.glb goes in its place if there is one. */
+  const prop = (name: string, x: number, z: number, ry: number, build: () => void) => {
+    const n0 = root.children.length; build();
+    const g = new T.Group(); g.name = name; g.position.set(x, 0, z); g.rotation.y = ry; root.add(g); g.updateMatrixWorld(true);
+    for (const o of root.children.slice(n0)) if (o !== g) g.attach(o);
+    hgPropSwap(g, name); return g;
+  };
+  A.prop = prop;
   // the windows' glass: one material for each way they face (the sky is brighter and warmer on the sun's side)
   const pane = (k: string) => A.panes[k] || (A.panes[k] = new T.MeshBasicMaterial({ color: 0x9FC4E6, toneMapped: false, side: T.DoubleSide }));
   const x0 = -W / 2, x1 = W / 2, z0 = -D / 2, z1 = D / 2;
@@ -343,8 +407,8 @@ function hgBuild(scene: any, q: number): any {
     const f = hgShellFile(sz); if (f) { try { Models.swap(shell, f, false); } catch (e) { /* our own building */ } } }
   // the aircraft: your own, nose towards the doors, on the centre line
   {
-    const a: any = plane(R.reg), lv = (a && a.livery) || liveryFor(co.color, co.color2, co.id);
-    let m: any = null; try { m = buildAircraftModel(a.typeId, lv); m.userData.set && m.userData.set({ flaps: 0, gear: 1 }); } catch (e) { m = null; }
+    const a: any = R.reg ? plane(R.reg) : null, lv = (a && a.livery) || liveryFor(co.color, co.color2, co.id);
+    let m: any = null; if (a) try { m = buildAircraftModel(a.typeId, lv); m.userData.set && m.userData.set({ flaps: 0, gear: 1 }); } catch (e) { m = null; }
     if (m) {
       const holder = new T.Group(); holder.add(m); root.add(holder);
       m.traverse((o: any) => { if (o.isMesh) { o.castShadow = shadow; o.receiveShadow = true; } });
@@ -359,7 +423,7 @@ function hgBuild(scene: any, q: number): any {
   const ab = A.acBox || new T.Box3(new T.Vector3(-15, 0, -10), new T.Vector3(15, 8, z1 - 5.5)), nose = ab.max.z, span = ab.max.x - ab.min.x;
   // things round it: tool trolleys, a work stand at the engine, cones at the wing tips, a tug by the doors
   {
-    const trolley = (x: number, z: number, ry: number) => { const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = ry; root.add(g);
+    const trolley = (x: number, z: number, ry: number) => { const g = new T.Group(); g.name = 'tool-trolley'; g.position.set(x, 0, z); g.rotation.y = ry; root.add(g);
       const o = (w: number, h: number, d: number, m: any, X: number, Y: number, Z: number) => { const k = new T.Mesh(new T.BoxGeometry(w, h, d), m); k.position.set(X, Y, Z); k.castShadow = shadow; k.receiveShadow = true; g.add(k); return k; };
       o(0.92, 0.82, 0.48, mat.red, 0, 0.53, 0); for (let i = 0; i < 5; i++) o(0.86, 0.006, 0.01, mat.metal, 0, 0.2 + i * 0.15, 0.245);
       const top = o(0.94, 0.03, 0.5, mat.dark, 0, 0.955, 0); surf(top);
@@ -367,44 +431,46 @@ function hgBuild(scene: any, q: number): any {
       o(0.04, 0.04, 0.5, mat.metal, 0.5, 0.9, 0);
       // spanners and a torque wrench on top
       o(0.3, 0.012, 0.03, mat.metal, -0.15, 0.976, 0.08).rotation.y = 0.3; o(0.22, 0.012, 0.025, mat.metal, 0.12, 0.976, -0.1).rotation.y = -0.5;
-      const c = Math.cos(ry), s = Math.sin(ry); block(x - 0.6, z - 0.6, x + 0.6, z + 0.6); void c; void s; return g; };
+      block(x - 0.6, z - 0.6, x + 0.6, z + 0.6); hgPropSwap(g, 'tool-trolley'); return g; };
     trolley(2.4, nose + 2.2, 0.2); trolley(-span * 0.22 - 1.5, (ab.min.z + ab.max.z) / 2 + 3, -0.4);
     // the work stand: yellow steps up to a platform at the engine
-    { const ex = Math.max(3.2, span * 0.17), ez = (ab.min.z + ab.max.z) / 2 + 1.6, ph = Math.min(1.8, Math.max(0.9, (ab.max.y - ab.min.y) * 0.12)), g = new T.Group(); g.position.set(ex + 1.6, 0, ez); root.add(g);
+    { const ex = Math.max(3.2, span * 0.17), ez = (ab.min.z + ab.max.z) / 2 + 1.6, ph = Math.min(1.8, Math.max(0.9, (ab.max.y - ab.min.y) * 0.12)), g = new T.Group(); g.name = 'work-stand'; g.position.set(ex + 1.6, 0, ez); root.add(g);
       const o = (w: number, h: number, d: number, m: any, X: number, Y: number, Z: number) => { const k = new T.Mesh(new T.BoxGeometry(w, h, d), m); k.position.set(X, Y, Z); k.castShadow = shadow; k.receiveShadow = true; g.add(k); return k; };
       const pl = o(1.4, 0.06, 1.2, mat.metal, 0, ph, 0); surf(pl);
       for (const [X, Z] of [[-0.65, -0.55], [0.65, -0.55], [-0.65, 0.55], [0.65, 0.55]]) { o(0.06, ph, 0.06, mat.yellow, X, ph / 2, Z); o(0.05, 1.0, 0.05, mat.yellow, X, ph + 0.5, Z); }
       for (const Z of [-0.55, 0.55]) o(1.4, 0.05, 0.05, mat.yellow, 0, ph + 1.0, Z); o(0.05, 0.05, 1.1, mat.yellow, 0.65, ph + 1.0, 0);
       const st = Math.round(ph / 0.22); for (let i = 0; i < st; i++) o(0.7, 0.04, 0.26, mat.metal, 0.7 + 0.35 + (st - i) * 0.24 - 0.24, (i + 1) * ph / (st + 1), 0);
       for (const Z of [-0.36, 0.36]) { const r = o(0.05, 0.05, 0.05, mat.yellow, 0, 0, Z); r.scale.set(st * 0.25 / 0.05, 1, 1); r.position.set(1.05 + st * 0.12 - 0.12, ph / 2, Z); r.rotation.z = Math.atan2(ph, st * 0.24); }
-      block(ex + 0.8, ez - 0.7, ex + 2.4 + st * 0.24, ez + 0.7); }
+      block(ex + 0.8, ez - 0.7, ex + 2.4 + st * 0.24, ez + 0.7); hgPropSwap(g, 'work-stand'); }
     // cones at the wing tips and the nose
     const coneM = M({ color: 0xF26A1B, roughness: 0.5 });
-    for (const [x, z] of [[ab.min.x - 0.8, (ab.min.z + ab.max.z) / 2 - 2], [ab.max.x + 0.8, (ab.min.z + ab.max.z) / 2 - 2], [-1.2, nose + 0.9], [1.2, nose + 0.9]]) { add(new T.ConeGeometry(0.17, 0.5, 16), coneM, x, 0.27, z); bx(0.38, 0.03, 0.38, mat.black, x, 0.015, z); }
+    for (const [x, z] of [[ab.min.x - 0.8, (ab.min.z + ab.max.z) / 2 - 2], [ab.max.x + 0.8, (ab.min.z + ab.max.z) / 2 - 2], [-1.2, nose + 0.9], [1.2, nose + 0.9]]) prop('traffic-cone', x, z, 0, () => { add(new T.ConeGeometry(0.17, 0.5, 16), coneM, x, 0.27, z); bx(0.38, 0.03, 0.38, mat.black, x, 0.015, z); });
     // the tug, parked by the doors
-    { const g = new T.Group(); g.position.set(x1 - 7, 0, z1 - 4.6); g.rotation.y = -Math.PI / 2; root.add(g);
-      const o = (w: number, h: number, d: number, m: any, X: number, Y: number, Z: number) => { const k = new T.Mesh(new T.BoxGeometry(w, h, d), m); k.position.set(X, Y, Z); k.castShadow = shadow; k.receiveShadow = true; g.add(k); return k; };
-      o(2.0, 0.7, 4.2, mat.yellow, 0, 0.7, 0); o(1.8, 0.9, 1.2, mat.dark, 0, 1.45, -1.2); o(1.7, 0.06, 1.1, mat.yellow, 0, 1.92, -1.2);
-      for (const [X, Z] of [[-1, -1.4], [1, -1.4], [-1, 1.4], [1, 1.4]]) { const w = new T.Mesh(new T.CylinderGeometry(0.42, 0.42, 0.34, 18), mat.black); w.rotation.z = Math.PI / 2; w.position.set(X, 0.42, Z); g.add(w); }
-      block(x1 - 9.3, z1 - 5.7, x1 - 4.7, z1 - 3.5); }
+    // (the same tug as on the apron, and the same file: vehicles/pushback-tug.glb)
+    { let g: any = null; try { g = GV_BUILD['pushback-tug'](); } catch (e) { g = null; }
+      if (g) { g.position.set(x1 - 7, 0, z1 - 4.6); root.add(g); g.traverse((o: any) => { if (o.isMesh) { o.castShadow = shadow; o.receiveShadow = true; } }); try { Models.swap(g, 'vehicles/pushback-tug.glb'); } catch (e) { /* the app's own */ } }
+      block(x1 - 9.8, z1 - 6.0, x1 - 4.2, z1 - 3.2); }
     // the workbench along the back wall (right of the rooms), with a vice and a pegboard of tools
     { const wx0 = HG_RX1 + 2, wx1 = Math.min(x1 - 2, wx0 + 6), wz = z0 + 0.75;
+      prop('workbench', (wx0 + wx1) / 2, wz, 0, () => {
       const top = bx(wx1 - wx0, 0.06, 0.9, mat.oak, (wx0 + wx1) / 2, 0.92, wz); surf(top);
       bx(wx1 - wx0, 0.8, 0.85, mat.steel, (wx0 + wx1) / 2, 0.45, wz);
       bx(wx1 - wx0, 1.4, 0.04, M({ map: ctTex(ctNoise('#C9B48A', 0.15, 12), 3, 1), roughness: 0.9 }), (wx0 + wx1) / 2, 1.75, z0 + 0.36);
       const r = ctRng(13); for (let i = 0; i < 18; i++) bx(0.03 + r() * 0.04, 0.2 + r() * 0.25, 0.02, i % 3 ? mat.metal : mat.red, wx0 + 0.3 + r() * (wx1 - wx0 - 0.6), 1.4 + r() * 0.7, z0 + 0.4);
-      bx(0.2, 0.14, 0.16, mat.steel, wx0 + 0.4, 1.02, wz + 0.2);
-      block(wx0, z0, wx1, z0 + 1.25); }
+      bx(0.2, 0.14, 0.16, mat.steel, wx0 + 0.4, 1.02, wz + 0.2); });
+      block(wx0, z0, wx1, z0 + 1.25);
+      // a waste bin at its end
+      prop('waste-bin', wx1 + 0.6, z0 + 0.9, 0, () => hgBin(add, wx1 + 0.6, z0 + 0.9, 0x2F6B4A)); block(wx1 + 0.3, z0 + 0.6, wx1 + 0.9, z0 + 1.2); }
     // a fire extinguisher on its stand by each side wall
-    for (const s of [-1, 1]) { add(new T.CylinderGeometry(0.09, 0.09, 0.6, 14), mat.red, s * (W / 2 - 1.0), 0.45, 0); bx(0.3, 0.12, 0.3, mat.dark, s * (W / 2 - 1.0), 0.06, 0); }
+    for (const s of [-1, 1]) prop('fire-extinguisher', s * (W / 2 - 1.0), 0, -s * Math.PI / 2, () => { add(new T.CylinderGeometry(0.09, 0.09, 0.6, 14), mat.red, s * (W / 2 - 1.0), 0.45, 0); bx(0.3, 0.12, 0.3, mat.dark, s * (W / 2 - 1.0), 0.06, 0); });
   }
   // the rooms along the back wall
-  hgRooms(A, mat, add, bx, quad, surf, block, pane);
+  hgRooms(A, mat, add, bx, quad, surf, block, pane, prop);
   return A;
 }
 
 /** The maintenance office and the break room: walls with doors and windows to the hangar, a ceiling, lights. */
-function hgRooms(A: any, mat: any, add: any, bx: any, quad: any, surf: any, block: any, pane: any) {
+function hgRooms(A: any, mat: any, add: any, bx: any, quad: any, surf: any, block: any, pane: any, prop: any) {
   const R = HangarRoom, T = THREE, D = R.sz.D, z0 = -D / 2, zf = z0 + HG_RD, H = HG_RH, q = R.q;
   // floors and ceilings
   for (const [xa, xb, m] of [[HG_RX0, HG_RXM, mat.vinyl], [HG_RXM, HG_RX1, mat.vinyl2]] as any[]) {
@@ -454,46 +520,52 @@ function hgRooms(A: any, mat: any, add: any, bx: any, quad: any, surf: any, bloc
   }
   /* --- the maintenance office: the work table with the monitor, keyboard and mouse; the work board; manuals --- */
   { const xc = (HG_RX0 + HG_RXM) / 2, tz = z0 + 1.6;
-    const top = bx(2.2, 0.045, 0.85, mat.oak, xc, 0.75, tz); surf(top);
-    for (const sx of [-1, 1]) { bx(0.06, 0.73, 0.75, mat.black, xc + sx * 1.0, 0.365, tz); }
+    prop('office-desk', xc, tz, 0, () => { const top = bx(2.2, 0.045, 0.85, mat.oak, xc, 0.75, tz); surf(top);
+      for (const sx of [-1, 1]) { bx(0.06, 0.73, 0.75, mat.black, xc + sx * 1.0, 0.365, tz); } });
     block(xc - 1.2, tz - 0.6, xc + 1.2, tz + 0.5);
     hgMonitor(A, xc, tz);
     // the chair
-    { const g = new T.Group(); g.position.set(xc, 0, tz + 0.9); A.root.add(g);
+    { const g = new T.Group(); g.name = 'office-chair'; g.position.set(xc, 0, tz + 0.9); g.rotation.y = Math.PI; A.root.add(g);
       const leather = new T.MeshStandardMaterial({ color: 0x1E1E22, roughness: 0.5 });
       const s = new T.Mesh(new T.BoxGeometry(0.52, 0.09, 0.5), leather); s.position.y = 0.5; g.add(s);
-      const b = new T.Mesh(new T.BoxGeometry(0.5, 0.65, 0.08), leather); b.position.set(0, 0.88, 0.25); b.rotation.x = 0.1; g.add(b);
+      const b = new T.Mesh(new T.BoxGeometry(0.5, 0.65, 0.08), leather); b.position.set(0, 0.88, -0.25); b.rotation.x = -0.1; g.add(b);
       const p = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.4, 10), mat.metal); p.position.y = 0.28; g.add(p);
       for (let i = 0; i < 5; i++) { const a = i / 5 * 6.283, l = new T.Mesh(new T.BoxGeometry(0.3, 0.03, 0.04), mat.metal); l.position.set(Math.cos(a) * 0.15, 0.06, Math.sin(a) * 0.15); l.rotation.y = -a; g.add(l); }
-      g.traverse((o: any) => { if (o.isMesh) { o.castShadow = q >= 1; o.receiveShadow = true; } }); block(xc - 0.3, tz + 0.6, xc + 0.3, tz + 1.2); }
+      g.traverse((o: any) => { if (o.isMesh) { o.castShadow = q >= 1; o.receiveShadow = true; } }); hgPropSwap(g, 'office-chair'); block(xc - 0.3, tz + 0.6, xc + 0.3, tz + 1.2);
+      prop('waste-bin', xc + 1.45, tz + 0.1, 0, () => hgBin(add, xc + 1.45, tz + 0.1, 0x3A3F46)); block(xc + 1.25, tz - 0.1, xc + 1.65, tz + 0.3); }
     // the work board on the side wall: what is being done on the aircraft in here
     { const c = hgBoard(R.reg); A.boardCv = c; const b = new T.Mesh(new T.PlaneGeometry(2.4, 1.5), new T.MeshStandardMaterial({ map: ctTex(c), roughness: 0.4 })); b.position.set(HG_RX0 + 0.09, 1.55, (z0 + zf) / 2 + 0.3); b.rotation.y = Math.PI / 2; A.root.add(b);
       bx(0.04, 1.58, 2.48, mat.metal, HG_RX0 + 0.08, 1.55, (z0 + zf) / 2 + 0.3); }
     // a shelf of manuals by the door
     { const sx = HG_RXM - 0.3, sz2 = z0 + 3.4, r = ctRng(31), cols = [0x2E4F7A, 0x8A2E2E, 0x2F6B4A, 0xB8862E, 0x3A3F46];
+      prop('bookshelf', sx, sz2, -Math.PI / 2, () => {
       for (const y of [0.4, 0.9, 1.4, 1.9]) { bx(0.4, 0.03, 1.6, mat.steel, sx, y, sz2); let z = sz2 - 0.75; while (z < sz2 + 0.72) { const w = 0.05 + r() * 0.03, h = 0.3 + r() * 0.12; bx(0.28, h, w, new T.MeshStandardMaterial({ color: cols[Math.floor(r() * cols.length)], roughness: 0.6 }), sx, y + 0.015 + h / 2, z + w / 2); z += w + 0.004; } }
-      for (const dz of [-0.8, 0.8]) bx(0.4, 2.1, 0.03, mat.steel, sx, 1.05, sz2 + dz);
+      for (const dz of [-0.8, 0.8]) bx(0.4, 2.1, 0.03, mat.steel, sx, 1.05, sz2 + dz); });
       block(sx - 0.3, sz2 - 0.85, sx + 0.3, sz2 + 0.85); }
   }
   /* --- the break room: the vending machine, a counter with a sink and a coffee machine, a table and chairs --- */
   { const xa = HG_RXM, xb = HG_RX1;
     // the counter along the back wall
     const cx0 = xa + 0.3, cx1 = xb - 1.6;
-    const cz = z0 + 1.0, ctop = bx(cx1 - cx0, 0.04, 0.62, new T.MeshStandardMaterial({ color: 0xE9E4DA, roughness: 0.35 }), (cx0 + cx1) / 2, 0.92, cz); surf(ctop);
+    const cz = z0 + 1.0;
+    prop('kitchen-counter', (cx0 + cx1) / 2, cz, 0, () => { const ctop = bx(cx1 - cx0, 0.04, 0.62, new T.MeshStandardMaterial({ color: 0xE9E4DA, roughness: 0.35 }), (cx0 + cx1) / 2, 0.92, cz); surf(ctop);
     bx(cx1 - cx0, 0.88, 0.58, new T.MeshStandardMaterial({ color: 0x3C5A72, roughness: 0.6 }), (cx0 + cx1) / 2, 0.45, cz);
     for (let x = cx0 + 0.6; x < cx1; x += 0.6) bx(0.012, 0.8, 0.005, mat.dark, x, 0.46, cz + 0.295);
-    bx(0.5, 0.012, 0.4, mat.metal, cx0 + 0.6, 0.945, cz - 0.02); add(new T.CylinderGeometry(0.015, 0.015, 0.3, 8), mat.metal, cx0 + 0.6, 1.08, cz - 0.22);
+    });
+    prop('sink', cx0 + 0.6, cz - 0.02, 0, () => { bx(0.5, 0.012, 0.4, mat.metal, cx0 + 0.6, 0.945, cz - 0.02); add(new T.CylinderGeometry(0.015, 0.015, 0.3, 8), mat.metal, cx0 + 0.6, 1.08, cz - 0.22); });
     // the coffee machine and a few mugs
-    bx(0.32, 0.42, 0.36, mat.black, cx1 - 0.4, 1.15, cz - 0.06); bx(0.2, 0.08, 0.04, M2(0x2C8CFF), cx1 - 0.4, 1.28, cz + 0.125);
-    for (let i = 0; i < 3; i++) add(new T.CylinderGeometry(0.04, 0.035, 0.095, 16), new T.MeshStandardMaterial({ color: [0xF4F4F2, 0x2E5C8A, 0xB3261E][i], roughness: 0.3 }), cx1 - 1.0 + i * 0.13, 0.988, cz + 0.06);
+    prop('coffee-machine', cx1 - 0.4, cz - 0.06, 0, () => { bx(0.32, 0.42, 0.36, mat.black, cx1 - 0.4, 1.15, cz - 0.06); bx(0.2, 0.08, 0.04, M2(0x2C8CFF), cx1 - 0.4, 1.28, cz + 0.125); bx(0.1, 0.06, 0.1, mat.metal, cx1 - 0.4, 0.97, cz + 0.06); });
+    for (let i = 0; i < 3; i++) prop('coffee-mug', cx1 - 1.0 + i * 0.13, cz + 0.06, 0, () => { const mm = new T.MeshStandardMaterial({ color: [0xF4F4F2, 0x2E5C8A, 0xB3261E][i], roughness: 0.3 }); add(new T.CylinderGeometry(0.04, 0.035, 0.095, 16), mm, cx1 - 1.0 + i * 0.13, 0.988, cz + 0.06); const h = new T.Mesh(new T.TorusGeometry(0.025, 0.007, 8, 16, Math.PI), mm); h.position.set(cx1 - 1.0 + i * 0.13 + 0.04, 0.99, cz + 0.06); h.rotation.z = -Math.PI / 2; A.root.add(h); });
+    for (let i = 0; i < 2; i++) prop('drinking-glass', cx1 - 1.5 + i * 0.1, cz + 0.1, 0, () => { const gl = new T.Mesh(new T.CylinderGeometry(0.035, 0.03, 0.11, 18, 1, true), new T.MeshPhysicalMaterial({ color: 0xE8F2FA, roughness: 0.05, transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false })); gl.position.set(cx1 - 1.5 + i * 0.1, 0.995, cz + 0.1); A.root.add(gl); });
+    prop('waste-bin', xa + 0.45, z0 + 1.75, 0, () => hgBin(add, xa + 0.45, z0 + 1.75, 0x3C5A72)); block(xa + 0.2, z0 + 1.5, xa + 0.7, z0 + 2.0);
     block(cx0, z0, cx1, cz + 0.38);
     // the table and four chairs
     const tx = (xa + xb) / 2 - 0.4, tz = z0 + 3.4;
-    const tt = bx(1.4, 0.04, 0.9, new T.MeshStandardMaterial({ color: 0xEDEDE8, roughness: 0.4 }), tx, 0.74, tz); surf(tt);
-    for (const [dx, dz] of [[-0.62, -0.38], [0.62, -0.38], [-0.62, 0.38], [0.62, 0.38]]) bx(0.04, 0.72, 0.04, mat.metal, tx + dx, 0.36, tz + dz);
-    for (const [dx, dz, ry] of [[-0.35, -0.75, 0], [0.35, -0.75, 0], [-0.35, 0.75, Math.PI], [0.35, 0.75, Math.PI]]) { const g = new T.Group(); g.position.set(tx + dx, 0, tz + dz); g.rotation.y = ry; A.root.add(g);
+    prop('break-room-table', tx, tz, 0, () => { const tt = bx(1.4, 0.04, 0.9, new T.MeshStandardMaterial({ color: 0xEDEDE8, roughness: 0.4 }), tx, 0.74, tz); surf(tt);
+      for (const [dx, dz] of [[-0.62, -0.38], [0.62, -0.38], [-0.62, 0.38], [0.62, 0.38]]) bx(0.04, 0.72, 0.04, mat.metal, tx + dx, 0.36, tz + dz); });
+    for (const [dx, dz, ry] of [[-0.35, -0.75, 0], [0.35, -0.75, 0], [-0.35, 0.75, Math.PI], [0.35, 0.75, Math.PI]]) { const g = new T.Group(); g.name = 'break-room-chair'; g.position.set(tx + dx, 0, tz + dz); g.rotation.y = ry; A.root.add(g);
       const sm = new T.MeshStandardMaterial({ color: 0xC0392B, roughness: 0.5 }); const s = new T.Mesh(new T.BoxGeometry(0.42, 0.04, 0.42), sm); s.position.y = 0.46; g.add(s); const b = new T.Mesh(new T.BoxGeometry(0.42, 0.4, 0.03), sm); b.position.set(0, 0.7, -0.2); g.add(b);
-      for (const [lx, lz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) { const l = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.46, 8), mat.metal); l.position.set(lx, 0.23, lz); g.add(l); } }
+      for (const [lx, lz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) { const l = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, 0.46, 8), mat.metal); l.position.set(lx, 0.23, lz); g.add(l); } hgPropSwap(g, 'break-room-chair'); }
     block(tx - 0.8, tz - 1.0, tx + 0.8, tz + 1.0);
     // a poster: drawn by us
     { const [c, x] = ctCanvas(384, 512); x.fillStyle = '#F2D18A'; x.fillRect(0, 0, 384, 512); x.fillStyle = '#12304E'; x.font = '800 54px Inter, Arial, sans-serif'; x.textAlign = 'center'; x.fillText('TAKE', 192, 140); x.fillText('A BREAK', 192, 210); x.font = '600 26px Inter, Arial, sans-serif'; x.fillText('Rested hands', 192, 330); x.fillText('make safe aircraft', 192, 368);
@@ -504,6 +576,14 @@ function hgRooms(A: any, mat: any, add: any, bx: any, quad: any, surf: any, bloc
   function M2(c: number) { return new T.MeshStandardMaterial({ color: c, roughness: 0.4 }); }
 }
 
+/** A model file in place of one piece of equipment or furniture (hangar-props/<name>.glb), if there is one. Surfaces
+ *  you can put things on keep working: they are still found where the app's own top was. */
+function hgPropSwap(g: any, name: string) { try { Models.swap(g, 'hangar-props/' + name + '.glb', false); } catch (e) { /* the app's own */ } }
+/** A waste bin: a round bin with a pedal and a lid. */
+function hgBin(add: any, x: number, z: number, col: number) {
+  const T = THREE, m = new T.MeshStandardMaterial({ color: col, roughness: 0.45, metalness: 0.2 }), dark = new T.MeshStandardMaterial({ color: 0x1E2126, roughness: 0.6 });
+  add(new T.CylinderGeometry(0.16, 0.14, 0.5, 20), m, x, 0.26, z); add(new T.CylinderGeometry(0.165, 0.165, 0.03, 20), dark, x, 0.525, z); add(new T.BoxGeometry(0.1, 0.02, 0.06), dark, x, 0.03, z + 0.17);
+}
 /** The monitor on the work table: the same ultra-wide screen as in the Operations office, showing the same. */
 function hgMonitor(A: any, xc: number, tz: number) {
   const T = THREE, R = HangarRoom, root = A.root, black = new T.MeshStandardMaterial({ color: 0x15171B, roughness: 0.4 }), metal = new T.MeshStandardMaterial({ color: 0x5D636B, metalness: 0.85, roughness: 0.35 });
@@ -517,10 +597,11 @@ function hgMonitor(A: any, xc: number, tz: number) {
   const st = new T.Mesh(new T.BoxGeometry(0.08, 0.28, 0.05), metal); st.position.set(xc, 0.93, tz - 0.12); root.add(st);
   const ft = new T.Mesh(new T.BoxGeometry(0.36, 0.012, 0.22), metal); ft.position.set(xc, 0.778, tz - 0.1); root.add(ft);
   // the keyboard and the mouse on its mat
-  const kb = new T.Mesh(new T.BoxGeometry(0.44, 0.02, 0.14), black); kb.position.set(xc - 0.05, 0.783, tz + 0.2); root.add(kb);
-  const km = new T.Mesh(new T.PlaneGeometry(0.42, 0.12), new T.MeshStandardMaterial({ map: ctTex(hgKeys()), roughness: 0.6 })); km.rotation.x = -Math.PI / 2; km.position.set(xc - 0.05, 0.7935, tz + 0.2); root.add(km);
+  const kbG = new T.Group(); kbG.name = 'keyboard'; kbG.position.set(xc - 0.05, 0, tz + 0.2); root.add(kbG);
+  const kb = new T.Mesh(new T.BoxGeometry(0.44, 0.02, 0.14), black); kb.position.set(0, 0.783, 0); kbG.add(kb);
+  const km = new T.Mesh(new T.PlaneGeometry(0.42, 0.12), new T.MeshStandardMaterial({ map: ctTex(hgKeys()), roughness: 0.6 })); km.rotation.x = -Math.PI / 2; km.position.set(0, 0.7935, 0); kbG.add(km); hgPropSwap(kbG, 'keyboard');
   const pad = new T.Mesh(new T.PlaneGeometry(0.26, 0.22), new T.MeshStandardMaterial({ color: 0x1B2028, roughness: 0.95 })); pad.rotation.x = -Math.PI / 2; pad.position.set(xc + 0.42, 0.7735, tz + 0.2); root.add(pad);
-  const mouse = new T.Mesh(new T.SphereGeometry(1, 24, 16), new T.MeshStandardMaterial({ color: 0x1A1C20, roughness: 0.3 })); mouse.scale.set(0.032, 0.019, 0.058); mouse.position.set(xc + 0.42, 0.776, tz + 0.21); root.add(mouse);
+  const mouse = new T.Mesh(new T.SphereGeometry(1, 24, 16), new T.MeshStandardMaterial({ color: 0x1A1C20, roughness: 0.3 })); mouse.scale.set(0.032, 0.019, 0.058); const msG = new T.Group(); msG.name = 'computer-mouse'; msG.position.set(xc + 0.42, 0, tz + 0.21); root.add(msG); mouse.position.set(0, 0.776, 0); msG.add(mouse); hgPropSwap(msG, 'computer-mouse');
   const glow = new T.PointLight(0x9CC8FF, 0.8, 2.4, 1.6); glow.position.set(xc, 1.12, tz + 0.2); root.add(glow);
   const hit = new T.Mesh(new T.BoxGeometry(1.2, 0.6, 0.6), new T.MeshBasicMaterial({ visible: false })); hit.position.set(xc, 1.0, tz); hit.userData.act = 'monitor'; root.add(hit); A.hits.push(hit);
   // the corners of the screen, for the zoom into it
@@ -647,8 +728,9 @@ function hgVendDisplay(text: string) {
 /* ---------- mechanics ---------- */
 function hgMechanics(scene: any) {
   const R = HangarRoom, T = THREE, A = R.A, co: any = company();
-  let list = (staffOf(co.id, 'mech') as any[]).filter(p => !p.left && p.base === R.base);
-  R.noMech = !list.length;
+  // the mechanics on this aircraft's work (an empty hangar has nobody in it)
+  let list: any[] = R.reg ? hgCrewFor(R.reg) : [];
+  R.noMech = !!R.reg && !list.length;
   list = list.slice(0, 3); R.mechs = [];
   const ab = A.acBox || new T.Box3(new T.Vector3(-10, 0, -10), new T.Vector3(10, 6, 10)), nose = ab.max.z, mid = (ab.min.z + ab.max.z) / 2, span = ab.max.x - ab.min.x;
   const spots = [[2.9, nose + 1.4, -0.9], [Math.max(3.2, span * 0.17) + 0.6, mid + 3.4, Math.PI], [-span * 0.22 - 0.9, mid + 3.0, 0.6]];
@@ -746,7 +828,8 @@ function hgOpen2(root: HTMLElement, q: number) {
       try { ren.compile(scene, cam); } catch (e) { /* first frame */ }
       R.loading = false; R.t0 = performance.now(); hgFrame();
       ctProgress(100, 'Ready', R);
-      const wait = Math.max(300, 3000 - (performance.now() - R.loadT0));
+      // the splash stays at least 5 seconds, and until everything is loaded (it is, by now)
+      const wait = Math.max(300, 5000 - (performance.now() - R.loadT0));
       setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); } hgUi(true); }, wait);
     }, 40);
     R.iv = setInterval(() => { if (R.on && !document.hidden) { opsMonitorDraw(R.A); hgSkyUpdate(); } }, 15000);
@@ -875,7 +958,7 @@ function hgHint(obj: any, spot: any): string {
   if (a === 'flap') return R.vend && R.vend.st === 'ready' ? 'Click to take it' : 'The tray';
   if (a === 'mech') { const M = R.mechs[obj.userData.i]; return M ? `Talk to ${M.p.name}` : ''; }
   if (a === 'item') return R.hold ? 'Your hands are full' : `Click to pick up the ${hgProd(obj.userData.kind).name.toLowerCase()}`;
-  if (a === 'aircraft' && !spot) { const fx = hgFixList(R.reg); return `${R.reg}: ${fx.length ? fx.length + ' to fix' : 'nothing to fix'}`; }
+  if (a === 'aircraft' && !spot && R.reg) { const fx = hgFixList(R.reg); return `${R.reg}: ${fx.length ? fx.length + ' to fix' : 'nothing to fix'}`; }
   if (spot) return 'Click to put it down here';
   return '';
 }
@@ -894,7 +977,7 @@ function hgSurfAt(e?: PointerEvent): any {
   const R = HangarRoom, T = THREE, rc = new T.Raycaster();
   if (e && !aimLocked()) { const r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect(); rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam); }
   else rc.setFromCamera(new T.Vector2(0, 0), R.cam);
-  rc.far = 3.2;
+  rc.far = 3.2; rc.layers.enableAll();
   const h = rc.intersectObjects(R.A.surfs, false)[0]; if (!h) return null;
   const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : new T.Vector3(0, 1, 0); if (n.y < 0.8) return null;
   // nothing else in the way (the aircraft, a wall)
@@ -918,7 +1001,7 @@ function hgClickAt(e?: PointerEvent) {
   if (a === 'flap') { if (R.vend && R.vend.st === 'ready') hgTake(); return; }
   if (a === 'item') { if (R.hold) { toast('Your hands are full: put it down first', 'info'); return; } hgPickUp(o.userData.id); return; }
   if (R.hold && !R.hold.use) { const s = e ? hgSurfAt(e) : R.spot; if (s) { hgPutDown(s); return; } }
-  if (a === 'aircraft') { const fx = hgFixList(R.reg); toast(`${R.reg}: ${fx.length ? fx.map((i: any) => i.title).join(', ') : 'nothing to fix'}`, 'info'); }
+  if (a === 'aircraft' && R.reg) { const fx = hgFixList(R.reg); toast(`${R.reg}: ${fx.length ? fx.map((i: any) => i.title).join(', ') : 'nothing to fix'}`, 'info'); }
 }
 
 /* ---------- the buttons below ---------- */
@@ -929,7 +1012,7 @@ function hgUi(first?: boolean) {
   const pad = R.root.querySelector('.op-pad') as HTMLElement; if (pad) pad.hidden = DESKTOP;
   hgHandUi();
   const hint = R.root.querySelector('.op-aim') as HTMLElement;
-  if (hint && first) { hint.hidden = false; hint.classList.add('op-hint'); hint.textContent = R.noMech ? `No mechanics are based at ${R.base} yet: hire some in Crew.` : DESKTOP ? 'W A S D to walk, Shift to run · the mouse looks around · click what glows' : 'Stick to walk (push it all the way to run) · drag to look · tap what glows'; setTimeout(() => { if (hint) hint.hidden = true; }, 7000); }
+  if (hint && first) { hint.hidden = false; hint.classList.add('op-hint'); hint.textContent = !R.reg ? `This hangar is empty: no ${R.sz.name.toLowerCase().replace(' hangar', '')} aircraft is in for work at ${R.base}.` : R.noMech ? `No mechanics are free at ${R.base}: hire some in Crew.` : DESKTOP ? 'W A S D to walk, Shift to run · the mouse looks around · click what glows' : 'Stick to walk (push it all the way to run) · drag to look · tap what glows'; setTimeout(() => { if (hint) hint.hidden = true; }, 7000); }
 }
 function hgHandUi() {
   const R = HangarRoom, el = R.root && R.root.querySelector('.hg-hand') as HTMLElement; if (!el) return;
@@ -1029,14 +1112,14 @@ function hgHoldStep(dt: number, now: number, eye: any) {
     const p = hgProd(H.it.kind), can = p.type === 'can'; U.t += dt;
     const up = 0.5, act = can ? 2.4 : 0.5, dn = can ? 0.5 : 1.3, e = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
     let k = 0; if (U.t < up) k = e(U.t / up); else if (U.t < up + act) k = 1; else k = 1 - e((U.t - up - act) / (can ? dn : 0.45));
-    if (can) { const sip = U.t > up && U.t < up + act ? Math.sin((U.t - up) / act * Math.PI) : 0; U.head = 0.32 * k + 0.1 * sip;
-      pos = eye.clone().lerp(eye.clone().add(rot(0.0, -0.085, -0.075)), 1).lerp(eye.clone().add(rot(0.07, -0.24, -0.3)), 1 - k);
+    if (can) { const sip = U.t > up && U.t < up + act ? Math.sin((U.t - up) / act * Math.PI) : 0; U.head = 0.14 * k + 0.06 * sip;
+      pos = eye.clone().add(rot(0.0, -0.03, -0.115)).lerp(eye.clone().add(rot(0.07, -0.2, -0.32)), 1 - k);
       q = new T.Quaternion().setFromEuler(new T.Euler(-0.3 + (1.35 + 0.25 * sip) * k, yaw + 0.1 * (1 - k), 0, 'YXZ'));
       if (!U.snd && U.t > up * 0.8) { U.snd = true; if (!H.it.used) hgSnd('open'); setTimeout(() => { if (R.on) hgSnd('sip'); }, H.it.used ? 0 : 450); }
     } else {
       U.head = 0.12 * k;
-      pos = eye.clone().add(rot(0.0, -0.07, -0.1)).lerp(eye.clone().add(rot(0.07, -0.24, -0.3)), 1 - k);
-      q = new T.Quaternion().setFromEuler(new T.Euler(-0.3 + 1.25 * k, yaw + 0.1 * (1 - k), 0, 'YXZ'));
+      pos = eye.clone().add(rot(0.01, -0.055, -0.19)).lerp(eye.clone().add(rot(0.07, -0.2, -0.32)), 1 - k);
+      q = new T.Quaternion().setFromEuler(new T.Euler(-0.3 + 1.0 * k, yaw + 0.1 * (1 - k), 0, 'YXZ'));
       if (!U.bit && U.t > up + 0.18) { U.bit = true; hgSnd('bite'); hgBite(); if (!R.hold) return; }
     }
     if (U.t >= up + act + (can ? dn : 0.45)) { hgUseDone(); }
@@ -1045,7 +1128,7 @@ function hgHoldStep(dt: number, now: number, eye: any) {
     pos = eye.clone().add(d.multiplyScalar(0.3)).add(rot(0.02, -0.04, 0));
     q = new T.Quaternion().setFromEuler(new T.Euler(-0.1 + R.look.pitch, yaw + 0.55 * Math.sin(now * 0.7), 0, 'YXZ'));
   } else {
-    pos = eye.clone().add(rot(0.07, -0.24, -0.3));
+    pos = eye.clone().add(rot(0.07, -0.2, -0.32));
     q = new T.Quaternion().setFromEuler(new T.Euler(-0.3, yaw + 0.1, 0, 'YXZ'));
   }
   if (!pos) return;
@@ -1242,8 +1325,8 @@ function hgLeave() {
   exitSplash('hangar', HangarRoom.sz ? HangarRoom.sz.name : 'Hangar', [
     { pct: 30, step: 'Closing the hangar…', run: () => HangarRoom.close(true) },
     { pct: 55, step: 'Clearing the hangar from memory…', run: exitFreeMemory },
-    { pct: 85, step: 'Loading Maintenance…', run: () => { try { closeAll(); go('maint'); } catch (e) { refresh(); } } },
+    { pct: 85, step: 'Loading your hangars…', run: () => { try { closeAll(); go('hangars'); } catch (e) { refresh(); } } },
   ]);
 }
 
-ACTIONS['hangar-visit'] = el => { const reg = el && el.getAttribute ? el.getAttribute('data-reg') : ''; closeAll(); HangarRoom.open(reg || ''); };
+ACTIONS['hangar-visit'] = el => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };

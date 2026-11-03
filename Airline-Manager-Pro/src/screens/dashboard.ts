@@ -266,6 +266,7 @@ function placesCardHtml(): string {
   return `<div class="card places-card">
     <button class="place office" data-act="office-open">${icon('jobs')}<span><b>My office</b><small>${reports ? `${reports} conduct ${reports === 1 ? 'report' : 'reports'} to look at: call them in` : 'Your desk, the view, the family photo'}</small></span>${icon('chevron')}</button>
     <button class="place opsroom" data-act="ops-room">${icon('clock')}<span><b>Operations</b><small>The schedule on the big screen: plan and change the flying</small></span>${icon('chevron')}</button>
+    <button class="place hangar" data-act="go" data-screen="hangars">${icon('wrench')}<span><b>Hangars</b><small>${hgBusyLine()}</small></span>${icon('chevron')}</button>
     <button class="place court ${live || verdict ? 'live' : ''}" data-act="court-enter">${icon('shield')}<span><b>${live ? 'Court is in session' : verdict ? 'The verdict is in' : 'The courtroom'}</b><small>${live ? 'Go to court and answer for the airline' : verdict ? 'Hear it read out in court' : 'No hearing today: walk in and look around'}</small></span>${icon('chevron')}</button>
   </div>`;
 }

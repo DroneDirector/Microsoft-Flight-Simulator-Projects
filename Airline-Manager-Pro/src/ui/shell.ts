@@ -9,7 +9,7 @@ const ACTIONS: { [k: string]: (el: HTMLElement, ev: Event) => void } = new Proxy
 
 const NAV_ORDER = ['ops', 'fleet', 'routes', 'jobs', 'schedule', 'dispatch', 'planner', 'maint', 'finance', 'logbook', 'pilots', 'ranking', 'career', 'news', 'coop'];
 // Pages opened from inside other pages, shown under their parent in the rail
-const SUB_PAGES: { [k: string]: string } = { map: 'ops', market: 'fleet' };
+const SUB_PAGES: { [k: string]: string } = { map: 'ops', market: 'fleet', hangars: 'ops' };
 
 function renderShell() {
   const app = $('#app');
