@@ -21,6 +21,7 @@ function crewNeeds(cid?: string): CrewNeedRow[] {
   const myA = plane(myReg);
   if (myA && multiCrew(acType(myA.typeId))) { const co = State.pilots.some((p: any) => p.coPilotFor === id); rows.push({ key: 'copilot', role: 'fo', label: 'Your co-pilot', need: 1, have: co ? 1 : 0, note: `In your ${acType(myA.typeId).model}: always provided with it` }); }
   rows.push({ key: 'fa', role: 'fa', label: 'Cabin crew', need: cc.faNeed, have: cc.faHave, note: 'One flight attendant for every 50 seats (aircraft with 20 seats or more)', act: 'fa' });
+  if (cc.winchNeed) rows.push({ key: 'winch', role: 'fa', label: 'Winch operators', need: cc.winchNeed, have: cc.winchHave || 0, note: 'The third crew member on rescue and air-ambulance helicopters with a hoist', act: 'fa' });
   rows.push({ key: 'mech', role: 'mech', label: 'Mechanics', need: cc.mechNeed, have: cc.mechHave, note: 'One at every base, plus line maintenance for the fleet', act: 'mech' });
   // ground crew, base by base
   for (const b of companyBases(id)) {

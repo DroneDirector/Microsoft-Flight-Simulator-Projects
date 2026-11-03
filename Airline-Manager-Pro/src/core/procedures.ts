@@ -543,18 +543,26 @@ function pathAt(fp: FlightPath, d: number): { pos: number[]; hdg: number } {
 }
 
 const _flightPaths: { [k: string]: FlightPath } = {};
+/** A helicopter's path: straight from pad to pad (no runways, departures or arrivals); it lifts off and sets down where it is. */
+function heliPath(from: string, to: string): FlightPath {
+  const A = apt(from), B = apt(to); if (!A || !B || from === to) return null;
+  const len = Math.max(0.2, gcDistanceNm(A.pos, B.pos)), hdg = geoBrg(A.pos, B.pos);
+  const end = (k: string, p: number[], h: number): RunwayEnd => ({ icao: k, name: 'pad', other: 'pad', thr: p, end: p, hdg: h, lenM: 0, ils: false });
+  return { pts: [A.pos, B.pos], cum: [0, len], len, parts: [{ kind: 'route', name: 'Direct', from: 0, to: len }], dep: end(from, A.pos, hdg), arr: end(to, B.pos, hdg) };
+}
 /** Where a hired or co-op pilot's flight is right now along its procedures (null: not on a known path). */
 function flightPathPos(f: any, now?: number): { pos: number[]; hdg: number; d: number; fp: FlightPath } {
   if (!f || !f.depAt || f.real && f.you) return null;
   const pk = f.id + '|' + f.from + '>' + f.to + '|' + f.depAt + planSig(f.from, f.to);
   let fp = _flightPaths[pk];
-  const cls = awyClass(f.typeId || (plane(f.reg) || {} as any).typeId);
+  const tid = f.typeId || (plane(f.reg) || {} as any).typeId, cls = awyClass(tid);
+  if (!fp && isHeli(tid)) { fp = heliPath(f.from, f.to); if (!fp) return null; _flightPaths[pk] = fp; }
   if (!fp) { fp = flightPathFor(f.from, f.noDest ? null : f.to, false, cls); if (!fp) return null; _flightPaths[pk] = fp; }
   now = now || Date.now();
   const prof: FlightProfile = f.coop || f.tfc ? flightProfile(f.typeId, f.from, f.to, f.depAt) : aiProfile(f);
   // the simulator's procedures much longer than the trip the times are worked out for: the app's own ones instead
   const pkF: any = procPick(f.from, f.to) || {};
-  if ((fp as any).sim && !flightPlanFor(f.from, f.to) && !(pkF.sid || pkF.star || pkF.app) && prof.routeNm > 0 && fp.len > prof.routeNm * 1.4 + 40) { const own = flightPathFor(f.from, f.noDest ? null : f.to, true); if (own) fp = _flightPaths[pk] = own; }
+  if (!isHeli(tid) && (fp as any).sim && !flightPlanFor(f.from, f.to) && !(pkF.sid || pkF.star || pkF.app) && prof.routeNm > 0 && fp.len > prof.routeNm * 1.4 + 40) { const own = flightPathFor(f.from, f.noDest ? null : f.to, true); if (own) fp = _flightPaths[pk] = own; }
   const fe = flightEl(f, now), q = profileAt(prof, fe.el);
   // the profile's distance (along airways) mapped onto this path
   const d = prof.routeNm > 0 ? q.d / prof.routeNm * fp.len : 0;

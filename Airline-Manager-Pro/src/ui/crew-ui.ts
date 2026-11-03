@@ -12,7 +12,7 @@ function staffCard(p: any, i: number, opts?: { hire?: boolean }): string {
   const role = personRole(p);
   return `<button class="staff-card ${opts && opts.hire ? 'hire' : ''}" data-act="${opts && opts.hire ? 'hire-staff' : 'staff-detail'}" data-id="${p.id}" style="--i:${i}">
     <span class="sc-av">${avatarSvg(p.look, role, { view: 'bust', accent: company().color })}</span>
-    <span class="sc-txt"><b>${esc(p.name)}</b><small>${levelChip(p) + ' '}${role === 'ground' ? esc(groundJobName(p)) : opts && opts.hire ? ROLE_NAMES[role] : esc(levelTitle(p))}, ${flag(p.nat || 'GB')} ${ageOf(p.dob)}</small>
+    <span class="sc-txt"><b>${esc(p.name)}</b><small>${levelChip(p) + ' '}${role === 'ground' ? esc(groundJobName(p)) : opts && opts.hire ? roleNameOf(p) : esc(isWinchOp(p) ? 'Winch operator' : levelTitle(p))}, ${flag(p.nat || 'GB')} ${ageOf(p.dob)}</small>
       <small>${opts && opts.hire ? `${esc(apt(p.base) ? apt(p.base).city : p.base)}, ${money(p.salary)}/wk` : `${esc(p.base)}, ${money(p.salary)}/wk`}</small></span>
     ${p.warnings ? `<i class="warn-dot" title="${p.warnings} warning${p.warnings > 1 ? 's' : ''}">${p.warnings}</i>` : ''}
     ${opts && opts.hire ? `<span class="sc-hire">${icon('plus')}Hire</span>` : ''}
@@ -30,7 +30,7 @@ function openStaff(id: string) {
     <div class="staff-pop">
       <div class="sp-stage"><div class="le-spot"></div>${avatarSvg(p.look, role, { accent: company().color })}</div>
       <div class="sp-info">
-        <div class="modal-head"><div><h2>${esc(p.name)}</h2><small>${ROLE_NAMES[role]}${isCo ? ', your co-pilot' : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+        <div class="modal-head"><div><h2>${esc(p.name)}</h2><small>${roleNameOf(p)}${isCo ? ', your co-pilot' : ''}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
         <div class="kv-row">
           <div><small>Nationality</small><b>${natLabel(p.nat)}</b></div>
           <div><small>Age</small><b>${ageOf(p.dob)}</b></div>
@@ -49,6 +49,7 @@ function openStaff(id: string) {
           ${editable ? `<button class="btn ghost" data-act="edit-staff-look" data-id="${p.id}">${icon('user')}Change look</button>` : ''}
           ${isCo ? `<button class="btn ghost" data-act="copilot-sex">${icon('swap')}Male or female</button>` : ''}
           ${p.you || isCo ? '' : `<button class="btn ghost" data-act="xfer-open" data-id="${p.id}">${icon('swap')}Transfer</button>`}
+          ${role === 'fa' && !isWinchOp(p) && !p.winchFrom ? `<button class="btn ghost" data-act="winch-train" data-id="${p.id}">${icon('plus')}Winch training</button>` : role === 'fa' && p.winchFrom > Date.now() ? `<button class="btn ghost" disabled>Winch training until ${new Date(p.winchFrom).toLocaleDateString()}</button>` : ''}
           ${p.you ? '' : `<button class="btn ghost" data-act="commend-open" data-id="${p.id}">${icon('trophy')}Commend</button>`}
           <button class="btn danger" data-act="dismiss-ask" data-id="${p.id}">Dismiss</button>
         </div>
@@ -56,6 +57,15 @@ function openStaff(id: string) {
     </div>`, { cls: 'wide staff-modal' });
 }
 
+/** Train a flight attendant as a rescue winch operator: 12 days and a course fee. */
+ACTIONS['winch-train'] = el => {
+  const p: any = staffById(el.getAttribute('data-id')); if (!p) return;
+  const c = company(p.companyId), cost = 14500;
+  if (c.balance < cost) { toast(`Winch training costs ${money(cost)}`); return; }
+  p.winchFrom = Date.now() + 12 * 864e5;
+  payTxn(c.id, `Winch operator course: ${p.name}`, -cost, 'training', [['Hoist and rescue training', -Math.round(cost * 0.7)], ['Medical and survival course', -(cost - Math.round(cost * 0.7))]]);
+  Store.save(); closeTop(); toast(`${p.name} starts the winch operator course: ready in 12 days`); openStaff(p.id);
+};
 ACTIONS['edit-staff-look'] = el => {
   const p = staffById(el.getAttribute('data-id')); if (!p) return;
   closeTop();
@@ -287,7 +297,7 @@ ACTIONS['hire-staff'] = el => {
     <div class="staff-pop">
       <div class="sp-stage"><div class="le-spot"></div>${avatarSvg(p.look, p.role, { accent: c.color })}</div>
       <div class="sp-info">
-        <div class="modal-head"><div><h2>Hire ${esc(p.name)}?</h2><small>${ROLE_NAMES[p.role]}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+        <div class="modal-head"><div><h2>Hire ${esc(p.name)}?</h2><small>${roleNameOf(p)}</small></div><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
         <div class="kv-row">
           <div><small>Nationality</small><b>${natLabel(p.nat)}</b></div>
           <div><small>Age</small><b>${ageOf(p.dob)}</b></div>

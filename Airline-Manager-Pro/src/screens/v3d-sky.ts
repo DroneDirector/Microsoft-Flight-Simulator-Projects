@@ -776,8 +776,9 @@ function v3dMastMeshes(masts: number[][], gy: (x: number, z: number) => number):
 /** Navigation lights (red left, green right, white tail), white strobes, red beacons and landing lights, on the model itself. */
 function v3dPlaneLightsAdd(body: any, typeId: string) {
   if (!skyOpt('v3dAcLights')) return;
-  const s = shapeOf(typeId), W = s.wing, semi = s.span / 2, rootY = s.w / 2 * 0.9;
-  const wz0 = s.ground + W.z * s.h + (W.z > 0.9 ? -0.05 : 0.06), tipX = W.x + (semi - rootY) * Math.tan(W.sweep * D2R) + W.tip * 0.5, tipZ = wz0 + (semi - rootY) * Math.tan(W.dih * D2R);
+  const s = shapeOf(typeId), W = s.wing, heli = typeof isHeli === 'function' && isHeli(typeId), semi = heli ? s.w / 2 + 0.15 : s.span / 2, rootY = s.w / 2 * 0.9;
+  // helicopters: the red and green lights sit on the sides of the cabin (no wings)
+  const wz0 = s.ground + W.z * s.h + (W.z > 0.9 ? -0.05 : 0.06), tipX = heli ? s.L * 0.3 : W.x + (semi - rootY) * Math.tan(W.sweep * D2R) + W.tip * 0.5, tipZ = heli ? s.ground + s.h * 0.45 : wz0 + (semi - rootY) * Math.tan(W.dih * D2R);
   const v = (x: number, y: number, z: number) => _av(x, y, z);
   const pos: number[] = [], col: number[] = [], size: number[] = [], kind: number[] = [], dir: number[] = [], ph: number[] = [];
   const add = (p: any, c: number[], sz: number, k: number, d?: number[], phase?: number) => { pos.push(p.x, p.y, p.z); col.push(c[0], c[1], c[2]); size.push(sz); kind.push(k); dir.push(...(d || [0, 0, 0])); ph.push(phase || 0); };

@@ -33,7 +33,7 @@ function loadKnownAirports() {
   for (const icao of Object.keys(k)) if (!AIRPORTS[icao]) AIRPORTS[icao] = { icao, name: icao, city: icao, country: '', pos: k[icao] };
 }
 /** Keep an airport from the world list with the airline's saved airports, so routes always find it. */
-function registerWorldAirport(icao: string) { if (AIRPORTS[icao]) return; const a = World.get(icao); if (a) { registerAirport(icao, a.pos[0], a.pos[1]); AIRPORTS[icao] = { icao, name: a.name, city: a.city, country: a.country, pos: a.pos }; } }
+function registerWorldAirport(icao: string) { if (AIRPORTS[icao]) return; const a = World.get(icao); if (a) { registerAirport(icao, a.pos[0], a.pos[1]); AIRPORTS[icao] = { icao, name: a.name, city: a.city, country: a.country, pos: a.pos }; if ((a as any).size === 4) Object.assign(AIRPORTS[icao], { size: 4, hk: (a as any).hk }); } }
 function nearestKnownAirport(lon: number, lat: number, maxNm: number): string { return World.nearest(lon, lat, maxNm); }
 
 function onAirports(list: { icao: string; lat: number; lon: number }[]) {

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.122 (2026-11-03)
+
+- Helicopters: 16 types (aircraft.ts cls helicopter, helicopter-model.ts, speeds, capacity, FIELD, WX_LIMITS, engines, flight-configs, docs/reference/helicopters.txt)
+- heliports-world.json (OurAirports heliports; kinds hospital/offshore/other), World.helis, helisNear, isHelipad, helipadKind; aeroplanes refused at helipads
+- Helicopter missions (HELI_MISSIONS, Jobs.makeHeli, slingLimitKg); winch operators (hoistHeli, isWinchOp, roleNameOf, winch-train)
+- ratingConversion for helicopter/aeroplane licences; heliPath (pad to pad) in flightPathPos; helicopter perf class
+- Helicopter operators in Traffic (tfc-h ids), kept out of the league and crew lending; followed traffic never culled; trafficCardHtml in 3D
+- heliCabinBuild; helicopter nav lights on the cabin; rotor animation
+- newsHeliDelivery; helicopter crash art and wreckage layout; used market adds two helicopters (usedMarket v2)
+- New airliners: A319neo, A321ceo/neo/LR/XLR, A330-800/900neo, 737 MAX 7/8/9/10, 787-8/9, 777-9, engine options with perf
+- Lounge 3D (lounge3d.ts, lounge-props/), Fleet crew-need links and live-flight buttons
+
 ## 0.9.121 (2026-11-03)
 
 - go-hire: refresh in place and scroll to the hiring list

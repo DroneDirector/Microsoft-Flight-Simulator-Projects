@@ -136,7 +136,9 @@ function buildHelicopterModel(typeId: string, lv: Livery): any {
   root.userData.shape = heliShape(typeId); root.userData.engPts = []; root.userData.revPts = []; root.userData.props = []; root.userData.heli = true;
   root.userData.rotor = blades; root.userData.tailRot = tailRot;
   root.userData.set = (o: { spin?: number; gear?: number }) => {
-    if (o.spin != null) { blades.rotation.y = -o.spin * 2.2; tailRot.rotation[h.tail === 'fen' ? 'z' : 'z'] = o.spin * 11; disc.visible = !!(o as any).fast; }
+    // turning: a soft rotor disc with the blades going round slowly enough to see (as a camera catches them); stopped: still blades
+    const stop = !!(o as any).stopped;
+    if (o.spin != null) { blades.rotation.y = stop ? blades.rotation.y : -o.spin * 0.35; tailRot.rotation.z = stop ? tailRot.rotation.z : o.spin * 1.7; disc.visible = !stop; }
     const G = root.userData.gear; if (o.gear != null && G && h.gear === 'retract') { G.visible = o.gear > 0.02; G.scale.y = 0.2 + 0.8 * clamp(o.gear, 0, 1); }
   };
   try { Models.swap(root, helicopterModelFile(typeId)); } catch (e) { /* the app's own model */ }

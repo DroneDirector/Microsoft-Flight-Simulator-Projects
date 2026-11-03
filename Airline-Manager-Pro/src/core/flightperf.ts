@@ -42,6 +42,9 @@ function perfFor(t: AircraftType): PerfSpec {
 function perfForClass(t: AircraftType): PerfSpec {
   const kt = t.cruiseKt;
   // heavy four-engine and 777-size aircraft start lower and step-climb later; the newer twins go higher sooner
+  // helicopters: low (1,500-3,000 ft), direct, no taxi to speak of, steep approaches to the pad
+  if (t.cls === 'helicopter') return { maxAlt: kt > 145 ? 3500 : 2500, jet: false, mach: 0, climbIas: Math.round(kt * 0.6), climbMach: 0, descIas: Math.round(kt * 0.95), rocSL: 1000, rocTop: 700, rod: 700, appKt: 45, taxiOut: 2, taxiIn: 1, airway: 1.01, procNm: 1,
+    climbPerNm: 60, altBase: 800, descK: 3.2, decelNm: 0, finalNm: 1 };
   if (t.cls === 'widebody') return { maxAlt: t.seats >= 350 ? 35000 : 37000, jet: true, mach: kt / soundKt(36000), climbIas: 310, climbMach: 0.84, descIas: 290, rocSL: 2800, rocTop: 800, rod: 2300, appKt: 148, taxiOut: 17, taxiIn: 8, airway: 1.06, procNm: 28, climbPerNm: 85, altBase: 9000, descK: 3.3, decelNm: 12, finalNm: 11 };
   if (t.cls === 'airliner') return { maxAlt: 37000, jet: true, mach: kt / soundKt(36000), climbIas: 290, climbMach: 0.76, descIas: 280, rocSL: 3000, rocTop: 1000, rod: 2300, appKt: 138, taxiOut: 14, taxiIn: 7, airway: 1.045, procNm: 22, climbPerNm: 85, altBase: 9000, descK: 3.0, decelNm: 10, finalNm: 10 };
   if (t.cls === 'regional') return { maxAlt: 35000, jet: true, mach: kt / soundKt(35000), climbIas: 290, climbMach: 0.74, descIas: 280, rocSL: 3300, rocTop: 900, rod: 2200, appKt: 138, taxiOut: 11, taxiIn: 6, airway: 1.04, procNm: 16, climbPerNm: 90, altBase: 8000, descK: 3.0, decelNm: 8, finalNm: 9 };

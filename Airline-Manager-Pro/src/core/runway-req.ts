@@ -103,6 +103,8 @@ function runwayNeed(typeId: string, tow: number, lw: number, depElevFt: number, 
  *  can take when the runways limit the weight (a payload-limited flight). */
 function legRunwayCheck(typeId: string, from: string, to: string, pax?: number, cargoKg?: number): { ok: boolean; why: string; maxPax: number; full: boolean } {
   const t = acType(typeId) || AIRCRAFT[0], seats = pax == null ? t.seats : pax;
+  if (t.cls !== 'helicopter') for (const k of [from, to]) if (isHelipad(k)) return { ok: false, why: `${k} is a ${helipadKind(k).toLowerCase() === 'helipad' ? 'helipad' : helipadKind(k).toLowerCase() + ' helipad'}: helicopters only`, maxPax: 0, full: false };
+  if (t.cls === 'helicopter') return { ok: true, why: '', maxPax: seats, full: true };   // helicopters land on any pad or runway
   if (!World.runways) return { ok: true, why: '', maxPax: seats, full: true };
   const A: any = apt(from), B: any = apt(to); if (!A || !B) return { ok: true, why: '', maxPax: seats, full: true };
   const rd = usableRunway(typeId, from), ra = usableRunway(typeId, to), F = fieldSpec(typeId);

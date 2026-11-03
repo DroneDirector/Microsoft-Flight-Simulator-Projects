@@ -85,6 +85,10 @@ function poolAdvance() {
       const come = Math.min(room, Math.floor(busy * (role === 'fa' || role === 'ground' ? 6 : 4) + Math.random() * 2));
       for (let i = 0; i < come; i++) { S.staffCandidates.push(makePerson('cand-' + role + uid(), role, '', POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)])); arrived++; }
     }
+    // rescue winch operators come looking when an airline has hoist helicopters
+    if (State.fleet.some(a => hoistHeli(acType(a.typeId))) && S.staffCandidates.filter((x: any) => x.role === 'fa' && isWinchOp(x)).length < 3) {
+      for (let i = 0; i < 2; i++) { const w: any = makePerson('cand-fa' + uid(), 'fa', '', POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)]); w.winch = true; S.staffCandidates.push(w); arrived++; }
+    }
     // captains
     if (State.candidates.length > 1 && Math.random() < 0.35) State.candidates.splice(Math.floor(Math.random() * State.candidates.length), 1);
     if (State.candidates.length < 7 && Math.random() < 0.3 + busy * 0.4) { State.candidates.push(makePilotCandidate('cap' + uid())); arrived++; }

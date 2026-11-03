@@ -129,6 +129,13 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
     [0, 0, 1.6, (rnd(6) - 0.5) * 16, 2, (rnd(7) - 0.5) * 18],
     [-len * 0.45 - 14 - rnd(8) * 30, (rnd(9) - 0.5) * 30, 0.8, 60 + rnd(10) * 70, 4, -30 - rnd(11) * 40],
   ];
+  // a helicopter comes down short and steep: the cabin on its side where it hit, the tail boom torn off a few
+  // metres away, the rotor blades broken and thrown around it
+  const heli = typeof isHeli === 'function' && isHeli(site.typeId);
+  if (heli && !dmg) {
+    cuts.length = 0; cuts.push([0, 0.46], [0.46, 1.01]);
+    lay.length = 0; lay.push([len * 0.05, 0, 0.5, (rnd(3) - 0.5) * 40, -15 - rnd(4) * 10, 70 + rnd(5) * 25], [-len * 0.45 - 3 - rnd(8) * 6, (rnd(9) - 0.5) * 9, 0.25, 40 + rnd(10) * 90, 6, -25 - rnd(11) * 30]);
+  }
   if (V3d.r) V3d.r.localClippingEnabled = true;
   cuts.forEach((cut, i) => {
     const m = buildAircraftModel(site.typeId, lv); try { m.userData.set && m.userData.set({ flaps: 0.3, gear: 0, spoilers: 1 }); } catch (e) { /* static */ }
@@ -160,7 +167,14 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   }
   const scar = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffffff, map: V3dCrash.sootTex, transparent: true, opacity: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10 }));
   scar.material.userData.noDim = true;
-  const sc = at(-len * 0.6 - 60, 0); scar.position.set(sc[0], gy(sc[0], sc[1]) + 0.6, sc[1]); scar.scale.set(s.span * 0.9, 1, len * 2.6 + 140); scar.rotation.y = -h; scar.renderOrder = 7;
+  const sc = at(heli ? -len * 0.2 : -len * 0.6 - 60, 0); scar.position.set(sc[0], gy(sc[0], sc[1]) + 0.6, sc[1]); scar.scale.set(s.span * 0.9, 1, heli ? len * 1.4 + 8 : len * 2.6 + 140); scar.rotation.y = -h; scar.renderOrder = 7;
+  if (heli && !dmg) {   // the broken rotor blades
+    const mB = new T.MeshStandardMaterial({ color: 0x1E2126, roughness: 0.9 }), bl = s.span / 2;
+    for (let k = 0; k < 5; k++) {
+      const piece = new T.Mesh(new T.BoxGeometry(bl * (0.25 + rnd(40 + k) * 0.6), 0.06, 0.45), mB), q = at((rnd(50 + k) - 0.5) * len * 1.4, (rnd(60 + k) - 0.5) * s.span * 1.2);
+      piece.position.set(q[0], gy(q[0], q[1]) + 0.08, q[1]); piece.rotation.set((rnd(70 + k) - 0.5) * 0.4, rnd(80 + k) * 6.28, (rnd(90 + k) - 0.5) * 0.3); piece.castShadow = true; grp.add(piece);
+    }
+  }
   const burn = new T.Mesh(new T.CircleGeometry(1, 28).rotateX(-Math.PI / 2), scar.material); burn.position.set(P.x, y0 + 0.65, P.z); burn.scale.set(s.span * 1.3, 1, len * 1.2); burn.renderOrder = 7;
   if (dmg) { scar.scale.set(s.span * 0.4, 1, len * 1.2 + 40); burn.scale.set(s.span * 0.35, 1, len * 0.4); }
   if (!sea) grp.add(scar, burn);

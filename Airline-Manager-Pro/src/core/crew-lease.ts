@@ -8,7 +8,7 @@ const LEASE_FALLBACK = ['Nordwind Regional', 'Atlantic Link', 'Skyways Connect',
 
 function leaseAirlines(): string[] {
   let names: string[] = [];
-  try { names = Traffic.airlines().map((a: any) => a.name).filter((n: string) => n && n !== company().name); } catch (e) { names = []; }
+  try { names = Traffic.airlines().filter((a: any) => !a.heli).map((a: any) => a.name).filter((n: string) => n && n !== company().name); } catch (e) { names = []; }
   if (names.length < 3) names = names.concat(LEASE_FALLBACK);
   return names.filter((n, i, l) => l.indexOf(n) === i);
 }

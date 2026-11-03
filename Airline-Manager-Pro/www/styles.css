@@ -4207,3 +4207,6 @@ html.calm .dclock b em { animation: none; }
 .lg3d .ctl-fill, .exit-lounge .ctl-fill { background: linear-gradient(90deg, #7A5A12, #D4AF37, #FFF0C8); }
 .lg3d .ctl-tip, .exit-lounge .ctl-tip, .lg3d .ctl-info b, .exit-lounge .ctl-info b { color: #F6E3A8; }
 .lg-emb .lg-steam { animation: lgSteam 3s ease-in-out infinite; } @keyframes lgSteam { 0%, 100% { opacity: .2; transform: translateY(4px); } 50% { opacity: .9; transform: translateY(-4px); } }
+.apt-btn .hp-chip { font-style: normal; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px; margin-left: 4px; background: rgba(255, 92, 92, .16); color: #ff8a8a; vertical-align: middle; }
+.job-sp.sp-hems, .job-sp.sp-sar { background: rgba(242, 92, 84, .16); color: #FF8A80; }
+.job-sp.sp-offshore { background: rgba(255, 170, 60, .16); color: #FFC274; }

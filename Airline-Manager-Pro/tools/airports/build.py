@@ -41,7 +41,22 @@ for r in csv.DictReader(open(os.path.join(src, 'runways.csv'), encoding='utf-8')
     rw.setdefault(ident, []).append([r['le_ident'], r['he_ident'], length, width, r['surface'][:12],
         f(r['le_latitude_deg'], 6), f(r['le_longitude_deg'], 6), f(r['he_latitude_deg'], 6), f(r['he_longitude_deg'], 6), f(r['le_heading_degT'], 1)])
 
-used = {r[3] for r in rows}
+# heliports, apart: [ident, name, city, country code, lat, lon, elevation ft, kind]; kind h hospital, o offshore, c other
+import re
+HOSP = re.compile(r'hospital|medical|clinic|klinik|sykehus|sjukhus|sygehus|krankenhaus|h[oô]pital|ospedale|hospitál|health|infirmary|trauma|children', re.I)
+OFF = re.compile(r'helideck|platform|\brig\b|fpso|offshore|jacket|\bfso\b|semi-sub|drilling', re.I)
+heli = []
+for r in csv.DictReader(open(os.path.join(src, 'airports.csv'), encoding='utf-8')):
+    if r['type'] != 'heliport': continue
+    ident = r['ident'].strip().upper(); lat, lon = f(r['latitude_deg']), f(r['longitude_deg'])
+    if not ident or ident in ids or lat is None or lon is None: continue
+    ids.add(ident); nm = r['name'].strip()
+    try: elev = int(float(r['elevation_ft'])) if r['elevation_ft'] else 0
+    except: elev = 0
+    heli.append([ident, nm, r['municipality'].strip(), r['iso_country'], lat, lon, elev, 'h' if HOSP.search(nm) else 'o' if OFF.search(nm) else 'c'])
+json.dump({'source': 'OurAirports (public domain)', 'heliports': heli}, open(os.path.join(out, 'heliports-world.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+print(f'{len(heli)} heliports')
+used = {r[3] for r in rows} | {r[3] for r in heli}
 json.dump({'source': 'OurAirports (public domain)', 'countries': {k: v for k, v in countries.items() if k in used}, 'airports': rows},
           open(os.path.join(out, 'airports-world.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
 json.dump(rw, open(os.path.join(out, 'runways-world.json'), 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))

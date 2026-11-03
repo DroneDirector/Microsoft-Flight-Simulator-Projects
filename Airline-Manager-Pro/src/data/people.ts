@@ -100,6 +100,7 @@ function makePerson(seed: string, role: CrewRole, companyId: string, base: strin
     status: pick(['on duty', 'on duty', 'off', 'resting'] as any),
     xp: startingXp(seed, role, age),
     job: role === 'ground' ? GROUND_JOBS[Math.floor(r() * GROUND_JOBS.length)][0] : undefined,
+    winch: role === 'fa' && seeded(seed + 'winch')() < 0.22 ? true : undefined,   // some cabin crew are trained rescue winch operators
   } as any;
 }
 
@@ -200,7 +201,17 @@ function ageOf(dob: string): number {
 
 /* ---------- Real-world crew requirements ---------- */
 // Flight attendants: aircraft with 20+ passenger seats need 1 per 50 seats (rounded up).
-function faNeeded(t: AircraftType): number { return t.seats >= 20 ? Math.ceil(t.seats / 50) : 0; }
+function faNeeded(t: AircraftType): number { return t.cls === 'helicopter' ? (hoistHeli(t) ? 1 : 0) : t.seats >= 20 ? Math.ceil(t.seats / 50) : 0; }
+/** Search-and-rescue and air-ambulance helicopters fitted with a rescue hoist fly with a third crew member: the winch operator. */
+function hoistHeli(t: AircraftType): boolean {
+  if (!t || t.cls !== 'helicopter') return false;
+  const roles: string[] = (t as any).roles || [], sp: any = typeof heliSpec === 'function' ? heliSpec(t.id) : null;
+  return (roles.indexOf('sar') >= 0 || roles.indexOf('hems') >= 0) && !!(sp && sp.hoist);
+}
+/** A trained winch operator (hired as one, or trained up from the cabin crew). */
+function isWinchOp(p: any): boolean { return !!p && (p.winch === true || (p.winchFrom && p.winchFrom <= Date.now())); }
+/** What to call a person: their role, or winch operator for rescue crew. */
+function roleNameOf(p: any): string { const r = personRole(p); return r === 'fa' && isWinchOp(p) ? 'Winch operator' : ROLE_NAMES[r]; }
 /** The flight attendants who fly on an aircraft: your own hired cabin crew, each aircraft its own team (as many
  *  as its seats need), kept from flight to flight so the same faces are on the same aircraft. People who leave,
  *  are dismissed, suspended, ill, on strike or off duty are replaced from the rest of the cabin crew, first
@@ -210,7 +221,7 @@ function planeCabinCrew(reg: string): Staff[] {
   const t = acType(a.typeId); if (!t) return [];
   S.faCrew = S.faCrew || {};
   const ok = (x: any) => x && !x.suspended && !x.left && !x.onStrike && x.status !== 'off' && !(x.sickUntil && x.sickUntil > Date.now());
-  const all: Staff[] = staffOf(a.companyId, 'fa'), byId = (id: string) => all.filter(x => x.id === id)[0];
+  const all: Staff[] = staffOf(a.companyId, 'fa').filter((x: any) => !hoistHeli(t) || isWinchOp(x)), byId = (id: string) => all.filter(x => x.id === id)[0];
   const need = Math.max(1, faNeeded(t));
   const taken: { [id: string]: boolean } = {};
   for (const r of Object.keys(S.faCrew)) if (r !== reg && plane(r)) for (const id of S.faCrew[r]) taken[id] = true;
@@ -228,17 +239,20 @@ function pilotsNeeded(t: AircraftType, blockMin: number): number {
   return blockMin > 13 * 60 ? 4 : blockMin > 9 * 60 ? 3 : 2;
 }
 
-interface CrewCheck { faNeed: number; faHave: number; mechNeed: number; mechHave: number; blocked: { [reg: string]: string[] } }
+interface CrewCheck { winchNeed?: number; winchHave?: number; faNeed: number; faHave: number; mechNeed: number; mechHave: number; blocked: { [reg: string]: string[] } }
 function crewCheck(cid?: string): CrewCheck {
   const c = cid || State.companyId;
   const fl = State.fleet.filter(a => a.companyId === c);
   const active = fl.filter(a => a.status !== 'grounded' && a.status !== 'maintenance');
   const order = active.slice().sort((a, b) => (a.status === 'flying' ? 0 : 1) - (b.status === 'flying' ? 0 : 1));
   const faHave = staffOf(c, 'fa').length, mechHave = staffOf(c, 'mech').length;
-  let faNeed = 0, faLeft = faHave;
+  let faNeed = 0, faLeft = faHave, winchNeed = 0, winchLeft = staffOf(c, 'fa').filter(isWinchOp).length;
+  const winchHave = winchLeft;
   const blocked: { [reg: string]: string[] } = {};
   for (const a of order) {
-    const n = faNeeded(acType(a.typeId)); faNeed += n;
+    const at = acType(a.typeId);
+    if (hoistHeli(at)) { winchNeed++; if (winchLeft < 1) (blocked[a.reg] = blocked[a.reg] || []).push('needs a winch operator'); winchLeft--; faLeft--; continue; }
+    const n = faNeeded(at); faNeed += n;
     if (n > faLeft) (blocked[a.reg] = blocked[a.reg] || []).push(`needs ${n - Math.max(faLeft, 0)} more flight attendant${n - Math.max(faLeft, 0) > 1 ? 's' : ''}`);
     faLeft -= n;
   }
@@ -253,7 +267,7 @@ function crewCheck(cid?: string): CrewCheck {
   }
   const myA = plane((State as any).myReg[c]);
   if (myA && multiCrew(acType(myA.typeId)) && !State.pilots.some((p: any) => p.coPilotFor === c)) (blocked[myA.reg] = blocked[myA.reg] || []).push('needs a co-pilot');
-  return { faNeed, faHave, mechNeed, mechHave, blocked };
+  return { faNeed, faHave, mechNeed, mechHave, blocked, winchNeed, winchHave };
 }
 
 /** The jobs on the ramp: who drives what and who handles what. */

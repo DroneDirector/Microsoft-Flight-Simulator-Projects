@@ -46,7 +46,7 @@ function league(month?: string, upto?: number): LeagueRow[] {
   const m = month || _monthKey(), u = upto || Date.now(), k = m + ':' + company().id + ':' + (upto ? 'end' : '');
   if (!upto && _lgCache && _lgCache.k === k && Date.now() - _lgCache.at < 600e3) { const rows = _lgCache.rows.filter(r => !r.you).concat([myLeagueRow(m)]); return rows.sort((a, b) => (+b.ok - +a.ok) || b.index - a.index); }
   // co-op: against other co-op airlines; single player: against the computer-run airlines
-  const ai = Mode.coop() ? coopRivalRows(m, u) : Traffic.airlines().map(A => aiAirlineMonth(A, m, u));
+  const ai = Mode.coop() ? coopRivalRows(m, u) : Traffic.airlines().filter(A => !(A as any).heli).map(A => aiAirlineMonth(A, m, u));
   if (!upto) _lgCache = { k, at: Date.now(), rows: ai };
   return ai.concat([myLeagueRow(m)]).sort((a, b) => (+b.ok - +a.ok) || b.index - a.index);
 }
