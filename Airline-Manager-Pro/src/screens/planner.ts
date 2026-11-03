@@ -102,7 +102,7 @@ SCREENS.planner = {
         <div class="pl-sum"></div>
       </div>
       <div class="pl-body"><div class="pl-map" id="pl-map"><div class="pl-maptools"><button class="btn sm ${U.addMode ? 'primary' : 'ghost'}" data-act="pl-addmode">${icon('plus')}${U.addMode ? 'Tap the map to add' : 'Add waypoints'}</button><button class="btn sm ghost" data-act="pl-fit">${icon('focus')}Whole route</button></div></div>
-        <div class="pl-side"><div class="seg pl-tabs">${[['route', 'Route'], ['wx', 'Weather'], ['notam', 'NOTAMs']].map(t => `<button class="${U.tab === t[0] ? 'on' : ''}" data-act="pl-tab" data-t="${t[0]}">${t[1]}</button>`).join('')}</div><div class="pl-panel"></div></div></div>
+        <div class="pl-side"><div class="seg pl-tabs">${[['route', 'Route'], ['rwy', 'Runways'], ['wx', 'Weather'], ['notam', 'NOTAMs']].map(t => `<button class="${U.tab === t[0] ? 'on' : ''}" data-act="pl-tab" data-t="${t[0]}">${t[1]}</button>`).join('')}</div><div class="pl-panel"></div></div></div>
       <div class="pl-prof"><canvas class="pl-prof-cv"></canvas></div>
     </div>`;
   },
@@ -242,7 +242,7 @@ function plPanelRedraw(soft?: boolean) {
   const sum = document.querySelector('.planner .pl-sum') as HTMLElement;
   if (sum) sum.innerHTML = plSummaryHtml(P);
   if (soft && document.activeElement && panel.contains(document.activeElement)) return;   // don't redraw under your fingers
-  panel.innerHTML = !P ? '<p class="muted">Pick a route, or type two airports.</p>' : U.tab === 'wx' ? plWxHtml(P) : U.tab === 'notam' ? plNotamHtml(P) : plRouteHtml(P);
+  panel.innerHTML = !P ? '<p class="muted">Pick a route, or type two airports.</p>' : U.tab === 'wx' ? plWxHtml(P) : U.tab === 'notam' ? plNotamHtml(P) : U.tab === 'rwy' ? plRwyHtml(P) : plRouteHtml(P);
   plProfileDraw();
 }
 function plSummaryHtml(P: FlightPlanR): string {
@@ -270,6 +270,30 @@ function plRouteHtml(P: FlightPlanR): string {
     <div class="pl-add"><input class="pl-addin" placeholder="Add: an airport (EKVG), a position (6200N00700W) or 62.0 -7.0" aria-label="Add a waypoint"><button class="btn sm" data-act="pl-addtxt">${icon('plus')}Add</button></div>
     <small class="muted">Levels: FL350 or 35000; a waypoint's level is flown from it on (step climbs and descents at the waypoint). Speeds: M.82 or 280 (indicated knots), empty for the aircraft's own. Drag a waypoint on the map to move it.</small>
     <div class="pl-btns">${typeof svcOk === 'function' && svcOk('simbriefApi') && SimBrief.user() ? `<button class="btn sm" data-act="pl-simbrief">${icon('download')}From my SimBrief flight plan</button>` : ''}<button class="btn sm" data-act="pl-awy">${icon('routes')}Real airways (Flight Simulator)</button><button class="btn ghost sm" data-act="pl-reset">Start again: straight route</button><button class="btn ghost sm" data-act="pl-remove">Remove this plan</button></div>`;
+}
+/** Runways: the take-off and landing runway for every flight on this route (yours and your pilots'), by the wind or
+ *  assigned, with the wind along each, and the departure, arrival and approach the flights then fly. */
+function plRwyHtml(P: FlightPlanR): string {
+  const path: FlightPath = PlannerUi.path, RR = routeRunways(P.from, P.to);
+  const SRC: any = { faa: 'published (FAA)', sim: 'published (Flight Simulator)' };
+  const side = (icao: string, k: 'depRwy' | 'arrRwy', title: string) => {
+    const ends = runwayEnds(icao), act = activeRunway(icao), cur = (P as any)[k] || '', use = k === 'depRwy' ? RR.dep : RR.arr;
+    const wtxt = (r: RunwayEnd) => { const w = runwayWind(r); return w.kt < 1 ? 'calm' : w.head >= 0 ? `head ${w.head} kt` : `tail ${-w.head} kt`; };
+    const opt = (r: RunwayEnd) => `<option value="${esc(r.name)}" ${rwyMatch(cur, r.name) ? 'selected' : ''}>${esc(r.name)} · ${num(Math.round(r.lenM))} m · ${wtxt(r)}${r.ils ? ' · ILS' : ''}</option>`;
+    const sel = cur ? runwayByName(icao, cur) : null, ws = sel ? runwayWind(sel) : null, w = use ? runwayWind(use) : null, lim = wxLimit(PlannerUi.typeId || plType());
+    const warn = sel && ws && -ws.head > RWY_TAIL_MAX ? `Tailwind ${-ws.head} kt on ${sel.name}: flights take off and land on ${use ? use.name : 'the runway in use'} until the wind turns.`
+      : w && use && w.cross > lim.xw ? `Crosswind ${w.cross} kt on ${use.name}: more than the ${lim.xw} kt this aircraft is allowed.` : '';
+    const part = path ? path.parts.filter(q => q.kind === (k === 'depRwy' ? 'sid' : 'star'))[0] : null, app = path && k === 'arrRwy' ? path.parts.filter(q => q.kind === 'app')[0] : null;
+    const src = path ? (path as any)[k === 'depRwy' ? 'depSrc' : 'arrSrc'] : '';
+    return `<div class="pl-rwy"><h4 class="pl-h">${title} · ${esc(icao)} <small>${esc((apt(icao) || { name: '' } as any).name)}</small></h4>
+      <label><small>Runway</small><select class="pl-rwysel" data-k="${k}" aria-label="${title} runway"><option value="" ${!cur ? 'selected' : ''}>By the wind${act ? ` (now ${esc(act.name)})` : ''}</option>${ends.map(opt).join('')}</select></label>
+      ${ends.length ? '' : '<small class="muted">The runways of this airport aren\'t known yet.</small>'}
+      ${warn ? `<p class="pl-warn">${icon('alert')}${esc(warn)}</p>` : ''}
+      <div class="pl-procs">${part ? `<span><small>${k === 'depRwy' ? 'Departure' : 'Arrival'}</small><b>${esc(part.name)}</b></span>` : ''}${app ? `<span><small>Approach</small><b>${esc(app.name)}</b></span>` : ''}
+        <span><small>Procedures</small><b>${src ? SRC[src] || 'published' : 'built from the runway'}</b></span></div></div>`;
+  };
+  return `${side(P.from, 'depRwy', 'Take-off')}${side(P.to, 'arrRwy', 'Landing')}
+    <small class="muted">Every flight ${esc(P.from)} → ${esc(P.to)} uses these runways: yours and the ones your pilots fly. "By the wind" takes the runway in use, the way the tower does. US airports fly the FAA's published departures, arrivals and approaches (they come with the app, so Flight Simulator doesn't need to be running); elsewhere the ones read from Flight Simulator when it has been linked, otherwise ones built from the runway.</small>`;
 }
 function plWxHtml(P: FlightPlanR): string {
   const hz = plHazards(), path: FlightPath = PlannerUi.path, pr: FlightProfile = PlannerUi.prev;
@@ -309,6 +333,8 @@ document.addEventListener('change', e => {
     const w = P.wps.filter(q => q.id === el.getAttribute('data-id'))[0]; if (!w) return;
     if (el.classList.contains('pl-alt')) { const a = plParseAlt(el.value); if (a >= 1000 && a <= 51000) w.alt = a; }
     else { const sp = plParseSpd(el.value); w.spd = sp.spd; w.mach = sp.mach; if (!sp.spd) delete w.spd; if (!sp.mach) delete w.mach; }
+  } else if (el.classList.contains('pl-rwysel')) {
+    const k = el.getAttribute('data-k'); (P as any)[k] = el.value || undefined; if (!el.value) delete (P as any)[k];
   } else if (el.classList.contains('pl-g')) {
     const k = el.getAttribute('data-k'), v = el.value.trim().toUpperCase();
     if (k === 'altn') P.altn = apt(v) ? v : ''; else { const n = parseInt(v, 10); (P as any)[k] = isFinite(n) && n >= 120 && n <= 360 ? n : undefined; }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.99 (2026-11-03)
+
+- Flight planner: Runways tab (plRwyHtml); runway per route for every flight (FlightPlanR depRwy/arrRwy, procPick, routeRunways, runwayEnds, runwayWind, runwayByName; over 10 kt tailwind falls back to the runway in use)
+- FAA CIFP published procedures bundled for US airports (tools/navdata/cifp.py, fetch.py in the build; BundledProcs loads navdata/cifp per two-letter group), used when the simulator has none
+- navaids-world.json from OurAirports (tools/navdata/navaids.py)
+- Schedule: the Refresh label always shows
+
 ## 0.9.98 (2026-11-03)
 
 - Schedule: Refresh button with a countdown (sched-refresh), schedRefreshAll redraws every open schedule, by itself every 30 seconds

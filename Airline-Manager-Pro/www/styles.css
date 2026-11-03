@@ -3051,7 +3051,7 @@ kbd { font: 600 11px Inter, sans-serif; color: var(--ink-2); border: 1px solid v
 .pl-pick { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 .pl-pick label { display: flex; flex-direction: column; gap: 3px; }
 .pl-pick small, .pl-glob small { color: var(--ink-3); font-size: 11px; }
-.pl-pick select, .pl-pick input, .pl-glob input, .pl-wps input, .pl-add input { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: 9px; padding: 7px 9px; font: 500 13px Inter, sans-serif; }
+.pl-pick select, .pl-pick input, .pl-glob input, .pl-wps input, .pl-add input, .pl-rwy select { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: 9px; padding: 7px 9px; font: 500 13px Inter, sans-serif; }
 .pl-pick input { width: 74px; text-transform: uppercase; }
 .planner:not(.other) .pl-other { display: none; }
 .pl-sum { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
@@ -3815,4 +3815,15 @@ html.calm .dclock b em { animation: none; }
 .sched-refresh small { min-width: 28px; padding: 2px 6px; border-radius: 8px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ink-2); background: var(--panel-3); text-align: center; }
 .sched-refresh.spin .ic { animation: schedSpin .7s var(--ease); }
 @keyframes schedSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
-@media (max-width: 900px) { .sched-refresh > span { display: none; } }
+.sched-refresh { white-space: nowrap; }
+/* Flight planner: runways */
+.pl-rwy { padding: 10px 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.pl-rwy .pl-h small { font-weight: 500; color: var(--ink-2); margin-left: 4px; }
+.pl-rwy label { display: grid; gap: 4px; margin-top: 6px; }
+.pl-rwy select { width: 100%; }
+.pl-procs { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; }
+.pl-procs span { display: grid; gap: 1px; }
+.pl-procs small { color: var(--ink-3); font-size: 11px; }
+.pl-procs b { font-size: 13px; font-variant-numeric: tabular-nums; }
+.pl-warn { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: rgba(255,176,32,.12); color: var(--amber, #FFB020); font-size: 12.5px; }
+.pl-warn .ic { flex: none; width: 16px; height: 16px; }

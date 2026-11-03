@@ -64,6 +64,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Navigation data (FAA CIFP)
+        working-directory: Airline-Manager-Pro
+        continue-on-error: true
+        run: python tools/navdata/fetch.py assets/navdata/cifp
+
       - name: Build the app for the PC window
         working-directory: Airline-Manager-Pro
         run: |
@@ -203,6 +208,10 @@ jobs:
 
       - name: Install
         run: npm install --no-audit --no-fund
+
+      - name: Navigation data (FAA CIFP)
+        continue-on-error: true
+        run: python3 tools/navdata/fetch.py assets/navdata/cifp
 
       - name: Build web app
         run: npm run build

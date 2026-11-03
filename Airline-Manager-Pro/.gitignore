@@ -14,3 +14,6 @@ www/runways-world.json
 
 # test screenshots never belong in the repository root
 /*.png
+www/navaids-world.json
+www/navdata/
+assets/navdata/
