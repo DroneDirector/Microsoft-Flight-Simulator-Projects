@@ -608,6 +608,7 @@ function hgMonitor(A: any, xc: number, tz: number) {
   const glow = new T.PointLight(0x9CC8FF, 0.8, 2.4, 1.6); glow.position.set(xc, 1.12, tz + 0.2); root.add(glow);
   const hit = new T.Mesh(new T.BoxGeometry(1.2, 0.6, 0.6), new T.MeshBasicMaterial({ visible: false })); hit.position.set(xc, 1.0, tz); hit.userData.act = 'monitor'; root.add(hit); A.hits.push(hit);
   // the corners of the screen, for the zoom into it
+  A.monEye = new T.Vector3(xc, 1.2, tz + 0.62); A.monAt = new T.Vector3(xc, 1.1, tz - 0.05);
   A.monRect = [[xc - 0.54, y0 + 0.16, tz + 0.12], [xc + 0.54, y0 + 0.16, tz + 0.12], [xc - 0.54, y0 - 0.16, tz + 0.12], [xc + 0.54, y0 - 0.16, tz + 0.12], [xc, y0 + 0.16, tz - 0.05], [xc, y0 - 0.16, tz - 0.05]];
 }
 function hgKeys(): HTMLCanvasElement {
@@ -900,7 +901,10 @@ function hgFrame() {
     try { M.m.pose({ t: now + M.seed, yaw: 0, gaze: [0, talking ? 0.05 : -0.1], blink: ((now + M.seed) % 4.3) < 0.12 ? 1 : 0, g: humanGesture(null, now + M.seed), talk: talking ? humanTalk(M.p.name, R.sayText, R.sayAt) : 0 }); } catch (e) { /* still */ }
   }
   if (R.glow) { if (R.overlay || R.zoomAnim || R.panelOpen) R.glow.hide(); R.glow.step(dt); }
-  if (R.A && R.A.monScr) { const zk = hgZoomK(); R.A.monScr.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, zk * 1.4))); }
+  // working at the monitor: you lean in to it as its screen comes up (and back out as it goes)
+  R.walkPos = R.cam.position.clone(); R.walkQuat = R.cam.quaternion.clone();
+  if (R.A && R.A.monScr) { const zk = hgZoomK(); R.A.monScr.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, zk * 1.4)));
+    if (zk > 0 && R.A.monEye) { const e = zk * zk * (3 - 2 * zk), q0 = R.cam.quaternion.clone(); R.cam.position.lerp(R.A.monEye, e); R.cam.lookAt(R.A.monAt); const q1 = R.cam.quaternion.clone(); R.cam.quaternion.copy(q0).slerp(q1, e); } }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function lerpAng(a: number, b: number, k: number): number { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; }
@@ -1243,8 +1247,11 @@ function hgZoomK(): number {
 }
 function hgMonRect(): { x: number; y: number; w: number; h: number } {
   const R = HangarRoom, T = THREE, rr = R.root.getBoundingClientRect(); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  // seen from where you stand (not from where you lean in to it)
+  const kp = R.cam.position.clone(), kq = R.cam.quaternion.clone(); if (R.walkPos) { R.cam.position.copy(R.walkPos); R.cam.quaternion.copy(R.walkQuat); }
   R.cam.updateMatrixWorld();
   for (const p of R.A.monRect || []) { const v = new T.Vector3(p[0], p[1], p[2]).project(R.cam), sx = (v.x + 1) / 2 * rr.width, sy = (1 - v.y) / 2 * rr.height; x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy); }
+  R.cam.position.copy(kp); R.cam.quaternion.copy(kq); R.cam.updateMatrixWorld();
   return { x: x0, y: y0, w: Math.max(40, x1 - x0), h: Math.max(30, y1 - y0) };
 }
 function hgScreenOpen(key: string) {
@@ -1350,11 +1357,32 @@ function roomExitMenu(root: HTMLElement, here: string, leave: (to: string) => vo
 /** After leaving a room: on to where you chose. */
 function roomGoTo(to: string) {
   try { closeAll(); } catch (e) { /* nothing open */ }
-  if (to === 'hangars') go('hangars');
+  if (to.indexOf('visit:') === 0) { const v = to.slice(6).split('|'); go('hangars'); setTimeout(() => HangarRoom.open(v[0], v[1], v[2]), 60); }
+  else if (to === 'hangars') go('hangars');
   else if (to === 'office') { go('ops'); setTimeout(() => ACTIONS['office-open'](null, null), 60); }
   else if (to === 'ops') { go('ops'); setTimeout(() => ACTIONS['ops-room'](null, null), 60); }
   else if (to === 'court') { go('ops'); setTimeout(() => ACTIONS['court-enter'](null, null), 60); }
   else go('ops');
 }
 
-ACTIONS['hangar-visit'] = el => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };
+/** A place picked on a computer (or anywhere) while you are in one of the rooms: the screen goes away, you leave the
+ *  room through its own loading screen, and the place opens. The room you are in just shows itself again. */
+function roomLeaveFor(dest: string): boolean {
+  const H: any = typeof HangarRoom !== 'undefined' ? HangarRoom : null, O: any = typeof OpsRoom !== 'undefined' ? OpsRoom : null, F: any = typeof OfficeRoom !== 'undefined' ? OfficeRoom : null;
+  const here = H && H.on ? 'hangars' : O && O.on ? 'ops' : F && F.on ? 'office' : ''; if (!here) return false;
+  if (dest === here) { if (here === 'hangars' && H.overlay) hgScreenClose(); else if (here === 'ops' && O.overlay) opsScreenClose(); else if (here === 'office') { try { closeAll(); } catch (e) { /* none */ } try { if (F.overlay && typeof ofLaptopClose === 'function') ofLaptopClose(); } catch (e) { /* none */ } } return true; }
+  try { if (Lap.root) lapUnmount(); } catch (e) { /* closed */ }
+  try { closeAll(); } catch (e) { /* none */ }
+  if (here === 'hangars') { if (H.overlay) { H.overlay.remove(); H.overlay = null; document.body.classList.remove('of-over'); } hgLeave(dest); }
+  else if (here === 'ops') { if (O.overlay) { O.overlay.remove(); O.overlay = null; document.body.classList.remove('of-over'); } opsLeave(dest); }
+  else ofExitToMain('', dest);
+  return true;
+}
+(() => {
+  const wrap = (k: string, dest: (el: any) => string) => { const f = ACTIONS[k]; ACTIONS[k] = (el: any, ev: any) => { if (roomLeaveFor(dest(el))) return; f(el, ev); }; };
+  wrap('office-open', () => 'office'); wrap('ops-room', () => 'ops'); wrap('court-enter', () => 'court');
+})();
+
+ACTIONS['hangar-visit'] = el => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; const to = 'visit:' + [g('data-reg'), g('data-base'), g('data-size')].join('|');
+  if ((HangarRoom.on || (typeof OpsRoom !== 'undefined' && OpsRoom.on) || (typeof OfficeRoom !== 'undefined' && OfficeRoom.on)) && roomLeaveFor(to)) return;
+  closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };

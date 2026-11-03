@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.119 (2026-11-03)
+
+- lap-close and roomGo know the hangar's monitor; camera glide to the hangar monitor (monEye/monAt), rect from the standing view
+- roomLeaveFor: office-open, ops-room, court-enter and hangar-visit from inside a room leave it first (roomGoTo visit:)
+
 ## 0.9.118 (2026-11-03)
 
 - Rail: Hangars between Operations and Court (own highlight); hangar list progress bar (hgProgress)
