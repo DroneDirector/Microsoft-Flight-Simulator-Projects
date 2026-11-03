@@ -1,17 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Airline Manager Pro widget: the airline on top, the game's charts, the tablet's readings with charts, and the
+     buttons. Sections show or hide by the widget's kind and size (StatusWidget.draw); charts fill their space. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="12dp"
+    android:padding="10dp"
     android:background="@drawable/amp_widget_bg">
-    <TextView android:id="@+id/w_title" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textColor="#93A9C1" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
-    <TextView android:id="@+id/w_balance" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textColor="#E6EEF7" android:textSize="22sp" android:textStyle="bold" android:maxLines="1" />
-    <TextView android:id="@+id/w_next" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textColor="#3FD0E8" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
-    <TextView android:id="@+id/w_flying" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textColor="#93A9C1" android:textSize="12sp" android:maxLines="1" />
+
+    <!-- the airline: name, balance, today's profit, the next flight, in the air; what needs you -->
+    <LinearLayout android:id="@+id/w_head" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:id="@+id/w_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#93A9C1" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="bottom">
+                <TextView android:id="@+id/w_balance" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#E6EEF7" android:textSize="22sp" android:textStyle="bold" android:maxLines="1" />
+                <TextView android:id="@+id/w_profit" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:textSize="13sp" android:textStyle="bold" android:maxLines="1" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_next" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#3FD0E8" android:textSize="12sp" android:maxLines="1" android:ellipsize="end" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end">
+            <TextView android:id="@+id/w_flying" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#E6EEF7" android:textSize="12sp" android:maxLines="1" />
+            <TextView android:id="@+id/w_alerts" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#F2B544" android:textSize="12sp" android:maxLines="1" />
+            <TextView android:id="@+id/w_track" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:paddingStart="8dp" android:paddingEnd="8dp" android:paddingTop="3dp" android:paddingBottom="3dp" android:background="@drawable/amp_widget_btn" android:textColor="#E6EEF7" android:textSize="11sp" android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- the game: profit, jet fuel, the fleet in the air -->
+    <LinearLayout android:id="@+id/w_row_game" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="6dp" android:orientation="horizontal">
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:background="@drawable/amp_widget_tile" android:padding="6dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Profit" android:textColor="#93A9C1" android:textSize="11sp" />
+            <ImageView android:id="@+id/w_ch_profit" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:scaleType="fitXY" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/w_tile_fuel" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="6dp" android:orientation="vertical" android:background="@drawable/amp_widget_tile" android:padding="6dp">
+            <TextView android:id="@+id/w_fuel" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#93A9C1" android:textSize="11sp" android:maxLines="1" />
+            <ImageView android:id="@+id/w_ch_fuel" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:scaleType="fitXY" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/w_tile_fleet" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="6dp" android:orientation="vertical" android:background="@drawable/amp_widget_tile" android:padding="6dp">
+            <TextView android:id="@+id/w_fleet" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#93A9C1" android:textSize="11sp" android:maxLines="1" />
+            <ImageView android:id="@+id/w_ch_fleet" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:scaleType="fitXY" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- the tablet: memory, processor, graphics, storage -->
+    <LinearLayout android:id="@+id/w_row_dev" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="6dp" android:orientation="horizontal">
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:background="@drawable/amp_widget_tile" android:padding="6dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Memory" android:textColor="#93A9C1" android:textSize="11sp" />
+            <TextView android:id="@+id/w_ram" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#E6EEF7" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <ProgressBar android:id="@+id/w_ram_bar" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="5dp" android:max="100" />
+            <ImageView android:id="@+id/w_ch_ram" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="3dp" android:scaleType="fitXY" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="6dp" android:orientation="vertical" android:background="@drawable/amp_widget_tile" android:padding="6dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Processor" android:textColor="#93A9C1" android:textSize="11sp" />
+            <TextView android:id="@+id/w_cpu" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#E6EEF7" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <ImageView android:id="@+id/w_ch_cpu" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="3dp" android:scaleType="fitXY" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/w_tile_gpu" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="6dp" android:orientation="vertical" android:background="@drawable/amp_widget_tile" android:padding="6dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Graphics" android:textColor="#93A9C1" android:textSize="11sp" />
+            <TextView android:id="@+id/w_gpu" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#E6EEF7" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <ImageView android:id="@+id/w_ch_gpu" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="3dp" android:scaleType="fitXY" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/w_tile_store" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="6dp" android:orientation="vertical" android:background="@drawable/amp_widget_tile" android:padding="6dp">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Storage" android:textColor="#93A9C1" android:textSize="11sp" />
+            <TextView android:id="@+id/w_store" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#E6EEF7" android:textSize="12sp" android:textStyle="bold" android:maxLines="2" />
+            <ProgressBar android:id="@+id/w_store_bar" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="5dp" android:max="100" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView android:id="@+id/w_note" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="#93A9C1" android:textSize="11sp" android:maxLines="2" android:ellipsize="end" />
+
+    <!-- the buttons: open the game, free memory, clean space, refresh -->
+    <LinearLayout android:id="@+id/w_buttons" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="horizontal">
+        <TextView android:id="@+id/w_open" android:layout_width="0dp" android:layout_height="30dp" android:layout_weight="1" android:gravity="center" android:background="@drawable/amp_widget_btn" android:text="Open" android:textColor="#E6EEF7" android:textSize="12sp" />
+        <TextView android:id="@+id/w_free" android:layout_width="0dp" android:layout_height="30dp" android:layout_weight="1.3" android:layout_marginStart="5dp" android:gravity="center" android:background="@drawable/amp_widget_btn" android:text="Free memory" android:textColor="#E6EEF7" android:textSize="12sp" android:maxLines="1" />
+        <TextView android:id="@+id/w_clean" android:layout_width="0dp" android:layout_height="30dp" android:layout_weight="1.3" android:layout_marginStart="5dp" android:gravity="center" android:background="@drawable/amp_widget_btn" android:text="Clean space" android:textColor="#E6EEF7" android:textSize="12sp" android:maxLines="1" />
+        <TextView android:id="@+id/w_refresh" android:layout_width="0dp" android:layout_height="30dp" android:layout_weight="1" android:layout_marginStart="5dp" android:gravity="center" android:background="@drawable/amp_widget_btn" android:text="Refresh" android:textColor="#E6EEF7" android:textSize="12sp" android:maxLines="1" />
+    </LinearLayout>
 </LinearLayout>

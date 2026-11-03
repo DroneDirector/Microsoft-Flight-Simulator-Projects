@@ -561,12 +561,10 @@ public class AppToolsPlugin extends Plugin {
     public void widget(PluginCall call) {
         try {
             Context ctx = getContext();
-            ctx.getSharedPreferences(StatusWidget.PREFS, Context.MODE_PRIVATE).edit()
-                .putString("title", call.getString("title", ""))
-                .putString("balance", call.getString("balance", ""))
-                .putString("next", call.getString("next", ""))
-                .putString("flying", call.getString("flying", ""))
-                .apply();
+            android.content.SharedPreferences.Editor e = ctx.getSharedPreferences(StatusWidget.PREFS, Context.MODE_PRIVATE).edit();
+            // the airline's figures and chart series (as the game sends them); the tablet's are read by the widget
+            for (String k : new String[] { "title", "balance", "next", "flying", "profit", "fleet", "alerts", "fuel", "fps", "hProfit", "hFuel", "hFlying" }) if (call.getData().has(k)) e.putString(k, call.getString(k, ""));
+            e.apply();
             StatusWidget.refresh(ctx);
             call.resolve();
         } catch (Exception e) {

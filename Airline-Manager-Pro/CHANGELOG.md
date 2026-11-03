@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.85 (2026-11-03)
+
+- home screen widgets: the adaptive one (more sections and bigger charts as it grows) plus small, medium and large; airline (balance, profit today, next flight, in the air, what needs you; profit, jet fuel and fleet charts) and the tablet (memory, processor, graphics, storage with charts; Free memory, Clean space and Android's Free up space, Refresh); a Tracking on/off button per widget; readings every 15 minutes only while the tablet is awake (inexact, never wakes it)
+
 ## 0.9.84 (2026-11-03)
 
 - conduct reports: a plan per day (conductPlanToday): most days none, usually one or two, a few days in between, at random times; severity mostly light, sometimes moderate, now and then severe (crimes only on severe ones)
