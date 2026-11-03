@@ -6,6 +6,8 @@
 - Terrain detail (v3dTerrainQ, 5 levels, z13 ring at Ultra) and smooth ridges (v3dSoften)
 - Android: highest refresh rate, largeHeap, renderer priority important
 - tools/shots: terrain comparison pictures in CI
+- loyalty.ts: frequent-flyer programme, fuel hedging (hedgeFactor in fuelPrice), flexible fares (flexK in routeFares), lounges (loungePull in aiLoad)
+- alliances.ts, goals.ts (achievements, first week), special cargo (jobs.ts), spare slots (biz-more.ts)
 
 ## 0.9.112 (2026-11-03)
 
