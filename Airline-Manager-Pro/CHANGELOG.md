@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.108 (2026-11-03)
+
+- Airline life (airline-life.ts): decision events (part stuck at an outstation, VIP charter, mistake fare, fixed fuel price), rivals answering new routes and poaching staff, codeshare partners with daily connecting revenue and monthly fees
+
 ## 0.9.107 (2026-11-03)
 
 - Morning briefing (briefing.ts: once a day in the Overview after reveals; button; setting morningBrief)

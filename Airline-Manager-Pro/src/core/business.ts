@@ -56,6 +56,8 @@ const SIZE_NAMES = ['Small airport', 'Regional airport', 'Major airport'];
 const FUEL_REGION: { [k: string]: number } = { K: 0.9, C: 0.96, P: 1.16, E: 1.0, L: 1.03, B: 1.16, O: 0.78, U: 0.9, V: 1.0, W: 1.02, R: 1.0, Z: 1.0, F: 1.18, G: 1.2, D: 1.2, H: 1.16, S: 1.08, M: 1.1, T: 1.12, Y: 1.04, N: 1.14, A: 1.12 };
 const REMOTE_AIRPORTS = ['EKVG', 'BGSF', 'BGBW', 'BGGH', 'BIAR', 'BIEG', 'ENSB', 'ENBO', 'EGPA', 'EGPB', 'EGPL', 'LPAZ', 'LPLA', 'GCLA', 'PHTO', 'NTAA'];
 function fuelPrice(icao: string, d?: Date): number {
+  // a fixed price agreed with the supplier at your hub (airline-life.ts)
+  try { const F: any = (State as any).life && (State as any).life.fuelFix; if (F && F.hub === icao && F.until > (d || new Date()).getTime() && F.cid === State.companyId) return F.price; } catch (e) { /* none */ }
   const day = (d || new Date()).toDateString(), base = 0.85 * (FUEL_REGION[icao[0]] || 1.05);
   const size = aptSize(icao), remote = REMOTE_AIRPORTS.indexOf(icao) >= 0 ? 1.1 : 1;
   const wobble = 1 + (((hashMix(icao[0] + day) % 1000) / 1000) - 0.5) * 0.08 + (((hashMix(icao + day) % 1000) / 1000) - 0.5) * 0.03;

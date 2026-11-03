@@ -99,6 +99,9 @@ Each widget opens its own page.
 | Fuel prices per airport and day; tankering | Built |
 | Job board: charters and cargo jobs, flown by you or a hired pilot | Built |
 | Tours and a weekly challenge | Built |
+| Airline events that need a decision: a part stuck at an outstation, a VIP charter, a mistake fare gone viral, a fixed fuel price | Built |
+| Rivals answer your new routes with more flights or lower fares, and try to hire your best people | Built |
+| Codeshare partners: their passengers connect onto your flights at their hub, for a monthly fee | Built |
 | Special days: holidays, festivals and events with their real dates fill aircraft to and from where they happen (Christmas, Easter, Thanksgiving, Lunar New Year, Eid, Ólavsøka, Oktoberfest, Carnival and more) | Built |
 | Schedule refreshes by itself every 30 seconds, with a Refresh button and a countdown | Built |
 | Force departure for a delayed flight at your home hub once the cause is fixed (crew assigned, enough crew, the fault repaired) | Built |
