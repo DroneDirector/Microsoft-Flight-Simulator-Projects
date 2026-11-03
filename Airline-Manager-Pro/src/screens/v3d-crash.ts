@@ -196,9 +196,9 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
     oil.material.userData.noDim = true; oil.position.set(P.x - fx * len * 0.4, y0 + 0.15, P.z - fz * len * 0.4); oil.scale.set(len * 3.2, 1, len * 4.2); oil.rotation.y = -h; oil.renderOrder = 7; grp.add(oil);
   }
   // debris: hundreds of pieces strewn back along the path, thickest near the wreck
-  const debF = crashDebrisGeo(), nD = dmg ? 45 : 260, deb = new T.InstancedMesh(debF ? debF.geo : new T.BoxGeometry(1, 1, 1), debF ? debF.mat : new T.MeshLambertMaterial({ color: 0x3A3C40 }), nD), M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), Sv = new T.Vector3();
+  const debF = crashDebrisGeo(), nD = dmg ? 45 : heli ? 90 : 260, deb = new T.InstancedMesh(debF ? debF.geo : new T.BoxGeometry(1, 1, 1), debF ? debF.mat : new T.MeshLambertMaterial({ color: 0x3A3C40 }), nD), M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), Sv = new T.Vector3();
   for (let i = 0; i < nD; i++) {
-    const t = Math.pow(Math.random(), 1.8), p = at(-t * (len * 3 + 220) + (Math.random() - 0.3) * len * 0.6, (Math.random() - 0.5) * (s.span * 0.5 + t * 50));
+    const t = Math.pow(Math.random(), 1.8), p = heli ? at(-t * (len * 1.5 + 25) + (Math.random() - 0.5) * len * 0.5, (Math.random() - 0.5) * (s.span * 0.9 + t * 12)) : at(-t * (len * 3 + 220) + (Math.random() - 0.3) * len * 0.6, (Math.random() - 0.5) * (s.span * 0.5 + t * 50));   // a helicopter comes down short: its pieces lie close by
     const sz = (0.25 + Math.pow(Math.random(), 3) * 2.6);
     E.set(Math.random() * 6, Math.random() * 6, Math.random() * 6); Q.setFromEuler(E); Sv.set(sz * (0.5 + Math.random()), sz * 0.25, sz * (0.4 + Math.random()));
     M.compose(new T.Vector3(p[0], gy(p[0], p[1]) + (sea ? 0.05 : sz * 0.1), p[1]), Q, Sv); deb.setMatrixAt(i, M);
