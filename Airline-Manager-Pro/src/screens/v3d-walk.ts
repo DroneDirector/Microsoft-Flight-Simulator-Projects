@@ -50,11 +50,12 @@ function cabinWalkPad() {
   const hint = document.createElement('div'); hint.className = 'walk-hint';
   hint.textContent = DESKTOP ? 'Click to look around with the mouse · W A S D to walk · Shift to walk faster · Esc lets go of the mouse' : 'Left stick to walk · drag to look around';
   root.appendChild(hint); setTimeout(() => hint.classList.add('fade'), 6000);
-  const pad = document.createElement('div'); pad.className = 'walk-pad'; pad.innerHTML = '<i></i>'; root.appendChild(pad);
+  const pad = document.createElement('div'); pad.className = 'walk-pad' + (cabinTouch() ? ' wp-touch' : ''); pad.innerHTML = '<i></i>'; root.appendChild(pad);
   const knob = pad.firstElementChild as HTMLElement; let id = -1;
   const move = (e: PointerEvent) => {
     const r = pad.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width / 2;
     let dx = (e.clientX - cx) / R, dy = (e.clientY - cy) / R; const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; }
+    if (V3d.mode === 'cabin' && Math.hypot(dx, dy) > 0.25) v3dModeSet('walk');   // in the cabin view, the stick gets you up and walking
     CabinWalk.stick = [dx, -dy]; knob.style.transform = `translate(${dx * R * 0.6}px, ${dy * R * 0.6}px)`;
   };
   pad.addEventListener('pointerdown', e => { e.stopPropagation(); id = e.pointerId; pad.setPointerCapture(id); move(e); });
@@ -130,4 +131,48 @@ function cabinWalkBumps(x: number, y: number, at: any): boolean {
     const S = CabinCrew.trolley; if (S && S.visible) { const tp = S.position, sx = tp.x, sy = -tp.z; if (Math.abs(sx - x) < 0.62 && Math.abs(sy - y) < 0.3) return true; }
   } catch (e) { /* nothing in the way */ }
   return false;
+}
+
+/* ---------- touch screens: the stick in the cabin view too ---------- */
+/** A touch screen (a phone, a tablet, or a PC with a touch screen)? */
+function cabinTouch(): boolean { try { return !DESKTOP || navigator.maxTouchPoints > 0 || matchMedia('(pointer: coarse)').matches; } catch (e) { return !DESKTOP; } }
+/** In the cabin view on a touch screen the walking stick is there: push it and you get up and walk the aisle,
+ *  as in your office, Operations and the court. Elsewhere it goes. */
+function cabinTouchPad() {
+  const root = V3d.root; if (!root) return;
+  if (V3d.mode === 'walk') return;
+  if (V3d.mode === 'cabin' && cabinTouch()) { cabinWalkPad(); return; }
+  const pad = root.querySelector('.walk-pad'); if (pad) pad.remove();
+  const hint = root.querySelector('.walk-hint'); if (hint) hint.remove();
+}
+
+/* ---------- going into the cabin: a loading screen, as when the 3D view opens ---------- */
+const CAB_LOAD_MS = 1300;   // shown at least this long
+function cabinLoadShow(go: () => void) {
+  const root = V3d.root; if (!root) { go(); return; }
+  if (root.querySelector('.cab-load')) return;
+  const L = document.createElement('div'); L.className = 'v3d-load splash cab-load';
+  L.innerHTML = `<div class="spl-glow"></div><div class="v3l-orbit"><i></i><i></i><i></i></div>
+    <div class="spl-mark">${splashLogo()}</div><div class="spl-name"><b>Loading cabin</b></div>
+    <div class="spl-load"><div class="spl-info"><span class="spl-step">Building the cabin…</span><b class="spl-pct">0%</b></div>
+      <div class="spl-bar"><i class="spl-fill"><span class="spl-sheen"></span></i><span class="spl-tip"><svg viewBox="0 0 24 24"><path d="M21 15.5v-1.8l-8-5V3.6a1.5 1.5 0 0 0-3 0v5.1l-8 5v1.8l8-2.5v5l-2 1.5V21l3.5-1 3.5 1v-1.5L13 18v-5z"/></svg></span></div></div>`;
+  root.appendChild(L);
+  const fill = L.querySelector('.spl-fill') as HTMLElement, tip = L.querySelector('.spl-tip') as HTMLElement, pct = L.querySelector('.spl-pct') as HTMLElement, step = L.querySelector('.spl-step') as HTMLElement;
+  const set = (k: number, txt: string) => { const v = Math.round(k * 100); fill.style.width = v + '%'; tip.style.left = v + '%'; pct.textContent = v + '%'; if (step.textContent !== txt) step.textContent = txt; };
+  const t0 = performance.now(); let went = 0, frames = 0;
+  const tick = () => {
+    if (!L.isConnected) return;
+    const t = performance.now() - t0;
+    if (!went) {
+      set(Math.min(0.55, t / 700 * 0.55), 'Building the cabin…');
+      if (t > 420) { went = t; requestAnimationFrame(() => { try { go(); } catch (e) { /* the view goes on */ } requestAnimationFrame(tick); }); return; }
+    } else {
+      frames++;   // the cabin is built in the first frame drawn after the switch
+      const k = Math.min(1, 0.55 + 0.45 * Math.min(1, (t - went) / Math.max(300, CAB_LOAD_MS - went)));
+      set(k, k < 0.8 ? 'Seating the passengers…' : k < 1 ? 'Turning on the cabin lights…' : 'Ready');
+      if (k >= 1 && frames > 2) { L.classList.add('out'); setTimeout(() => L.remove(), 750); return; }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }

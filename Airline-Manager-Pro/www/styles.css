@@ -3539,3 +3539,6 @@ html.calm .ph-frame, html.calm .ph-screen { transition: none; }
 .ph-os .ps-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .ph-os .ps-t b { font-size: 14.5px; } .ph-os .ps-t small { font-size: 12px; opacity: .6; }
 .ph-os .ps-get { min-width: 64px; height: 28px; border-radius: 14px; border: 0; background: rgba(47,123,246,.18); color: #5B9BFF; font: 700 12.5px Inter, sans-serif; cursor: pointer; }
 .ph-os .ps-get:disabled { opacity: .5; cursor: default; }
+/* the walking stick on a PC with a touch screen too */
+.desktop .walk-pad.wp-touch { display: flex; }
+.v3d-load.cab-load { z-index: 8; }
