@@ -1,0 +1,30 @@
+name: Airline Manager Pro – terrain pictures
+
+# Pictures of the 3D view's ground at every terrain detail setting, to compare them (kept as a download on the run).
+on:
+  workflow_dispatch:
+  push:
+    branches: [amp-0.5.1-work]
+    paths: ['Airline-Manager-Pro/tools/shots/**', '.github/workflows/airline-manager-pro-shots.yml']
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Build the app
+        run: cd Airline-Manager-Pro && npm install --no-audit --no-fund && npm run build
+      - name: Browser
+        run: npm install --no-save --prefix /tmp/pw playwright@1.48.2 && (cd /tmp/pw && npx playwright install --with-deps chromium >/dev/null)
+      - name: Take the pictures
+        run: |
+          (cd Airline-Manager-Pro/www && python3 -m http.server 47610 >/dev/null 2>&1 &)
+          sleep 2; mkdir -p /tmp/terrain
+          NODE_PATH=/tmp/pw/node_modules node Airline-Manager-Pro/tools/shots/terrain-shots.js /tmp/terrain
+          pip install -q pillow && python3 Airline-Manager-Pro/tools/shots/grid.py /tmp/terrain /tmp/terrain/sheets
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: terrain-pictures, path: /tmp/terrain, retention-days: 14 }

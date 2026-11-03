@@ -63,6 +63,7 @@ public class MainActivity extends BridgeActivity {
         enterImmersive();
         protectEdges();
         applyBoost();
+        fastScreen();
         // after a swipe from the edge the system bars show over the app for a moment: hide them again
         // soon after (the notification shade can still be pulled down while they show)
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (v, insets) -> {
@@ -139,6 +140,28 @@ public class MainActivity extends BridgeActivity {
         super.onResume();
         enterImmersive();
         applyBoost();
+        fastScreen();
+    }
+
+    /** The screen's fastest refresh rate (90, 120 Hz…) at its own resolution, and the 3D drawing kept at a high
+     *  priority while the app is in front (Android lowers it again when the app is not seen). The phone still
+     *  slows down by itself when it is warm or saving battery. */
+    void fastScreen() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                android.view.Display d = getWindowManager().getDefaultDisplay();
+                android.view.Display.Mode cur = d.getMode(), best = cur;
+                for (android.view.Display.Mode m : d.getSupportedModes()) {
+                    if (m.getPhysicalWidth() == cur.getPhysicalWidth() && m.getPhysicalHeight() == cur.getPhysicalHeight() && m.getRefreshRate() > best.getRefreshRate() + 0.5f) best = m;
+                }
+                WindowManager.LayoutParams lp = getWindow().getAttributes();
+                if (lp.preferredDisplayModeId != best.getModeId()) { lp.preferredDisplayModeId = best.getModeId(); getWindow().setAttributes(lp); }
+            }
+        } catch (Exception ignored) { }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && getBridge() != null && getBridge().getWebView() != null)
+                getBridge().getWebView().setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, true);
+        } catch (Exception ignored) { }
     }
 
     private void enterImmersive() {

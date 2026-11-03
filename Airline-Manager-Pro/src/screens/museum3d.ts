@@ -70,10 +70,10 @@ function museumOpen() {
     const plate = new T.Mesh(new T.PlaneGeometry(1.1, 0.27), new T.MeshStandardMaterial({ map: v3vTex(T, pc), metalness: 1, roughness: 0.3 })); plate.position.set(cx, 0.75, cz + 0.76); sc.add(plate);
     // a beam of light from the ceiling (drawn, not a real light: cheap on a phone), and its pool on the floor
     const beam = new T.Mesh(new T.ConeGeometry(1.3, 5.6, hiQ() ? 64 : 24, 1, true), beamM); beam.position.set(cx, 4.1, cz); sc.add(beam);
-    if (Gfx.lights() >= 1) {
+    if (i < Gfx.museumLights()) {
       // on the PC: a real spotlight for every piece (the first eight with their own soft shadows), as in a gallery
       const sp = new T.SpotLight(0xFFF1DA, 160, 12, 0.42, 0.5, 1.2); sp.position.set(cx, 6.6, cz + 0.9); sp.target.position.set(cx, 1.3, cz);
-      if (i < 8 && Gfx.lights() >= 2) { sp.castShadow = true; sp.shadow.mapSize.set(1024, 1024); sp.shadow.bias = -0.0005; sp.shadow.radius = 4; }
+      if (i < 8 && Gfx.lights() >= 2 && Gfx.shadow() !== 0) { sp.castShadow = true; sp.shadow.mapSize.set(1024, 1024); sp.shadow.bias = -0.0005; sp.shadow.radius = 4; }
       sc.add(sp); sc.add(sp.target);
     } else {
       const pool = new T.Mesh(new T.CircleGeometry(1.6, 32), poolM); pool.rotation.x = -Math.PI / 2; pool.position.set(cx, 0.012, cz); sc.add(pool);
