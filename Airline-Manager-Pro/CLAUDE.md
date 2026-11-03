@@ -49,7 +49,7 @@
 - Work goes to branch `amp-0.5.1-work`; merging to `main` releases (the build runs on `Airline-Manager-Pro/**` changes on main).
 - Never put registration keys or reactivation codes in this (public) repository: only their fingerprints.
 - **Replaceable models**: every aircraft type, ground vehicle, the jet bridge, the people (per gender and group of
-  looks), the hangar buildings (per size, with an optional `-pc` file used first on the PC) and the vending items have a file name in `www/models/` (`src/graphics/models.ts`; the build writes `www/models/README.md` with
+  looks), the hangar buildings (per size, with an optional `-pc` file used first on the PC), the hangar and lounge furniture, the vending items, every helicopter type (`helicopters/`) and the crash scene's vehicles, wreckage and effect pictures (`crash/`) have a file name in `www/models/` (`src/graphics/models.ts`; the build writes `www/models/README.md` with
   every name). A `.glb` there is used instead of the app's own model everywhere that model appears; without it, the
   app's own model. Anything new of these kinds (a new aircraft type, a new vehicle, new people) gets its file name
   and goes through `Models.swap` / `modelsPeople` the same way, in the same change.

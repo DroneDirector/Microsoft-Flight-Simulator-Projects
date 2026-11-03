@@ -73,7 +73,7 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
 // replaceable models: the list of the .glb files in www/models (see www/models/README.md)
 {
   const dir = join(root, 'www/models'), files = [];
-  const walk = (d, rel) => { if (!existsSync(d)) return; for (const f of readdirSync(d, { withFileTypes: true })) { if (f.isDirectory()) walk(join(d, f.name), rel + f.name + '/'); else if (/\.glb$/i.test(f.name)) files.push(rel + f.name); } };
+  const walk = (d, rel) => { if (!existsSync(d)) return; for (const f of readdirSync(d, { withFileTypes: true })) { if (f.isDirectory()) walk(join(d, f.name), rel + f.name + '/'); else if (/\.(glb|png|jpe?g|webp)$/i.test(f.name)) files.push(rel + f.name); } };
   walk(dir, '');
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'index.json'), JSON.stringify({ files: files.sort() }, null, 1));
@@ -90,7 +90,7 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   }
   const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
   const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
-  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES');
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES'), crm = pairs('CRASH_FILES'), crx = pairs('CRASH_FX_FILES');
   const have = f => files.includes(f) ? ' (in use)' : '';
   const md = [
     '# Replaceable models', '',
@@ -134,6 +134,14 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     'towards +Z (where you sit or stand to use it), standing on the floor; fitted to the size of the app\'s own.', '',
     '| File | What |', '|---|---|',
     ...lpr.map(([f, n]) => `| \`lounge-props/${f}.glb\`${have('lounge-props/' + f + '.glb')} | ${n} |`), '',
+    '## Crash scene (`crash/`)', '',
+    'What is at a crash site besides the aircraft itself (the wreck is the aircraft\'s own model, broken and scorched).',
+    'Models: metres, +Y up, the front towards +Z, standing on the ground; each is fitted to the size of the app\'s own.',
+    'The vehicles keep the app\'s flashing lights. Effects: square PNG pictures with transparency, used instead of the',
+    'app\'s own drawing (the app still moves, fades and tints them).', '',
+    '| File | What |', '|---|---|',
+    ...crm.map(([f, n]) => `| \`crash/${f}.glb\`${have('crash/' + f + '.glb')} | ${n} |`),
+    ...crx.map(([f, n]) => `| \`crash/${f}.png\`${have('crash/' + f + '.png')} | ${n} |`), '',
     '## The vending machine\'s parts (`items/vending-machine.glb`)', '',
     'Name these parts (nodes or meshes) in your file and the machine works with them; any part left out stays the app\'s own.',
     'Rows are A (top), B, C; columns 1 (left), 2, 3: nine products, as in the app.', '',

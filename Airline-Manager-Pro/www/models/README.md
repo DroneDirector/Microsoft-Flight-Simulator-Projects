@@ -187,6 +187,28 @@ towards +Z (where you sit or stand to use it), standing on the floor; fitted to 
 | `lounge-props/champagne-bucket.glb` | Champagne bucket (Flagship) |
 | `lounge-props/departures-screen.glb` | Departures screen frame (the list is drawn by the app) |
 
+## Crash scene (`crash/`)
+
+What is at a crash site besides the aircraft itself (the wreck is the aircraft's own model, broken and scorched).
+Models: metres, +Y up, the front towards +Z, standing on the ground; each is fitted to the size of the app's own.
+The vehicles keep the app's flashing lights. Effects: square PNG pictures with transparency, used instead of the
+app's own drawing (the app still moves, fades and tints them).
+
+| File | What |
+|---|---|
+| `crash/crash-fire-engine.glb` | Fire engine at a crash site (vehicles/fire-truck.glb is used when this file is missing) |
+| `crash/crash-ambulance.glb` | Ambulance |
+| `crash/crash-rescue-boat.glb` | Rescue boat (a crash in the sea) |
+| `crash/crash-debris.glb` | One piece of wreckage: copied, turned and scaled for all the debris strewn along the path |
+| `crash/crash-engine.glb` | An engine that broke off |
+| `crash/crash-wing-piece.glb` | A piece of wing that broke off |
+| `crash/crash-wheel.glb` | A wheel from the landing gear |
+| `crash/crash-rotor-blade.glb` | A broken helicopter rotor blade |
+| `crash/crash-fire.png` | Flames: one flame on a transparent background, used for every flame particle (it is tinted as it burns down) |
+| `crash/crash-smoke.png` | Smoke: one puff of smoke on a transparent background (grey, lit by the app) |
+| `crash/crash-soot.png` | Scorched ground under the wreck and along its path (dark, ragged edges fading to transparent) |
+| `crash/crash-oil.png` | Burning-fuel and oil slick on the water (a crash in the sea) |
+
 ## The vending machine's parts (`items/vending-machine.glb`)
 
 Name these parts (nodes or meshes) in your file and the machine works with them; any part left out stays the app's own.

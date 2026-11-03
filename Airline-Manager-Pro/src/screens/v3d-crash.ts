@@ -44,9 +44,9 @@ function crashPlace(site: CrashSite, L: AirportLayout, loc: (x: number, y: numbe
 
 /** The shared fire and smoke shader: soft billboards that move entirely on the graphics card. */
 function crashFxMat(kind: 'fire' | 'smoke'): any {
-  const T = THREE, fire = kind === 'fire';
+  const T = THREE, fire = kind === 'fire', map = Models.tex('crash/crash-' + kind + '.png');   // a picture from the folder instead of the drawn one
   return new T.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uK: { value: 1 }, uWind: { value: new T.Vector2() }, uAmb: { value: 1 } },
+    uniforms: { uTime: { value: 0 }, uK: { value: 1 }, uWind: { value: new T.Vector2() }, uAmb: { value: 1 }, uMap: { value: map }, uUse: { value: map ? 1 : 0 } },
     vertexShader: `
       #include <common>
       #include <logdepthbuf_pars_vertex>
@@ -66,21 +66,23 @@ function crashFxMat(kind: 'fire' | 'smoke'): any {
     fragmentShader: `
       #include <common>
       #include <logdepthbuf_pars_fragment>
-      uniform float uK; uniform float uAmb; uniform float uTime;
+      uniform float uK; uniform float uAmb; uniform float uTime; uniform sampler2D uMap; uniform float uUse;
       varying vec2 vUv; varying float vAge; varying float vSeed;
       void main() {
         #include <logdepthbuf_fragment>
         vec2 q = vUv * 2.0 - 1.0; float r = length(q);
         float n = sin(q.x * 7.0 + vSeed * 30.0 + uTime * 3.0) * sin(q.y * 6.0 - uTime * 4.0 + vSeed * 11.0) * 0.18;
         float a = (1.0 - smoothstep(0.35 + n, 1.0, r));
+        vec4 tx = uUse > 0.5 ? texture2D(uMap, vUv) : vec4(1.0);
+        if (uUse > 0.5) a = tx.a;
         ${fire
         ? `vec3 c = mix(vec3(1.0, 0.95, 0.6), vec3(1.0, 0.35, 0.05), smoothstep(0.0, 0.6, vAge + r * 0.3));
         c = mix(c, vec3(0.5, 0.08, 0.02), smoothstep(0.55, 1.0, vAge));
         a *= (1.0 - smoothstep(0.6, 1.0, vAge)) * uK;
-        gl_FragColor = vec4(c * 1.6, a);`
+        gl_FragColor = vec4(c * 1.6 * mix(vec3(1.0), tx.rgb * 1.4, uUse), a);`
         : `float g = mix(0.06, 0.32, smoothstep(0.0, 0.8, vAge)) * mix(0.35, 1.0, uAmb);
         a *= 0.55 * smoothstep(0.0, 0.08, vAge) * (1.0 - smoothstep(0.55, 1.0, vAge)) * uK;
-        gl_FragColor = vec4(vec3(g, g * 0.97, g * 0.95), a);`}
+        gl_FragColor = vec4(mix(vec3(g, g * 0.97, g * 0.95), tx.rgb * mix(0.35, 1.0, uAmb), uUse), a);`}
         if (gl_FragColor.a < 0.01) discard;
       }`,
     transparent: true, depthWrite: false, blending: fire ? T.AdditiveBlending : T.NormalBlending, fog: false,
@@ -165,14 +167,15 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
       const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, `rgba(12,10,8,${0.35 + Math.random() * 0.3})`); gr.addColorStop(1, 'rgba(12,10,8,0)'); x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, r, 0, 6.28); x.fill(); }
     V3dCrash.sootTex = new T.CanvasTexture(cv);
   }
-  const scar = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffffff, map: V3dCrash.sootTex, transparent: true, opacity: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10 }));
+  const scar = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffffff, map: Models.tex('crash/crash-soot.png') || V3dCrash.sootTex, transparent: true, opacity: 0.95, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10 }));
   scar.material.userData.noDim = true;
   const sc = at(heli ? -len * 0.2 : -len * 0.6 - 60, 0); scar.position.set(sc[0], gy(sc[0], sc[1]) + 0.6, sc[1]); scar.scale.set(s.span * 0.9, 1, heli ? len * 1.4 + 8 : len * 2.6 + 140); scar.rotation.y = -h; scar.renderOrder = 7;
   if (heli && !dmg) {   // the broken rotor blades
     const mB = new T.MeshStandardMaterial({ color: 0x1E2126, roughness: 0.9 }), bl = s.span / 2;
     for (let k = 0; k < 5; k++) {
       const piece = new T.Mesh(new T.BoxGeometry(bl * (0.25 + rnd(40 + k) * 0.6), 0.06, 0.45), mB), q = at((rnd(50 + k) - 0.5) * len * 1.4, (rnd(60 + k) - 0.5) * s.span * 1.2);
-      piece.position.set(q[0], gy(q[0], q[1]) + 0.08, q[1]); piece.rotation.set((rnd(70 + k) - 0.5) * 0.4, rnd(80 + k) * 6.28, (rnd(90 + k) - 0.5) * 0.3); piece.castShadow = true; grp.add(piece);
+      const w = new T.Group(); w.add(piece); w.position.set(q[0], gy(q[0], q[1]) + 0.08, q[1]); w.rotation.set((rnd(70 + k) - 0.5) * 0.4, rnd(80 + k) * 6.28, (rnd(90 + k) - 0.5) * 0.3); piece.castShadow = true; grp.add(w);
+      crashSwap(w, ['crash/crash-rotor-blade.glb'], false);
     }
   }
   const burn = new T.Mesh(new T.CircleGeometry(1, 28).rotateX(-Math.PI / 2), scar.material); burn.position.set(P.x, y0 + 0.65, P.z); burn.scale.set(s.span * 1.3, 1, len * 1.2); burn.renderOrder = 7;
@@ -189,11 +192,11 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
         const gr = x.createRadialGradient(cx, cy, r * 0.4, cx, cy, r); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.6, `hsla(${hue},80%,55%,.22)`); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.beginPath(); x.arc(cx, cy, r, 0, 6.28); x.fill(); }
       V3dCrash.oilTex = new T.CanvasTexture(cv);
     }
-    const oil = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: V3dCrash.oilTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10 }));
+    const oil = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: Models.tex('crash/crash-oil.png') || V3dCrash.oilTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -10, polygonOffsetUnits: -10 }));
     oil.material.userData.noDim = true; oil.position.set(P.x - fx * len * 0.4, y0 + 0.15, P.z - fz * len * 0.4); oil.scale.set(len * 3.2, 1, len * 4.2); oil.rotation.y = -h; oil.renderOrder = 7; grp.add(oil);
   }
   // debris: hundreds of pieces strewn back along the path, thickest near the wreck
-  const nD = dmg ? 45 : 260, deb = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial({ color: 0x3A3C40 }), nD), M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), Sv = new T.Vector3();
+  const debF = crashDebrisGeo(), nD = dmg ? 45 : 260, deb = new T.InstancedMesh(debF ? debF.geo : new T.BoxGeometry(1, 1, 1), debF ? debF.mat : new T.MeshLambertMaterial({ color: 0x3A3C40 }), nD), M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), Sv = new T.Vector3();
   for (let i = 0; i < nD; i++) {
     const t = Math.pow(Math.random(), 1.8), p = at(-t * (len * 3 + 220) + (Math.random() - 0.3) * len * 0.6, (Math.random() - 0.5) * (s.span * 0.5 + t * 50));
     const sz = (0.25 + Math.pow(Math.random(), 3) * 2.6);
@@ -207,9 +210,16 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   // the parts that broke off (damaged aircraft): an engine, a wing tip, the gear, lying where they fell
   if (dmg) {
     const metal = new T.MeshLambertMaterial({ color: 0xBFC4CA }), dark = new T.MeshLambertMaterial({ color: 0x3A3D42 });
+    const n0 = grp.children.length;
     if (has('engine')) { const q = at(-len * 0.25 - rnd(20) * 20, s.span * 0.42 + rnd(21) * 10), e = new T.Mesh(new T.CylinderGeometry(s.w * 0.28, s.w * 0.24, s.w * 0.9, 18), metal); e.rotation.set(Math.PI / 2, rnd(22) * 3, 0.3); e.position.set(q[0], gy(q[0], q[1]) + s.w * 0.24, q[1]); grp.add(e); }
     if (has('wing')) { const q = at(-len * 0.4 - rnd(23) * 30, -s.span * 0.5 - 6), w = new T.Mesh(new T.BoxGeometry(s.span * 0.12, 0.35, len * 0.06), new T.MeshLambertMaterial({ color: site.color })); w.rotation.set(0.2, rnd(24) * 3, 0.15); w.position.set(q[0], gy(q[0], q[1]) + 0.3, q[1]); grp.add(w); }
     if (has('gear')) { const q = at(-len * 0.15 - rnd(25) * 25, (rnd(26) - 0.5) * 12); for (let k = 0; k < 2; k++) { const wh = new T.Mesh(new T.CylinderGeometry(0.6, 0.6, 0.45, 16), dark); wh.rotation.set(Math.PI / 2, 0, rnd(27 + k)); wh.position.set(q[0] + k * 1.6, gy(q[0], q[1]) + 0.25, q[1] + k); grp.add(wh); } }
+    // each broken-off part can come from its own file (crash-engine, crash-wing-piece, crash-wheel)
+    for (const o of grp.children.slice(n0)) {
+      const geo = o.geometry && o.geometry.type, name = geo === 'BoxGeometry' ? 'crash-wing-piece' : geo === 'CylinderGeometry' && o.geometry.parameters.radiusTop < 0.7 && o.geometry.parameters.height < 0.5 ? 'crash-wheel' : 'crash-engine';
+      const w = new T.Group(); w.position.copy(o.position); w.quaternion.copy(o.quaternion); grp.add(w); o.position.set(0, 0, 0); o.quaternion.identity(); w.add(o);
+      crashSwap(w, ['crash/' + name + '.glb'], false);
+    }
   }
   const fireAt: number[][] = dmg ? (has('fire') ? [[len * 0.05, -s.span * 0.22, 3]] : []) : [[0, 0, 9], [len * 0.05, -s.span * 0.22, 8], [len * 0.05, s.span * 0.22, 8], [lay[0][0], lay[0][1], 6], [-len * 0.2, s.span * 0.35, 5], [lay[2][0] * 0.5, 4, 4]];
   if (dmg && !fireAt.length) fireAt.push([len * 0.05, s.span * 0.2, 1.2]);   // a little smoke where it was hurt
@@ -226,9 +236,9 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
   grp.add(fire, smoke);
   // the fire's glow on the ground at night
   const glow = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.ShaderMaterial({
-    uniforms: { uK: { value: 0 } }, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
+    uniforms: { uK: { value: 0 }, uMap: { value: Models.tex('crash/crash-glow.png') }, uUse: { value: Models.has('crash/crash-glow.png') ? 1 : 0 } }, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
     vertexShader: '#include <common>\n#include <logdepthbuf_pars_vertex>\nvarying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n#include <logdepthbuf_vertex>\n}',
-    fragmentShader: '#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform float uK; varying vec2 vUv; void main() {\n#include <logdepthbuf_fragment>\nfloat r = length(vUv - 0.5) * 2.0; float k = 1.0 - smoothstep(0.0, 1.0, r); gl_FragColor = vec4(vec3(1.0, 0.45, 0.12) * k * k * uK, 1.0); }',
+    fragmentShader: '#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform float uK; uniform sampler2D uMap; uniform float uUse; varying vec2 vUv; void main() {\n#include <logdepthbuf_fragment>\nfloat r = length(vUv - 0.5) * 2.0; float k = 1.0 - smoothstep(0.0, 1.0, r); vec3 c = vec3(1.0, 0.45, 0.12) * k * k; if (uUse > 0.5) { vec4 t = texture2D(uMap, vUv); c = t.rgb * t.a; } gl_FragColor = vec4(c * uK, 1.0); }',
     polygonOffset: true, polygonOffsetFactor: -12, polygonOffsetUnits: -12,
   }));
   glow.position.set(P.x, y0 + 0.8, P.z); glow.scale.set(260, 1, 260); glow.renderOrder = 8; grp.add(glow);
@@ -250,11 +260,34 @@ function v3dCrashSite(site: CrashSite, L: AirportLayout, loc: (x: number, y: num
       const lm = new T.Mesh(new T.SphereGeometry(0.28, 8, 6), new T.MeshBasicMaterial({ color: 0x2040FF })); lm.material.userData.noDim = true;
       lm.position.set((amb ? 3 : 5.25) - 0.4, (amb ? 2.6 : 3.3) + 0.6, sd); v.add(lm); lights.push({ m: lm, ph: i * 0.37 + (sd > 0 ? 0.5 : 0), amb });
     }
+    for (const o of v.children) if (o.geometry && o.geometry.type === 'SphereGeometry') o.userData.keep = true;   // the flashing lights stay the app's own
+    crashSwap(v, sea ? ['crash/crash-rescue-boat.glb'] : amb ? ['crash/crash-ambulance.glb'] : i === 0 ? ['crash/crash-command-vehicle.glb', 'crash/crash-fire-engine.glb', 'vehicles/fire-truck.glb'] : ['crash/crash-fire-engine.glb', 'vehicles/fire-truck.glb'], true);
     v.position.set(x, gy(x, z) + (sea ? -0.3 : 0), z); v.rotation.y = -ang + Math.PI;   // facing the wreck
     grp.add(v); veh.push(v); if (sea) v.userData.boat = true;
   }
   if (sea) glow.scale.set(380, 1, 380);
   return { site, obj: grp, fire, smoke, glow, lights, veh, sea, x: P.x, y: y0, z: P.z };
+}
+
+/** A crash-scene model from the folder (the first of `paths` that is there) in place of the app's own. With
+ *  `frontPlusX`, the app's own faces +X (the vehicles drive towards the wreck), so the file's front is turned that way. */
+function crashSwap(g: any, paths: string[], frontPlusX: boolean) {
+  const path = Models.first(paths); if (!path) return;
+  try {
+    if (!frontPlusX) { Models.swap(g, path, false); return; }
+    const T = THREE, inner = new T.Group(); inner.rotation.y = Math.PI; g.add(inner); g.updateMatrixWorld(true);
+    for (const o of g.children.slice()) if (o !== inner && !o.userData.keep) inner.attach(o);
+    Models.swap(inner, path, true);
+  } catch (e) { /* the app's own */ }
+}
+/** The debris piece from crash/crash-debris.glb: its first mesh, centred and scaled to about a metre, for the instanced debris. */
+function crashDebrisGeo(): { geo: any; mat: any } {
+  const P = 'crash/crash-debris.glb'; if (!Models.has(P)) return null;
+  const g = Models.ready[P]; if (!g) { Models.load(P); return null; }   // next time it is built
+  let mesh: any = null; g.scene.traverse((o: any) => { if (!mesh && o.isMesh) mesh = o; }); if (!mesh) return null;
+  const geo = mesh.geometry.clone(); geo.computeBoundingBox(); const b = geo.boundingBox, c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+  geo.translate(-c.x, -c.y, -c.z); geo.scale(1 / Math.max(0.001, sz.x, sz.y, sz.z), 1 / Math.max(0.001, sz.x, sz.y, sz.z), 1 / Math.max(0.001, sz.x, sz.y, sz.z));
+  return { geo, mat: Array.isArray(mesh.material) ? mesh.material[0] : mesh.material };
 }
 
 /** Each frame: the fires flicker and die down over the hours, the smoke drifts with the wind, the lights flash. */

@@ -57,6 +57,23 @@ const ITEM_FILES: [string, string][] = [
   ['bar-chocolate', 'Chocolate bar'], ['bar-peanut', 'Peanut bar'], ['bar-oat', 'Oat bar'], ['bar-caramel', 'Caramel bar'],
 ];
 
+/** The crash scene: its vehicles and wreckage (models in crash/), each used for every one of its kind at a crash site. */
+const CRASH_FILES: [string, string][] = [
+  ['crash-fire-engine', 'Fire engine at a crash site (vehicles/fire-truck.glb is used when this file is missing)'], ['crash-command-vehicle', 'Fire chief\'s command vehicle (the yellow one)'],
+  ['crash-ambulance', 'Ambulance'], ['crash-rescue-boat', 'Rescue boat (a crash in the sea)'],
+  ['crash-debris', 'One piece of wreckage: copied, turned and scaled for all the debris strewn along the path'],
+  ['crash-engine', 'An engine that broke off'], ['crash-wing-piece', 'A piece of wing that broke off'],
+  ['crash-wheel', 'A wheel from the landing gear'], ['crash-rotor-blade', 'A broken helicopter rotor blade'],
+];
+/** The crash scene's effects: pictures (PNG with transparency, square) used instead of the app's own. */
+const CRASH_FX_FILES: [string, string][] = [
+  ['crash-fire', 'Flames: one flame on a transparent background, used for every flame particle (it is tinted as it burns down)'],
+  ['crash-smoke', 'Smoke: one puff of smoke on a transparent background (grey, lit by the app)'],
+  ['crash-soot', 'Scorched ground under the wreck and along its path (dark, ragged edges fading to transparent)'],
+  ['crash-oil', 'Burning-fuel and oil slick on the water (a crash in the sea)'],
+  ['crash-glow', 'The fire\'s glow on the ground at night (bright in the middle, fading out)'],
+];
+
 /** The file name for an aircraft type: maker and model, e.g. airbus-a320neo.glb, boeing-737-800.glb. */
 function modelSlug(s: string): string { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 function aircraftModelFile(typeId: string): string {
@@ -86,10 +103,18 @@ const Models = {
     return fetch(MODEL_DIR + 'index.json').then(r => r.ok ? r.json() : { files: [] }).catch(() => ({ files: [] })).then((j: any) => {
       this.list = {}; for (const f of (j && j.files) || []) this.list[f] = 1;
       // every file is loaded now, so the pictures of the fleet and the first people use them straight away
-      for (const f of Object.keys(this.list)) this.load(f);
+      for (const f of Object.keys(this.list)) if (/\.glb$/i.test(f)) this.load(f);
     });
   },
   has(path: string): boolean { return !!(this.list && this.list[path]); },
+  _tex: {} as { [path: string]: any },
+  /** A picture from the folder (crash effects): a texture that fills in when it has loaded, or null without the file. */
+  tex(path: string): any {
+    if (!this.has(path)) return null;
+    if (this._tex[path]) return this._tex[path];
+    const T = THREE, t = new T.TextureLoader().load(MODEL_DIR + path); t.colorSpace = T.SRGBColorSpace;
+    return (this._tex[path] = t);
+  },
   first(paths: string[]): string { for (const p of paths) if (this.has(p)) return p; return ''; },
   load(path: string): Promise<any> {
     if (this.cache[path]) return this.cache[path];
