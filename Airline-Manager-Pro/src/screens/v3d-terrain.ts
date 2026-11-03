@@ -44,8 +44,34 @@ function v3dSoften(H: Float32Array, size: number, step: number): Float32Array {
       for (let y = 0; y < size; y++) { a[y * size + x] = sum / n; const yo = y - rad, yi = y + rad + 1; if (yo >= 0) { sum -= b[yo * size + x]; n--; } if (yi < size) { sum += b[yi * size + x]; n++; } } }
   }
   // the sea and the shore stay as they were (soften only land that is clearly above the sea)
-  for (let i = 0; i < H.length; i++) if (H[i] <= 2) a[i] = H[i];
   return a;
+}
+/** How far each pixel is from the coast (pixels; + on land, − at sea), from the sea mask: two passes of a chamfer
+ *  distance. The ground's height near the coast follows it, so the coastline (where the ground meets the sea's
+ *  level surface) runs where the map has it, smoothly between the ground's points instead of along their grid. */
+function v3dCoastDist(size: number, sea: (i: number) => boolean): Float32Array {
+  const n = size * size, INF = 1e6, dl = new Float32Array(n), ds = new Float32Array(n), D = 1, Dg = 1.4142;
+  for (let i = 0; i < n; i++) { const s = sea(i); dl[i] = s ? 0 : INF; ds[i] = s ? INF : 0; }
+  for (const d of [dl, ds]) {
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) { const i = y * size + x; let v = d[i];
+      if (x > 0) v = Math.min(v, d[i - 1] + D); if (y > 0) { v = Math.min(v, d[i - size] + D); if (x > 0) v = Math.min(v, d[i - size - 1] + Dg); if (x < size - 1) v = Math.min(v, d[i - size + 1] + Dg); } d[i] = v; }
+    for (let y = size - 1; y >= 0; y--) for (let x = size - 1; x >= 0; x--) { const i = y * size + x; let v = d[i];
+      if (x < size - 1) v = Math.min(v, d[i + 1] + D); if (y < size - 1) { v = Math.min(v, d[i + size] + D); if (x < size - 1) v = Math.min(v, d[i + size + 1] + Dg); if (x > 0) v = Math.min(v, d[i + size - 1] + Dg); } d[i] = v; }
+  }
+  const out = new Float32Array(n); for (let i = 0; i < n; i++) out[i] = dl[i] > 0 ? dl[i] - 0.5 : -(ds[i] - 0.5);
+  return out;
+}
+/** The sea's level surface under the whole view (curving with the earth), with the living water on it. */
+function v3dSeaPlane(x0: number, z0: number, x1: number, z1: number) {
+  const T = THREE, n = 96, geo = new T.PlaneGeometry(1, 1, n, n); geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, flat = new Float32Array(pos.count).fill(1);
+  for (let k = 0; k < pos.count; k++) { const x = x0 + (pos.getX(k) + 0.5) * (x1 - x0), z = z0 + (pos.getZ(k) + 0.5) * (z1 - z0); pos.setXYZ(k, x, -v3dCurve(x, z), z); }
+  pos.needsUpdate = true; geo.setAttribute('aFlat', new T.BufferAttribute(flat, 1)); geo.computeBoundingSphere();
+  const one = (r: number, g: number, b: number) => { const c = document.createElement('canvas'); c.width = c.height = 2; const x = c.getContext('2d') as CanvasRenderingContext2D; x.fillStyle = `rgb(${r},${g},${b})`; x.fillRect(0, 0, 2, 2); const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; return t; };
+  const VT: any = V3dTerrain;
+  if (VT.seaPlane) { V3d.scene.remove(VT.seaPlane); VT.seaPlane.geometry.dispose(); }
+  const m = new T.Mesh(geo, v3dGroundMat(one(4, 11, 22), one(255, 255, 255))); m.renderOrder = -30; m.frustumCulled = false;
+  VT.seaPlane = m; V3d.scene.add(m);
 }
 function v3dSatQ(): number { const v = (State.settings as any).v3dSatQ; return v == null ? 1 : clamp(Math.round(+v), 0, 3); }
 
@@ -79,6 +105,7 @@ const V3dTerrain = {
     next(0);
   },
   clear() {
+    { const VT: any = V3dTerrain; if (VT.seaPlane) { V3d.scene.remove(VT.seaPlane); VT.seaPlane.geometry.dispose(); VT.seaPlane = null; VT.seaSpan = 0; } }
     for (const r of this.rings) { if (r.mesh) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } if (r.mapTex) r.mapTex.dispose(); if (r.satTex) r.satTex.dispose(); const R: any = r; if (R.wetTex) R.wetTex.dispose(); if (R.cityTex) R.cityTex.dispose(); if (r.mesh && r.mesh.material) r.mesh.material.dispose(); }
     this.rings = [];
   },
@@ -226,6 +253,10 @@ const V3dTerrain = {
     const aptLL = V3d.icao ? apt(V3d.icao).pos : null, aElev = V3d.elev || 0;
     const pos = new Float32Array((G + 1) * (G + 1) * 3), uv = new Float32Array((G + 1) * (G + 1) * 2), idx: number[] = [], mh = new Float32Array((G + 1) * (G + 1));
     const flat = new Float32Array((G + 1) * (G + 1));   // 1 where the mesh is water: flat, at the water's level
+    // the coast: distance in metres from it (+ land, − sea), from the map's sea outline
+    const SD = v3dCoastDist(size, sea), CLIFF = 3;   // near the coast the ground rises at most 3 m for each metre inland
+    const sdAt = (px: number, py: number) => { const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
+      return (SD[i] * (1 - fx) * (1 - fy) + SD[i + 1] * fx * (1 - fy) + SD[i + size] * (1 - fx) * fy + SD[i + size + 1] * fx * fy) * mPerPx; };
     const sample = (px: number, py: number) => {
       const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
       const h = Hs[i] * (1 - fx) * (1 - fy) + Hs[i + 1] * fx * (1 - fy) + Hs[i + size] * (1 - fx) * fy + Hs[i + size + 1] * fx * fy;
@@ -235,19 +266,21 @@ const V3dTerrain = {
     for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
       const px = i / G * size, py = j / G * size, lon = lonOf(px), lat = latOf(py);
       const s = sample(px, py);
-      let h = Math.max(0, s.h), wl = -1;
-      // the sea: perfectly flat, at sea level; but a point of the sea next to the land (the coast runs between the
-      // ground's points) takes a height between the two, so the coastline doesn't zig-zag along the grid
-      const cs = size / G, coastLand = s.wet ? [[cs, 0], [-cs, 0], [0, cs], [0, -cs]].map(d => sample(px + d[0], py + d[1])).filter(q => !q.wet && q.lake == null) : [];
-      if (s.wet && coastLand.length) { h = Math.max(0, Math.min(...coastLand.map(q => q.h))) * 0.45; }
-      else if (s.wet) { h = 0; wl = 0; }
-      else if (s.lake != null) { h = Math.max(0, s.lake); wl = h; }  // a lake: flat at its own level
+      // the sea is a level surface of its own (v3dSeaPlane); the ground runs on beneath it, and near the coast its height
+      // follows the distance from the coast, so the two meet exactly along the map's coastline
+      const sd = sdAt(px, py);
+      let h = Math.max(0.6, s.h), wl = -1, y = 0;
+      if (s.lake != null && !s.wet) { h = Math.max(0, s.lake); wl = h; }  // a lake: flat at its own level
+      if (s.wet) { y = Math.max(-40, Math.min(sd, -0.3) * CLIFF); h = 0; }
+      else if (wl < 0) { y = h = Math.min(h, Math.max(0.6, sd * CLIFF + 0.6)); }
+      else y = h;
       if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
       const p = v3dXY(lon, lat), o = j * (G + 1) + i;
       flat[o] = wl >= 0 && Math.abs(h - wl) < 0.5 ? 1 : 0;
       // outer rings sit a little lower so the finer ring always shows where they meet
-      mh[o] = h - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0);
-      pos[o * 3] = p[0]; pos[o * 3 + 1] = mh[o] - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
+      if (aptLL && !s.wet) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); y = aElev + (y - aElev) * k; }
+      mh[o] = h - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0);   // the surface (the sea's at sea), for what stands or floats on it
+      pos[o * 3] = p[0]; pos[o * 3 + 1] = (s.wet ? y : mh[o]) - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
       uv[o * 2] = i / G; uv[o * 2 + 1] = 1 - j / G;
     }
     // where the finer ring lies: this ring's ground there sinks well below it (out of sight), so the two never
@@ -280,6 +313,9 @@ const V3dTerrain = {
     r.mesh = new T.Mesh(geo, v3dGroundMat((State.settings as any).v3dSat && r.satTex ? r.satTex : r.mapTex, wetTex));
     (r as any).wetTex = wetTex;
     r.mesh.renderOrder = -r.z;
+    // the sea's surface under this ring (the largest ring's replaces the smaller ones')
+    { const VT: any = V3dTerrain; const a = v3dXY(lonOf(0), latOf(0)), b = v3dXY(lonOf(size), latOf(size)), span = Math.abs(b[0] - a[0]);
+      if (!VT.seaPlane || span > (VT.seaSpan || 0)) { VT.seaSpan = span; v3dSeaPlane(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])); } }
     V3d.scene.add(r.mesh);
     try { v3dCityLoad(r); } catch (e) { (r as any).cityDone = true; }
   },
