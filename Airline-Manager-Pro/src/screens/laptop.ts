@@ -481,6 +481,8 @@ ACTIONS['lap-web'] = el => {
 function roomGo(screen: string): boolean {
   const O: any = typeof OpsRoom !== 'undefined' ? OpsRoom : null, F: any = typeof OfficeRoom !== 'undefined' ? OfficeRoom : null;
   if (O && O.on && O.overlay && !O.zoomAnim) { opsScreenFill(screen); return true; }
+  const H: any = typeof HangarRoom !== 'undefined' ? HangarRoom : null;
+  if (H && H.on && H.overlay && Lap.root === H.overlay) { if (Lap.app === 'browser') lapBrowserHide(); Lap.app = 'scr:' + screen; lapRender(); return true; }
   if (F && F.on && F.overlay) {
     if (F.overlay.classList.contains('lap-screen')) { if (Lap.app === 'browser') lapBrowserHide(); Lap.app = 'scr:' + screen; lapRender(); return true; }
     const body = F.overlay.querySelector('.of-pl-body') as HTMLElement; if (!body || !SCREENS[screen]) return false;
@@ -501,4 +503,4 @@ ACTIONS['lap-app'] = el => {
   Lap.app = k; Lap.photo = ''; Sound.tick();
   lapRender();
 };
-ACTIONS['lap-close'] = () => { if (typeof OpsRoom !== 'undefined' && OpsRoom.on && OpsRoom.overlay) { opsScreenClose(); return; } if (typeof ofLaptopClose === 'function') ofLaptopClose(); };
+ACTIONS['lap-close'] = () => { if (typeof HangarRoom !== 'undefined' && HangarRoom.on && HangarRoom.overlay) { hgScreenClose(); return; } if (typeof OpsRoom !== 'undefined' && OpsRoom.on && OpsRoom.overlay) { opsScreenClose(); return; } if (typeof ofLaptopClose === 'function') ofLaptopClose(); };
