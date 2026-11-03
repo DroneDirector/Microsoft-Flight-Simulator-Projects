@@ -42,7 +42,7 @@ function mailAdd(m: Partial<LapMail> & { from: string; subject: string; body: st
 }
 /** A notification sliding down from the top of the phone while you are using it (new mail, messages from the
  *  bell). Tap it to open what it is about; it goes up again after a few seconds, or swipe it up. */
-function phoneNote(n: { title: string; body?: string; ic?: string; c?: string; app?: string; id?: string; notice?: string }) {
+function phoneNote(n: { title: string; body?: string; ic?: string; c?: string; app?: string; id?: string; notice?: string; thread?: string }) {
   const R = Lap.root as HTMLElement; if (!Lap.phone || !R || !R.isConnected) return;
   const os = R.querySelector('.ph-os') as HTMLElement; if (!os) return;
   os.querySelectorAll('.ph-note').forEach(o => o.remove());
@@ -53,7 +53,7 @@ function phoneNote(n: { title: string; body?: string; ic?: string; c?: string; a
   el.addEventListener('click', e => {
     e.stopPropagation(); gone();
     if (n.notice) { const b = document.createElement('b'); b.setAttribute('data-id', n.notice); try { ACTIONS['open-notice'](b, null); } catch (er) { /* gone */ } return; }
-    if (n.app) { if (Lap.app === 'browser') lapBrowserHide(); Lap.app = n.app; if (n.app === 'mail' && n.id) { Lap.mailId = n.id; const m = lapMail().filter(x => x.id === n.id)[0]; if (m && !m.read) { m.read = true; Store.soon(); } } Sound.tick(); lapRender(); }
+    if (n.app) { if (Lap.app === 'browser') lapBrowserHide(); Lap.app = n.app; if (n.thread) { PhA.thread = n.thread; PhA.newMsg = false; } if (n.app === 'mail' && n.id) { Lap.mailId = n.id; const m = lapMail().filter(x => x.id === n.id)[0]; if (m && !m.read) { m.read = true; Store.soon(); } } Sound.tick(); lapRender(); }
   });
   let y0 = 0; el.addEventListener('pointerdown', e => { y0 = e.clientY; });
   el.addEventListener('pointermove', e => { if (y0 && y0 - e.clientY > 24) { y0 = 0; gone(); } });
@@ -165,7 +165,7 @@ function lapOsHtml(): string {
   // the phone: the same apps, in a tall screen with a status bar on top and the home bar below
   if (Lap.phone) return `<div class="lap-os ph-os">
     <div class="lap-bar ph-status"></div>
-    <div class="lap-area"><div class="lap-desk"></div><div class="lap-win" hidden></div></div>
+    <div class="lap-area"><div class="lap-desk"></div><div class="ph-dock"></div><div class="lap-win" hidden></div></div>
     <button class="ph-home" data-act="lap-app" data-k="" aria-label="Home"><i></i></button>
   </div>`;
   return `<div class="lap-os">
@@ -180,7 +180,7 @@ function lapMount(root: HTMLElement, phone?: boolean) {
   lapRender();
   clearInterval(Lap.clock); Lap.clock = setInterval(() => { if (!Lap.root || !Lap.root.isConnected) { clearInterval(Lap.clock); return; } lapBar(); }, 10000);
 }
-function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.phone = false; Lap.bankIn = false; Lap.bankBusy = false; }   // closing the laptop logs you out of the bank
+function lapUnmount() { lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.phone = false; Lap.bankIn = false; Lap.bankBusy = false; try { clearTimeout(PhA.callT); PhA.calling = null; PhA.callState = ''; PhA.typing = ''; } catch (e) { /* none */ } }   // closing the laptop logs you out of the bank
 function lapRefresh() { if (Lap.root && Lap.root.isConnected) lapRender(true); }
 
 function lapRender(soft?: boolean) {
@@ -188,8 +188,9 @@ function lapRender(soft?: boolean) {
   lapBar();
   const desk = R.querySelector('.lap-desk') as HTMLElement, win = R.querySelector('.lap-win') as HTMLElement;
   desk.innerHTML = lapDeskHtml();
+  const dock = R.querySelector('.ph-dock') as HTMLElement; if (dock) dock.innerHTML = phDockHtml();
   if (!Lap.app) { win.hidden = true; win.innerHTML = ''; return; }
-  const sk = /^scr:/.test(Lap.app) ? Lap.app.slice(4) : '', A = sk ? [Lap.app, SCREENS[sk] ? SCREENS[sk].title : sk, (SCREENS[sk] && SCREENS[sk].icon) || 'ops', '#3FD0E8'] : LAP_APPS.filter(x => x[0] === Lap.app)[0]; if (!A) return;
+  const sk = /^scr:/.test(Lap.app) ? Lap.app.slice(4) : '', A = sk ? [Lap.app, SCREENS[sk] ? SCREENS[sk].title : sk, (SCREENS[sk] && SCREENS[sk].icon) || 'ops', '#3FD0E8'] : LAP_APPS.concat(PH_APPS).filter(x => x[0] === Lap.app)[0]; if (!A) return;
   if (Lap.app === 'browser' && soft && win.querySelector('.lap-br')) { lapBrowserChrome(); return; }   // the page itself is never drawn again
   win.hidden = false;
   const body = lapAppHtml(Lap.app);
@@ -225,6 +226,7 @@ function lapDeskHtml(): string {
 }
 
 function lapAppHtml(k: string): string {
+  if (k === 'msgs' || k === 'call' || k === 'store') return phAppHtml(k);
   if (k === 'mail') return lapMailHtml();
   if (k === 'calendar') return lapCalHtml();
   if (k === 'bank') return lapBankHtml();

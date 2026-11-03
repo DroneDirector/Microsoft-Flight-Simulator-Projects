@@ -3449,3 +3449,93 @@ html.calm .ph-frame, html.calm .ph-screen { transition: none; }
 .ph-os .pn-h small { font-size: 11px; opacity: .6; }
 .ph-os .pn-b { font-size: 12.5px; opacity: .85; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .ph-os .ph-note { transition: opacity .2s; transform: none; } }
+/* the phone's dock: Messages, Phone and the Store, centred at the bottom of the home screen */
+.ph-os .lap-desk { padding-bottom: 120px; }
+.ph-os .ph-dock { position: absolute; left: 0; right: 0; bottom: 30px; z-index: 2; display: flex; justify-content: center; pointer-events: none; }
+.ph-os .ph-dock-in { pointer-events: auto; display: flex; gap: 22px; padding: 10px 20px; border-radius: 30px; background: rgba(255,255,255,.14); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.ph-os .pd-ic { width: auto; padding: 0; }
+.ph-os .pd-ic > span { width: 54px; height: 54px; }
+.ph-os .pd-ic > span svg { width: 28px; height: 28px; }
+/* the phone's own apps fill the window */
+.ph-os .lap-app-msgs, .ph-os .lap-app-call, .ph-os .lap-app-store { padding: 0; display: flex; flex-direction: column; }
+.ph-os .pa-h { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 8px; }
+.ph-os .pa-h b { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.ph-os .pa-new { width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(52,199,89,.16); color: #34C759; display: grid; place-items: center; cursor: pointer; }
+.ph-os .pa-new svg { width: 18px; height: 18px; }
+.ph-os .pa-empty { padding: 20px 16px; text-align: center; }
+.ph-os .pa-av { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 600 14px Inter, sans-serif; color: #fff; background: linear-gradient(160deg, color-mix(in srgb, var(--c) 80%, #fff), color-mix(in srgb, var(--c) 70%, #000)); }
+.ph-os .pa-av.big { width: 96px; height: 96px; font-size: 34px; }
+.ph-os .pc-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 16px; border: 0; border-bottom: 1px solid rgba(255,255,255,.06); background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; box-sizing: border-box; }
+.ph-os .pc-row:hover { background: rgba(255,255,255,.04); }
+.ph-os .pc-row > span:not(.pa-av) { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ph-os .pc-row b { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-os .pc-row small { font-size: 12.5px; opacity: .62; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-os .pc-row em { font-style: normal; font-size: 11.5px; opacity: .6; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.ph-os .pm-row.new b { color: #fff; } .ph-os .pm-row.new small { opacity: .9; }
+.ph-os .pc-row em i { font-style: normal; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #34C759; color: #fff; font-size: 11px; display: grid; place-items: center; box-sizing: border-box; }
+.ph-os .pc-ph { color: #34C759; opacity: 1 !important; } .ph-os .pc-ph svg { width: 18px; height: 18px; }
+.ph-os .pc-l { display: block; padding: 10px 16px 4px; font: 700 12px Inter, sans-serif; opacity: .5; text-transform: uppercase; letter-spacing: .05em; }
+.ph-os .pc-mini { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; border: 0; display: grid; place-items: center; background: rgba(52,199,89,.14); color: #34C759; cursor: pointer; }
+.ph-os .pc-mini svg { width: 16px; height: 16px; }
+/* a conversation */
+.ph-os .pm-thread, .ph-os .pm-new, .ph-os .pm-home { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.ph-os .pm-home, .ph-os .pm-new .pc-list { overflow: auto; }
+.ph-os .pm-th { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.ph-os .pm-th .lm-back { margin: 0; }
+.ph-os .pm-th > span:not(.pa-av) { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ph-os .pm-th b { font-size: 15px; } .ph-os .pm-th small { font-size: 12px; opacity: .6; }
+.ph-os .pm-th .pa-av { width: 34px; height: 34px; font-size: 12px; }
+.ph-os .pm-call { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(52,199,89,.16); color: #34C759; display: grid; place-items: center; cursor: pointer; }
+.ph-os .pm-call svg { width: 18px; height: 18px; }
+.ph-os .pm-list { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.ph-os .pm-day { align-self: center; font-size: 11px; opacity: .5; margin: 8px 0 4px; }
+.ph-os .pm-empty { margin: auto; }
+.ph-os .pm-b { max-width: 78%; padding: 8px 12px; border-radius: 18px 18px 18px 6px; background: #2A2F38; font-size: 14px; line-height: 1.35; align-self: flex-start; word-wrap: break-word; }
+.ph-os .pm-b.me { align-self: flex-end; border-radius: 18px 18px 6px 18px; background: #2F7BF6; color: #fff; }
+.ph-os .pm-typing { display: flex; gap: 4px; padding: 12px 14px; } .ph-os .pm-typing i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.55); animation: pmDot 1.1s infinite ease-in-out; }
+.ph-os .pm-typing i:nth-child(2) { animation-delay: .15s; } .ph-os .pm-typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes pmDot { 0%, 60%, 100% { transform: none; opacity: .5; } 30% { transform: translateY(-3px); opacity: 1; } }
+.ph-os .pm-send { flex: 0 0 auto; display: flex; gap: 8px; padding: 8px 10px 34px; border-top: 1px solid rgba(255,255,255,.08); }
+.ph-os .pm-in { flex: 1; min-width: 0; height: 36px; border-radius: 18px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.06); color: #fff; padding: 0 14px; font: 14px Inter, sans-serif; }
+.ph-os .pm-go { width: 36px; height: 36px; border-radius: 50%; border: 0; background: #2F7BF6; color: #fff; display: grid; place-items: center; cursor: pointer; }
+.ph-os .pm-go svg { width: 18px; height: 18px; transform: rotate(-90deg); }
+/* the Phone app */
+.ph-os .pph { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.ph-os .pph-b { flex: 1; min-height: 0; overflow: auto; }
+.ph-os .pph-tabs { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px 4px 30px; border-top: 1px solid rgba(255,255,255,.08); background: rgba(10,14,20,.6); }
+.ph-os .pph-tabs button { border: 0; background: none; color: rgba(255,255,255,.5); display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; font: inherit; }
+.ph-os .pph-tabs button.on { color: #34C759; }
+.ph-os .pph-tabs svg { width: 22px; height: 22px; } .ph-os .pph-tabs small { font-size: 10.5px; }
+.ph-os .pkp { display: flex; flex-direction: column; align-items: center; padding: 18px 0 10px; gap: 14px; }
+.ph-os .pkp-num { min-height: 40px; font: 500 30px Inter, sans-serif; letter-spacing: .04em; display: flex; align-items: center; }
+.ph-os .pkp-num .muted { font-size: 15px; letter-spacing: 0; }
+.ph-os .pkp-grid { display: grid; grid-template-columns: repeat(3, 70px); gap: 14px 24px; }
+.ph-os .pkp-k { width: 70px; height: 70px; border-radius: 50%; border: 0; background: rgba(255,255,255,.12); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font: inherit; }
+.ph-os .pkp-k:active { background: rgba(255,255,255,.3); }
+.ph-os .pkp-k b { font: 400 28px Inter, sans-serif; line-height: 1; } .ph-os .pkp-k small { font-size: 9px; letter-spacing: .14em; opacity: .7; min-height: 11px; }
+.ph-os .pkp-row { display: grid; grid-template-columns: repeat(3, 70px); gap: 24px; align-items: center; justify-items: center; }
+.ph-os .pkp-call, .ph-os .pcall-end { width: 70px; height: 70px; border-radius: 50%; border: 0; background: #34C759; color: #fff; display: grid; place-items: center; cursor: pointer; }
+.ph-os .pkp-call svg, .ph-os .pcall-end svg { width: 30px; height: 30px; }
+.ph-os .pkp-del { border: 0; background: none; color: #fff; opacity: .7; cursor: pointer; } .ph-os .pkp-del svg { width: 24px; height: 24px; }
+/* a call */
+.ph-os .lap-app-call:has(.pcall) { background: linear-gradient(180deg, #2a3546, #0c1118); }
+.ph-os .pcall { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 40px 20px 46px; box-sizing: border-box; }
+.ph-os .pcall-who { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.ph-os .pcall-who b { font-size: 26px; font-weight: 600; } .ph-os .pcall-who small { font-size: 14px; opacity: .7; max-width: 240px; }
+.ph-os .pcall-keys { display: grid; grid-template-columns: repeat(3, 72px); gap: 18px 24px; }
+.ph-os .pk-b { border: 0; background: none; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 6px; font: inherit; opacity: .55; }
+.ph-os .pk-b span { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,.14); display: grid; place-items: center; } .ph-os .pk-b svg { width: 26px; height: 26px; }
+.ph-os .pk-b small { font-size: 11px; }
+.ph-os .pcall-end { background: #FF3B30; } .ph-os .pcall-end svg { transform: rotate(135deg); }
+/* the Store */
+.ph-os .pstore { overflow: auto; height: 100%; padding-bottom: 30px; }
+.ph-os .pstore h4 { margin: 18px 16px 6px; font-size: 17px; }
+.ph-os .ps-hero { margin: 4px 16px 0; padding: 18px; border-radius: 18px; background: linear-gradient(135deg, #2F7BF6, #34C759); display: flex; flex-direction: column; gap: 4px; align-items: flex-start; color: #fff; }
+.ph-os .ps-hero small { font: 700 11px Inter, sans-serif; text-transform: uppercase; letter-spacing: .08em; opacity: .85; }
+.ph-os .ps-hero b { font-size: 20px; } .ph-os .ps-hero span { font-size: 13px; opacity: .9; margin-bottom: 8px; }
+.ph-os .ps-hero .btn { background: rgba(255,255,255,.95); color: #1a1f27; border: 0; border-radius: 14px; }
+.ph-os .ps-row { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.ph-os .ps-row .ld-ic { width: auto; padding: 0; } .ph-os .ps-row .ld-ic > span { width: 46px; height: 46px; border-radius: 12px; }
+.ph-os .ps-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .ph-os .ps-t b { font-size: 14.5px; } .ph-os .ps-t small { font-size: 12px; opacity: .6; }
+.ph-os .ps-get { min-width: 64px; height: 28px; border-radius: 14px; border: 0; background: rgba(47,123,246,.18); color: #5B9BFF; font: 700 12.5px Inter, sans-serif; cursor: pointer; }
+.ph-os .ps-get:disabled { opacity: .5; cursor: default; }
