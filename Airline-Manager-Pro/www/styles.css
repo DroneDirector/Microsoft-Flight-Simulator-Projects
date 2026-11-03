@@ -3557,3 +3557,21 @@ html.calm .ph-frame, html.calm .ph-screen { transition: none; }
 .ph-os .pcall-ans { display: flex; gap: 70px; }
 .ph-os .pc-ring { animation: pcRing 1s ease-in-out infinite; }
 @keyframes pcRing { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-14deg); } 40% { transform: rotate(14deg); } 60% { transform: rotate(-8deg); } }
+/* the phone's own keyboard */
+.ph-os .pm-send.kb { padding-bottom: 6px; }
+.ph-os .pm-kbt { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.08); color: rgba(255,255,255,.6); display: grid; place-items: center; cursor: pointer; }
+.ph-os .pm-kbt.on { color: #5B9BFF; background: rgba(47,123,246,.16); }
+.ph-os .pm-kbt svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.ph-os .ph-kb { flex: 0 0 auto; align-self: stretch; display: flex; flex-direction: column; gap: 7px; padding: 8px 3px 30px; background: rgba(30,34,42,.96); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.ph-os .pk-r { display: flex; gap: 4px; justify-content: center; }
+.ph-os .pk-r.r2 { padding: 0 4.5%; }
+.ph-os .pk-k { flex: 1 1 0; min-width: 0; height: 40px; border: 0; border-radius: 6px; background: #5a5f69; color: #fff; font: 400 18px Inter, sans-serif; box-shadow: 0 1px 0 rgba(0,0,0,.45); cursor: pointer; padding: 0; display: grid; place-items: center; }
+.ph-os .ph-kb.num .pk-k { font-size: 16px; }
+.ph-os .pk-k.down { background: #8a909c; transform: translateY(1px); }
+.ph-os .pk-w { flex: 1.45 1 0; background: #3c4049; } .ph-os .pk-w2 { flex: 1.6 1 0; background: #3c4049; font-size: 14px; }
+.ph-os .pk-k svg { width: 20px; height: 20px; fill: none; stroke: #fff; stroke-width: 1.7; stroke-linejoin: round; }
+.ph-os .pk-sh.on { background: #e9ecf2; } .ph-os .pk-sh.on svg { stroke: #111; fill: #111; }
+.ph-os .pk-sh.lock { background: #e9ecf2; box-shadow: inset 0 -3px 0 #2F7BF6; } .ph-os .pk-sh.lock svg { stroke: #111; fill: #111; }
+.ph-os .pk-sp { flex: 5 1 0; font-size: 14px; color: rgba(255,255,255,.8); }
+.ph-os .pk-go { flex: 2 1 0; background: #2F7BF6; font-size: 14px; font-weight: 600; }
+.ph-os .pcall.on .ph-kb { margin: 0 -12px; padding-bottom: 6px; }

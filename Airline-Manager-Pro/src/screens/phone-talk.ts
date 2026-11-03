@@ -231,7 +231,7 @@ function phCallScreenHtml(): string {
   return `<div class="pcall ${on ? 'on' : ''}"><div class="pcall-who ${on ? 'sm' : ''}">${phAvatar(c, !on)}<b>${esc(c.name)}</b><small class="pcall-t">${label}</small></div>
     ${on ? `<div class="pcall-log">${PhCall.log.map((l: any) => `<div class="pm-b ${l.me ? 'me' : ''}">${esc(l.t)}</div>`).join('')}${PhCall.busy ? '<div class="pm-b pm-typing"><i></i><i></i><i></i></div>' : ''}</div>
       <div class="pcall-say">${phCallOpts(c).map(o => `<button class="pcs-o" data-act="ph-call-say" data-t="${esc(o)}" ${PhCall.busy ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div>
-      <form class="pm-send pcall-own"><input class="pm-in pcall-in" type="text" maxlength="200" placeholder="Say something…" autocomplete="off" enterkeyhint="send" ${PhCall.busy ? 'disabled' : ''}><button type="submit" class="pm-go" aria-label="Say it">${icon('chevron')}</button></form>`
+      <form class="pm-send pcall-own ${phKbOn() ? 'kb' : ''}">${phKbToggle()}<input class="pm-in pcall-in" type="text" maxlength="200" placeholder="Say something…" autocomplete="off" enterkeyhint="send" value="${esc(PhA.callDraft || '')}" ${phKbOn() ? 'inputmode="none"' : ''} ${PhCall.busy ? 'disabled' : ''}><button type="submit" class="pm-go" aria-label="Say it">${icon('chevron')}</button></form>${phKbOn() ? phKbHtml() : ''}`
     : `<div class="pcall-keys">${[['Mute', 'mute'], ['Keypad', 'sliders'], ['Speaker', 'volume'], ['Add call', 'plus'], ['Video', 'camera'], ['Contacts', 'user']].map(b => `<button class="pk-b" disabled><span>${icon(b[1])}</span><small>${b[0]}</small></button>`).join('')}</div>`}
     <button class="pcall-end" data-act="ph-call-end" aria-label="End call">${icon('phone')}</button></div>`;
 }
@@ -256,6 +256,6 @@ ACTIONS['ph-call-ans'] = () => { if (PhCall.st === 'incoming') { Sound.tick(); p
 ACTIONS['ph-call-say'] = el => { Sound.tick(); phCallSay(el.getAttribute('data-t') || ''); };
 document.addEventListener('submit', e => {
   const f = e.target as HTMLElement; if (!f || !f.classList || !f.classList.contains('pcall-own')) return;
-  e.preventDefault(); const i = f.querySelector('.pcall-in') as HTMLInputElement; const v = i.value; i.value = ''; phCallSay(v);
+  e.preventDefault(); const i = f.querySelector('.pcall-in') as HTMLInputElement; const v = i.value; i.value = ''; PhA.callDraft = ''; phCallSay(v);
 });
 document.addEventListener('keydown', e => { const t = e.target as HTMLElement; if (t && t.classList && t.classList.contains('pcall-in')) e.stopPropagation(); }, true);

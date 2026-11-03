@@ -60,7 +60,7 @@ function phMsgsHtml(): string {
     const typing = PhA.typing === c.id ? '<div class="pm-b pm-typing"><i></i><i></i><i></i></div>' : '';
     return `<div class="pm-thread"><div class="pm-th"><button class="lm-back" data-act="ph-msg-back">${icon('back')}</button>${phAvatar(c)}<span><b>${esc(c.name)}</b><small>${esc(c.sub)} · ${esc(phRelWord(phRelOf(c.id)))}</small></span><button class="pm-call" data-act="ph-call" data-id="${esc(c.id)}" aria-label="Call ${esc(c.name)}">${icon('phone')}</button></div>
       <div class="pm-list">${rows || `<p class="muted pm-empty">Write to ${esc(c.name.split(' ')[0])}.</p>`}${typing}</div>
-      <form class="pm-send" data-id="${esc(c.id)}"><input class="pm-in" type="text" maxlength="300" placeholder="Message" autocomplete="off" enterkeyhint="send"><button type="submit" class="pm-go" aria-label="Send">${icon('chevron')}</button></form></div>`;
+      <form class="pm-send ${phKbOn() ? 'kb' : ''}" data-id="${esc(c.id)}">${phKbToggle()}<input class="pm-in" type="text" maxlength="300" placeholder="Message" autocomplete="off" enterkeyhint="send" value="${esc(PhA.draft || '')}" ${phKbOn() ? 'inputmode="none"' : ''}><button type="submit" class="pm-go" aria-label="Send">${icon('chevron')}</button></form>${phKbOn() ? phKbHtml() : ''}</div>`;
   }
   if (PhA.newMsg) {
     return `<div class="pm-new"><div class="pm-th"><button class="lm-back" data-act="ph-msg-back">${icon('back')}</button><span><b>New message</b><small>Choose who to write to</small></span></div>
@@ -100,10 +100,10 @@ ACTIONS['ph-msg-open'] = el => { PhA.thread = el.getAttribute('data-id') || ''; 
 ACTIONS['ph-msg-back'] = () => { PhA.thread = ''; PhA.newMsg = false; Sound.tick(); lapRender(true); };
 ACTIONS['ph-msg-new'] = () => { PhA.newMsg = true; Sound.tick(); lapRender(true); };
 document.addEventListener('submit', e => {
-  const f = e.target as HTMLElement; if (!f || !f.classList || !f.classList.contains('pm-send')) return;
-  e.preventDefault(); const i = f.querySelector('.pm-in') as HTMLInputElement; const v = i.value; i.value = '';
+  const f = e.target as HTMLElement; if (!f || !f.classList || !f.classList.contains('pm-send') || f.classList.contains('pcall-own')) return;
+  e.preventDefault(); const i = f.querySelector('.pm-in') as HTMLInputElement; const v = i.value; i.value = ''; PhA.draft = '';
   phSend(f.getAttribute('data-id') || '', v); phRefresh();
-  setTimeout(() => { const j = Lap.root && Lap.root.querySelector('.pm-in') as HTMLInputElement; if (j) j.focus(); }, 30);
+  setTimeout(() => { const j = Lap.root && Lap.root.querySelector('.pm-in') as HTMLInputElement; if (j && (!phKbOn() || DESKTOP)) j.focus(); }, 30);
 });
 // typing a message never walks you around the room
 document.addEventListener('keydown', e => { const t = e.target as HTMLElement; if (t && t.classList && t.classList.contains('pm-in')) e.stopPropagation(); }, true);
@@ -167,3 +167,51 @@ function phStoreHtml(): string {
     <h4>Coming soon</h4>${PH_STORE_SOON.map(a => row(['', a[0], a[2], a[3]], a[1], '<button class="ps-get" disabled>Soon</button>')).join('')}
     <h4>On your phone</h4>${mine.map(a => row(a, 'Installed', `<button class="ps-get" data-act="lap-app" data-k="${a[0]}">Open</button>`)).join('')}</div>`;
 }
+
+/* ---------- the phone's own keyboard: tap the letters on the screen ---------- */
+// Letters (with shift and caps lock: tap shift once for one capital, twice to keep capitals on), numbers and
+// symbols, space, delete and send. A new sentence starts with a capital. The keyboard button beside the message
+// box turns it off and back on (kept); on a PC you can type on your own keyboard as well.
+const PH_KB_L = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+const PH_KB_N = ['1234567890', '-/:;()€&@"', '.,?!\'#%+='];
+function phKbOn(): boolean { return (State.settings as any).phoneKb !== false; }
+function phKbToggle(): string { return `<button type="button" class="pm-kbt ${phKbOn() ? 'on' : ''}" data-act="ph-kb-toggle" aria-label="${phKbOn() ? 'Hide' : 'Show'} the phone's keyboard" title="The phone's keyboard"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg></button>`; }
+function phKbHtml(): string {
+  const K = PhA.kb || (PhA.kb = { shift: 1, caps: false, num: false }), up = K.caps || K.shift;
+  const rows = K.num ? PH_KB_N : PH_KB_L;
+  const key = (ch: string) => `<button type="button" class="pk-k" data-k="${esc(ch)}">${esc(K.num ? ch : up ? ch.toUpperCase() : ch)}</button>`;
+  return `<div class="ph-kb ${K.num ? 'num' : ''}" role="group" aria-label="Keyboard">
+    <div class="pk-r">${rows[0].split('').map(key).join('')}</div>
+    <div class="pk-r r2">${rows[1].split('').map(key).join('')}</div>
+    <div class="pk-r">${K.num ? '' : `<button type="button" class="pk-k pk-w pk-sh ${K.caps ? 'lock' : K.shift ? 'on' : ''}" data-k="shift" aria-label="Shift"><svg viewBox="0 0 24 24"><path d="M12 4l7 8h-4v7H9v-7H5z"/></svg></button>`}${rows[2].split('').map(key).join('')}<button type="button" class="pk-k pk-w" data-k="del" aria-label="Delete"><svg viewBox="0 0 24 24"><path d="M9 6h11v12H9l-6-6z"/><path d="M12 10l4 4M16 10l-4 4"/></svg></button></div>
+    <div class="pk-r"><button type="button" class="pk-k pk-w2" data-k="mode">${K.num ? 'ABC' : '123'}</button><button type="button" class="pk-k" data-k="😊">😊</button><button type="button" class="pk-k pk-sp" data-k=" ">space</button><button type="button" class="pk-k pk-go" data-k="send">send</button></div></div>`;
+}
+/** A key tapped: into the message (or what you say on a call). */
+function phKbPress(k: string, kbEl: HTMLElement) {
+  const form = kbEl.previousElementSibling as HTMLFormElement, inp = form && form.querySelector('.pm-in') as HTMLInputElement; if (!inp || inp.disabled) return;
+  const K = PhA.kb || (PhA.kb = { shift: 1, caps: false, num: false }), call = form.classList.contains('pcall-own');
+  let v = inp.value;
+  if (k === 'shift') { const now = Date.now(); if (K.shift && now - (K.shT || 0) < 350) { K.caps = true; K.shift = 0; } else if (K.caps) { K.caps = false; K.shift = 0; } else K.shift = K.shift ? 0 : 1; K.shT = now; }
+  else if (k === 'mode') K.num = !K.num;
+  else if (k === 'del') v = Array.from(v).slice(0, -1).join('');
+  else if (k === 'send') { form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); K.shift = 1; phKbRedraw(kbEl); return; }
+  else {
+    v += (!K.num && (K.caps || K.shift)) ? k.toUpperCase() : k;
+    if (K.shift) K.shift = 0;
+    if (!K.num && k === ' ' && /[.!?]\s$/.test(v)) K.shift = 1;   // a new sentence: a capital
+    if (K.num && k === ' ') K.num = false;
+  }
+  if (!v) K.shift = 1;
+  inp.value = v; if (call) PhA.callDraft = v; else PhA.draft = v;
+  try { Sound.tick(); } catch (e) { /* no sound */ }
+  phKbRedraw(kbEl);
+}
+function phKbRedraw(kbEl: HTMLElement) { if (!kbEl.isConnected) return; const t = document.createElement('div'); t.innerHTML = phKbHtml(); kbEl.replaceWith(t.firstElementChild as HTMLElement); }
+// taps (pointerdown, so the message box keeps its place and nothing scrolls)
+document.addEventListener('pointerdown', e => {
+  const b = (e.target as HTMLElement).closest && (e.target as HTMLElement).closest('.ph-kb .pk-k') as HTMLElement; if (!b) return;
+  e.preventDefault(); e.stopPropagation(); b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 120);
+  phKbPress(b.getAttribute('data-k') || '', b.closest('.ph-kb') as HTMLElement);
+}, true);
+document.addEventListener('input', e => { const t = e.target as HTMLInputElement; if (!t || !t.classList || !t.classList.contains('pm-in')) return; if (t.classList.contains('pcall-in')) PhA.callDraft = t.value; else PhA.draft = t.value; });
+ACTIONS['ph-kb-toggle'] = () => { (State.settings as any).phoneKb = !phKbOn(); Store.soon(); Sound.tick(); lapRender(true); };
