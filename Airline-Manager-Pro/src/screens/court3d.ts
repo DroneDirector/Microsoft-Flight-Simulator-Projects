@@ -534,7 +534,7 @@ CourtRoom.close = function (quiet?: boolean) {
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   document.removeEventListener('mousemove', R.mm$); aimUnlock();
   try { Voice.stop(); } catch (e) { /* ignore */ }
-  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null;
+  FrameGen.dispose(R.perf); exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null;
   R.root.remove(); R.people = {}; R.crowd = [];
   if (!quiet) { try { refresh(); if (R.c) courtPopup(R.c.id); } catch (e) { /* ignore */ } }
 };
@@ -659,7 +659,7 @@ function ctFrame() {
     p.g = p.g ? cabinLerpG(p.g, gT, Math.min(1, dt * 6)) : gT;
     p.m.pose({ t, yaw: 0, gaze: [p.gazeYaw * 0.4, 0], blink: (t % 4.3) < 0.12 ? 1 : 0, g: p.g, talk: humanTalk(vn, R.speaker === k ? R.sayText : '', R.sayAt) });
   }
-  if (R.empty) { ctWalk(dt); ctGateStep(dt); R.ren.render(R.scene, R.cam); Perf.frame(R.perf, R.ren); return; }
+  if (R.empty) { ctWalk(dt); ctGateStep(dt); FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren); return; }
   // the camera eases to the shot, and you can look around it
   const sh = R.shot, ease = Math.min(1, dt * 1.6);
   R.cam.position.lerp(sh.pos, ease); R.camAt.lerp(sh.at, ease);
@@ -670,7 +670,7 @@ function ctFrame() {
   // dust drifting in the sunlight, the clock
   if (R.dust) { const a = R.dust.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) + dt * 0.02 * Math.sin(i + now * 0.3); if (y > 6) y = 0.5; a.setY(i, y); a.setX(i, a.getX(i) + dt * 0.01 * Math.cos(i * 1.7 + now * 0.2)); } a.needsUpdate = true; }
   if (R.A.clockHands) { const d = new Date(), hrs = (d.getHours() % 12 + d.getMinutes() / 60) / 12, mn = d.getMinutes() / 60; R.A.clockHands[0].rotation.z = hrs * Math.PI * 2; R.A.clockHands[1].rotation.z = mn * Math.PI * 2; }
-  R.ren.render(R.scene, R.cam); Perf.frame(R.perf, R.ren);
+  FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function ctHead(p: any): any { const s = p.seat, sk = p.sitK; return new THREE.Vector3(s.x, s.y + (sk > 0.5 ? 1.28 : (p.m.top || 1.7) - 0.12), s.z); }
 /** A camera shot of someone speaking: from in front of them, a little to one side, at about eye level. */

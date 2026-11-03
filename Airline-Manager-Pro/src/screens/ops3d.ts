@@ -291,7 +291,7 @@ function opsFrame() {
   }
   if (R.glow) { if (R.overlay || R.zoomAnim || (R.seat && !R.hover)) R.glow.hide(); R.glow.step(dt); }
   if (R.A && R.A.monScr) R.A.monScr.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, zk * 1.4)));   // the screen lights up as it opens
-  R.ren.render(R.scene, R.cam); Perf.frame(R.perf, R.ren);
+  FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function opsAimed(e?: PointerEvent): string { const o = opsAimedObj(e); return o ? o.userData.act : ''; }
 /** What you can use at the mouse (or, walking with the mouse taken, at the dot in the middle), within reach. */
@@ -445,7 +445,7 @@ OpsRoom.close = function (quiet?: boolean) {
   R.overlay = null; document.body.classList.remove('of-over');
   cancelAnimationFrame(R.raf); clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   document.removeEventListener('mousemove', R.mm$); aimUnlock();
-  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null; R.glow = null; R.me = null; R.meTried = false;
+  FrameGen.dispose(R.perf); exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null; R.glow = null; R.me = null; R.meTried = false;
   R.root.remove();
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };

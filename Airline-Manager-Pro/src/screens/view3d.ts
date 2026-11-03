@@ -146,7 +146,7 @@ function v3dClose() {
   removeEventListener('resize', v3dSize);
   try {
     V3d.scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach((m: any) => { if (m.map) m.map.dispose(); m.dispose(); }); } });
-    V3d.r.dispose(); V3d.r.forceContextLoss && V3d.r.forceContextLoss();
+    FrameGen.dispose((V3d as any).perf); V3d.r.dispose(); V3d.r.forceContextLoss && V3d.r.forceContextLoss();
   } catch (e) { /* gone */ }
   if (V3d.root) V3d.root.remove();
   try { V3dTerrain.clear(); V3dTerrain.gen++; } catch (e) { /* none */ }
@@ -599,7 +599,8 @@ function v3dRecentre(f: LiveFlight, w: { lon: number; lat: number }) {
 function v3dLoop(now: number) {
   if (!V3d.open) return;
   V3d.raf = requestAnimationFrame(v3dLoop);
-  if (document.hidden || now - V3d.last < 1000 / (gameBoost() ? 60 : V3D_FPS) - 2) return;
+  const VP: any = (V3d as any).perf, gen = FrameGen.on() && !(V3d as any).dprWas; if (VP) VP.genCap = gameBoost() ? 0 : V3D_FPS;   // frame generation fills the screen's other frames (not in the cabin)
+  if (document.hidden || now - V3d.last < 1000 / (gameBoost() || gen ? 60 : V3D_FPS) - 2) return;
   if (Perf.skip((V3d as any).perf, now)) return;   // warm, or saving battery: fewer frames
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
   V3d.frames = (V3d.frames || 0) + 1;   // counted for the Game Booster's frame-rate chart
@@ -860,7 +861,7 @@ function v3dLoop(now: number) {
   if (V3d.loaded || !VL.drawnAt || now - VL.drawnAt > 450) {
     VL.drawnAt = now;
     if (VL.cabinFwdFor) { try { cabinOutsidePass(V3d.planes[VL.cabinFwdFor]); } catch (e) { /* the windows keep the last view */ } }
-    V3d.r.render(V3d.scene, V3d.cam);
+    if (V3d.loaded && !(V3d as any).dprWas) FrameGen.draw((V3d as any).perf, V3d.r, V3d.scene, V3d.cam, now); else V3d.r.render(V3d.scene, V3d.cam);
     if (V3d.loaded && !(V3d as any).dprWas) Perf.frame((V3d as any).perf, V3d.r, gameBoost() ? 60 : V3D_FPS);   // the cabin keeps its own sharpness
   }
 

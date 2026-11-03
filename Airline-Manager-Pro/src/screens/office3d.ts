@@ -453,7 +453,7 @@ OfficeRoom.close = function (quiet?: boolean) {
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   document.removeEventListener('mousemove', R.mm$); aimUnlock(); R.glow = null;
   try { Voice.stop(); } catch (e) { /* ignore */ }
-  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null;
+  FrameGen.dispose(R.perf); exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null; R.A = null;
   R.root.remove(); R.vis = null; R.me = null; R.ph = null;
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };
@@ -671,7 +671,7 @@ function ofFrame() {
     R.cam.lookAt(ahead);
   } else ofWalk(dt, now);
   if (R.glow) { if ((R.seat && !R.lapHover) || R.overlay || R.lapZ) R.glow.hide(); R.glow.step(dt); }
-  R.ren.render(R.scene, R.cam); Perf.frame(R.perf, R.ren);
+  FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function ofBlocked(x: number, z: number): boolean {
   if (x < -2.9 || x > 2.9 || z < -3.1 || z > 2.7) return true;
