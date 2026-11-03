@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.89 (2026-11-03)
+
+- pets: your own coat and markings colours (coatHex, lightHex; PET_LIGHTS presets and colour pickers in the Pet tab), a picture of the pet in the editor (petPreviewDraw, one shared renderer); water and food bowls beside the bed (petBowls: glazed lathe bowls, the name and paw prints painted on the food bowl facing the room, kibble, water); the office keeps clear of them
+
 ## 0.9.88 (2026-11-03)
 
 - pets: a standing pose sculpted alongside the curled one (corgi and ginger kitten shapes, leg pivots and weights), single fur strands (7,000 on a dog, 5,200 on a cat) laid along the body, tabby stripes, pink ear insides, eyes with irises; a state machine (sleep, wake, rise, walk, turn, down) crossfades the poses, walks a diagonal gait between the office wander points and back, and sleeps four to nine minutes after

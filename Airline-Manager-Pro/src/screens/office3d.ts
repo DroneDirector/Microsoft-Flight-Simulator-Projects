@@ -241,7 +241,7 @@ function ofBuild(scene: any, q: number) {
   { const px = X1 - 0.45, pz = Z0 + 0.45; add(new T.CylinderGeometry(0.22, 0.17, 0.45, 24), mat.pot, px, 0.225, pz); const r = ctRng(5);
     for (let i = 0; i < 26; i++) { const lf = new T.Mesh(new T.PlaneGeometry(0.12, 0.55), mat.plant); const a = r() * 6.3, t = 0.4 + r() * 0.7; lf.position.set(px + Math.cos(a) * 0.12, 0.45 + 0.25 + r() * 0.6, pz + Math.sin(a) * 0.12); lf.rotation.set(-t * Math.cos(a) * 0.8, a, t * 0.8 * Math.sin(a)); lf.castShadow = true; root.add(lf); } }
   // your pet, asleep in its bed by the right-hand bookshelf
-  try { petPlace(T, root, A, [1.2, -2.8], -0.5, [[1.2, -2.0], [2.1, -1.9], [2.4, -1.0], [1.6, -1.3], [0.8, -1.8], [1.9, -2.3]]); } catch (e) { /* no pet */ }
+  try { petPlace(T, root, A, [1.2, -2.8], -0.5, [[1.2, -2.0], [2.1, -1.9], [2.4, -1.0], [1.6, -1.3], [0.8, -1.8]]); } catch (e) { /* no pet */ }
   // ceiling lights
   const dm = new T.MeshBasicMaterial({ color: 0xFFF1D8, toneMapped: false });
   for (const [x, z] of [[-1.6, -1.8], [1.6, -1.8], [-1.6, 1.4], [1.6, 1.4], [0, -0.2]]) { const d = new T.Mesh(new T.CircleGeometry(0.08, 20), dm); d.rotation.x = Math.PI / 2; d.position.set(x, HH - 0.005, z); root.add(d); const L = new T.SpotLight(0xFFE4C0, 5, 7, 0.9, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); root.add(L); root.add(L.target); }
@@ -532,7 +532,7 @@ const OF_BLOCK: number[][] = [
   [-0.45, 0.55, 0.45, 1.45],     // your chair
   [-0.34, -1.32, 0.34, -0.7],    // the visitor's chair
   [-3.05, -3.4, -1.65, -3.0], [1.65, -3.4, 3.05, -3.0],   // the bookshelves
-  [0.72, -3.28, 1.68, -2.32],    // the pet's bed
+  [0.72, -3.28, 1.98, -2.22],    // the pet's bed and bowls
   [-3.2, 0.1, -2.35, 2.3], [-2.05, 0.68, -1.45, 1.72],     // the sofa and the low table
   [2.5, -3.2, 3.2, -2.7],        // the plant
   [-1.25, 2.45, 1.25, 3.0],      // the credenza

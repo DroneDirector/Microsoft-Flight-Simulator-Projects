@@ -3588,3 +3588,4 @@ html.calm .ph-frame, html.calm .ph-screen { transition: none; }
 .office3d .of-planner.lap-screen, .ops3d .of-planner.op-screen { inset: 2.5% 3%; border-radius: 16px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08); }
 /* a closed window on the laptop is gone (its frame never shows over the desktop) */
 .lap-win[hidden] { display: none !important; }
+.pet-prev { display: block; width: 100%; max-width: 420px; aspect-ratio: 560 / 340; margin: 10px 0 2px; border-radius: 12px; background: radial-gradient(ellipse at 50% 60%, #6b5442, #3a2c22); }
