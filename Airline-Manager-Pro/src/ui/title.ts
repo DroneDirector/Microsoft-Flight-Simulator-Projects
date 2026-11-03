@@ -81,7 +81,6 @@ function titleClose(then?: () => void) {
 }
 
 function titleHtml(): string {
-  const fresh = Store.wasEmpty;
   const item = (act: string, ic: string, label: string, sub: string) => `<button class="ts-btn" data-act="${act}" style="--i:${_tsI++}"><span class="ts-bi">${icon(ic)}</span><span class="ts-bt"><b>${label}</b><small>${sub}</small></span><i class="ts-sheen"></i></button>`;
   let _tsI = 0;
   const co = company();
@@ -90,9 +89,9 @@ function titleHtml(): string {
     <div class="ts-left">
       <div class="ts-logo" aria-label="${esc(APP.name)}"><span class="ts-l1">Airline</span><span class="ts-l2">Manager</span><span class="ts-l3">Pro</span></div>
       <nav class="ts-nav">
-        ${fresh ? item('ts-demo', 'play', 'Explore the demo', 'Three airlines already flying') : item('ts-continue', 'play', 'Continue', co ? esc(co.name) : 'Back into the game')}
+        ${item('ts-continue', 'play', 'Continue', co ? esc(co.name) : 'Back into the game')}
         ${item('ts-new', 'plus', 'New game', 'Create your pilot and airline')}
-        ${fresh ? '' : item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
+        ${item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
         ${item('ts-load', 'download', 'Load game', 'Pick up any save')}
         ${item('ts-options', 'gear', 'Options', 'Every setting')}
         ${item('ts-quit', 'power', 'Quit', 'Hold to close')}
