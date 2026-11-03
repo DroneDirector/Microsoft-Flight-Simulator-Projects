@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.72 (2026-11-03)
+
+- faces: photographic face textures (assets/faces) mapped by per-head landmarks (eyes, nose, mouth, chin, ears) and tinted to the skin; ear photograph mapped onto the ear; finer pore layer close up; skin detail on hands and arms
+- skin: relief, cavities and oil from the photograph, warm wrap past the terminator, light through the ears from behind
+
 ## 0.9.71 (2026-11-03)
 
 - figure system: ankles (uAnkL/R about the foot joints) and a spine (uSpine about the waist) in the body shader; shoes, headPivot and a chest group follow
