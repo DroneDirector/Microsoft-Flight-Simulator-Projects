@@ -1,4 +1,4 @@
-// Pictures of the 3D view's ground at the terrain detail settings, for comparing them side by side (sea surface, low land kept dry).
+// Pictures of the 3D view's ground at the terrain detail settings, for comparing them side by side (airport levelling).
 // Run with the app served at http://localhost:47610/ (as the PC app, so Ultra is offered):
 //   node tools/shots/terrain-shots.js <output folder>
 // Two places on the Faroe Islands (steep mountains straight out of the sea): over the sea west of Vágar looking

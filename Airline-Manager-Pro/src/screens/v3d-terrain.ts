@@ -251,6 +251,9 @@ const V3dTerrain = {
     const lonOf = (px: number) => (r.x0 + px / 256) / n * 360 - 180;
     const latOf = (py: number) => { const k = Math.PI - 2 * Math.PI * (r.y0 + py / 256) / n; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
     const aptLL = V3d.icao ? apt(V3d.icao).pos : null, aElev = V3d.elev || 0;
+    // the ground is levelled only where the airport is (a big airport's runways reach further), blending out over
+    // a good distance beyond, so no terrace is cut into the hills around it
+    const aBig = V3d.icao && aptSize(V3d.icao) === 2, aR0 = aBig ? 2600 : 1500, aR1 = aR0 + (aBig ? 1800 : 1500);
     const pos = new Float32Array((G + 1) * (G + 1) * 3), uv = new Float32Array((G + 1) * (G + 1) * 2), idx: number[] = [], mh = new Float32Array((G + 1) * (G + 1));
     const flat = new Float32Array((G + 1) * (G + 1));   // 1 where the mesh is water: flat, at the water's level
     // the coast: distance in metres from it (+ land, − sea), from the map's sea outline
@@ -274,11 +277,11 @@ const V3dTerrain = {
       if (s.wet) { y = Math.max(-40, Math.min(sd, -0.3) * CLIFF); h = 0; }
       else if (wl < 0) { y = h = Math.min(h, Math.max(0.6, sd * CLIFF + 0.6)); }
       else y = h;
-      if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); h = aElev + (h - aElev) * k; }
+      if (aptLL) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - aR0) / (aR1 - aR0), 0, 1); h = aElev + (h - aElev) * k; }
       const p = v3dXY(lon, lat), o = j * (G + 1) + i;
       flat[o] = wl >= 0 && Math.abs(h - wl) < 0.5 ? 1 : 0;
       // outer rings sit a little lower so the finer ring always shows where they meet
-      if (aptLL && !s.wet) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - 2500) / 2500, 0, 1); y = aElev + (y - aElev) * k; }
+      if (aptLL && !s.wet) { const d = gcDistanceNm([lon, lat], aptLL) * NM, k = clamp((d - aR0) / (aR1 - aR0), 0, 1); y = aElev + (y - aElev) * k; }
       mh[o] = h - (aptLL ? 1.5 : 0) - (r.inner ? 4 : 0);   // the surface (the sea's at sea), for what stands or floats on it
       // land never dips under the sea's surface (the small offsets above are for where rings and the airport meet)
       pos[o * 3] = p[0]; pos[o * 3 + 1] = (s.wet ? y : wl >= 0 ? mh[o] : Math.max(Math.min(h, 0.5), mh[o])) - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
