@@ -15,7 +15,7 @@ function renderShell() {
   const app = $('#app');
   app.innerHTML = `
     <nav class="rail" aria-label="Main">
-      <div class="rail-brand" title="${esc(APP.name)}">${brandMark()}</div>
+      <button class="rail-brand" data-act="title-open" title="Back to the title screen" aria-label="Back to the title screen">${brandMark()}</button>
       <button class="rail-more up" data-act="rail-scroll" data-d="-1" aria-label="Scroll the menu up">${icon('down')}</button>
       <div class="rail-items">${NAV_ORDER.map(k => `
         <button class="rail-btn" data-act="go" data-screen="${k}" aria-label="${esc(SCREENS[k].title)}">

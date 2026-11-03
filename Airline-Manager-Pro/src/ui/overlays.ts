@@ -77,6 +77,7 @@ ACTIONS.switcher = el => {
     <div class="sw-foot">
       <button class="btn ghost" data-act="new-company">${icon('plus')}New company</button>
       <button class="btn ghost" data-act="settings" data-section="profiles">${icon('sliders')}Profiles and divisions</button>
+      <button class="btn ghost" data-act="title-open">${icon('back')}Back to the title screen</button>
     </div>`, { cls: 'switcher', anchor: el });
 };
 

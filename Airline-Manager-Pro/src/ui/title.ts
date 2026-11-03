@@ -7,8 +7,9 @@
 const TS_BPM = 101.63, TS_OFF = 0.322, TS_BEAT = 60 / TS_BPM, TS_DUR = 257.16;
 type TsView = [number, number, number];   // centre x, centre y, visible width (in the picture's pixels)
 interface TsShot { img: string; kind: 'd' | 'w' | 'c' | 'f'; beats: number; a: TsView; b: TsView; cap?: [string, string]; lights?: string }
-// one round of the film, in beats; it repeats (mirrored every other round) until the music ends
+// one round of the film, in beats, opening above the clouds; it repeats (mirrored every other round) until the music ends
 const TS_SHOTS: TsShot[] = [
+  { img: 'fly', kind: 'f', beats: 16, a: [700, 384, 1408], b: [720, 380, 1220], cap: ['Above the clouds', 'Sunset at flight level 370'], lights: 'fly' },   // it opens above the clouds at sunset
   { img: 'fly', kind: 'd', beats: 8, a: [1128, 262, 360], b: [1100, 252, 300] },                 // the tail and its S, lit up
   { img: 't1', kind: 'd', beats: 8, a: [660, 488, 420], b: [722, 492, 340] },                     // the engine
   { img: 't1', kind: 'd', beats: 8, a: [1040, 528, 300], b: [1028, 510, 250] },                   // the nose gear
@@ -88,11 +89,11 @@ function titleHtml(): string {
     <div class="ts-left">
       <div class="ts-logo" aria-label="${esc(APP.name)}"><span class="ts-l1">Airline</span><span class="ts-l2">Manager</span><span class="ts-l3">Pro</span></div>
       <nav class="ts-nav">
-        ${fresh ? item('ts-demo', 'play', 'Explore the demo', 'Three airlines already flying') : item('ts-continue', 'play', 'Continue', co ? esc(co.name) + ': into your office' : 'Into your office')}
+        ${fresh ? item('ts-demo', 'play', 'Explore the demo', 'Three airlines already flying') : item('ts-continue', 'play', 'Continue', co ? esc(co.name) : 'Back into the game')}
         ${item('ts-new', 'plus', 'New game', 'Create your pilot and airline')}
         ${fresh ? '' : item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
         ${item('ts-load', 'download', 'Load game', 'Pick up any save')}
-        ${item('ts-options', 'settings', 'Options', 'Every setting')}
+        ${item('ts-options', 'gear', 'Options', 'Every setting')}
         ${item('ts-quit', 'power', 'Quit', 'Hold to close')}
       </nav>
     </div>
@@ -315,31 +316,38 @@ function titleKey(e: KeyboardEvent) {
   else if (e.key === 'Escape' && T.panel) { e.preventDefault(); titlePanel(''); }
 }
 function titleGo(then: () => void) { Sound.tick(); titleClose(then); }
-ACTIONS['ts-continue'] = () => titleGo(() => { try { OfficeRoom.open(); } catch (e) { /* the overview */ } });
+ACTIONS['ts-continue'] = () => titleGo(() => { /* back into the game, where you were */ });
 ACTIONS['ts-demo'] = () => titleGo(() => { try { const S: any = State; S.settings.tourDone = S.settings.tourDone || false; ACTIONS['fs-demo'](null as any, null as any); } catch (e) { /* ignore */ } });
 ACTIONS['ts-options'] = () => { titlePanel(''); ACTIONS.settings(null as any, null as any); };
 ACTIONS['ts-quit'] = () => { titlePanel(''); ACTIONS.exit(null as any, null as any); };
 ACTIONS['ts-new'] = () => {
   Sound.tick();
-  if (Store.wasEmpty) { titleNewGame(); return; }
   titlePanel('new', `<div class="ts-ph"><h2>Start a new game?</h2><button class="ts-x" data-act="ts-panel-close" aria-label="Close">${icon('close')}</button></div>
-    <p class="ts-p">Your airline as it is now is replaced by a new one: your pilot, aircraft, staff, routes and money. Save it to a slot first if you want to come back to it.</p>
+    <p class="ts-p">${Store.wasEmpty ? 'The demo airlines are removed and everything starts from nothing' : 'Everything is erased and starts from nothing'}: your pilot, companies, aircraft, staff, routes, flights, money, loans, logbook, news, markets and history. Only your settings are kept. ${Store.wasEmpty ? '' : 'Save the game in a slot first if you want to come back to it.'}</p>
+    <p class="ts-p">Next: create your pilot and choose the difficulty, then found your airline.</p>
     <div class="ts-row"><button class="ts-pb hot" data-act="ts-new-go">${icon('plus')}Yes, start a new game</button><button class="ts-pb" data-act="ts-save">${icon('check')}Save first</button><button class="ts-pb" data-act="ts-panel-close">No</button></div>`);
 };
 ACTIONS['ts-new-go'] = () => { Sound.tick(); titleNewGame(); };
 ACTIONS['ts-panel-close'] = () => { Sound.tick(); titlePanel(''); };
-/** A new game: into the game, then straight to creating your pilot, then your airline. */
+/** A new game: create your pilot (and choose the difficulty), then found your airline; only then is everything
+ *  erased and the game starts again from nothing. Cancel on the way and you are back on the start screen as before. */
 function titleNewGame() {
-  titleClose(() => {
-    const me: any = myPilot(), look = defaultLook((me && me.sex) || 'm', 'captain');
-    openLookEditor({ title: 'Create your pilot', role: 'captain', look, identity: { name: 'Capt. New Pilot', dob: '1990-06-15', nat: (me && me.nat) || 'FO' },
-      onAccept: (lk, idt) => {
-        const p: any = myPilot(); p.look = lk; p.sex = lk.sex; p.lookAccepted = true;
-        if (idt) { p.name = idt.name; p.dob = idt.dob; p.nat = idt.nat; }
-        Store.save();
-        setTimeout(() => { ACTIONS['fs-scratch'](null as any, null as any); const n = $('.fs-pilot') as HTMLInputElement; if (n) n.value = p.name; }, 350);
-      } });
-  });
+  titlePanel('');
+  const me: any = myPilot(), look = defaultLook((me && me.sex) || 'm', 'captain');
+  (window as any).__ngPilot = null;
+  openLookEditor({ title: 'Create your pilot', role: 'captain', look, identity: { name: 'Capt. New Pilot', dob: '1990-06-15', nat: (me && me.nat) || 'FO' }, difficulty: true,
+    onAccept: (lk, idt) => {
+      (window as any).__ngPilot = { look: lk, sex: lk.sex, name: (idt && idt.name) || 'Capt. New Pilot', dob: idt && idt.dob, nat: idt && idt.nat };
+      setTimeout(() => {
+        ACTIONS['fs-scratch'](null as any, null as any);
+        const n = $('.fs-pilot') as HTMLInputElement; if (n) { n.value = (window as any).__ngPilot.name; const f = n.closest('.field') as HTMLElement; if (f) f.style.display = 'none'; }
+        const d = $('.fs-modal .fs-diff') as HTMLElement; if (d) d.remove();   // chosen with the pilot
+        const h = $('.fs-modal h2'), w = $('.fs-modal .fine-print'), b = $('.fs-modal [data-act=fs-wipe]');
+        if (h) h.textContent = 'Found your airline';
+        if (w) w.innerHTML = `${icon('alert')}Starting erases everything that is there now and begins from nothing, at ${esc(DIFFICULTY[_fsDiff].name)} difficulty. Your settings are kept.`;
+        if (b) b.innerHTML = `${icon('play')}Start the new game`;
+      }, 350);
+    } });
 }
 
 /** The panel on the right: saving, loading, or a question. */
@@ -377,11 +385,17 @@ ACTIONS['ts-slot-save'] = el => {
 };
 ACTIONS['ts-slot-load'] = el => {
   const i = +(el.getAttribute('data-i') || 0); if (!i) return;
-  titleAsk(el, 'Load this save?', 'Load', () => { GameSaves.load(i); });
+  const m = GameSaves.meta()[i - 1]; if (!m) return; Sound.tick();
+  const d = new Date(m.at);
+  titlePanel('load', `<div class="ts-ph"><h2>Load this save?</h2><button class="ts-x" data-act="ts-load" aria-label="Back">${icon('close')}</button></div>
+    <div class="ts-slot ts-sel"><span class="ts-sb"><span class="ts-sn">${String(i).padStart(2, '0')}</span><span class="ts-si"><b>${esc(m.airline || 'Airline')}</b><small>${esc(m.pilot || '')}${m.pilot ? ' · ' : ''}${esc(dateStr(d).slice(0, 10))} ${esc(d.toTimeString().slice(0, 5))}</small><small>${esc(money(m.balance || 0, { compact: true }))} · ${m.fleet || 0} aircraft${m.flying ? ` · ${m.flying} flying` : ''}</small></span></span></div>
+    <p class="ts-p">Are you sure you want to load this save game? The game goes back to that moment, and everything since then that isn't saved in a slot is replaced.</p>
+    <div class="ts-row"><button class="ts-pb hot" data-act="ts-load-go" data-i="${i}">${icon('download')}Yes, load it</button><button class="ts-pb" data-act="ts-load">No</button></div>`);
 };
+ACTIONS['ts-load-go'] = el => { const i = +(el.getAttribute('data-i') || 0); if (i) { Sound.tick(); GameSaves.load(i); } };
 ACTIONS['ts-auto-load'] = el => {
   const i = +(el.getAttribute('data-i') || 0); if (!i) return;
-  titleAsk(el, 'Go back to this backup?', 'Load', () => { SaveSlots.read(i).then((t: string) => { if (!t) { toast('That backup save could not be read', 'warn'); return; } GameSaves.restoreText(t); }).catch(() => toast('That backup save could not be read', 'warn')); });
+  titleAsk(el, 'Are you sure you want to load this backup?', 'Load', () => { SaveSlots.read(i).then((t: string) => { if (!t) { toast('That backup save could not be read', 'warn'); return; } GameSaves.restoreText(t); }).catch(() => toast('That backup save could not be read', 'warn')); });
 };
 ACTIONS['ts-slot-del'] = el => {
   const i = +(el.getAttribute('data-i') || 0); if (!i) return;
@@ -395,6 +409,13 @@ function titleAsk(el: HTMLElement, q: string, yes: string, ok: () => void) {
   y.addEventListener('click', e => { e.stopPropagation(); a.remove(); ok(); }); n.addEventListener('click', e => { e.stopPropagation(); a.remove(); });
   slot.appendChild(a); Sound.tick();
 }
+
+/** From the game: back to the start screen (the game is saved first). */
+ACTIONS['title-open'] = () => {
+  closeAll(); Sound.tick();
+  try { saveNow(true); } catch (e) { /* ignore */ }
+  titleOpen();
+};
 
 /* ---------- twenty saves ---------- */
 // Each save is the whole airline as it was at that moment. On the phone, files in the app's own storage; on the PC,
@@ -438,7 +459,7 @@ const GameSaves = {
       const walk = (o: any) => { if (!o || typeof o !== 'object') return; for (const k in o) { const v = o[k]; if (typeof v === 'number') { if (v > 1e12 && v > lo && v < hi) o[k] = v + dt; } else if (v && typeof v === 'object') walk(v); } };
       walk(d.state); d.savedAt = now;
     }
-    try { sessionStorage.setItem('amp-title-next', 'office'); } catch (e) { /* ignore */ }
+    try { sessionStorage.setItem('amp-title-next', 'game'); } catch (e) { /* ignore */ }
     Backup.restore(JSON.stringify(d));
   },
 };

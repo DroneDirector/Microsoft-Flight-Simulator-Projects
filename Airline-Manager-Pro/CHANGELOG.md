@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.91 (2026-11-03)
+
+- New game: always confirmed; pilot creation with difficulty (look editor difficulty option), then the airline; wipeToScratch writes a whole fresh save (every saved key emptied, settings, registration and device data kept) and reloads into the game; Continue and a loaded save go to the game UI; Load game asks first; Back to the title screen from the rail logo and the company menu (title-open); the film opens with the sunset flight shot
+
 ## 0.9.90 (2026-11-03)
 
 - start screen (ui/title.ts) after the start-up screen: a canvas film timed to the soundtrack (101.63 bpm, envelope in assets/title/env.json), wide shots and close-up light-sweep reveals, flight deck split into inside and outside layers for the pushback, the aircraft cut out from the clouds in flight, light leaks, flares, grain, cut flashes and glitches, letterbox; menu on the left (Continue → office, New game → pilot then airline, Save game / Load game with 20 slots (GameSaves: phone files game-N.json, PC saves\\game-N.json, browser IndexedDB), Options themed, Quit); music toggle there and in Sound and feel (titleMusic); a loaded save moves every clock in it to now; Backup.restore stops saving until the reload; images made by tools/title/make_title.py; Audiowide (OFL) and Yellowtail (Apache 2.0) fonts
