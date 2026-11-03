@@ -104,6 +104,8 @@ Each widget opens its own page.
 | Who is missing: for a delay for want of people, the pilot, cabin crew, mechanics and ground crew needed, available and why not | Built |
 | Flight planner: the take-off and landing runway for every flight on a route, by the wind or assigned, with the wind on each runway | Built |
 | Published departures, arrivals and approaches with their real waypoints for 2,900+ US airports (FAA), without the simulator running | Built |
+| Choose the SID, STAR and approach with their transitions per route, with their waypoints, altitude and speed limits on the map | Built |
+| Departures, arrivals and approaches built from the real navaids around airports where none are published | Built |
 
 ## Flight logs
 

@@ -144,11 +144,13 @@ const SimProcedures = {
   data: {} as { [icao: string]: SimProcs | false },
   asked: {} as { [icao: string]: boolean },
   get(icao: string): SimProcs {
-    const d = this.data[icao]; if (d) return d; if (d === false) { const b = BundledProcs.get(icao); if (b) this.src[icao] = 'faa'; return b; }
+    const d = this.data[icao]; if (d) return d; if (d === false) { const b = BundledProcs.get(icao); if (b) { this.src[icao] = 'faa'; return b; } const g = BundledProcs.index && !BundledProcs.index[icao] ? NavProcs.get(icao) : null; if (g) this.src[icao] = 'nav'; return g; }
     try { const k = JSON.parse(localStorage.getItem('amp-proc:' + icao) || 'null'); if (k && k.l) { this.src[icao] = 'sim'; return (this.data[icao] = k.l); } } catch (e) { /* none */ }
     this.ask(icao);
     // the published ones that come with the app (US airports, FAA), with or without the simulator
     const b = BundledProcs.get(icao); if (b) { this.src[icao] = 'faa'; return b; }
+    // elsewhere: ones built from the real radio navaids around the airport
+    if (BundledProcs.index && !BundledProcs.index[icao]) { const g = NavProcs.get(icao); if (g) { this.src[icao] = 'nav'; return g; } }
     return null;
   },
   /** Where an airport's procedures come from: 'sim' (Flight Simulator's navigation data), 'faa' (the FAA's, with the app). */
@@ -193,6 +195,73 @@ const BundledProcs = {
     return null;
   },
 };
+/** Every radio navaid in the world (OurAirports, public domain): VOR, VOR-DME, VORTAC, TACAN, DME and NDB. */
+const Navaids = {
+  list: null as any[], grid: {} as { [k: string]: any[] }, loading: false,
+  load() {
+    if (this.list || this.loading) return; this.loading = true;
+    fetch('navaids-world.json').then(r => r.ok ? r.json() : null).then((j: any) => {
+      const L: any[] = (j && j.navaids) || [], G: any = {};
+      for (const n of L) { const k = Math.floor(n[2]) + ',' + Math.floor(n[3]); (G[k] || (G[k] = [])).push(n); }
+      this.grid = G; this.list = L;
+      for (const k of Object.keys(_paths)) delete _paths[k];   // flights from now on use them
+    }).catch(() => { this.list = []; });
+  },
+  /** Navaids within `nm` of a place: [ident, kind, lat, lon, kHz, airport]. */
+  near(pos: number[], nm: number): any[] {
+    if (!this.list) { this.load(); return []; }
+    const out: any[] = [], la = Math.floor(pos[1]), lo = Math.floor(pos[0]), r = Math.ceil(nm / 50) + 1;
+    for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) for (const n of this.grid[(la + i) + ',' + (lo + j)] || []) if (gcDistanceNm(pos, [n[3], n[2]]) <= nm) out.push(n);
+    return out;
+  },
+};
+
+/** Departures, arrivals and approaches built the way they are designed, from the real navaids around an airport,
+ *  where neither the simulator nor the FAA has published ones: each departure climbs straight ahead and turns
+ *  to a navaid in its direction; each arrival starts at a navaid and leads to the final approach course; the
+ *  approach has its fixes where they are put on real approaches (CIxx about 10 nm out, FFxx, the final approach
+ *  fix, 5.5 nm out at about 1,800 ft above the runway, and the runway). An ILS where the runway has one,
+ *  otherwise an RNAV approach. Shown as built from navaids, never as published. */
+const NavProcs = {
+  data: {} as { [icao: string]: SimProcs | false },
+  get(icao: string): SimProcs {
+    if (this.data[icao] !== undefined) return this.data[icao] || null;
+    const A: any = apt(icao); if (!A || !World.runways) return null;
+    if (!Navaids.list) { Navaids.load(); return null; }
+    const ends = runwayEnds(icao); if (!ends.length) { this.data[icao] = false; return null; }
+    const elevM = (A.elev || 0) * 0.3048, ft = (f: number) => Math.round(elevM + f * 0.3048);
+    const leg = (t: number, fix: string, p: number[], alt?: number, crs?: number): SimLeg => ({ t, fix, lat: p ? p[1] : 0, lon: p ? p[0] : 0, alt: alt || 0, crs: crs || 0, dist: 0, turn: 0 });
+    // up to six navaids 12-80 nm away, spread round the compass (the nearest in each direction)
+    const cand = Navaids.near(A.pos, 80).filter(n => { const d = gcDistanceNm(A.pos, [n[3], n[2]]); return d >= 12 && /^(V|VD|VT|T|N|ND)$/.test(n[1]); })
+      .map(n => ({ id: String(n[0]), pos: [n[3], n[2]], brg: geoBrg(A.pos, [n[3], n[2]]), d: gcDistanceNm(A.pos, [n[3], n[2]]), vor: /^V/.test(n[1]) }))
+      .sort((a, b) => (a.vor === b.vor ? a.d - b.d : a.vor ? -1 : 1));
+    const picked: any[] = [];
+    for (const c of cand) { if (picked.length >= 6) break; if (picked.every(p => Math.abs(angDiff(p.brg, c.brg)) > 45)) picked.push(c); }
+    const num = (k: string) => 1 + (_hashStr(icao + k) % 9);
+    const sids: SimProc[] = [], stars: SimProc[] = [], apps: SimProc[] = [];
+    for (const n of picked) {
+      sids.push({ name: n.id + num(n.id) + 'D', kind: 'sid', common: [leg(7, n.id, n.pos, ft(Math.min(12000, 3000 + n.d * 150)))],
+        runways: ends.map(e => ({ name: 'RW' + e.name, rwy: e.name, legs: [leg(2, '', null, ft(1500), e.hdg)] })), enroute: [] });
+      stars.push({ name: n.id + num(n.id + 'a') + 'A', kind: 'star', common: [leg(15, n.id, n.pos, ft(Math.min(10000, 4000 + n.d * 100)))],
+        runways: ends.map(e => {
+          const back = (e.hdg + 180) % 360, ci = geoDest(e.thr, back, 10), inb = geoBrg(n.pos, ci), off = angDiff(e.hdg, inb), legs: SimLeg[] = [];
+          // coming from ahead of the runway: round by a point abeam the field, as a downwind and base would
+          if (Math.abs(off) > 70) { const side = off > 0 ? -1 : 1; legs.push(leg(18, '', geoDest(geoDest(e.thr, (e.hdg + 90 * side + 360) % 360, 6), back, 4), ft(4000))); }
+          legs.push(leg(18, 'CI' + e.name, ci, ft(3000)));
+          return { name: 'RW' + e.name, rwy: e.name, legs };
+        }), enroute: [] });
+    }
+    for (const e of ends) {
+      const back = (e.hdg + 180) % 360, ci = geoDest(e.thr, back, 10), ff = geoDest(e.thr, back, 5.5);
+      const l1 = leg(15, 'CI' + e.name, ci, ft(3000)), l2 = leg(4, 'FF' + e.name, ff, ft(1800), e.hdg), l3 = leg(4, 'RW' + e.name, e.thr, ft(50), e.hdg);
+      l1.role = 'B'; l2.role = 'F'; l3.role = 'M'; l1.ad = '+'; l2.ad = '+';
+      apps.push({ name: (e.ils ? 'I' : 'R') + e.name, kind: 'app', type: e.ils ? 4 : 10, suffix: '', rwy: e.name, common: [l1, l2, l3], runways: [], enroute: [] });
+    }
+    const out: SimProcs = { icao, sids, stars, apps };
+    this.data[icao] = out; return out;
+  },
+};
+
 /** A leg as the file has it ([type, fix, lat, lon, alt, course, distance, turn, arc lat, arc lon, rule, alt 2, speed, role]) to a SimLeg. */
 function bundledLeg(a: any[]): SimLeg {
   const l: any = { t: a[0], fix: a[1] || '', lat: a[2] || 0, lon: a[3] || 0, alt: a[4] || 0, crs: a[5] || 0, dist: a[6] || 0, turn: a[7] || 0 };
@@ -296,51 +365,79 @@ function legPoints(legs: SimLeg[], start: number[]): number[][] {
 }
 function rwyMatch(a: string, b: string) { return !!a && !!b && a.replace(/^0/, '') === b.replace(/^0/, ''); }
 
-/** The published departure for the runway in use that heads best towards the destination. */
-function simDeparture(dep: RunwayEnd, dest: number[]): { pts: number[][]; name: string } {
-  const sp = SimProcedures.get(dep.icao); if (!sp || !sp.sids.length) return null;
+/** A procedure's named fixes in order, with their altitude rule (for the map and the profile). */
+interface ProcFix { name: string; pos: number[]; alt?: number; ad?: string; spd?: number }
+function legFixes(legs: SimLeg[]): ProcFix[] {
+  const out: ProcFix[] = [];
+  for (const l of legs || []) if (hasFix(l) && l.fix) { const f: ProcFix = { name: l.fix, pos: [l.lon, l.lat] }; if (l.alt) { f.alt = Math.round(l.alt / 0.3048 / 10) * 10; f.ad = l.ad || ''; } if (l.spd) f.spd = l.spd; if (!out.length || out[out.length - 1].name !== f.name) out.push(f); }
+  return out;
+}
+/** The departures (SIDs) that can be flown from a runway end, each with its transitions. */
+function sidsFor(dep: RunwayEnd): SimProc[] {
+  const sp = SimProcedures.get(dep.icao); if (!sp) return [];
+  return sp.sids.filter(sid => !sid.runways.length || sid.runways.some(r => rwyMatch(r.rwy, dep.name)));
+}
+function starsFor(arr: RunwayEnd): SimProc[] {
+  const sp = SimProcedures.get(arr.icao); if (!sp) return [];
+  return sp.stars.filter(st => !st.runways.length || st.runways.some(r => rwyMatch(r.rwy, arr.name)));
+}
+function appsFor(arr: RunwayEnd): SimProc[] {
+  const sp = SimProcedures.get(arr.icao); if (!sp) return [];
+  const rank = (t: number) => t === 4 ? 0 : t === 10 || t === 1 ? 1 : 2;
+  return sp.apps.filter(a => rwyMatch(a.rwy, arr.name)).sort((a, b) => rank(a.type) - rank(b.type));
+}
+function appName(app: SimProc): string { return `${APP_TYPES[app.type] || 'APP'} ${app.rwy || ''}${app.suffix ? ' ' + app.suffix : ''}`.trim(); }
+
+/** The departure for the runway: the one assigned in the planner (and its transition), otherwise the published
+ *  one that heads best towards the destination. */
+function simDeparture(dep: RunwayEnd, dest: number[], pick?: { sid?: string; sidTr?: string }): { pts: number[][]; name: string; fixes: ProcFix[] } {
+  const sids = sidsFor(dep); if (!sids.length) return null;
   const want = geoBrg(dep.end, dest);
   let best: any = null, bs = 1e9;
-  for (const sid of sp.sids) {
+  for (const sid of sids) {
+    if (pick && pick.sid && sid.name !== pick.sid) continue;
     const rt = sid.runways.filter(r => rwyMatch(r.rwy, dep.name))[0];
-    if (sid.runways.length && !rt) continue;
-    const ens = sid.enroute.length ? sid.enroute : [{ name: '', legs: [] }];
+    let ens = sid.enroute.length ? sid.enroute : [{ name: '', legs: [] as SimLeg[] }];
+    if (pick && pick.sidTr) { const e = ens.filter(x => x.name === pick.sidTr); if (e.length) ens = e; }
     for (const en of ens) {
-      const pts = legPoints((rt ? rt.legs : []).concat(sid.common, en.legs), dep.end); if (!pts.length) continue;
+      const legs = (rt ? rt.legs : []).concat(sid.common, en.legs), pts = legPoints(legs, dep.end); if (!pts.length) continue;
       const exit = pts[pts.length - 1], score = Math.abs(angDiff(want, geoBrg(dep.end, exit))) + gcDistanceNm(exit, dest) * 0.02;
-      if (score < bs) { bs = score; best = { pts, name: sid.name + (en.name ? '.' + en.name : '') }; }
+      if (score < bs) { bs = score; best = { pts, name: sid.name + (en.name ? '.' + en.name : ''), fixes: legFixes(legs) }; }
     }
   }
-  return best;
+  return best || (pick && pick.sid ? simDeparture(dep, dest) : null);
 }
 
-/** The published arrival and approach for the landing runway, joined the way the flight comes in. */
-function simArrival(arr: RunwayEnd, from: number[]): { star: number[][]; app: number[][]; starName: string; appName: string } {
-  const sp = SimProcedures.get(arr.icao); if (!sp || !sp.apps.length) return null;
-  const rank = (t: number) => t === 4 ? 0 : t === 10 || t === 1 ? 1 : 2;
-  const apps = sp.apps.filter(a => rwyMatch(a.rwy, arr.name)).sort((a, b) => rank(a.type) - rank(b.type));
-  if (!apps.length) return null;
+/** The arrival and approach for the landing runway: the ones assigned in the planner (with their transitions),
+ *  otherwise the published ones that suit the direction the flight comes from. */
+function simArrival(arr: RunwayEnd, from: number[], pick?: { star?: string; starTr?: string; app?: string; appTr?: string }): { star: number[][]; app: number[][]; starName: string; appName: string; fixes: ProcFix[] } {
+  let apps = appsFor(arr); if (!apps.length) return null;
+  if (pick && pick.app) { const a = apps.filter(x => x.name === pick.app || appName(x) === pick.app); if (a.length) apps = a; }
   const app = apps[0];
-  // the arrival: the one whose way in suits the direction the flight comes from
   let star: any = null, ss = 1e9;
-  for (const st of sp.stars) {
+  for (const st of starsFor(arr)) {
+    if (pick && pick.star && st.name !== pick.star) continue;
     const rt = st.runways.filter(r => rwyMatch(r.rwy, arr.name))[0];
-    if (st.runways.length && !rt) continue;
-    const ens = st.enroute.length ? st.enroute : [{ name: '', legs: [] }];
+    let ens = st.enroute.length ? st.enroute : [{ name: '', legs: [] as SimLeg[] }];
+    if (pick && pick.starTr) { const e = ens.filter(x => x.name === pick.starTr); if (e.length) ens = e; }
     for (const en of ens) {
-      const pts = legPoints(en.legs.concat(st.common, rt ? rt.legs : []), null); if (!pts.length) continue;
+      const legs = en.legs.concat(st.common, rt ? rt.legs : []), pts = legPoints(legs, null); if (!pts.length) continue;
       const score = gcDistanceNm(from, pts[0]) + pts.reduce((t, q, i) => i ? t + gcDistanceNm(pts[i - 1], q) : 0, 0) * 0.5;
-      if (score < ss) { ss = score; star = { pts, name: (en.name ? en.name + '.' : '') + st.name }; }
+      if (score < ss) { ss = score; star = { pts, name: (en.name ? en.name + '.' : '') + st.name, fixes: legFixes(legs) }; }
     }
   }
-  // the approach transition nearest where the arrival ends (or where the flight comes from)
+  if (!star && pick && pick.star) return simArrival(arr, from, { app: pick.app, appTr: pick.appTr });
+  // the approach transition: the one assigned, or the one nearest where the arrival ends (or where the flight comes from)
   const joinAt = star ? star.pts[star.pts.length - 1] : from;
-  let tr: any = null, ts = 1e9;
-  for (const t of app.enroute) { const p = legPoints(t.legs, null); if (!p.length) continue; const d = gcDistanceNm(joinAt, p[0]); if (d < ts) { ts = d; tr = p; } }
+  let tr: any = null, trLegs: SimLeg[] = [], ts = 1e9;
+  for (const t of app.enroute) {
+    if (pick && pick.appTr && t.name !== pick.appTr) continue;
+    const p = legPoints(t.legs, null); if (!p.length) continue; const d = gcDistanceNm(joinAt, p[0]); if (d < ts) { ts = d; tr = p; trLegs = t.legs; }
+  }
   const final = legPoints(app.common, tr ? tr[tr.length - 1] : joinAt);
   if (!final.length) return null;
-  const name = `${APP_TYPES[app.type] || 'APP'} ${arr.name}${app.suffix ? ' ' + app.suffix : ''}`;
-  return { star: star ? star.pts : [], app: (tr || []).concat(final), starName: star ? star.name : '', appName: name };
+  const fixes = (star ? star.fixes : []).concat(legFixes(trLegs.concat(app.common)));
+  return { star: star ? star.pts : [], app: (tr || []).concat(final), starName: star ? star.name : '', appName: appName(app), fixes };
 }
 
 const _paths: { [k: string]: FlightPath } = {};
@@ -360,7 +457,8 @@ function flightPathFor(from: string, to: string, noSim?: boolean, cls?: 'H' | 'L
   // the simulator's procedures, when every point of them is near the airport (a point in the wrong place
   // would send the path on a huge detour, and the aircraft along it far too fast)
   const near = (pts: number[][], c: number[], nm: number) => pts.every(q => q && isFinite(q[0]) && isFinite(q[1]) && gcDistanceNm(q, c) < nm);
-  let sd = noSim ? null : simDeparture(dep, arr.thr); if (sd && !near(sd.pts, dep.thr, 120)) sd = null;
+  const PK: any = procPick(from, to) || {};
+  let sd = noSim ? null : simDeparture(dep, arr.thr, PK); if (sd && !near(sd.pts, dep.thr, 120)) sd = null;
   if (sd) { sidPts = sd.pts; sidName = sd.name; }
   else {
     const sidA = geoDest(dep.end, dep.hdg, 4), turn = angDiff(dep.hdg, geoBrg(sidA, arr.thr));
@@ -373,7 +471,7 @@ function flightPathFor(from: string, to: string, noSim?: boolean, cls?: 'H' | 'L
   const sidEnd = sidPts[sidPts.length - 1];
   // arrival and approach: published ones, or generated (straight in, or downwind and base; IF 10 nm, FAF 5.5 nm)
   let starPts: number[][], appPts: number[][], starName: string, appName: string;
-  let sa = noSim ? null : simArrival(arr, sidEnd); if (sa && !near((sa.star || []).concat(sa.app || []), arr.thr, 200)) sa = null;
+  let sa = noSim ? null : simArrival(arr, sidEnd, PK); if (sa && !near((sa.star || []).concat(sa.app || []), arr.thr, 200)) sa = null;
   if (sa) {
     starPts = sa.star; appPts = sa.app; starName = sa.starName || `${arr.name} arrival`; appName = sa.appName;
     if (!starPts.length) starPts = [geoDest(appPts[0], geoBrg(appPts[0], sidEnd), 15)];
@@ -432,7 +530,7 @@ function flightPathFor(from: string, to: string, noSim?: boolean, cls?: 'H' | 'L
   const wpD: { [id: string]: number } = {}; for (const id in wpRaw) wpD[id] = idx(map[sid.length + wpRaw[id]]);
   // still much longer than the trip itself: the app's own departure and arrival instead
   if ((sd || sa) && !noSim && len > gc * 1.35 + (PL ? 400 : 120)) { const own = flightPathFor(from, to, true); if (own) return (_paths[key] = own); }
-  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa), wpD, awy: AW || null, depSrc: sd ? SimProcedures.src[from] || 'sim' : '', arrSrc: sa ? SimProcedures.src[to] || 'sim' : '' } as any);
+  return (_paths[key] = { pts, cum, len, parts, dep, arr, sim: !!(sd || sa), wpD, awy: AW || null, depSrc: sd ? SimProcedures.src[from] || 'sim' : '', arrSrc: sa ? SimProcedures.src[to] || 'sim' : '', fixes: (sd ? sd.fixes : []).concat(sa ? sa.fixes : []) } as any);
 }
 
 /** The point `d` nm along a path, and the direction of travel there. */

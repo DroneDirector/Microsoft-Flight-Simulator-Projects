@@ -101,7 +101,7 @@ SCREENS.planner = {
           <label><small>Aircraft</small><select class="pl-type" aria-label="Aircraft type">${types.map(t => `<option value="${t}" ${t === U.typeId ? 'selected' : ''}>${esc((acType(t) || { model: t } as any).model)}</option>`).join('')}</select></label></div>
         <div class="pl-sum"></div>
       </div>
-      <div class="pl-body"><div class="pl-map" id="pl-map"><div class="pl-maptools"><button class="btn sm ${U.addMode ? 'primary' : 'ghost'}" data-act="pl-addmode">${icon('plus')}${U.addMode ? 'Tap the map to add' : 'Add waypoints'}</button><button class="btn sm ghost" data-act="pl-fit">${icon('focus')}Whole route</button></div></div>
+      <div class="pl-body"><div class="pl-map" id="pl-map"><div class="pl-maptools"><button class="btn sm ${U.addMode ? 'primary' : 'ghost'}" data-act="pl-addmode">${icon('plus')}${U.addMode ? 'Tap the map to add' : 'Add waypoints'}</button><button class="btn sm ghost" data-act="pl-zoom" data-w="dep">${icon('fleet')}Departure</button><button class="btn sm ghost" data-act="pl-zoom" data-w="arr">${icon('pin')}Arrival</button><button class="btn sm ghost" data-act="pl-fit">${icon('focus')}Whole route</button></div></div>
         <div class="pl-side"><div class="seg pl-tabs">${[['route', 'Route'], ['rwy', 'Runways'], ['wx', 'Weather'], ['notam', 'NOTAMs']].map(t => `<button class="${U.tab === t[0] ? 'on' : ''}" data-act="pl-tab" data-t="${t[0]}">${t[1]}</button>`).join('')}</div><div class="pl-panel"></div></div></div>
       <div class="pl-prof"><canvas class="pl-prof-cv"></canvas></div>
     </div>`;
@@ -185,6 +185,25 @@ function plOverlay(c: CanvasRenderingContext2D, m: WorldMap) {
     c.strokeStyle = 'rgba(6,16,30,.9)'; c.lineWidth = 2; c.stroke();
     c.font = '700 11px Inter, sans-serif'; const lab = `${k} ${role}${wx && wx.cat ? ' · ' + wx.cat : ''}`, w = c.measureText(lab).width;
     c.fillStyle = 'rgba(6,16,30,.85)'; c.fillRect(s[0] + 9, s[1] - 9, w + 8, 16); c.fillStyle = col.ink; c.fillText(lab, s[0] + 13, s[1] + 3);
+  }
+  // the departure, arrival and approach waypoints, with their altitude rules (when zoomed in enough to read)
+  const fx: ProcFix[] = (U.path && (U.path as any).fixes) || [];
+  if (fx.length && degPx > 6) {
+    c.font = '600 10px Inter, sans-serif';
+    const taken: number[][] = [];   // labels never drawn over one another
+    for (const f of fx) {
+      const q = m.px(f.pos[0], f.pos[1]);
+      c.fillStyle = col.cyan; c.strokeStyle = 'rgba(6,16,30,.9)'; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(q[0], q[1] - 5); c.lineTo(q[0] + 4.5, q[1] + 3.5); c.lineTo(q[0] - 4.5, q[1] + 3.5); c.closePath(); c.fill(); c.stroke();
+      if (degPx > 14) {
+        const al = f.alt ? (f.ad === '+' ? '≥' : f.ad === '-' ? '≤' : '') + (f.alt >= 18000 ? 'FL' + Math.round(f.alt / 100) : num(f.alt)) : '';
+        const lab = f.name + (al ? '  ' + al : '') + (f.spd ? ' ' + f.spd + 'kt' : ''), tw = c.measureText(lab).width;
+        const r = [q[0] + 6, q[1] - 14, tw + 6, 13];
+        if (taken.some(t => r[0] < t[0] + t[2] && t[0] < r[0] + r[2] && r[1] < t[1] + t[3] && t[1] < r[1] + r[3])) continue;
+        taken.push(r);
+        c.fillStyle = 'rgba(6,16,30,.78)'; c.fillRect(r[0], r[1], r[2], r[3]); c.fillStyle = '#9FE8F4'; c.fillText(lab, q[0] + 9, q[1] - 4);
+      }
+    }
   }
   // the waypoints: the selected one larger, each with its name and level
   for (const w of P.wps) {
@@ -275,7 +294,7 @@ function plRouteHtml(P: FlightPlanR): string {
  *  assigned, with the wind along each, and the departure, arrival and approach the flights then fly. */
 function plRwyHtml(P: FlightPlanR): string {
   const path: FlightPath = PlannerUi.path, RR = routeRunways(P.from, P.to);
-  const SRC: any = { faa: 'published (FAA)', sim: 'published (Flight Simulator)' };
+  const SRC: any = { faa: 'published (FAA)', sim: 'published (Flight Simulator)', nav: 'built from the navaids around it' };
   const side = (icao: string, k: 'depRwy' | 'arrRwy', title: string) => {
     const ends = runwayEnds(icao), act = activeRunway(icao), cur = (P as any)[k] || '', use = k === 'depRwy' ? RR.dep : RR.arr;
     const wtxt = (r: RunwayEnd) => { const w = runwayWind(r); return w.kt < 1 ? 'calm' : w.head >= 0 ? `head ${w.head} kt` : `tail ${-w.head} kt`; };
@@ -289,11 +308,28 @@ function plRwyHtml(P: FlightPlanR): string {
       <label><small>Runway</small><select class="pl-rwysel" data-k="${k}" aria-label="${title} runway"><option value="" ${!cur ? 'selected' : ''}>By the wind${act ? ` (now ${esc(act.name)})` : ''}</option>${ends.map(opt).join('')}</select></label>
       ${ends.length ? '' : '<small class="muted">The runways of this airport aren\'t known yet.</small>'}
       ${warn ? `<p class="pl-warn">${icon('alert')}${esc(warn)}</p>` : ''}
+      ${use ? plProcPickers(P, use, k === 'depRwy') : ''}
       <div class="pl-procs">${part ? `<span><small>${k === 'depRwy' ? 'Departure' : 'Arrival'}</small><b>${esc(part.name)}</b></span>` : ''}${app ? `<span><small>Approach</small><b>${esc(app.name)}</b></span>` : ''}
         <span><small>Procedures</small><b>${src ? SRC[src] || 'published' : 'built from the runway'}</b></span></div></div>`;
   };
   return `${side(P.from, 'depRwy', 'Take-off')}${side(P.to, 'arrRwy', 'Landing')}
     <small class="muted">Every flight ${esc(P.from)} → ${esc(P.to)} uses these runways: yours and the ones your pilots fly. "By the wind" takes the runway in use, the way the tower does. US airports fly the FAA's published departures, arrivals and approaches (they come with the app, so Flight Simulator doesn't need to be running); elsewhere the ones read from Flight Simulator when it has been linked, otherwise ones built from the runway.</small>`;
+}
+/** The departure (SID and its transition), or the arrival (STAR and its transition) and the approach (and its
+ *  transition), for the runway: by the route (the best one, as now), or the one you pick. */
+function plProcPickers(P: FlightPlanR, re: RunwayEnd, dep: boolean): string {
+  const Q: any = P, sel = (k: string, label: string, opts: [string, string][], auto: string) => opts.length ? `<label><small>${label}</small><select class="pl-procsel" data-k="${k}" aria-label="${label}">
+      <option value="">${esc(auto)}</option>${opts.map(o => `<option value="${esc(o[0])}" ${Q[k] === o[0] ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select></label>` : '';
+  const trs = (pr: SimProc) => pr ? pr.enroute.filter(e => e.name).map(e => [e.name, e.name] as [string, string]) : [];
+  if (dep) {
+    const L = sidsFor(re), cur = L.filter(x => x.name === Q.sid)[0];
+    if (!L.length) return '';
+    return `<div class="pl-pk">${sel('sid', 'Departure (SID)', L.map(x => [x.name, x.name] as [string, string]), 'The best one for the route')}${cur ? sel('sidTr', 'Transition', trs(cur), 'The best one for the route') : ''}</div>`;
+  }
+  const S = starsFor(re), A = appsFor(re), cs = S.filter(x => x.name === Q.star)[0], ca = A.filter(x => x.name === Q.app)[0];
+  if (!S.length && !A.length) return '';
+  return `<div class="pl-pk">${sel('star', 'Arrival (STAR)', S.map(x => [x.name, x.name] as [string, string]), 'The best one for the route')}${cs ? sel('starTr', 'Transition', trs(cs), 'The best one for the route') : ''}
+    ${sel('app', 'Approach', A.map(x => [x.name, appName(x)] as [string, string]), 'The best one (ILS first)')}${ca ? sel('appTr', 'Approach transition', trs(ca), 'Where the arrival ends') : ''}</div>`;
 }
 function plWxHtml(P: FlightPlanR): string {
   const hz = plHazards(), path: FlightPath = PlannerUi.path, pr: FlightProfile = PlannerUi.prev;
@@ -333,8 +369,11 @@ document.addEventListener('change', e => {
     const w = P.wps.filter(q => q.id === el.getAttribute('data-id'))[0]; if (!w) return;
     if (el.classList.contains('pl-alt')) { const a = plParseAlt(el.value); if (a >= 1000 && a <= 51000) w.alt = a; }
     else { const sp = plParseSpd(el.value); w.spd = sp.spd; w.mach = sp.mach; if (!sp.spd) delete w.spd; if (!sp.mach) delete w.mach; }
-  } else if (el.classList.contains('pl-rwysel')) {
+  } else if (el.classList.contains('pl-rwysel') || el.classList.contains('pl-procsel')) {
     const k = el.getAttribute('data-k'); (P as any)[k] = el.value || undefined; if (!el.value) delete (P as any)[k];
+    // a new runway or procedure: what depends on it starts again from the best one
+    const dep: any = { depRwy: ['sid', 'sidTr'], sid: ['sidTr'], arrRwy: ['star', 'starTr', 'app', 'appTr'], star: ['starTr'], app: ['appTr'] };
+    for (const d of dep[k] || []) delete (P as any)[d];
   } else if (el.classList.contains('pl-g')) {
     const k = el.getAttribute('data-k'), v = el.value.trim().toUpperCase();
     if (k === 'altn') P.altn = apt(v) ? v : ''; else { const n = parseInt(v, 10); (P as any)[k] = isFinite(n) && n >= 120 && n <= 360 ? n : undefined; }
@@ -346,6 +385,14 @@ ACTIONS['pl-sel'] = (el, ev) => { if (ev && (ev.target as HTMLElement).closest('
 ACTIONS['pl-del'] = el => { const P = plCur(); if (!P) return; P.wps = P.wps.filter(w => w.id !== el.getAttribute('data-id')); planSave(P); plRecalc(); plPanelRedraw(); };
 ACTIONS['pl-addmode'] = el => { PlannerUi.addMode = !PlannerUi.addMode; el.classList.toggle('primary', PlannerUi.addMode); el.classList.toggle('ghost', !PlannerUi.addMode); el.innerHTML = icon('plus') + (PlannerUi.addMode ? 'Tap the map to add' : 'Add waypoints'); Sound.tick(); };
 ACTIONS['pl-fit'] = () => plFit(true);
+/** Close in on the departure or the arrival: the procedure's waypoints, with their names and altitudes. */
+ACTIONS['pl-zoom'] = el => {
+  const P = plCur(), U = PlannerUi; if (!P || !U.map) return;
+  const dep = el.getAttribute('data-w') === 'dep', A = apt(dep ? P.from : P.to); if (!A) return;
+  const fx: ProcFix[] = ((U.path && (U.path as any).fixes) || []).filter((f: ProcFix) => gcDistanceNm(f.pos, A.pos) < 90);
+  const pts = [A.pos].concat(fx.map(f => f.pos)); if (pts.length < 2) pts.push([A.pos[0] + 0.3, A.pos[1] + 0.2], [A.pos[0] - 0.3, A.pos[1] - 0.2]);
+  U.map.fit(pts, 50, true, false, true); Sound.tick();
+};
 ACTIONS['pl-addtxt'] = () => { const inp = document.querySelector('.pl-addin') as HTMLInputElement, w = inp && plParseWp(inp.value); if (!w) { toast('Not an airport code or a position', 'warn'); return; } plInsert(w, PlannerUi.sel || undefined); };
 ACTIONS['pl-reset'] = () => { const P = plCur(); if (!P) return; const d = planDefault(P.from, P.to, PlannerUi.typeId || plType()); if (!d) return; P.wps = d.wps; planSave(P); plRecalc(); plFit(true); plPanelRedraw(); };
 ACTIONS['pl-remove'] = () => { const P = plCur(); if (!P) return; delete plansAll()[P.key]; Store.soon(); try { for (const k in _profiles) if (k.indexOf('|' + P.from + '|' + P.to + '|') >= 0) delete _profiles[k]; } catch (e) { /* none */ } toast('Plan removed: flights fly their own route', 'info'); plRecalc(); plPanelRedraw(); };

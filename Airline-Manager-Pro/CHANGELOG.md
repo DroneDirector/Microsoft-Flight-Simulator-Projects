@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.105 (2026-11-03)
+
+- Planner: SID/STAR/approach and transition pickers (plProcPickers; FlightPlanR sid/sidTr/star/starTr/app/appTr honoured by simDeparture/simArrival); procedure fixes on the map with altitude and speed limits (legFixes, FlightPath.fixes), Departure/Arrival zoom
+- Procedures built from navaids where none are published (Navaids, NavProcs; source 'nav')
+- PDF documents moved to 'pdf documents'
+
 ## 0.9.104 (2026-11-03)
 
 - Update check reads every page of releases and takes the highest version (GitHub lists 0.9.100+ after 0.9.69, so per_page=30 stopped at 0.9.99); the website's version and download links likewise (site.js, airline-manager-site.php)
