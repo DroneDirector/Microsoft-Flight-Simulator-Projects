@@ -203,6 +203,7 @@ function aiLand(f: LiveFlight, at: number, summary: { legs: number; net: number;
     amount: net, kind: net >= 0 ? 'revenue' : 'fees', reg: a.reg, flight: f.callsign, route: `${f.from} → ${f.to}`, lines: m.lines, byPilot: f.pilotId } as any);
   c.balance += net;
   try { if (f.from !== f.to && !F.ferry) hubOnLand(c.id, f.from, f.to, at, f.pax || 0, Math.round((at - (F.schedEnd || at)) / 60000), F.schedEnd || at); } catch (e) { /* ignore */ }
+  try { if (f.from !== f.to && !F.ferry) firstVisitCheck(c.id, f.to, a.reg, at); } catch (e) { /* ignore */ }
   // keep the day's flown legs for the schedule (the last two days)
   const S: any = State; S.aiDay = (S.aiDay || []).filter((x: any) => x.end > Date.now() - 2 * 864e5);
   S.aiDay.push({ reg: a.reg, from: f.from, to: f.to, start: F.depAt, end: at, sched: F.sched || F.depAt, schedEnd: F.schedEnd || at, why: aiDelayWhy(F), retry: !!F.retry, callsign: f.callsign });

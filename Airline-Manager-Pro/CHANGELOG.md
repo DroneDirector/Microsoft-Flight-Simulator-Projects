@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.100 (2026-11-03)
+
+- Water salute on an airline's first landing at an airport (salute3d.ts: firstVisitCheck, State.visited seeded from hub, fleet and log book; newsPublish with a photo rendered from the 3D scene, random viewpoint per article; saluteOpen 3D film: trucks, particle water jets, real runways, airport name, sun position, weather and land by country)
+
 ## 0.9.99 (2026-11-03)
 
 - Flight planner: Runways tab (plRwyHtml); runway per route for every flight (FlightPlanR depRwy/arrRwy, procPick, routeRunways, runwayEnds, runwayWind, runwayByName; over 10 kt tailwind falls back to the runway in use)
