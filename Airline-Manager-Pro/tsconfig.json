@@ -33,6 +33,7 @@
     "src/graphics/avatar.ts",
     "src/graphics/human.ts",
     "src/graphics/perf.ts",
+    "src/graphics/models.ts",
     "src/graphics/avatar3d-view.ts",
     "src/data/people.ts",
     "src/core/link.ts",

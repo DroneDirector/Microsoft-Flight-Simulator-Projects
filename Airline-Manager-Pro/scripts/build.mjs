@@ -67,6 +67,56 @@ if (existsSync(three)) {
   mkdirSync(join(root, 'www/vendor'), { recursive: true });
   copyFileSync(three, join(root, 'www/vendor/three.min.js'));
 }
+// three.js's model loader (MIT), made into a plain script by tools/vendor/make-gltf.py
+mkdirSync(join(root, 'www/vendor'), { recursive: true });
+copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/three-gltf.js'));
+// replaceable models: the list of the .glb files in www/models (see www/models/README.md)
+{
+  const dir = join(root, 'www/models'), files = [];
+  const walk = (d, rel) => { if (!existsSync(d)) return; for (const f of readdirSync(d, { withFileTypes: true })) { if (f.isDirectory()) walk(join(d, f.name), rel + f.name + '/'); else if (/\.glb$/i.test(f.name)) files.push(rel + f.name); } };
+  walk(dir, '');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'index.json'), JSON.stringify({ files: files.sort() }, null, 1));
+  if (files.length) console.log(`Models from files: ${files.length} (${files.join(', ')})`);
+  // the guide with every file name the app looks for (from the aircraft list and the vehicle, jet bridge and people
+  // slots in src/graphics/models.ts), written on every build so a new aircraft type appears in it straight away
+  const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const acSrc = readFileSync(join(root, 'src/data/aircraft.ts'), 'utf8'), ac = [], seen = {};
+  for (const m of acSrc.matchAll(/\{ id: '([^']+)', maker: '([^']+)', model: '([^']+)'/g)) {
+    const mk = slug(m[2]), md = slug(m[3]), f = (md.startsWith(mk + '-') ? md : mk + '-' + md) + '.glb';
+    if (seen[f]) { seen[f].push(m[1]); continue; } seen[f] = [m[1]]; ac.push([f, `${m[2]} ${m[3]}`]);
+  }
+  const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
+  const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS');
+  const have = f => files.includes(f) ? ' (in use)' : '';
+  const md = [
+    '# Replaceable models', '',
+    'Put a `.glb` file (glTF binary) with one of these names in this folder, in the sub-folder shown, and build the app.',
+    'The app then uses it instead of its own model everywhere that model appears: the 3D view, the pictures, the',
+    'water salute, the museum. Remove the file and the app\'s own model comes back. This list is written by the build.', '',
+    '**How the files should be made**', '',
+    '- glTF 2.0 binary (`.glb`), textures inside the file. Metres. **+Y up, the front (the nose) towards +Z** (glTF\'s own convention).',
+    '- The app fits each model to the real size of the thing it replaces (length), sets it on the ground and centres it across, so small differences in scale or origin do not matter.',
+    '- Aircraft: the app\'s own model still moves its gear, flaps and lights; a file\'s model is shown as it is (its own paint).',
+    '- Licences of bought models must allow commercial sale (see CLAUDE.md).', '',
+    '## Aircraft (`aircraft/`)', '', '| File | Aircraft |', '|---|---|',
+    ...ac.map(([f, n]) => `| \`aircraft/${f}\`${have('aircraft/' + f)} | ${n} |`), '',
+    '## Ground vehicles (`vehicles/`)', '', '| File | Vehicle |', '|---|---|',
+    ...veh.map(([f, n]) => `| \`vehicles/${f}.glb\`${have('vehicles/' + f + '.glb')} | ${n} |`), '',
+    '## Jet bridges (`jetways/`)', '', '| File | What |', '|---|---|',
+    ...jw.map(([f, n]) => `| \`jetways/${f}.glb\`${have('jetways/' + f + '.glb')} | ${n} |`), '',
+    '## People (`people/`)', '',
+    'A base model for each gender and group of looks. The app picks the group from each person\'s look (skin tone and eyes);',
+    'when that file is missing it uses `person-male.glb` or `person-female.glb`, and when that is missing too its own figure.',
+    'Rig them with a skeleton; a bone named `Jaw` (or containing "jaw") opens the mouth while the person talks, and',
+    'animations named `Idle` and `Walk` are played when they stand and walk. Height is fitted to the person\'s own.', '',
+    '| File | People |', '|---|---|',
+    ...['male', 'female'].flatMap(sx => ppl.map(([g, n]) => `| \`people/person-${sx}-${g}.glb\`${have('people/person-' + sx + '-' + g + '.glb')} | ${sx === 'male' ? 'Men' : 'Women'}: ${n} |`)),
+    `| \`people/person-male.glb\` | Men (any group without its own file) |`, `| \`people/person-female.glb\` | Women (any group without its own file) |`, '',
+  ].join('\n');
+  writeFileSync(join(dir, 'README.md'), md);
+}
 
 // Runs the voice model in the app (ONNX Runtime Web, MIT License): the WebAssembly build only
 const ort = join(root, 'node_modules/onnxruntime-web/dist');

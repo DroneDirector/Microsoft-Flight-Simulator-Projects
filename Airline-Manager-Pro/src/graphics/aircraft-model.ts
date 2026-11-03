@@ -568,6 +568,7 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
     if (o.gear != null && !s.gear.fixed && !s.gear.floats) { gearG.visible = o.gear > 0.02; gearG.scale.y = 0.2 + 0.8 * clamp(o.gear, 0, 1); gearG.position.y = (1 - clamp(o.gear, 0, 1)) * s.ground * 0.55; }
     if (o.spin != null) props.forEach((p, i) => { const out = (o as any).stopped === propIdx[i]; if (!out) p.blades.rotation.x = o.spin; p.disc.visible = !out; });   // a stopped engine's propeller stands still (feathered)
   };
+  try { Models.swap(root, aircraftModelFile(typeId)); } catch (e) { /* the app's own model */ }
   return root;
 }
 

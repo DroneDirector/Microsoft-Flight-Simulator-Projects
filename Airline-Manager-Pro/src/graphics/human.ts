@@ -1568,6 +1568,8 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
   }
   return { load, build, get ready() { return !!DATA; }, timings: T };
 })();
+// a base model from a file (www/models/people/, see models.ts) stands in for the app's own figure where there is one
+{ const H: any = Human, own = H.build; H.build = function (look: any, ...rest: any[]) { const m = own.call(this, look, ...rest); try { modelsPeople(m, look); } catch (e) { /* the app's own figure */ } return m; }; }
 
 /** Where the hand (the palm) is, in the figure's own space, for an arm pose [forward, out, turn, elbow]. */
 function humanHandAt(m: any, sd: 'L' | 'R', a: number[], out?: any, pt?: any): any {
