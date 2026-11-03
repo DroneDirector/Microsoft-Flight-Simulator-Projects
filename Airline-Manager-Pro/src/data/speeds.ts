@@ -32,6 +32,20 @@ const SPEEDS: { [typeId: string]: SpeedSpec } = {
   'kodiak': { to: [65, 75], app: [75, 85], mtow: 3.291, mlw: 3.035, oew: 1.77, doc: 'Kodiak 100 (additional)' },
   'pc12': { to: [65, 75], app: [80, 90], mtow: 4.74, mlw: 4.5, oew: 3.0, doc: 'Pilatus PC-12 (additional)' },
   'c172': { to: [55, 55], app: [60, 75], mtow: 1.157, mlw: 1.157, oew: 0.77, doc: 'Cessna 172S (additional)' },
+  'a319neo': { to: [128, 148], app: [125, 135], mtow: 75.5, mlw: 63.9, oew: 43.5, doc: 'A319neo' },
+  'a321ceo': { to: [140, 162], app: [135, 148], mtow: 93.5, mlw: 77.8, oew: 48.5, doc: 'A321' },
+  'a321neo': { to: [140, 162], app: [135, 148], mtow: 93.5, mlw: 79.2, oew: 50.5, doc: 'A321neo' },
+  'a321lr': { to: [143, 166], app: [136, 149], mtow: 97.0, mlw: 79.2, oew: 51.8, doc: 'A321LR neo' },
+  'a321xlr': { to: [145, 170], app: [137, 150], mtow: 101.0, mlw: 79.2, oew: 53.5, doc: 'A321XLR neo' },
+  'a330-800neo': { to: [145, 168], app: [130, 142], mtow: 251.0, mlw: 186.0, oew: 132.0, doc: 'A330-800neo' },
+  'a330-900neo': { to: [148, 170], app: [132, 145], mtow: 251.0, mlw: 191.0, oew: 135.0, doc: 'A330-900neo' },
+  'b737-max7': { to: [135, 155], app: [128, 140], mtow: 80.286, mlw: 66.043, oew: 42.2, doc: '737 MAX 7' },
+  'b737-max8': { to: [140, 160], app: [132, 148], mtow: 82.644, mlw: 69.308, oew: 45.1, doc: '737 MAX 8' },
+  'b737-max9': { to: [145, 165], app: [138, 152], mtow: 88.314, mlw: 74.343, oew: 50.3, doc: '737 MAX 9' },
+  'b737-max10': { to: [148, 168], app: [142, 156], mtow: 89.765, mlw: 75.931, oew: 52.0, doc: '737 MAX 10' },
+  'b787-8': { to: [145, 168], app: [135, 148], mtow: 227.93, mlw: 172.365, oew: 119.95, doc: '787-8' },
+  'b787-9': { to: [150, 172], app: [140, 152], mtow: 254.692, mlw: 192.776, oew: 128.85, doc: '787-9' },
+  'b777-9': { to: [155, 180], app: [140, 155], mtow: 351.534, mlw: 266.258, oew: 185.0, doc: '777-9' },
 };
 
 /** The speeds for a type; types not in the table (aircraft detected in the simulator) use their size class. */

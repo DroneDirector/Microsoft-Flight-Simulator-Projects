@@ -100,3 +100,63 @@ Cessna 172S Pilot's Operating Handbook:
 https://www.befa.org/wp-content/uploads/2019/12/POH-Cessna-172S.pdf
 
 END OF DOCUMENT
+
+
+PART 2: TYPES ADDED 3 NOVEMBER 2026
+(C) = worked out, not published. Sources per type below each row.
+
+Airbus A319neo (A319-171N)   app type a319neo
+  Take-off 128-148 kt (C), approach 125-135 kt (C); MTOW 75.5 t, MLW 63.9 t, OEW 43.5 t (C); seats 140 typical / 160 max
+  Sources: Airbus A319neo product page <https://www.aircraft.airbus.com/en/aircraft/a320-family/a319neo>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A321 (A321-211 (CFM56-5B3) / A321-231 (IAE V2533-A5))   app type a321ceo
+  Take-off 140-162 kt (C), approach 135-148 kt (C); MTOW 93.5 t, MLW 77.8 t, OEW 48.5 t (C); seats 185 typical / 220 max
+  Sources: Airbus A321 Aircraft Characteristics - Airport and Maintenance Planning (AC_A321, rev. 03/2022) <https://aviation.hawaii.gov/wp-content/uploads/2025/06/Airbus-techdata-AC_A321_0322-2.pdf>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A321neo (A321-251N)   app type a321neo
+  Take-off 140-162 kt (C), approach 135-148 kt (C); MTOW 93.5 t, MLW 79.2 t, OEW 50.5 t (C); seats 196 typical / 244 max
+  Sources: Airbus A321 Aircraft Characteristics - Airport and Maintenance Planning (AC_A321, rev. 03/2022) <https://aviation.hawaii.gov/wp-content/uploads/2025/06/Airbus-techdata-AC_A321_0322-2.pdf>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A321LR neo (A321-251NX)   app type a321lr
+  Take-off 143-166 kt (C), approach 136-149 kt (C); MTOW 97.0 t, MLW 79.2 t, OEW 51.8 t (C); seats 206 typical / 244 max
+  Sources: Airbus A321 Aircraft Characteristics - Airport and Maintenance Planning (AC_A321, rev. 03/2022) <https://aviation.hawaii.gov/wp-content/uploads/2025/06/Airbus-techdata-AC_A321_0322-2.pdf>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A321XLR neo (A321-253NY)   app type a321xlr
+  Take-off 145-170 kt (C), approach 137-150 kt (C); MTOW 101.0 t, MLW 79.2 t, OEW 53.5 t (C); seats 200 typical / 244 max
+  Sources: Airbus A321 Aircraft Characteristics - Airport and Maintenance Planning (AC_A321, rev. 03/2022) <https://aviation.hawaii.gov/wp-content/uploads/2025/06/Airbus-techdata-AC_A321_0322-2.pdf>; EASA TCDS A.064 Airbus A318/A319/A320/A321 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A320neo family (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A319neo.html>; FlightGlobal - Airbus details weight variants for A320neo family <https://www.flightglobal.com/airbus-details-weight-variants-for-a320neo-family/113316.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>; Airbus A321XLR product page <https://aircraft.airbus.com/en/aircraft/a320-family/a321XLR>
+
+Airbus A330-800neo (A330-841)   app type a330-800neo
+  Take-off 145-168 kt (C), approach 130-142 kt (C); MTOW 251.0 t, MLW 186.0 t, OEW 132.0 t (C); seats 257 typical / 406 max
+  Sources: EASA TCDS A.004 Airbus A330 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A330neo (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A330neo.html>; Airbus - EASA approves increased take-off weight variant of the A330-900 (251 t) <https://www.airbus.com/en/newsroom/news/2020-10-easa-approves-increased-take-off-weight-variant-of-the-a330-900>; FlightGlobal - EASA certifies A330-800 with 251t take-off weight <https://flightglobal.com/air-transport/easa-certifies-a330-800-with-251t-take-off-weight/148282.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Airbus A330-900neo (A330-941)   app type a330-900neo
+  Take-off 148-170 kt (C), approach 132-145 kt (C); MTOW 251.0 t, MLW 191.0 t, OEW 135.0 t (C); seats 287 typical / 460 max
+  Sources: EASA TCDS A.004 Airbus A330 <https://www.easa.europa.eu/en/document-library/type-certificates>; Airbus A330neo (Wikipedia mirror) - specifications <https://bafybeiemxf5abjwjbikoz4mc3a3dla6ual3jsgpdr4cjr3oz3evfyavhwq.ipfs.4everland.io/wiki/A330neo.html>; Airbus - EASA approves increased take-off weight variant of the A330-900 (251 t) <https://www.airbus.com/en/newsroom/news/2020-10-easa-approves-increased-take-off-weight-variant-of-the-a330-900>; FlightGlobal - EASA certifies A330-800 with 251t take-off weight <https://flightglobal.com/air-transport/easa-certifies-a330-800-with-251t-take-off-weight/148282.article>; Airbus 2018 list prices (last published) - via FlightGlobal/Simple Flying <https://simpleflying.com/airbus-aircraft-list-prices/>
+
+Boeing 737 MAX 7 (737-7)   app type b737-max7
+  Take-off 135-155 kt (C), approach 128-140 kt (C); MTOW 80.286 t, MLW 66.043 t, OEW 42.2 t (C); seats 153 typical / 172 max
+  Sources: Boeing 737 MAX Airplane Characteristics for Airport Planning (D6-38A004, Rev K) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/737MAX_RevK.pdf>; Boeing 737 MAX ACAP brochure (737-7 / 737-9) <https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/737MaxBrochure.pdf>; FAA TCDS A16WE Boeing 737 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 737 MAX 8 (737-8)   app type b737-max8
+  Take-off 140-160 kt (C), approach 132-148 kt (C); MTOW 82.644 t, MLW 69.308 t, OEW 45.1 t (C); seats 178 typical / 210 max
+  Sources: Boeing 737 MAX Airplane Characteristics for Airport Planning (D6-38A004, Rev K) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/737MAX_RevK.pdf>; Boeing 737 MAX ACAP brochure (737-7 / 737-9) <https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/737MaxBrochure.pdf>; FAA TCDS A16WE Boeing 737 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 737 MAX 9 (737-9)   app type b737-max9
+  Take-off 145-165 kt (C), approach 138-152 kt (C); MTOW 88.314 t, MLW 74.343 t, OEW 50.3 t (C); seats 193 typical / 220 max
+  Sources: Boeing 737 MAX Airplane Characteristics for Airport Planning (D6-38A004, Rev K) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/737MAX_RevK.pdf>; Boeing 737 MAX ACAP brochure (737-7 / 737-9) <https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/737MaxBrochure.pdf>; FAA TCDS A16WE Boeing 737 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 737 MAX 10 (737-10)   app type b737-max10
+  Take-off 148-168 kt (C), approach 142-156 kt (C); MTOW 89.765 t, MLW 75.931 t, OEW 52.0 t (C); seats 204 typical / 230 max
+  Sources: Boeing 737 MAX Airplane Characteristics for Airport Planning (D6-38A004, Rev K) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/737MAX_RevK.pdf>; Boeing 737 MAX ACAP brochure (737-7 / 737-9) <https://www.boeing.com/content/dam/boeing/boeingdotcom/commercial/airports/acaps/737MaxBrochure.pdf>; FAA TCDS A16WE Boeing 737 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 787-8 (787-8)   app type b787-8
+  Take-off 145-168 kt (C), approach 135-148 kt (C); MTOW 227.93 t, MLW 172.365 t, OEW 119.95 t (C); seats 242 typical / 381 max
+  Sources: Boeing 787 Airplane Characteristics for Airport Planning (D6-58333, Rev Q, Oct 2025) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/787_ACAP_Rev_Q.pdf>; FAA TCDS T00021SE Boeing 787 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>
+
+Boeing 787-9 (787-9)   app type b787-9
+  Take-off 150-172 kt (C), approach 140-152 kt (C); MTOW 254.692 t, MLW 192.776 t, OEW 128.85 t (C); seats 290 typical / 420 max
+  Sources: Boeing 787 Airplane Characteristics for Airport Planning (D6-58333, Rev Q, Oct 2025) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/787_ACAP_Rev_Q.pdf>; FAA TCDS T00021SE Boeing 787 <https://drs.faa.gov/browse/TCDSModel>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>; Boeing - FAA clears higher takeoff weight for 787-9 and 787-10 (Mar 2026) <https://www.boeing.com/content/theboeingcompany/us/en/features/2026/03/faa-clears-higher-takeoff-weight-for-787-9-and-787-10.html>
+
+Boeing 777-9 (777-9 (777X))   app type b777-9
+  Take-off 155-180 kt (C), approach 140-155 kt (C); MTOW 351.534 t, MLW 266.258 t, OEW 185.0 t (C); seats 426 typical / 460 max
+  Sources: Boeing 777X Airplane Characteristics for Airport Planning (D6-86073, Rev G) <https://www.boeing.com/content/dam/boeing/v2/airports/acaps/777X_Rev_G.pdf>; FAA TCDS T00001SE Boeing 777 <https://drs.faa.gov/browse/TCDSModel>; AeroCorner - Boeing 777-9 specifications <https://aerocorner.com/aircraft/boeing-777-9/>; Boeing commercial airplane list prices (last published 2023) - via Simple Flying <https://simpleflying.com/boeing-aircraft-list-prices/>

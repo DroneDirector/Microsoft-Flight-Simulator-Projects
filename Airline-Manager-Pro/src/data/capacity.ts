@@ -26,6 +26,20 @@ const CAPACITY: { [typeId: string]: Capacity } = {
   'kodiak': { typ: 8, cls: 'utility', one: 9, max: 9 },
   'pc12': { typ: 6, cls: 'executive', one: 9, max: 9 },
   'c172': { typ: 3, cls: 'with the pilot', one: 3, max: 3 },
+  'a319neo': { typ: 140, cls: '2 classes', one: 156, max: 160 },
+  'a321ceo': { typ: 185, cls: '2 classes', one: 220, max: 220 },
+  'a321neo': { typ: 196, cls: '2 classes', one: 220, max: 244 },
+  'a321lr': { typ: 206, cls: '2 classes', one: 220, max: 244 },
+  'a321xlr': { typ: 200, cls: '2 classes', one: 220, max: 244 },
+  'a330-800neo': { typ: 257, cls: '2 classes', one: 300, max: 406 },
+  'a330-900neo': { typ: 287, cls: '2 classes', one: 330, max: 460 },
+  'b737-max7': { typ: 153, cls: '2 classes', one: 172, max: 172 },
+  'b737-max8': { typ: 178, cls: '2 classes', one: 189, max: 210 },
+  'b737-max9': { typ: 193, cls: '2 classes', one: 220, max: 220 },
+  'b737-max10': { typ: 204, cls: '2 classes', one: 230, max: 230 },
+  'b787-8': { typ: 242, cls: '2 classes', one: 359, max: 381 },
+  'b787-9': { typ: 290, cls: '2 classes', one: 406, max: 420 },
+  'b777-9': { typ: 426, cls: '2 classes', one: 450, max: 460 },
 };
 
 /** The capacity of a type (types without an entry: their seats as the typical figure). */

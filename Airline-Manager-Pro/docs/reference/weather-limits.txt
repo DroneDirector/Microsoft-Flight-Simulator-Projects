@@ -46,3 +46,21 @@ For every aircraft and airport:
 Only weather happening now counts: legs caught up after the app was closed are not judged by today's weather.
 
 Data: aviationweather.gov (US National Weather Service, public domain): METAR, TAF, international and US SIGMETs.
+
+
+PART 2: TYPES ADDED 3 NOVEMBER 2026
+(C) = worked out, not published. Sources per type below each row.
+A319neo          38 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes
+A321             35 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+A321neo          35 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+A321LR neo       35 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+A321XLR neo      35 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+A330-800neo      40 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+A330-900neo      40 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+737 MAX 7        33 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+737 MAX 8        33 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+737 MAX 9        33 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+737 MAX 10       33 kt D   15 kt    75 m / 0 ft (CAT IIIB)   125 m     yes  yes (C)
+787-8            40 kt D   15 kt    75 m / 0 ft (CAT IIIB)   75 m     yes  yes (C)
+787-9            40 kt D   15 kt    75 m / 0 ft (CAT IIIB)   75 m     yes  yes (C)
+777-9            38 kt D   15 kt    75 m / 0 ft (CAT IIIB)   75 m     yes  yes (C)

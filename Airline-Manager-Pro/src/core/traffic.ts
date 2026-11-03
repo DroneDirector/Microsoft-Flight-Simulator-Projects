@@ -48,7 +48,7 @@ const Traffic = {
       let longHaul = r() < 0.4, regional = r() < 0.5;
       const rTypes = R ? R.fleet.filter(t => !!acType(t) && acType(t).cls !== 'bush' && acType(t).cls !== 'ga') : [];
       for (let k = 0; k < n; k++) {
-        const x = r(), typeId = longHaul && x < 0.25 ? ['b78x', 'a350-ini', 'b77w-pmdg'][Math.floor(r() * 3)] : regional && x < 0.45 ? (r() < 0.6 ? 'atr72' : 'crj9-aero') : ['a320neo', 'b738-pmdg', 'a320-fenix', 'b736-pmdg'][Math.floor(r() * 4)];
+        const x = r(), typeId = longHaul && x < 0.25 ? ['b78x', 'a350-ini', 'b77w-pmdg', 'b787-9', 'a330-900neo', 'b787-8'][Math.floor(r() * 6)] : regional && x < 0.45 ? (r() < 0.6 ? 'atr72' : 'crj9-aero') : ['a320neo', 'b738-pmdg', 'a320-fenix', 'b736-pmdg', 'a321neo', 'b737-max8', 'a321ceo', 'b737-max9'][Math.floor(r() * 8)];
         const tId = rTypes.length ? rTypes[Math.floor(r() * rTypes.length)] : typeId;
         if (!acType(tId)) continue;
         const c: TrafficCraft = { id: `tfc-${i}-${k}`, airline: al, code, color: R ? R.color : col[0], color2: R ? '#14233A' : col[1], typeId: tId, reg: code.slice(0, 2) + '-' + String.fromCharCode(65 + Math.floor(r() * 26), 65 + Math.floor(r() * 26), 65 + Math.floor(r() * 26)), hub: home.icao, seats: acType(tId).seats || 180 };

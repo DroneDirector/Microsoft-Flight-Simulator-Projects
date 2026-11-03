@@ -16,6 +16,7 @@ function fleetCard(a: Aircraft, i: number): string {
       <div class="ac-meta">
         <span>${icon('pin')}${esc(where)}</span>
         <span>${icon('clock')}${num(a.hoursMin / 60)} h</span>
+        ${engineOptions(a.typeId).length > 1 && engineOf(a) ? `<span title="Engines">${icon('fuel')}${esc(engineOf(a).name.replace(/^(CFM |GE |IAE |Pratt & Whitney |Rolls-Royce )/, ''))}</span>` : ''}
       </div>
       <div class="ac-cond"><small>Condition</small>${conditionBar(a.condition)}<b>${Math.round(a.condition)}%</b></div>
     </div>

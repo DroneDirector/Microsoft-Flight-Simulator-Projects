@@ -99,6 +99,7 @@ function aiPlannedLoad(n: any): { pax: number; paxJ: number; paxF: number; cargo
   try {
     const a = plane(n.reg), L = n.ld;
     if (a) {
+      RW_PERF = (engineOf(a) && engineOf(a).perf) || 1;   // this aircraft's own engines
       const cargo = L.cargoKg || 0, full = legRunwayCheck(a.typeId, n.from, n.to, L.pax, cargo);
       if (full.maxPax < L.pax) {
         if (cargo && legRunwayCheck(a.typeId, n.from, n.to, L.pax, 0).maxPax >= L.pax) {
@@ -111,5 +112,6 @@ function aiPlannedLoad(n: any): { pax: number; paxJ: number; paxF: number; cargo
       }
     }
   } catch (e) { /* ignore */ }
+  RW_PERF = 1;
   return n.ld;
 }

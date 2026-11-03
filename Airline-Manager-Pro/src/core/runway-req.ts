@@ -27,6 +27,20 @@ const FIELD: { [typeId: string]: FieldSpec } = {
   'kodiak': { to: 430, ld: 400, wid: 8, rough: true },
   'pc12': { to: 790, ld: 660, wid: 12, rough: true },
   'c172': { to: 500, ld: 410, wid: 8, rough: true },
+  'a319neo': { to: 2000, ld: 1500, wid: 30 },
+  'a321ceo': { to: 2210, ld: 1600, wid: 30 },
+  'a321neo': { to: 2200, ld: 1750, wid: 30 },
+  'a321lr': { to: 2400, ld: 1750, wid: 30 },
+  'a321xlr': { to: 2600, ld: 1750, wid: 30 },
+  'a330-800neo': { to: 2770, ld: 1900, wid: 45 },
+  'a330-900neo': { to: 2770, ld: 1900, wid: 45 },
+  'b737-max7': { to: 2100, ld: 1500, wid: 30 },
+  'b737-max8': { to: 2500, ld: 1600, wid: 30 },
+  'b737-max9': { to: 2700, ld: 1750, wid: 30 },
+  'b737-max10': { to: 2800, ld: 1850, wid: 30 },
+  'b787-8': { to: 2600, ld: 1700, wid: 45 },
+  'b787-9': { to: 2800, ld: 1800, wid: 45 },
+  'b777-9': { to: 3050, ld: 2000, wid: 45 },
 };
 
 function fieldSpec(typeId: string): FieldSpec {
@@ -36,6 +50,8 @@ function fieldSpec(typeId: string): FieldSpec {
   return FIELD[by[t.cls] || 'a320neo'];
 }
 
+/** The take-off performance of the engine on the aircraft being checked now (1 = the type's usual engine). */
+let RW_PERF = 1;
 const PAVED = /ASP|CON|BIT|PEM|ASF|PAV|TAR|SEAL|MAC/i;
 
 /** The airport's longest runway this type may use (surface and width), in metres; null without runway data. */
@@ -58,7 +74,9 @@ function usableRunway(typeId: string, icao: string): { name: string; len: number
 /** Runway needed for take-off and landing at given weights (t) and airport elevations (ft). */
 function runwayNeed(typeId: string, tow: number, lw: number, depElevFt: number, arrElevFt: number): { to: number; ld: number } {
   const F = fieldSpec(typeId), S = speedSpec(typeId);
-  const to = F.to * Math.pow(clamp(tow / S.mtow, 0.45, 1), 2) * (1 + 0.07 * Math.max(0, depElevFt) / 1000);
+  // an engine with more take-off thrust (RW_PERF, for the aircraft being checked) needs less runway, more so up high
+  const pf = RW_PERF || 1;
+  const to = F.to * Math.pow(clamp(tow / S.mtow, 0.45, 1), 2) * (1 + 0.07 / Math.pow(pf, 3) * Math.max(0, depElevFt) / 1000) / pf;
   const ld = F.ld * clamp(lw / S.mlw, 0.6, 1) * (1 + 0.05 * Math.max(0, arrElevFt) / 1000);
   return { to: Math.round(to), ld: Math.round(ld) };
 }

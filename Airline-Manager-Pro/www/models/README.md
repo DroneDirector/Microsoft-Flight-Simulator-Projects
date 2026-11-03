@@ -17,6 +17,13 @@ water salute, the museum. Remove the file and the app's own model comes back. Th
 |---|---|
 | `aircraft/airbus-a320.glb` | Airbus A320 |
 | `aircraft/airbus-a320neo.glb` | Airbus A320neo |
+| `aircraft/airbus-a319neo.glb` | Airbus A319neo |
+| `aircraft/airbus-a321.glb` | Airbus A321 |
+| `aircraft/airbus-a321neo.glb` | Airbus A321neo |
+| `aircraft/airbus-a321lr-neo.glb` | Airbus A321LR neo |
+| `aircraft/airbus-a321xlr-neo.glb` | Airbus A321XLR neo |
+| `aircraft/airbus-a330-800neo.glb` | Airbus A330-800neo |
+| `aircraft/airbus-a330-900neo.glb` | Airbus A330-900neo |
 | `aircraft/airbus-a350-900.glb` | Airbus A350-900 |
 | `aircraft/airbus-a310-300.glb` | Airbus A310-300 |
 | `aircraft/boeing-737-800.glb` | Boeing 737-800 |
@@ -24,6 +31,13 @@ water salute, the museum. Remove the file and the app's own model comes back. Th
 | `aircraft/boeing-777-300er.glb` | Boeing 777-300ER |
 | `aircraft/boeing-787-10.glb` | Boeing 787-10 |
 | `aircraft/boeing-747-8.glb` | Boeing 747-8 |
+| `aircraft/boeing-737-max-7.glb` | Boeing 737 MAX 7 |
+| `aircraft/boeing-737-max-8.glb` | Boeing 737 MAX 8 |
+| `aircraft/boeing-737-max-9.glb` | Boeing 737 MAX 9 |
+| `aircraft/boeing-737-max-10.glb` | Boeing 737 MAX 10 |
+| `aircraft/boeing-787-8.glb` | Boeing 787-8 |
+| `aircraft/boeing-787-9.glb` | Boeing 787-9 |
+| `aircraft/boeing-777-9.glb` | Boeing 777-9 |
 | `aircraft/bombardier-crj900.glb` | Bombardier CRJ900 |
 | `aircraft/bombardier-crj700.glb` | Bombardier CRJ700 |
 | `aircraft/atr-72-600.glb` | ATR ATR 72-600 |

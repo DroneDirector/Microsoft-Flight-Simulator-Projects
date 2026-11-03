@@ -21,3 +21,21 @@ Cessna 172      Lycoming IO-360-L2A only
 
 New aircraft (bought or leased new): you choose the engine where there is a choice.
 Used aircraft and real-airline fleets come with the engine they have.
+
+
+PART 2: TYPES ADDED 3 NOVEMBER 2026
+(C) = worked out, not published. Sources per type below each row.
+A319neo         CFM LEAP-1A / Pratt & Whitney PW1100G-JM GTF                Pratt & Whitney PW1100G-JM GTF: fuel -1.0%, maintenance +12% (C)
+A321            CFM56-5B3 / IAE V2533-A5                                    IAE V2533-A5: fuel -1.5%, maintenance +4%, take-off/hot-and-high +3% (C)
+A321neo         CFM LEAP-1A / Pratt & Whitney PW1100G-JM GTF                Pratt & Whitney PW1100G-JM GTF: fuel -1.0%, maintenance +12% (C)
+A321LR neo      CFM LEAP-1A / Pratt & Whitney PW1100G-JM GTF                Pratt & Whitney PW1100G-JM GTF: fuel -1.0%, maintenance +12% (C)
+A321XLR neo     CFM LEAP-1A / Pratt & Whitney PW1100G-JM GTF                Pratt & Whitney PW1100G-JM GTF: fuel -1.0%, maintenance +12% (C)
+A330-800neo     Rolls-Royce Trent 7000                                      only engine
+A330-900neo     Rolls-Royce Trent 7000                                      only engine
+737 MAX 7       CFM LEAP-1B                                                 only engine
+737 MAX 8       CFM LEAP-1B                                                 only engine
+737 MAX 9       CFM LEAP-1B                                                 only engine
+737 MAX 10      CFM LEAP-1B                                                 only engine
+787-8           GE GEnx-1B / Rolls-Royce Trent 1000 (TEN)                   Rolls-Royce Trent 1000 (TEN): fuel +0.5%, maintenance +12% (C)
+787-9           GE GEnx-1B / Rolls-Royce Trent 1000 (TEN)                   Rolls-Royce Trent 1000 (TEN): fuel +0.5%, maintenance +12% (C)
+777-9           GE9X-105B1A                                                 only engine
