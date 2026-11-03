@@ -464,7 +464,7 @@ function v3dBuildAirport(L: AirportLayout) {
     for (let k = 0; k < pos.count; k++) { const x = pos.getX(k), z = pos.getZ(k), wx = q[0] + x * cs + z * sn, wz = q[1] - x * sn + z * cs; pos.setXYZ(k, wx, gy(wx, wz) + 0.5, wz); }
     pos.needsUpdate = true; geo.computeBoundingSphere();
     const m = new T.Mesh(geo, new T.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 })); m.renderOrder = 4;
-    g.add(m);
+    g.add(m); (g.userData.rwyMats = g.userData.rwyMats || []).push(m.material);   // darker when wet (v3d-wet.ts)
   }
   // the airport built before goes (its geometry and its own pictures; the buildings' shared facade materials stay)
   if (V3d.airport) { V3d.scene.remove(V3d.airport); V3d.airport.traverse((o: any) => { try { if (o.geometry) o.geometry.dispose(); if (o.material && !Array.isArray(o.material) && o.material.map && o.material.map.dispose) o.material.map.dispose(); } catch (e) { /* gone already */ } }); }
@@ -629,6 +629,7 @@ function v3dLoop(now: number) {
   v3dPrefetch(f, w0);
   if (V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
   v3dLoaderTick(now);
+  try { v3dWetTick(now); } catch (e) { /* dry */ }
 
   // aircraft within about 40 km
   const seen: { [id: string]: boolean } = {};

@@ -610,7 +610,8 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
   if (!skyOpt('v3dAptLights')) return null;
   const pos: number[] = [], col: number[] = [], size: number[] = [];
   const kind: number[] = [], dirs: number[] = [], phs: number[] = [];
-  const add = (x: number, z: number, h: number, c: number[], s: number, k?: number, d?: number[], ph?: number) => { pos.push(x, gy(x, z) + h, z); col.push(c[0], c[1], c[2]); size.push(s); kind.push(k || 0); dirs.push(...(d || [0, 0, 0])); phs.push(ph || 0); };
+  let rwy = true; const wp: number[] = [], wc: number[] = [], wg: number[] = [];   // runway lights, for their reflections on a wet runway
+  const add = (x: number, z: number, h: number, c: number[], s: number, k?: number, d?: number[], ph?: number) => { if (rwy && !(k > 0)) { const g0 = gy(x, z); wp.push(x, g0 + h, z); wc.push(c[0], c[1], c[2]); wg.push(g0); } pos.push(x, gy(x, z) + h, z); col.push(c[0], c[1], c[2]); size.push(s); kind.push(k || 0); dirs.push(...(d || [0, 0, 0])); phs.push(ph || 0); };
   const W = [1, 0.95, 0.85], RED = [1, 0.15, 0.1], GRN = [0.2, 1, 0.45], BLU = [0.25, 0.45, 1], AMB = [1, 0.75, 0.25], FLOOD = [1, 0.72, 0.42];
   for (const r of L.runways) {
     if (r.surf === 9) continue;
@@ -658,6 +659,7 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
       }
     }
   }
+  rwy = false;
   // taxiways: green centre line every 30 m, blue edges every 60 m
   for (const p of L.paths || []) {
     if (!(p[0] === 1 || p[0] === 4)) continue;
@@ -673,8 +675,9 @@ function v3dAirportLights(L: AirportLayout, loc: (x: number, y: number) => numbe
   for (const m of masts) add(m[0], m[1], 27, FLOOD.map(v => v * 0.75), 7);
   if (!size.length) return null;
   const pts = v3dLightPoints(pos, col, size, kind, dirs, phs);
-  if (!masts.length) return pts;
-  const grp = new THREE.Group(); grp.add(pts); grp.add(v3dMastMeshes(masts, gy));
+  const wet = typeof v3dWetReflections === 'function' ? v3dWetReflections(wp, wc, wg) : null;
+  if (!masts.length && !wet) return pts;
+  const grp = new THREE.Group(); grp.add(pts); if (masts.length) grp.add(v3dMastMeshes(masts, gy)); if (wet) grp.add(wet);
   return grp;
 }
 

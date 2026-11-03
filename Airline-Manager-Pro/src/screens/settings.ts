@@ -85,6 +85,7 @@ const SETTINGS: SetSection[] = [
         + row('v3dSky', 'Sun, moon and stars', 'The sun and the moon at their true size and place, the moon in its phase, and the real stars at night.')
         + row('v3dFlare', 'Lens flare', 'Looking towards the sun, its light catches in the camera lens: a glare and a row of soft rings and spots across the picture.')
         + row('v3dPrecip', 'Rain and snow', 'From the real-world weather reports (or Flight Simulator\'s weather when linked): falling around you under a raining cloud, and in grey curtains below the clouds in the distance.')
+        + row('v3dWet', 'Wet runways', 'After rain or snow the runways turn darker and glossy, and at night their lights shine back from the wet surface. They dry out over about half an hour.')
         + row('v3dContrails', 'Contrails', 'Aircraft cruising where the air is colder than about −40 °C leave white trails from their engines: gone in seconds in dry air, lingering and spreading in damp air. Longer and finer on the PC.')
         + row('v3dLightning', 'Lightning', 'Storm clouds flash from inside, with bolts to the ground now and then; at night the whole area lights up for an instant.')
         + row('v3dRainbow', 'Rainbows', 'Where it rains with the sun low behind you, a rainbow: a full arc or part of one, sometimes with a fainter second bow outside it.')
