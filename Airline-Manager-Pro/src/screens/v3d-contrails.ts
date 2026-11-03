@@ -88,3 +88,32 @@ function v3dContrailStep(P: any, g: any, w: any, now: number) {
   // a trail that has fully faded is put away
   if (!on && t - C.at > C.life + 2) drop();
 }
+
+/* ---------- heat haze behind the engines (the PC) ---------- */
+// While the engines run on the ground (taxiing, lined up, the take-off roll), the hot exhaust makes what is behind
+// them shimmer: a clear patch behind each engine bends the view through it, moving with the flow.
+let _hazeMat: any = null;
+function v3dHazeMat(): any {
+  if (_hazeMat) return _hazeMat;
+  const T = THREE, c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d') as CanvasRenderingContext2D, img = x.createImageData(128, 128);
+  for (let i = 0; i < 128 * 128; i++) { const u = (i % 128) / 128, v = Math.floor(i / 128) / 128; const a = Math.sin(u * 25 + Math.sin(v * 13) * 2) * 0.5 + Math.sin(v * 31 + u * 7) * 0.5; img.data[i * 4] = 128 + a * 60; img.data[i * 4 + 1] = 128 + Math.cos(u * 19 - v * 23) * 60; img.data[i * 4 + 2] = 255; img.data[i * 4 + 3] = 255; }
+  x.putImageData(img, 0, 0); const tex = new T.CanvasTexture(c); tex.wrapS = tex.wrapT = T.RepeatWrapping; tex.repeat.set(2, 1);
+  // soft edges: strongest in the middle of the plume, nothing at its edges
+  const ac = document.createElement('canvas'); ac.width = ac.height = 64; const ax = ac.getContext('2d') as CanvasRenderingContext2D, gr = ax.createRadialGradient(32, 32, 2, 32, 32, 31);
+  gr.addColorStop(0, '#fff'); gr.addColorStop(0.5, '#888'); gr.addColorStop(1, '#000'); ax.fillStyle = gr; ax.fillRect(0, 0, 64, 64);
+  _hazeMat = new T.MeshPhysicalMaterial({ transmission: 1, roughness: 0, metalness: 0, thickness: 0.25, ior: 1.02, normalMap: tex, normalScale: new T.Vector2(0.35, 0.35), alphaMap: new T.CanvasTexture(ac), transparent: true, opacity: 1, depthWrite: false, side: T.DoubleSide, specularIntensity: 0 });
+  return _hazeMat;
+}
+function v3dHazeStep(P: any, w: any, now: number) {
+  const S: any = State.settings, ph = String(P.ph || '').toLowerCase();
+  const on = hiQ() && S.v3dHaze !== false && w.onGround && /taxi|line|take-?off|roll|hold|push/.test(ph);
+  if (!on) { if (P.haze) P.haze.visible = false; return; }
+  const body = P.model.userData.body; if (!body) return;
+  if (!P.haze) {
+    const T = THREE, g = new T.Group(), E: any[] = (body.userData.engPts || []).filter((e: any) => e.exh);
+    for (const e of E) for (const r of [0, Math.PI / 2]) { const q = new T.Mesh(new T.PlaneGeometry(r ? (e.d || 1.5) * 1.4 : 7, (e.d || 1.5) * 1.5), v3dHazeMat()); q.rotation.x = r ? 0 : 0; q.rotation.y = r; q.position.copy(e.exh).add(new T.Vector3(r ? 5 : 3.8, 0, 0)); q.renderOrder = 30; g.add(q); }   // seen from the side and from behind
+    body.add(g); P.haze = g;
+  }
+  P.haze.visible = true;
+  const M = v3dHazeMat(); M.normalMap.offset.set(-now / 1000 * 1.8, Math.sin(now / 700) * 0.05);
+}
