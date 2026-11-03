@@ -195,7 +195,7 @@ function lapMount(root: HTMLElement, phone?: boolean) {
   if (!Lap.phone) { lapFit(); Lap.fit$ = () => lapFit(); window.addEventListener('resize', Lap.fit$); }
   clearInterval(Lap.clock); Lap.clock = setInterval(() => { if (!Lap.root || !Lap.root.isConnected) { clearInterval(Lap.clock); return; } lapBar(); }, 10000);
 }
-function lapUnmount() { if (Lap.fit$) { window.removeEventListener('resize', Lap.fit$); Lap.fit$ = null; } lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.phone = false; Lap.bankIn = false; Lap.bankBusy = false; try { clearTimeout(PhA.callT); PhA.calling = null; PhA.callState = ''; PhA.typing = ''; if (PhCall.c) phCallEnd(); } catch (e) { /* none */ } }   // closing the laptop logs you out of the bank
+function lapUnmount() { (Lap as any).ops = false; if (Lap.fit$) { window.removeEventListener('resize', Lap.fit$); Lap.fit$ = null; } lapBrowserClose(); clearInterval(Lap.clock); Lap.root = null; Lap.app = ''; Lap.phone = false; Lap.bankIn = false; Lap.bankBusy = false; try { clearTimeout(PhA.callT); PhA.calling = null; PhA.callState = ''; PhA.typing = ''; if (PhCall.c) phCallEnd(); } catch (e) { /* none */ } }   // closing the laptop logs you out of the bank
 function lapRefresh() { if (Lap.root && Lap.root.isConnected) lapRender(true); }
 
 function lapRender(soft?: boolean) {
@@ -225,16 +225,22 @@ function lapBar() {
     return;
   }
   patchHtml(bar, `<button class="lb-home ${Lap.app ? '' : 'on'}" data-act="lap-app" data-k="" aria-label="Desktop">${icon('star')}</button>
-    <div class="lb-apps">${LAP_APPS.map(a => `<button class="lb-app ${Lap.app === a[0] ? 'on' : ''}" data-act="lap-app" data-k="${a[0]}" title="${esc(a[1])}" style="--c:${a[3]}">${icon(a[2])}${a[0] === 'mail' && un ? `<i class="lb-badge">${un}</i>` : ''}</button>`).join('')}</div>
+    <div class="lb-apps">${lapDeskApps().map(a => `<button class="lb-app ${Lap.app === a[0] ? 'on' : ''}" data-act="lap-app" data-k="${a[0]}" title="${esc(a[1])}" style="--c:${a[3]}">${icon(a[2])}${a[0] === 'mail' && un ? `<i class="lb-badge">${un}</i>` : ''}</button>`).join('')}</div>
     <span class="lb-sp"></span>
     ${notes ? `<button class="lb-note" data-act="lap-app" data-k="calendar">${icon('calendar')}${notes} today</button>` : ''}
     <button class="lb-clock" data-act="lap-app" data-k="calendar"><b>${time}</b><small>${esc(date)}</small></button>
-    <button class="lb-off" data-act="lap-close" aria-label="Close the laptop" title="Close the laptop (Esc)">${icon('power')}</button>`);
+    <button class="lb-off" data-act="lap-close" aria-label="${Lap.ops ? 'Switch off the screen' : 'Close the laptop'}" title="${Lap.ops ? 'Back to your desk' : 'Close the laptop'} (Esc)">${icon('power')}</button>`);
+}
+/** The apps on this computer's desktop: the laptop's own, every app on your phone (what you install on one is on
+ *  both), and on the Operations computer the operations screens. */
+function lapDeskApps(): [string, string, string, string][] {
+  const ops: [string, string, string, string][] = Lap.ops ? OPS_TABS.filter(t => SCREENS[t[0]]).map(t => ['scr:' + t[0], t[1], t[2], '#2FB4E8'] as [string, string, string, string]) : [];
+  return ops.concat(LAP_APPS, PH_APPS.filter(a => !LAP_APPS.some(b => b[0] === a[0])));
 }
 function lapDeskHtml(): string {
   const co: any = company(), d = lapGameNow(), today = lapYmd(d), notes = (lapS().calendar as CalNote[]).filter(c => c.date >= today).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 3), un = lapUnread();
   return `<div class="ld-wall" style="--c1:${co.color};--c2:${co.color2 || '#0B2A55'}"><span class="ld-brand">${esc(co.name)}</span></div>
-    <div class="ld-icons">${LAP_APPS.map(a => `<button class="ld-ic" data-act="lap-app" data-k="${a[0]}"><span style="--c:${a[3]}">${icon(a[2])}${a[0] === 'mail' && un ? `<i class="lb-badge">${un}</i>` : ''}</span><b>${esc(a[1])}</b></button>`).join('')}</div>
+    <div class="ld-icons">${lapDeskApps().map(a => `<button class="ld-ic" data-act="lap-app" data-k="${a[0]}"><span style="--c:${a[3]}">${icon(a[2])}${a[0] === 'mail' && un ? `<i class="lb-badge">${un}</i>` : ''}</span><b>${esc(a[1])}</b></button>`).join('')}</div>
     <div class="ld-widget"><b class="ld-time">${d.toTimeString().slice(0, 5)}</b><small>${esc(d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</small>
       <div class="ld-notes">${notes.length ? notes.map(n => `<span><i>${esc(n.date.slice(5).split('-').reverse().join('/'))}</i>${esc(n.text)}</span>`).join('') : '<span class="muted">Nothing in your calendar</span>'}</div>
       <small>${un ? `${un} unread ${un === 1 ? 'message' : 'messages'}` : 'No new mail'}</small></div>`;
@@ -495,4 +501,4 @@ ACTIONS['lap-app'] = el => {
   Lap.app = k; Lap.photo = ''; Sound.tick();
   lapRender();
 };
-ACTIONS['lap-close'] = () => { if (typeof ofLaptopClose === 'function') ofLaptopClose(); };
+ACTIONS['lap-close'] = () => { if (typeof OpsRoom !== 'undefined' && OpsRoom.on && OpsRoom.overlay) { opsScreenClose(); return; } if (typeof ofLaptopClose === 'function') ofLaptopClose(); };

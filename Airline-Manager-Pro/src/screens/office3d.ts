@@ -728,7 +728,7 @@ function ofAimedObj(e?: PointerEvent): any {
 function ofClickAt(e?: PointerEvent) {
   const R = OfficeRoom; if (R.loading) return;
   // the laptop's screen is up: a click beside it puts it away (and on the phone, picks the phone up after)
-  if (R.overlay) { if (R.overlay.classList.contains('lap-screen') && !R.lapZ) { const a = ofAimed(e); ofLaptopClose(); if (a === 'phone') setTimeout(() => { if (!R.overlay) ofPhonePick(); }, 800); } return; }
+  if (R.overlay) return;   // the laptop fills the screen: its power button puts it away
   if (R.bw) { if (R.bw.st === 'hold') ofBowlPut(); return; }   // the food bowl in your hands: a click puts it down
   if (R.ph && R.ph.st !== 'idle') { if (R.ph.st === 'hold') ofPhotoPut(); return; }   // holding the photo: a click puts it back
   // the phone in your hand: a tap brings its screen up; a click on the laptop puts the phone down first, then opens it
