@@ -211,7 +211,7 @@ const V3dTerrain = {
         const lift = clamp(H[i] / 2200, 0, 1);
         R = 11 * shade + 16 * lift; G = 29 * shade + 24 * lift; B = 51 * shade + 30 * lift;
         // the coast, as on the map
-        if ((x > 0 && water(i - 1)) || (x < size - 1 && water(i + 1)) || (y > 0 && water(i - size)) || (y < size - 1 && water(i + size))) { R = 63; G = 208; B = 232; }
+        if (H[i] < 25 && ((x > 0 && water(i - 1)) || (x < size - 1 && water(i + 1)) || (y > 0 && water(i - size)) || (y < size - 1 && water(i + size)))) { R = 63; G = 208; B = 232; }
       }
       D[i * 4] = R; D[i * 4 + 1] = G; D[i * 4 + 2] = B; D[i * 4 + 3] = 255;
     }
@@ -246,19 +246,31 @@ const V3dTerrain = {
       pos[o * 3] = p[0]; pos[o * 3 + 1] = mh[o] - v3dCurve(p[0], p[1]); pos[o * 3 + 2] = p[1];
       uv[o * 2] = i / G; uv[o * 2 + 1] = 1 - j / G;
     }
-    const inside = (lon: number, lat: number) => {
-      const q = r.inner; if (!q) return false;
-      const qn = 1 << q.z, w0 = q.x0 / qn * 360 - 180, w1 = (q.x0 + q.N) / qn * 360 - 180;
-      const lt = (y: number) => { const k = Math.PI - 2 * Math.PI * y / qn; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
-      const n0 = lt(q.y0), s0 = lt(q.y0 + q.N), padX = (w1 - w0) * 0.02, padY = (n0 - s0) * 0.02;
-      return lon > w0 + padX && lon < w1 - padX && lat < n0 - padY && lat > s0 + padY;
-    };
+    // where the finer ring lies: this ring's ground there sinks well below it (out of sight), so the two never
+    // overlap at nearly the same height (that flickered as saw teeth); the finer ring's skirt covers the step
+    const innerBox = (() => { const q = r.inner; if (!q) return null; const qn = 1 << q.z, lt = (y: number) => { const k = Math.PI - 2 * Math.PI * y / qn; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
+      return [q.x0 / qn * 360 - 180, (q.x0 + q.N) / qn * 360 - 180, lt(q.y0 + q.N), lt(q.y0)]; })();
+    const inside = (lon: number, lat: number, shrink: number) => { const B = innerBox; if (!B) return false; const px = (B[1] - B[0]) * shrink, py = (B[3] - B[2]) * shrink; return lon > B[0] + px && lon < B[1] - px && lat > B[2] + py && lat < B[3] - py; };
+    if (innerBox) for (let j = 0; j <= G; j++) for (let i = 0; i <= G; i++) {
+      if (!inside(lonOf(i / G * size), latOf(j / G * size), 0)) continue;
+      const o = j * (G + 1) + i; pos[o * 3 + 1] -= 40;
+    }
     for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
-      if (r.inner && inside(lonOf((i + 0.5) / G * size), latOf((j + 0.5) / G * size))) continue;
+      if (r.inner && inside(lonOf((i + 0.5) / G * size), latOf((j + 0.5) / G * size), 0.04)) continue;
       const a = j * (G + 1) + i, b = a + 1, d = a + G + 1, e = d + 1; idx.push(a, d, b, b, d, e);
     }
     (r as any).mh = mh; (r as any).G = G;
-    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.setAttribute('aFlat', new T.BufferAttribute(flat, 1)); geo.setIndex(idx);
+    // a skirt round the ring's edge, hanging 60 m down: no crack shows where it meets the coarser ring around it
+    const nv = (G + 1) * (G + 1), edge: number[] = [];
+    for (let i = 0; i <= G; i++) edge.push(i);
+    for (let j = 1; j <= G; j++) edge.push(j * (G + 1) + G);
+    for (let i = G - 1; i >= 0; i--) edge.push(G * (G + 1) + i);
+    for (let j = G - 1; j >= 0; j--) edge.push(j * (G + 1));
+    const P2 = new Float32Array((nv + edge.length) * 3), U2 = new Float32Array((nv + edge.length) * 2), F2 = new Float32Array(nv + edge.length);
+    P2.set(pos); U2.set(uv); F2.set(flat);
+    edge.forEach((v, k) => { const o = nv + k; P2[o * 3] = pos[v * 3]; P2[o * 3 + 1] = pos[v * 3 + 1] - 60; P2[o * 3 + 2] = pos[v * 3 + 2]; U2[o * 2] = uv[v * 2]; U2[o * 2 + 1] = uv[v * 2 + 1]; F2[o] = flat[v]; });
+    for (let k = 0; k < edge.length - 1; k++) { const a = edge[k], b = edge[k + 1], a2 = nv + k, b2 = nv + k + 1; idx.push(a, a2, b, b, a2, b2, a, b, a2, b, b2, a2); }
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(P2, 3)); geo.setAttribute('uv', new T.BufferAttribute(U2, 2)); geo.setAttribute('aFlat', new T.BufferAttribute(F2, 1)); geo.setIndex(idx);
     // the water as its own picture (the sea and lakes; rivers half), for the living water and the coastline
     const wetTex = v3dWetTexture(size, (i: number) => water(i) ? 255 : river(i) ? 150 : 0);
     r.mesh = new T.Mesh(geo, v3dGroundMat((State.settings as any).v3dSat && r.satTex ? r.satTex : r.mapTex, wetTex));

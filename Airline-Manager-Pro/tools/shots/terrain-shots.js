@@ -1,4 +1,4 @@
-// Pictures of the 3D view's ground at every terrain detail setting, for comparing them side by side.
+// Pictures of the 3D view's ground at every terrain detail setting, for comparing them side by side (ring seams and skirts included).
 // Run with the app served at http://localhost:47610/ (as the PC app, so Ultra is offered):
 //   node tools/shots/terrain-shots.js <output folder>
 // Two places on the Faroe Islands (steep mountains straight out of the sea): over the sea west of Vágar looking
