@@ -276,6 +276,7 @@ ACTIONS['keys-help'] = () => openLayer('modal', `<div class="modal-head"><div><h
 
 /* ---------- the first-run tour and screen tips ---------- */
 const TOUR: { sel: string; title: string; text: string; screen?: string }[] = [
+  { sel: '.fin-hold', title: 'Start your career', text: 'Your money is on hold until you press this. Then your company is registered and every purchase, salary and fee is booked. Press it when you are ready to buy your first aircraft and hire your staff.' },
   { sel: '.rail-btn[data-screen="ops"]', title: 'Overview', text: 'Your airline at a glance: aircraft in the air, money, alerts and the world map.', screen: 'ops' },
   { sel: '.rail-btn[data-screen="fleet"]', title: 'Fleet', text: 'Buy, lease and look after your aircraft. Tap one for its details, its log and its condition.' },
   { sel: '.rail-btn[data-screen="routes"]', title: 'Routes', text: 'Plan routes and put a hired pilot on each; they fly them by themselves, even while the app is closed.' },
