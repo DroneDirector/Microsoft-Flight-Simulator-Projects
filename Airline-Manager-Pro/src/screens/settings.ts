@@ -60,6 +60,7 @@ const SETTINGS: SetSection[] = [
     } },
     { type: 'html', html: () => cabinSettingsHtml() },
     { type: 'html', html: () => animSettingsHtml() },
+    { type: 'html', html: () => perfSettingsHtml() },
     { type: 'group', title: 'Sky and water' },
     { type: 'html', html: () => {
       const S: any = State.settings, wm = v3dWaterMode();
@@ -662,3 +663,20 @@ ACTIONS['dev-voice-try'] = el => {
   $all('.dev-voices .le-voice').forEach(b => b.classList.toggle('on', b === el));
   try { Voice.stop(); Voice.speak(`Hello. This is ${sx === 'm' ? 'male' : 'female'} voice ${i + 1}. Shall we get the aircraft ready?`, undefined, `me|${sx}|neutral|__dev${i}`); } catch (e) { /* no voice */ }
 };
+
+/** Automatic performance: fewer frames and a little less sharpness while the device is warm or slow. */
+function perfSettingsHtml(): string {
+  const S: any = State.settings, cur = S.perfAuto == null ? 'auto' : S.perfAuto === false || S.perfAuto === 'off' ? 'off' : 'on';
+  const opts: [string, string][] = [['auto', `Automatic (${DESKTOP ? 'off on the PC' : 'on'})`], ['on', 'On'], ['off', 'Off']];
+  return `<div class="set-card col cab-opts">
+    <div class="sc-h">${icon('sliders')}<span><b>Smooth on this device</b><small>The 3D view, your offices and the courtroom keep their frame rate up: while it drops, they are drawn a little less sharply, and sharp again when there is room. When the ${DESKTOP ? 'computer' : 'phone or tablet'} gets warm or battery saver is on, they draw up to 30 frames a second, which also keeps it cooler and saves battery.</small></span></div>
+    <div class="ch-row"><span><b>Automatic performance</b><small>${esc(Perf.label())}</small></span><div class="seg">${opts.map(o => `<button class="${cur === o[0] ? 'on' : ''}" data-act="perf-set" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>
+    <div class="ch-row"><span><b>Frame generation (smoother turning)</b><small>While a view draws 30 frames a second (the 3D view always; your offices and the courtroom when the device is warm or saving battery), the frames in between are made from the last one, shifted to where you are looking now. Looking around, orbiting and walking become as smooth as your screen. Things that move by themselves, like aircraft and people, still move 30 times a second, and the very edges of the screen can look a little smeared while you turn.</small></span><div class="seg">${([['off', 'Off'], ['auto', 'With automatic performance'], ['on', 'On']] as [string, string][]).map(o => `<button class="${(S.frameGen || 'off') === o[0] ? 'on' : ''}" data-act="framegen-set" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>
+  </div>`;
+}
+ACTIONS['perf-set'] = el => {
+  const S: any = State.settings, v = el.getAttribute('data-v');
+  if (v === 'auto') delete S.perfAuto; else S.perfAuto = v === 'on';
+  Store.save(); Sound.tick(); rerenderSettingsBody();
+};
+ACTIONS['framegen-set'] = el => { const S: any = State.settings; S.frameGen = el.getAttribute('data-v'); Store.save(); Sound.tick(); rerenderSettingsBody(); };

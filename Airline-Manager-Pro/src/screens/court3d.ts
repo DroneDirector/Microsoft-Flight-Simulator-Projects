@@ -494,13 +494,15 @@ function ctOpen2(c: any, st: any, root: HTMLElement, q: number, appeal: boolean,
     if (R.empty) { if (aimLocked(cv)) { if (R.lockedOnce) ctUse(); R.lockedOnce = true; } else if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) ctUse(e); }
     drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-ct]') as HTMLElement; if (b) ctClick(b); });
+  roomBoxDrag(root, 'court');
   R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; }; window.addEventListener('keyup', R.ku$, true);
   R.key$ = (e: KeyboardEvent) => { if (!R.on) return; if (R.empty && e.key.toLowerCase() === 'h') { e.preventDefault(); R.root.classList.toggle('ui-off'); return; } if (R.empty && /^(w|a|s|d|arrow\w+|shift)$/.test(e.key.toLowerCase())) { R.keys[e.key.toLowerCase()] = true; e.preventDefault(); return; } if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; ctLeaveAsk(); } else if ((e.key === 'Enter' || e.key === ' ') && !root.querySelector('.ct-modal:not([hidden])')) { const n = root.querySelector('[data-ct="next"]') as HTMLElement; if (n) { e.preventDefault(); ctClick(n); } } };
   window.addEventListener('keydown', R.key$, true);
   // the people come in one by one while the room shows (an empty courtroom has no one in it)
   if (empty) { R.loading = true; ctEmptyStart(); setTimeout(() => ctLoaded(), 60); } else { ctCast(c, st, judges, q); R.loading = true; }
   R.fc = 0;
-  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (R.loading) return; ctFrame(); };   // nothing is drawn behind the loading screen, so everything comes in quickly
+  R.perf = Perf.state();
+  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (R.loading || Perf.skip(R.perf)) return; ctFrame(); };   // nothing is drawn behind the loading screen, so everything comes in quickly
   R.raf = requestAnimationFrame(loop);
 }
 
@@ -518,7 +520,7 @@ CourtRoom.open = function (c: any, st: any) {
     <button class="ct-leave" data-ct="leave">${icon('close')}<span>Leave court</span><kbd>Esc</kbd></button>
     <div class="ct-ex" hidden></div>${empty ? '<div class="of-aim" hidden>·</div>' : ''}
     <div class="ct-rate" hidden></div>
-    <div class="ct-box" hidden><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
+    <div class="ct-box" hidden><div class="box-grip" title="Drag to move the window (double-click to put it back)"><i></i></div><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
     ${empty ? `<div class="ct-spots">${[['bench', 'The bench'], ['witness', 'Witness box'], ['def', 'Defence table'], ['pub', 'Public benches'], ['door', 'The doors']].map(x => `<button data-ct="spot" data-k="${x[0]}">${x[1]}</button>`).join('')}</div><div class="ct-hint">${DESKTOP ? 'W A S D to walk · click the view and the mouse looks all the way round · H hides the controls · Esc gives the mouse back, Esc again leaves' : 'Stick to walk · drag to look around'}</div><div class="walk-pad ct-pad"><i></i></div>` : ''}
     ${ctLoaderHtml(empty ? 'The courtroom' : st.key === 'verdict' ? 'The verdict' : 'Court is in session', empty ? 'Opening the doors…' : 'The court is preparing…')}
     <div class="ct-modal" hidden></div>`;
@@ -532,7 +534,7 @@ CourtRoom.close = function (quiet?: boolean) {
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   document.removeEventListener('mousemove', R.mm$); aimUnlock();
   try { Voice.stop(); } catch (e) { /* ignore */ }
-  exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null;
+  FrameGen.dispose(R.perf); exitFreeRenderer(R.ren, R.scene); R.ren = null; R.scene = null;
   R.root.remove(); R.people = {}; R.crowd = [];
   if (!quiet) { try { refresh(); if (R.c) courtPopup(R.c.id); } catch (e) { /* ignore */ } }
 };
@@ -657,7 +659,7 @@ function ctFrame() {
     p.g = p.g ? cabinLerpG(p.g, gT, Math.min(1, dt * 6)) : gT;
     p.m.pose({ t, yaw: 0, gaze: [p.gazeYaw * 0.4, 0], blink: (t % 4.3) < 0.12 ? 1 : 0, g: p.g, talk: humanTalk(vn, R.speaker === k ? R.sayText : '', R.sayAt) });
   }
-  if (R.empty) { ctWalk(dt); ctGateStep(dt); R.ren.render(R.scene, R.cam); return; }
+  if (R.empty) { ctWalk(dt); ctGateStep(dt); FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren); return; }
   // the camera eases to the shot, and you can look around it
   const sh = R.shot, ease = Math.min(1, dt * 1.6);
   R.cam.position.lerp(sh.pos, ease); R.camAt.lerp(sh.at, ease);
@@ -668,7 +670,7 @@ function ctFrame() {
   // dust drifting in the sunlight, the clock
   if (R.dust) { const a = R.dust.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) + dt * 0.02 * Math.sin(i + now * 0.3); if (y > 6) y = 0.5; a.setY(i, y); a.setX(i, a.getX(i) + dt * 0.01 * Math.cos(i * 1.7 + now * 0.2)); } a.needsUpdate = true; }
   if (R.A.clockHands) { const d = new Date(), hrs = (d.getHours() % 12 + d.getMinutes() / 60) / 12, mn = d.getMinutes() / 60; R.A.clockHands[0].rotation.z = hrs * Math.PI * 2; R.A.clockHands[1].rotation.z = mn * Math.PI * 2; }
-  R.ren.render(R.scene, R.cam);
+  FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function ctHead(p: any): any { const s = p.seat, sk = p.sitK; return new THREE.Vector3(s.x, s.y + (sk > 0.5 ? 1.28 : (p.m.top || 1.7) - 0.12), s.z); }
 /** A camera shot of someone speaking: from in front of them, a little to one side, at about eye level. */

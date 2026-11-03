@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.69 (2026-11-03)
+
+- Perf (graphics/perf.ts): dynamic resolution and a 30 fps cap from Android thermal status and battery saver (AppTools.boostStats powerSave), in the 3D view, office, Operations and court; setting in Graphics
+- FrameGen: depth reprojection of the last drawn frame for the in-between frames (rooms when capped, the 3D view at its 30 fps outside the cabin), logarithmic depth handled, background not tone-mapped
+- roomBoxDrag: the conversation window in office and court can be dragged, position kept per room
+- police buttons: red and blue light-bar animation
+
 ## 0.9.68 (2026-11-02)
 
 - Android: laptop browser added to the activity's content frame (the web view's parent is a CoordinatorLayout), placed with the web view's offset
