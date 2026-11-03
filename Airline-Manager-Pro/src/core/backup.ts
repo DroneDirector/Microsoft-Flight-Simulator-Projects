@@ -144,3 +144,45 @@ ACTIONS['backup-folder-restore'] = () => {
   }).catch((e: any) => ErrorLog.add('backup', 'The backup folder couldn\'t be read', (e && e.message) || String(e)));
 };
 ACTIONS['backup-restore-go'] = () => { const t = (window as any).__restoreText; closeAll(); if (t) Backup.restore(t); };
+
+/* ---------- five backup saves on this device, taken in turn ---------- */
+// The main save is written after every change (Store.save). Besides it, the device keeps five backup saves:
+// each new one replaces the oldest, at most one a minute while you play and one straight away when you leave
+// the app, so there are always five recent moments to go back to. On the phone they are files in the app's own
+// storage; on the PC, in Documents\Airline Manager Pro\backups; in a browser, in its own storage.
+const SaveSlots = {
+  N: 5, _last: 0, _json: '', _timer: 0 as any,
+  meta(): { next: number; at: number[] } { try { const m = JSON.parse(localStorage.getItem('amp.saveSlots') || 'null'); if (m && Array.isArray(m.at)) return m; } catch (e) { /* none */ } return { next: 0, at: [0, 0, 0, 0, 0] }; },
+  after(json: string, now?: boolean) {
+    this._json = json;
+    if (now || Date.now() - this._last > 60000) { this.write(); return; }
+    if (!this._timer) this._timer = setTimeout(() => { this._timer = 0; this.write(); }, 60000 - (Date.now() - this._last));
+  },
+  write() {
+    clearTimeout(this._timer); this._timer = 0;
+    const json = this._json; if (!json) return; this._json = ''; this._last = Date.now();
+    const m = this.meta(), i = m.next % this.N, name = `save-${i + 1}.json`;
+    const done = () => { m.at[i] = Date.now(); m.next = (i + 1) % this.N; try { localStorage.setItem('amp.saveSlots', JSON.stringify(m)); } catch (e) { /* ignore */ } };
+    const T = Store.native();
+    if (T && T.backupWrite) { T.backupWrite({ data: json, name }).then(done).catch(() => { /* the main save is still there */ }); return; }
+    if (DESKTOP) { fetch('/api/saves?slot=' + (i + 1), { method: 'PUT', body: json }).then(r => { if (r.ok) done(); }).catch(() => { /* PC app closed */ }); return; }
+    try { localStorage.setItem('amp.save.' + (i + 1), json); done(); } catch (e) { /* storage full: the main save is kept */ }
+  },
+  read(i: number): Promise<string> {
+    const T = Store.native(), name = `save-${i}.json`;
+    if (T && T.backupRead) return T.backupRead({ name }).then((r: any) => (r && r.data) || '');
+    if (DESKTOP) return fetch('/api/saves?slot=' + i).then(r => r.json()).then((j: any) => j.data || '');
+    try { return Promise.resolve(localStorage.getItem('amp.save.' + i) || ''); } catch (e) { return Promise.resolve(''); }
+  },
+  html(): string {
+    const m = this.meta(), rows = m.at.map((at, i) => ({ at, i: i + 1 })).filter(r => r.at).sort((a, b) => b.at - a.at);
+    return `<div class="set-card col"><div class="sc-h">${icon('shield')}<span><b>Backup saves on this device</b><small>Everything is saved the moment it changes. Five backup saves are kept besides, taken in turn (one a minute while you play, and when you leave the app), so you can go back to an earlier moment.</small></span></div>
+      ${rows.length ? rows.map(r => `<div class="ch-row"><span><b>Backup ${r.i}</b><small>${esc(dateStr(new Date(r.at)))} ${esc(new Date(r.at).toTimeString().slice(0, 5))}</small></span><button class="btn ghost sm" data-act="slot-restore" data-i="${r.i}">${icon('sync')}Restore</button></div>`).join('') : '<small class="muted">The first backup save is made a minute from now.</small>'}</div>`;
+  },
+};
+ACTIONS['slot-restore'] = el => {
+  const i = +(el.getAttribute('data-i') || 0); if (!i) return;
+  if (!confirm('Go back to this backup save? What happened since then is replaced.')) return;
+  SaveSlots.read(i).then(t => { if (!t) { toast('That backup save could not be read', 'warn'); return; } Backup.restore(t); }).catch(() => toast('That backup save could not be read', 'warn'));
+};
+document.addEventListener('change', () => { try { Store.soon(); } catch (e) { /* not ready */ } }, true);

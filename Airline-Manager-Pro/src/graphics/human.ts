@@ -1610,7 +1610,7 @@ function humanReach(m: any, sd: 'L' | 'R', target: any, prev?: number[], pt?: an
 function humanHandPts(m: any, sd: 'L' | 'R', a: number[], h: any): any[] {
   const T = THREE, U = m.U, J = m.joints[sd], b = m.body; if (!U || !b) return [];
   const G = b.geometry, PA = G.attributes.position.array, FA = G.attributes.fa.array, RA = G.attributes.rest.array, lf = sd === 'L';
-  if (!J.idx) { const L: number[] = [], n = PA.length / 3; for (let i = 0; i < n; i++) if (FA[i * 4 + 1] > 0.5 && (RA[i * 3] > 0) === lf && FA[i * 4] > U.uHandK.value.x - 0.03) L.push(i); const st = Math.max(1, Math.floor(L.length / 500)); J.idx = L.filter((_, i) => i % st === 0); }
+  if (!J.idx) { const L: number[] = [], n = PA.length / 3; for (let i = 0; i < n; i++) if (FA[i * 4 + 1] > 0.5 && (RA[i * 3] > 0) === lf && FA[i * 4] > U.uHandK.value.x - 0.03) L.push(i); const st = Math.max(1, Math.floor(L.length / 1600)); J.idx = L.filter((_, i) => i % st === 0); }
   const k = lf ? 1 : -1, M4 = (m4: any) => new T.Matrix3().setFromMatrix4(m4);
   const Arm = M4(new T.Matrix4().makeRotationY(k * -a[2]).multiply(new T.Matrix4().makeRotationZ(k * a[1])).multiply(new T.Matrix4().makeRotationX(-a[0]))), Elb = M4(new T.Matrix4().makeRotationX(-a[3]));
   const cu = h && h.curl || 0, W = h && h.W ? h.W : new T.Matrix3(), C1 = M4(new T.Matrix4().makeRotationAxis(J.ax, cu * (h && h.k1 || 1.15))), C2 = M4(new T.Matrix4().makeRotationAxis(J.ax, cu * (h && h.k2 || 1.25))), Th = M4(new T.Matrix4().makeRotationAxis(J.T, -k * (h && h.th || 0)));
