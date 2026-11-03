@@ -248,6 +248,10 @@ const V3dTerrain = {
     // the mesh: finest near the aircraft; the part an inner ring covers is left out
     const G = Math.round((r.z >= 12 ? 220 : r.z >= 10 ? 140 : 110) * TERRAIN_DENSITY[v3dTerrainQ()]);
     const Hs = v3dTerrainSmooth() ? v3dSoften(H, size, size / G) : H;
+    // near its edge a ring takes on the coarser shape of the ring around it (which has half its detail), so the two
+    // meet at the same height instead of a step
+    const outer = this.rings.length < v3dRange(this.origin ? this.origin[1] : 50).rings.length - 1;   // rings are built finest first
+    const Hc = outer ? v3dSoften(H, size, 2 * size / G) : null;
     const lonOf = (px: number) => (r.x0 + px / 256) / n * 360 - 180;
     const latOf = (py: number) => { const k = Math.PI - 2 * Math.PI * (r.y0 + py / 256) / n; return Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))) / D2R; };
     const aptLL = V3d.icao ? apt(V3d.icao).pos : null, aElev = V3d.elev || 0;
@@ -262,7 +266,9 @@ const V3dTerrain = {
       return (SD[i] * (1 - fx) * (1 - fy) + SD[i + 1] * fx * (1 - fy) + SD[i + size] * (1 - fx) * fy + SD[i + size + 1] * fx * fy) * mPerPx; };
     const sample = (px: number, py: number) => {
       const x = clamp(px, 0, size - 1.001), y = clamp(py, 0, size - 1.001), xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, i = yi * size + xi;
-      const h = Hs[i] * (1 - fx) * (1 - fy) + Hs[i + 1] * fx * (1 - fy) + Hs[i + size] * (1 - fx) * fy + Hs[i + size + 1] * fx * fy;
+      let h = Hs[i] * (1 - fx) * (1 - fy) + Hs[i + 1] * fx * (1 - fy) + Hs[i + size] * (1 - fx) * fy + Hs[i + size + 1] * fx * fy;
+      if (Hc) { const e = Math.max(Math.abs(px / size - 0.5), Math.abs(py / size - 0.5)) * 2, t = clamp((e - 0.8) / 0.18, 0, 1);
+        if (t > 0) { const hc = Hc[i] * (1 - fx) * (1 - fy) + Hc[i + 1] * fx * (1 - fy) + Hc[i + size] * (1 - fx) * fy + Hc[i + size + 1] * fx * fy; h += (hc - h) * t * t * (3 - 2 * t); } }
       const k = Math.round(y) * size + Math.round(x);
       return { h, wet: sea(k), lake: !sea(k) && water(k) ? H[k] : null };
     };

@@ -68,6 +68,7 @@ function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: 
     balance: Math.round((o.kind === 'bush' ? 1500000 : o.kind === 'regional' ? 12000000 : 25000000) * DIFFICULTY[_fsDiff].start / 100000) * 100000, reputation: 50, founded: dateStr(new Date()).slice(0, 10), kind: o.kind, divisions: [] }];
   st.profiles = [{ id: 'p1', pilotId: 'you', label: 'Main profile' }];
   st.freeCrew = { [id]: 'offered' };   // the first crew for free (crew-start.ts)
+  st.poolFill = true;   // the hiring list is filled to POOL_MIN of every kind as the new career opens (staffing.ts)
   const look = (np && np.look) || old.look;
   st.pilots = [{ id: 'you', name: (np && np.name) || o.pilot || old.name || 'Capt. New Pilot', rank: 'Captain', hoursMin: 0, landings: 0, base: o.hub, you: true, profileId: 'p1', status: 'standby', types: [], rating: 4, xp: 0,
     sex: (np && np.sex) || old.sex || 'm', look, dob: (np && np.dob) || old.dob, nat: (np && np.nat) || old.nat, lookAccepted: true, voice: old.voice }];

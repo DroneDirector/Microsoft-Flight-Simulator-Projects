@@ -8,6 +8,20 @@
 //    removed, and court cases pause; switched back on, everything carries on where it stopped.
 
 const POOL_ROLES: CrewRole[] = ['fo', 'fa', 'mech', 'ground'];
+/** A new career opens with at least this many of every kind on the hiring list (captains, first officers, cabin
+ *  crew, mechanics, ground crew). After that the list moves as usual: hired people are gone, and new ones come
+ *  looking over time. */
+const POOL_MIN = 20;
+/** Fill the hiring list to POOL_MIN of every kind (once, as a new career opens). */
+function poolTopUp(): number {
+  const S: any = State; let n = 0; S.staffCandidates = S.staffCandidates || [];
+  for (const role of POOL_ROLES) {
+    let have = S.staffCandidates.filter((x: Staff) => x.role === role).length;
+    while (have < POOL_MIN) { S.staffCandidates.push(makePerson('cand-' + role + uid(), role, '', POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)])); have++; n++; }
+  }
+  while (State.candidates.length < POOL_MIN) { State.candidates.push(makePilotCandidate('cap' + uid())); n++; }
+  return n;
+}
 const POOL_BASES = ['EKVG', 'EKCH', 'ENGM', 'BIKF', 'EGLL', 'EDDF', 'PALH', 'EKBI', 'KJFK', 'CYYZ'];
 
 /** Pay everyone for every week that has passed. */
@@ -54,6 +68,7 @@ function makePilotCandidate(seed: string): any {
 /** The job market moves: candidates leave, new ones arrive (some days more, some days fewer). */
 function poolAdvance() {
   const S: any = State, now = Date.now();
+  if (S.poolFill) { S.poolFill = false; if (poolTopUp()) Store.soon(); }   // a new career: the list starts full
   if (!S.poolNext) { S.poolNext = now + (2 + Math.random() * 4) * 3600e3; return; }
   let rounds = 0, arrived = 0;
   while (S.poolNext <= now && rounds < 20) {
