@@ -277,7 +277,7 @@ function saluteOpen(o: { typeId: string; reg: string; icao: string; cid?: string
   const cv = host.querySelector('canvas') as HTMLCanvasElement;
   let R: any;
   try { R = new T.WebGLRenderer({ canvas: cv, antialias: true }); } catch (e) { host.remove(); toast('3D is not available on this device', 'warn'); return; }
-  R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); R.outputColorSpace = T.SRGBColorSpace;
+  R.setPixelRatio(Gfx.pr(Math.min(2, window.devicePixelRatio || 1))); R.outputColorSpace = T.SRGBColorSpace;
   R.toneMapping = T.ACESFilmicToneMapping; R.toneMappingExposure = 1.05; R.shadowMap.enabled = true; R.shadowMap.type = T.PCFSoftShadowMap;
   const cam = new T.PerspectiveCamera(40, 1, 1, 4000);
   const SC = saluteScene(T, o, c), sc = SC.sc, ac = SC.ac, model = SC.model, jets = SC.jets, trucks = SC.trucks, half = SC.half, s = SC.s, prop = SC.prop;

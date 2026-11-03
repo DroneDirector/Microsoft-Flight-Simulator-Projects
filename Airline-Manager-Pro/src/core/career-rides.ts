@@ -78,7 +78,7 @@ function careerAward(kind: string, name: string, desc: string, lines: string[], 
   giftsAll().unshift(ex); Store.soon();
   State.notices.unshift({ id: uid(), kind: 'company' as any, title: name, body: desc + ' Tap to see it.', time: 'Now', at, read: false, ref: ex.id } as any);
   try { renderTopbar(); } catch (e) { /* not ready */ }
-  try { badgeReveal([{ id: ex.id, group: 'pilot', cat: 'Milestone', title: name, desc, tier: 3, metric: '', need: 0, icon: 'star', img: viewerThumb(ex.id + 'bare', T => giftBuild(T, ex.received[0], ex), hiQ() ? 720 : 420, true), gift: true, rankText: kind === 'cert' ? 'Type rating' : 'Career milestone', dateText: dateStr(new Date(at)).slice(0, 10) } as any]); } catch (e) { /* later */ }
+  try { badgeReveal([{ id: ex.id, group: 'pilot', cat: 'Milestone', title: name, desc, tier: 3, metric: '', need: 0, icon: 'star', img: viewerThumb(ex.id + 'bare', T => giftBuild(T, ex.received[0], ex), Gfx.pic([420, 720, 1080]), true), gift: true, rankText: kind === 'cert' ? 'Type rating' : 'Career milestone', dateText: dateStr(new Date(at)).slice(0, 10) } as any]); } catch (e) { /* later */ }
   if (news) try { newsPublish({ paper: newsPaper((apt(c.hub) as any || {}).country || ''), section: 'Aviation', place: (apt(c.hub) as any || {}).city || '', headline: news.headline, standfirst: news.standfirst, body: news.body, art: { kind: 'person', look: (myPilot() as any).look, role: 'captain', color: c.color }, companyId: c.id } as any, false); } catch (e) { /* no paper */ }
 }
 

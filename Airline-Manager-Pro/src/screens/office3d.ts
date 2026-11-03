@@ -362,7 +362,7 @@ OfficeRoom.open = function (inc?: any) {
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   const p: any = inc ? staffById(inc.staffId) : null; if (inc && !p) { toast('This person no longer works for you', 'info'); return; }
   R.on = true; R.inc = inc || null; R.p = p; R.mode = inc ? 'interview' : 'visit'; R.keys = {}; R.stick = [0, 0]; R.pct = 0; R.asked = []; R.answers = 0; R.decided = false; R.ended = false; R.started = false; R.rescued = false; R.talkUntil = 0; R.flush = false; R.cond = null; R.doorT = 0; R.last = 0; R.view = ''; R.vis = null; R.loadT0 = performance.now();
-  const q = typeof cabinQ === 'function' ? cabinQ() : 2, co = company();
+  const q = Gfx.roomQ(), co = company();
   const root = document.createElement('div'); root.className = 'court3d office3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
     <div class="ct-top" data-of="boxopen" title="Show the conversation"><div><small>${esc(co.name)}</small><b>${inc ? `Your office: ${esc(p.name)}, ${esc(inc.title.toLowerCase())}` : 'Your office'}</b></div><i class="of-reopen">${icon('chevron')}</i></div>
@@ -376,7 +376,7 @@ OfficeRoom.open = function (inc?: any) {
 function ofOpen2(root: HTMLElement, q: number) {
   const R = OfficeRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement;
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
-  ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1)); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
+  ren.setPixelRatio(Gfx.pr(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
   ren.shadowMap.enabled = q >= 1; ren.shadowMap.type = T.PCFSoftShadowMap;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x101820);
   const cam = new T.PerspectiveCamera(58, 1, 0.03, 40); R.cam = cam;

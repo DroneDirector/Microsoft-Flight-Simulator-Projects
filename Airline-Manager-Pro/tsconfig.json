@@ -58,6 +58,7 @@
     "src/data/licence-hashes.ts",
     "src/core/licence.ts",
     "src/core/desktop.ts",
+    "src/graphics/gfx.ts",
     "src/ui/exit.ts",
     "src/ui/look-editor.ts",
     "src/ui/crew-ui.ts",

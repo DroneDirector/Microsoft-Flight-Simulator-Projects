@@ -451,7 +451,7 @@ function ctOpen2(c: any, st: any, root: HTMLElement, q: number, appeal: boolean,
   const R = CourtRoom, T = THREE;
   const cv = root.querySelector('canvas') as HTMLCanvasElement;
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' });
-  ren.setPixelRatio(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1));
+  ren.setPixelRatio(Gfx.pr(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1)));
   ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.05;
   ren.shadowMap.enabled = q >= 1; ren.shadowMap.type = T.PCFSoftShadowMap;
   R.ren = ren;
@@ -511,7 +511,7 @@ CourtRoom.open = function (c: any, st: any) {
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   const empty = !c; R.empty = empty; R.keys = {}; R.stick = [0, 0]; R.gateT = 0; R.gateK = 0; R.gateV = 0; R.pushK = 0; R.lockedOnce = false; R.glow = null;
   R.on = true; R.c = c; R.st = st; R.key = st.key; R.lines = empty ? [] : hearingScript(c, st.key); R.i = -1; R.answered = []; R.finished = st.key === 'verdict' ? false : false; R.objected = false;
-  const q = typeof cabinQ === 'function' ? cabinQ() : 2;
+  const q = Gfx.roomQ();
   const appeal = st.key === 'hearA', judges = appeal ? 5 : 3;
   const root = document.createElement('div'); root.className = 'court3d'; R.root = root;
   const co = company(c ? c.companyId : State.companyId), hub = apt(co.hub), courtName = c ? (appeal ? c.court.replace(/District Court|Crown Court/, 'Court of Appeal') : c.court) : `The District Court in ${hub ? hub.city : 'town'}`;

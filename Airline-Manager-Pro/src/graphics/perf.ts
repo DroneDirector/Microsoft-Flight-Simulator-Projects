@@ -21,7 +21,7 @@ const Perf = {
     T.boostStats().then((r: any) => { this.thermal = +(r && r.thermal) || 0; this.saver = !!(r && r.powerSave); }).catch(() => { /* no readings */ }).then(() => { this.polling = false; });
   },
   /** The highest frame rate worth drawing now: 30 while warm or saving battery, otherwise as fast as the screen. */
-  fpsCap(): number { return this.on() && (this.thermal >= 2 || this.saver) ? 30 : 0; },
+  fpsCap(): number { const w = this.on() && (this.thermal >= 2 || this.saver) ? 30 : 0, u = typeof Gfx !== 'undefined' ? Gfx.fps() : 0; return w && u ? Math.min(w, u) : w || u; },
   /** The sharpest it may draw now (warm: less, hot: less again). */
   kMax(): number { return !this.on() ? 1 : this.thermal >= 4 ? 0.6 : this.thermal >= 3 ? 0.7 : this.thermal >= 2 ? 0.85 : 1; },
   /** A renderer's own state. */

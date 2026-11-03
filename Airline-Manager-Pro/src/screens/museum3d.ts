@@ -32,7 +32,7 @@ function museumOpen() {
   document.body.appendChild(host);
   const cv = host.querySelector('canvas') as HTMLCanvasElement;
   let R: any; try { R = new T.WebGLRenderer({ canvas: cv, antialias: true }); } catch (e) { host.remove(); toast('3D is not available on this device', 'warn'); return; }
-  R.setPixelRatio(Math.min(hiQ() ? 2 : 1.6, window.devicePixelRatio || 1)); if (hiQ()) R.shadowMap.type = T.PCFSoftShadowMap; R.outputColorSpace = T.SRGBColorSpace; R.toneMapping = T.ACESFilmicToneMapping; R.toneMappingExposure = 1.05; R.shadowMap.enabled = true;
+  R.setPixelRatio(Gfx.pr(Math.min(hiQ() ? 2 : 1.6, window.devicePixelRatio || 1))); if (hiQ()) R.shadowMap.type = T.PCFSoftShadowMap; R.outputColorSpace = T.SRGBColorSpace; R.toneMapping = T.ACESFilmicToneMapping; R.toneMappingExposure = 1.05; R.shadowMap.enabled = true;
   const sc = new T.Scene(); sc.background = new T.Color(0x0C0F14); sc.fog = new T.Fog(0x0C0F14, 18, 60);
   v3vStudio(T, R, sc, true);
   // the hall: a polished dark floor, walls in a soft grey, a ceiling with light strips
@@ -70,10 +70,10 @@ function museumOpen() {
     const plate = new T.Mesh(new T.PlaneGeometry(1.1, 0.27), new T.MeshStandardMaterial({ map: v3vTex(T, pc), metalness: 1, roughness: 0.3 })); plate.position.set(cx, 0.75, cz + 0.76); sc.add(plate);
     // a beam of light from the ceiling (drawn, not a real light: cheap on a phone), and its pool on the floor
     const beam = new T.Mesh(new T.ConeGeometry(1.3, 5.6, hiQ() ? 64 : 24, 1, true), beamM); beam.position.set(cx, 4.1, cz); sc.add(beam);
-    if (hiQ()) {
+    if (Gfx.lights() >= 1) {
       // on the PC: a real spotlight for every piece (the first eight with their own soft shadows), as in a gallery
       const sp = new T.SpotLight(0xFFF1DA, 160, 12, 0.42, 0.5, 1.2); sp.position.set(cx, 6.6, cz + 0.9); sp.target.position.set(cx, 1.3, cz);
-      if (i < 8) { sp.castShadow = true; sp.shadow.mapSize.set(1024, 1024); sp.shadow.bias = -0.0005; sp.shadow.radius = 4; }
+      if (i < 8 && Gfx.lights() >= 2) { sp.castShadow = true; sp.shadow.mapSize.set(1024, 1024); sp.shadow.bias = -0.0005; sp.shadow.radius = 4; }
       sc.add(sp); sc.add(sp.target);
     } else {
       const pool = new T.Mesh(new T.CircleGeometry(1.6, 32), poolM); pool.rotation.x = -Math.PI / 2; pool.position.set(cx, 0.012, cz); sc.add(pool);
