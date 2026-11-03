@@ -106,10 +106,7 @@ function humanGesture(mood: any, t: number): any {
   }
   // cabin crew at work: walking (legs and arms swinging), pushing the trolley, handing something to a seat
   // (v: −1 left, 1 right), and sitting on a jump seat
-  if (mood && mood.kind === 'walk') { const L = animLevel('animWalk'), wk = [0.35, 0.7, 1, 1.1][L], w = S(t * 2 * Math.PI * 0.9) * wk, g = base([0.02 + 0.28 * w, 0.07, 0, 0.25 + 0.1 * Math.max(0, w)], [0.02 - 0.28 * w, 0.07, 0, 0.25 + 0.1 * Math.max(0, -w)]);
-    g.legs = [-0.32 * w, 0.45 * Math.max(0, w), 0.32 * w, 0.45 * Math.max(0, -w)]; g.bob = L ? 0.012 * Math.abs(S(t * 2 * Math.PI * 0.9)) * wk : 0; g.roll = L ? 0.015 * w : 0;
-    if (L >= 3) { g.nod += 0.025 * Math.abs(S(t * 2 * Math.PI * 0.9)); g.shake += 0.03 * S(t * Math.PI * 0.9); }   // Ultra: the head goes with each step
-    return g; }
+  if (mood && mood.kind === 'walk') return humanWalk(t, mood);
   if (mood && mood.kind === 'push') { const w = S(t * 2 * Math.PI * 0.7), g = base([0.95, 0.12, 0.15, 0.9], [0.95, 0.12, 0.15, 0.9]);
     g.legs = mood.v ? [-0.22 * w, 0.35 * Math.max(0, w), 0.22 * w, 0.35 * Math.max(0, -w)] : [0, 0, 0, 0]; g.lean = 0.08; g.bob = mood.v ? 0.008 * Math.abs(w) : 0; return g; }
   if (mood && mood.kind === 'serve') { const sd = mood.v || 1, k = 0.5 + 0.5 * S(t * 1.3), reach = [1.15 + 0.15 * k, 0.55, -0.1, 0.35], rest = [0.55, 0.1, 0.4, 1.3];
@@ -281,12 +278,15 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
       // legs: hip and knee turns (walking, sitting)
       uHipL: { value: v3(I.J['upperleg01.L']) }, uHipR: { value: v3(I.J['upperleg01.L']).multiply(new THREE.Vector3(-1, 1, 1)) },
       uLegL: { value: new THREE.Matrix3() }, uLegR: { value: new THREE.Matrix3() }, uKneeL: { value: new THREE.Matrix3() }, uKneeR: { value: new THREE.Matrix3() },
+      // the ankles (the foot turns at the ankle) and the spine (the upper body bends, twists and leans from the waist)
+      uAnkL: { value: new THREE.Matrix3() }, uAnkR: { value: new THREE.Matrix3() }, uAnkPL: { value: v3(I.J['foot.L']) }, uAnkPR: { value: v3(I.J['foot.R'] || I.J['foot.L']).multiply(I.J['foot.R'] ? new THREE.Vector3(1, 1, 1) : new THREE.Vector3(-1, 1, 1)) },
+      uSpine: { value: new THREE.Matrix3() }, uSpineP: { value: new THREE.Vector3(0, c.waistY, -0.02) },
     };
     m.userData.U = U;
     m.onBeforeCompile = sh => {
       Object.assign(sh.uniforms, U);
       const decl = `uniform vec3 uSkin,uHair,uTop,uSleeve,uBot,uShoe,uShirt,uTie,uLip,uVest,uAccent,uBrow,uEyeL,uEyeRp,uMouth,uNeckP,uShL,uShR,uElL,uElR,uHipL,uHipR; uniform mat3 uHeadRot,uArmL,uArmR,uElbL,uElbR,uLegL,uLegR,uKneeL,uKneeR; uniform float uFlush;
-        uniform float uPress,uLipLow,uLipUp,uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink,uJaw,uLipR,uMouthIn;
+        uniform vec3 uAnkPL,uAnkPR,uSpineP; uniform mat3 uAnkL,uAnkR,uSpine; uniform float uPress,uLipLow,uLipUp,uHemY,uWaistY,uCuffS,uShoeY,uBotLow,uNeckY,uVBot,uVW,uTieBot,uStripes,uLapels,uTopFab,uSleeveFab,uHairT,uHairline,uEyeR0,uHiVis,uSkirt,uFem,uBald,uBrowT,uElbowS,uKneeY,uCrotchY,uLegX,uSideZ,uMech,uPockets,uBlink,uJaw,uLipR,uMouthIn;
         varying vec3 vRest; varying vec3 vF; varying vec3 vON; varying vec4 vA; varying vec4 vB; varying float vBeard;
         float hairlineAt(float az){ float a = abs(az);
           float h = mix(uHairline, uHairline - 0.12, smoothstep(0.35, 0.9, a));
@@ -301,7 +301,10 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
           if (fa.y > 0.5) { bool lf = rest.x > 0.0; float ke = smoothstep(uElbowS - 0.03, uElbowS + 0.03, fa.x), ks = smoothstep(0.0, 0.06, fa.x);
             objectNormal = normalize(mix(objectNormal, (lf ? uElbL : uElbR) * objectNormal, ke)); objectNormal = normalize(mix(objectNormal, (lf ? uArmL : uArmR) * objectNormal, ks)); }
           if (fa.z > 0.02 && fa.y < 0.5) { bool ll = rest.x > 0.0; float kw = smoothstep(uKneeY + 0.03, uKneeY - 0.03, rest.y);
-            objectNormal = normalize(mix(objectNormal, (ll ? uKneeL : uKneeR) * objectNormal, kw)); objectNormal = normalize(mix(objectNormal, (ll ? uLegL : uLegR) * objectNormal, fa.z)); }`)
+            float aw = smoothstep((ll ? uAnkPL.y : uAnkPR.y) + 0.025, (ll ? uAnkPL.y : uAnkPR.y) - 0.015, rest.y);
+            objectNormal = normalize(mix(objectNormal, (ll ? uAnkL : uAnkR) * objectNormal, aw));
+            objectNormal = normalize(mix(objectNormal, (ll ? uKneeL : uKneeR) * objectNormal, kw)); objectNormal = normalize(mix(objectNormal, (ll ? uLegL : uLegR) * objectNormal, fa.z)); }
+          { float sw = smoothstep(uSpineP.y - 0.08, uSpineP.y + 0.22, rest.y) * ((fa.z > 0.02 && fa.y < 0.5) ? 0.0 : 1.0); objectNormal = normalize(mix(objectNormal, uSpine * objectNormal, sw)); }`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           vRest = rest; vF = fpos; vA = fa; vB = fb; vON = objectNormal; vBeard = beardW;
           float hm = hairMask(fb, fa.w);
@@ -343,10 +346,14 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
             transformed = mix(transformed, ep + (lf ? uElbL : uElbR) * (transformed - ep), ke);
             transformed = mix(transformed, sp + (lf ? uArmL : uArmR) * (transformed - sp), ks); }
           // legs: the lower leg turns at the knee, then the whole leg at the hip
-          if (fa.z > 0.02 && fa.y < 0.5) { bool ll = rest.x > 0.0; vec3 hp = ll ? uHipL : uHipR, kp = vec3(hp.x, uKneeY, hp.z);
-            float kw = smoothstep(uKneeY + 0.03, uKneeY - 0.03, rest.y);
+          if (fa.z > 0.02 && fa.y < 0.5) { bool ll = rest.x > 0.0; vec3 hp = ll ? uHipL : uHipR, kp = vec3(hp.x, uKneeY, hp.z), ap = ll ? uAnkPL : uAnkPR;
+            float kw = smoothstep(uKneeY + 0.03, uKneeY - 0.03, rest.y), aw = smoothstep(ap.y + 0.025, ap.y - 0.015, rest.y);
+            transformed = mix(transformed, ap + (ll ? uAnkL : uAnkR) * (transformed - ap), aw);   // the foot at the ankle
             transformed = mix(transformed, kp + (ll ? uKneeL : uKneeR) * (transformed - kp), kw);
-            transformed = mix(transformed, hp + (ll ? uLegL : uLegR) * (transformed - hp), fa.z); }`);
+            transformed = mix(transformed, hp + (ll ? uLegL : uLegR) * (transformed - hp), fa.z); }
+          // the spine: everything above the waist (arms and head too) bends, twists and leans with it
+          { float sw = smoothstep(uSpineP.y - 0.08, uSpineP.y + 0.22, rest.y) * ((fa.z > 0.02 && fa.y < 0.5) ? 0.0 : 1.0);
+            transformed = mix(transformed, uSpineP + uSpine * (transformed - uSpineP), sw); }`);
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + decl + GLSL_NOISE)
         .replace('#include <color_fragment>', `#include <color_fragment>
           vec3 R = vRest; float onArm = step(0.5, vA.y), headW = vA.w;
@@ -1293,9 +1300,10 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     if (L.glasses && L.glasses !== 'none') head.add(glasses(L.glasses, I, c.eyeR));
     if (hatKind) head.add(hat(hatKind, I, c.mech ? '#3d4a5c' : (UNIFORM_COLORS[L.uniform] || UNIFORM_COLORS[0]), accent));
     const shoeG = shoes(b, I, c.shoe, L.shoes, accent); root.add(shoeG);
+    const chestG = new THREE.Group(); chestG.matrixAutoUpdate = false; root.add(chestG);   // badges, buttons, epaulettes, the scarf: they go with the chest
     const gm = gold();
-    if (c.wings) { const y = I.neckY - 0.16, z = surfaceZ(body, 0.085, y); const w = badge(accent, c.wings); w.position.set(0.085, y, z + 0.004); w.rotation.y = 0.3; root.add(w); }
-    if (c.buttons) for (const y of [c.vBot - 0.03, c.vBot - 0.13]) { const z = surfaceZ(body, 0.012, y); const bt = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.004, 20), gm); bt.rotation.x = Math.PI / 2; bt.position.set(0.012, y, z + 0.002); root.add(bt); }
+    if (c.wings) { const y = I.neckY - 0.16, z = surfaceZ(body, 0.085, y); const w = badge(accent, c.wings); w.position.set(0.085, y, z + 0.004); w.rotation.y = 0.3; chestG.add(w); }
+    if (c.buttons) for (const y of [c.vBot - 0.03, c.vBot - 0.13]) { const z = surfaceZ(body, 0.012, y); const bt = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.004, 20), gm); bt.rotation.x = Math.PI / 2; bt.position.set(0.012, y, z + 0.002); chestG.add(bt); }
     if (c.epaulettes) {
       const n = role === 'captain' ? 4 : role === 'fo' ? 3 : 1;
       for (const sd of [1, -1]) {
@@ -1305,15 +1313,15 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         ep.add(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.006, 0.046), new THREE.MeshStandardMaterial({ color: shade(UNIFORM_COLORS[L.uniform] || UNIFORM_COLORS[0], -0.3), roughness: 0.8 })));
         for (let i = 0; i < n; i++) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.0045, 0.0075, 0.047), gm); st.position.x = sd * (0.03 - i * 0.0095); ep.add(st); }
         const btn = new THREE.Mesh(new THREE.SphereGeometry(0.0045, 10, 8), gm); btn.position.set(-sd * 0.032, 0.004, 0); ep.add(btn);
-        ep.position.set(x, topY + 0.004, zc); ep.rotation.z = -sd * 0.28; root.add(ep);
+        ep.position.set(x, topY + 0.004, zc); ep.rotation.z = -sd * 0.28; chestG.add(ep);
       }
     }
     if (c.scarf) {
       const m = cloth(accent);
-      const sc = new THREE.Mesh(new THREE.TorusGeometry(0.064, 0.009, 12, 48), m); sc.rotation.x = Math.PI / 2 - 0.35; sc.scale.set(1, 0.95, 1); sc.position.set(0, I.neckY + 0.008, 0.018); root.add(sc);
+      const sc = new THREE.Mesh(new THREE.TorusGeometry(0.064, 0.009, 12, 48), m); sc.rotation.x = Math.PI / 2 - 0.35; sc.scale.set(1, 0.95, 1); sc.position.set(0, I.neckY + 0.008, 0.018); chestG.add(sc);
       const kz = surfaceZ(body, 0.028, I.neckY - 0.012) + 0.012;
-      const k = new THREE.Mesh(new THREE.SphereGeometry(0.011, 16, 12), m); k.scale.set(1.1, 0.9, 0.7); k.position.set(0.028, I.neckY - 0.008, kz); root.add(k);
-      for (const [dx, ang, len] of [[0.042, -0.6, 0.06], [0.03, -0.2, 0.05]]) { const t = new THREE.Mesh(new THREE.ConeGeometry(0.016, len, 3, 1), m); t.scale.z = 0.25; t.position.set(dx, I.neckY - 0.012 - len / 2, kz - 0.002); t.rotation.set(0, 0, Math.PI + ang); root.add(t); }
+      const k = new THREE.Mesh(new THREE.SphereGeometry(0.011, 16, 12), m); k.scale.set(1.1, 0.9, 0.7); k.position.set(0.028, I.neckY - 0.008, kz); chestG.add(k);
+      for (const [dx, ang, len] of [[0.042, -0.6, 0.06], [0.03, -0.2, 0.05]]) { const t = new THREE.Mesh(new THREE.ConeGeometry(0.016, len, 3, 1), m); t.scale.z = 0.25; t.position.set(dx, I.neckY - 0.012 - len / 2, kz - 0.002); t.rotation.set(0, 0, Math.PI + ang); chestG.add(t); }
     }
     if (c.skirt) {
       // sized from the dressed body (not the bare one), with room to spare, so nothing pokes through
@@ -1354,18 +1362,26 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
         U.uArmL.value.copy(arm(g.L, 1)); U.uArmR.value.copy(arm(g.R, -1)); U.uElbL.value.copy(elb(g.L[3])); U.uElbR.value.copy(elb(g.R[3])); U.uFlush.value = g.flush;
         const lg = g.legs || [0, 0, 0, 0], rx = (a) => new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationX(a));
         U.uLegL.value.copy(rx(lg[0])); U.uKneeL.value.copy(rx(lg[1])); U.uLegR.value.copy(rx(lg[2])); U.uKneeR.value.copy(rx(lg[3]));
-        // the shoes with the feet: turned at the knee, then at the hip, as the legs are
+        const an = g.ank || [0, 0]; U.uAnkL.value.copy(rx(an[0])); U.uAnkR.value.copy(rx(an[1]));
+        // the shoes with the feet: turned at the ankle, then the knee, then the hip, as the legs are
         for (const sd of [1, -1]) {
           const sg = shoeG.userData.sides && shoeG.userData.sides[sd]; if (!sg) continue;
-          const hp = (sd > 0 ? U.uHipL : U.uHipR).value, kp = new THREE.Vector3(hp.x, U.uKneeY.value, hp.z), a = sd > 0 ? lg[0] : lg[2], k = sd > 0 ? lg[1] : lg[3];
+          const hp = (sd > 0 ? U.uHipL : U.uHipR).value, kp = new THREE.Vector3(hp.x, U.uKneeY.value, hp.z), ap = (sd > 0 ? U.uAnkPL : U.uAnkPR).value, a = sd > 0 ? lg[0] : lg[2], k = sd > 0 ? lg[1] : lg[3], f = sd > 0 ? an[0] : an[1];
           sg.matrix.makeTranslation(hp.x, hp.y, hp.z).multiply(m4.makeRotationX(a)).multiply(new THREE.Matrix4().makeTranslation(kp.x - hp.x, kp.y - hp.y, kp.z - hp.z))
-            .multiply(new THREE.Matrix4().makeRotationX(k)).multiply(new THREE.Matrix4().makeTranslation(-kp.x, -kp.y, -kp.z));
+            .multiply(new THREE.Matrix4().makeRotationX(k)).multiply(new THREE.Matrix4().makeTranslation(ap.x - kp.x, ap.y - kp.y, ap.z - kp.z))
+            .multiply(new THREE.Matrix4().makeRotationX(f)).multiply(new THREE.Matrix4().makeTranslation(-ap.x, -ap.y, -ap.z));
           sg.matrixWorldNeedsUpdate = true;
         }
-        root.rotation.x = g.lean; root.position.y = g.bob; root.rotation.z += g.roll;
+        // the spine: bend forward, twist, lean to the side, from the waist
+        const spn = g.spine || [0, 0, 0], sq = new THREE.Quaternion().setFromEuler(new THREE.Euler(spn[0], spn[1], spn[2], 'YXZ')), sp0 = U.uSpineP.value;
+        U.uSpine.value.setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(sq));
+        chestG.matrix.makeTranslation(sp0.x, sp0.y, sp0.z).multiply(new THREE.Matrix4().makeRotationFromQuaternion(sq)).multiply(new THREE.Matrix4().makeTranslation(-sp0.x, -sp0.y, -sp0.z)); chestG.matrixWorldNeedsUpdate = true;
+        root.rotation.x = g.lean; root.position.y = g.bob; root.rotation.z += g.roll; root.rotation.y += g.pelvis || 0;
         eul.set(Math.sin(t * 0.31 + 1) * 0.035 * bk - 0.01 + g.nod, (Math.sin(t * 0.43) * 0.13 * g.calm + Math.sin(t * 0.17) * 0.06 * g.calm) * bk + p.gaze[0] * 0.25 + g.shake, Math.sin(t * 0.23 + 2) * 0.02 * bk + g.tilt);
         headPivot.quaternion.setFromEuler(eul); rot.copy(headPivot.quaternion);
         U.uHeadRot.value.setFromMatrix4(m4.makeRotationFromQuaternion(rot));
+        // the head (eyes, hair, glasses, cap) rides on the spine too
+        { const np0 = new THREE.Vector3(I.neckPivot[0], I.neckPivot[1], I.neckPivot[2]); headPivot.position.copy(np0.sub(sp0).applyQuaternion(sq).add(sp0)); headPivot.quaternion.premultiply(sq); }
         // seen from your own eyes: the head (and all on it) folds away into the neck, so the view isn't inside it
         if (p.noHead) { U.uHeadRot.value.multiplyScalar(0.001); headPivot.scale.setScalar(0.001); } else headPivot.scale.setScalar(1);
         U.uBlink.value = p.blink;
@@ -1438,7 +1454,7 @@ function selfEyeOff(S: any, yaw: number, lean: number): any {
 function selfPose(S: any, hip: any, yaw: number, lean: number, sit: number, v: number, dist: number, t: number, dt: number, arms?: (m: any) => { L?: number[]; R?: number[] } | null): any {
   const m = S.m;
   S.g.position.copy(hip); S.yawG.rotation.y = yaw; S.leanG.rotation.x = lean;
-  let gT = cabinLerpG(humanGesture(null, t), humanGesture({ kind: 'walk', v: 1 }, dist / 1.25), Math.min(1, v / 0.6));
+  let gT = cabinLerpG(humanGesture(null, t), humanGesture({ kind: 'walk', v: Math.max(0.6, v), seed: 'me' }, dist / 1.25), Math.min(1, v / 0.6));
   if (sit > 0) gT = cabinLerpG(gT, humanGesture({ kind: 'sit', v: 0 }, t), sit);
   S.G = S.G ? cabinLerpG(S.G, gT, Math.min(1, dt * 8)) : gT;
   const g = Object.assign({}, S.G); g.lean = 0; g.nod = 0; g.shake = 0; g.tilt = 0;
@@ -1450,4 +1466,46 @@ function selfPose(S: any, hip: any, yaw: number, lean: number, sit: number, v: n
   const eye = hip.clone().add(selfEyeOff(S, yaw, lean)), dn = Math.max(0, -(S.pitch || 0));
   if (dn > 0) eye.add(new THREE.Vector3(Math.sin(yaw) * 0.16 * Math.sin(dn), -0.07 * (1 - Math.cos(dn)), Math.cos(yaw) * 0.16 * Math.sin(dn)));
   return eye;
+}
+
+/** A walking step, as people really walk (t: distance walked / 1.25, so the feet stay planted as the body moves).
+ *  Each leg: heel strike, the knee giving a little as the weight comes on, the push-off from the toes, the knee
+ *  bending well up as the leg swings through, the toes lifting clear. The hips turn and tilt with each step and the
+ *  weight shifts from side to side; the shoulders turn against the hips; the arms swing opposite the legs with the
+ *  elbow bending more on the forward swing; the head stays steady. mood.seed gives each person their own walk
+ *  (stride, arm swing, posture); mood.v their speed (1 normal). Low to Ultra (Animation > Walking) scales it. */
+function humanWalk(t: number, mood: any): any {
+  const L = animLevel('animWalk'), wk = [0.35, 0.75, 1, 1.08][L], sp = clamp(mood.v == null ? 1 : mood.v, 0.4, 1.6);
+  let r1 = 0.5, r2 = 0.5, r3 = 0.5; if (mood.seed) { let h = 7; for (const ch of String(mood.seed)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; r1 = (h % 997) / 997; r2 = ((h >> 10) % 991) / 991; r3 = ((h >> 20) % 983) / 983; }
+  const stride = (0.88 + 0.24 * r1) * (0.85 + 0.15 * sp) * wk, swing = (0.75 + 0.5 * r2) * wk, posture = (r3 - 0.5) * 0.06;
+  const ph = t * 0.9, bump = (x: number, c: number, w: number) => { let d = x - c; d -= Math.round(d); return Math.exp(-(d * d) / (w * w)); };
+  const leg = (f: number) => {   // f: 0 heel strike … 1 the next heel strike
+    const hip = 0.3 * Math.cos(f * 2 * Math.PI) + 0.06;   // thigh forward (+) and back
+    const knee = 0.2 * bump(f, 0.12, 0.08) + 1.0 * bump(f, 0.72, 0.13) + 0.04;
+    const ank = 0.32 * bump(f, 0.56, 0.06) - 0.18 * bump(f, 0.82, 0.1) - 0.1 * bump(f, 0.0, 0.05);   // push off (toes down), toes up through the swing, the heel first
+    return [-hip * stride, knee * Math.min(1.15, stride * 1.05), ank * wk];
+  };
+  const fl = ((ph % 1) + 1) % 1, fr = (fl + 0.5) % 1, A = leg(fl), B = leg(fr), c = Math.cos(fl * 2 * Math.PI);
+  const g: any = { L: [0.03 - 0.3 * c * swing, 0.07, 0, 0.22 + 0.22 * Math.max(0, -c) * swing], R: [0.03 + 0.3 * c * swing, 0.07, 0, 0.22 + 0.22 * Math.max(0, c) * swing],
+    lean: 0, bob: 0, roll: 0, nod: 0, shake: 0, tilt: 0, flush: 0, calm: 0.4 };
+  g.legs = [A[0], A[1], B[0], B[1]]; g.ank = [A[2], B[2]];
+  if (L) {
+    const two = Math.cos(fl * 4 * Math.PI);
+    g.bob = 0.011 * (1 - two) / 2 * stride - 0.006 * stride;   // highest over the standing leg, lowest as the feet pass
+    g.roll = 0.022 * Math.sin(fl * 2 * Math.PI) * wk;          // the weight from side to side
+    g.pelvis = 0.07 * c * stride;                              // the hips turn with the forward leg
+    g.spine = [0.04 + posture + 0.01 * sp, -0.11 * c * stride, -0.018 * Math.sin(fl * 2 * Math.PI) * wk];   // shoulders against the hips
+    g.shake = -0.5 * g.pelvis - 0.5 * g.spine[1];              // the head keeps looking ahead
+    g.nod = -g.bob * 2.5 - g.spine[0] * 0.6;
+    if (L >= 3) g.nod += 0.012 * two;                         // Ultra: a touch of the step in the head
+  }
+  return g;
+}
+/** Sitting down or standing up (k: 0 standing … 1 seated): leaning forward on the way, as people do. */
+function humanSitMove(g: any, k: number): any {
+  const s = Math.sin(Math.PI * clamp(k, 0, 1)); if (s < 0.01) return g;
+  const sp = (g.spine || [0, 0, 0]).slice(); sp[0] += 0.42 * s; g.spine = sp; g.nod = (g.nod || 0) - 0.25 * s;
+  // the hands go to the thighs (or the armrests) to take the weight
+  g.L = [g.L[0] + 0.25 * s, g.L[1] + 0.06 * s, g.L[2], g.L[3] + 0.35 * s]; g.R = [g.R[0] + 0.25 * s, g.R[1] + 0.06 * s, g.R[2], g.R[3] + 0.35 * s];
+  return g;
 }
