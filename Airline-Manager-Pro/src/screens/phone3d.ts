@@ -68,14 +68,23 @@ function phoneUi(R: any) {
   if (!on) { if (b) b.remove(); return; }
   if (b) return;
   b = document.createElement('div'); b.className = 'of-ph of-pk';
-  b.innerHTML = `<button class="btn primary sm" data-pk="open">${icon('user')}Use the phone</button><button class="btn sm" data-pk="put">Put it down</button>`;
+  b.innerHTML = `<button class="btn primary sm" data-pk="open">${icon('user')}Use the phone</button><button class="btn sm" data-pk="put">Put it down</button>
+    <span class="of-pk-turn" aria-label="Turn the phone in your hand"><button class="btn sm ghost" data-pk="tl" title="Turn it left">⟲</button><button class="btn sm ghost" data-pk="tu" title="Tilt it towards you">⤒</button><button class="btn sm ghost" data-pk="td" title="Tilt it away">⤓</button><button class="btn sm ghost" data-pk="tr" title="Turn it right">⟳</button></span>`;
   b.addEventListener('pointerdown', e => e.stopPropagation());
-  b.addEventListener('click', e => { const k = (e.target as HTMLElement).closest('[data-pk]'); if (!k) return; e.stopPropagation(); if (k.getAttribute('data-pk') === 'open') phoneOpen(R); else phonePut(R); });
+  b.addEventListener('click', e => { const k = (e.target as HTMLElement).closest('[data-pk]'); if (!k) return; e.stopPropagation(); const v = k.getAttribute('data-pk'); if (v === 'open') phoneOpen(R); else if (v === 'put') phonePut(R); else phoneTurn(R, v === 'tl' ? -1 : v === 'tr' ? 1 : 0, v === 'tu' ? -1 : v === 'td' ? 1 : 0); });
   R.root.appendChild(b);
 }
+/** Turn the phone gently in your hand, only when you choose to (a step each time, within what a wrist does). */
+function phoneTurn(R: any, dy: number, dp: number) {
+  const pk = R.pk; if (!pk || pk.st !== 'hold') return;
+  pk.turn = pk.turn || { y: 0, p: 0 };
+  pk.turn.y = clamp(pk.turn.y + dy * 0.22, -0.66, 0.66); pk.turn.p = clamp(pk.turn.p + dp * 0.16, -0.32, 0.48);
+  pk.fit = null;   // the hand finds its grip again once the phone has turned
+  Sound.tick();
+}
 /** Each frame in the chair while the phone is in play: where it is, your right hand on it, leaning to the desk. */
-function phoneStep(R: any, dt: number, t: number): { lean: number; turn: number; slide: number; lookK: number; at: any; arms: any } {
-  const pk = R.pk, A = R.A, T = THREE, out = { lean: 0, turn: 0, slide: 0, lookK: 0, at: null as any, arms: null as any };
+function phoneStep(R: any, dt: number, t: number): { lean: number; turn: number; slide: number; lookK: number; at: any; arms: any; t?: number } {
+  const pk = R.pk, A = R.A, T = THREE, out = { lean: 0, turn: 0, slide: 0, lookK: 0, at: null as any, arms: null as any, t: undefined as number };
   if (!pk || !A || !A.phoneAt) return out;
   const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, D = PH_PK_D;
   pk.t += dt;
@@ -87,20 +96,29 @@ function phoneStep(R: any, dt: number, t: number): { lean: number; turn: number;
   else if (pk.st === 'release') { w = 1 - E(pk.t / D.release); if (pk.t >= D.release) { R.pk = null; phoneUi(R); return out; } }
   const down = pk.st === 'reach' || pk.st === 'release' ? w : 1 - mv;
   out.lean = 0.35 * down; out.turn = -0.3 * down; out.slide = 0.08 * down;
-  // in your hand: low and a little to the right, screen towards you, never quite still
-  const e0 = R.me && R.me.eye0 ? R.me.eye0 : new T.Vector3(0, 1.2, 1.02), S = Math.sin;
-  const hold = new T.Vector3(e0.x + 0.06 + 0.002 * S(t * 1.2), e0.y - 0.2 + 0.002 * S(t * 0.9 + 1), e0.z - 0.31);
-  const qh = new T.Quaternion().setFromEuler(new T.Euler(-0.32 + 0.006 * S(t * 1.1), 0.08 + 0.008 * S(t * 0.8), 0.004 * S(t * 0.6), 'YXZ'));
+  // in your hand: low and a little to the right, screen towards you, perfectly still (you sit still too, the
+  // time your body moves by stands still while you hold it); it turns only when you turn it
+  if (pk.st === 'hold') { if (pk.tf == null) pk.tf = t; out.t = pk.tf; } else if (pk.st === 'lift' || pk.st === 'lower') { if (pk.tf != null) out.t = pk.tf; } else pk.tf = null;
+  const tu = pk.turn || { y: 0, p: 0 }, tc = pk.tc || (pk.tc = { y: 0, p: 0 }), ke = 1 - Math.exp(-dt * 6);
+  tc.y += (tu.y - tc.y) * ke; tc.p += (tu.p - tc.p) * ke;
+  const e0 = R.me && R.me.eye0 ? R.me.eye0 : new T.Vector3(0, 1.2, 1.02);
+  const hold = new T.Vector3(e0.x + 0.06, e0.y - 0.2, e0.z - 0.31);
+  const qh = new T.Quaternion().setFromEuler(new T.Euler(-0.32 + tc.p, 0.08 + tc.y, 0, 'YXZ'));
   const pos = pk.P0.clone().lerp(hold, mv); pos.y += 0.07 * Math.sin(Math.PI * mv);
   A.phoneAt.position.copy(pos); A.phoneAt.quaternion.copy(pk.q0).slerp(qh, mv); A.phoneAt.updateMatrixWorld(true);
   out.at = A.phoneAt.localToWorld(new T.Vector3(0, 0, 0));
   out.lookK = pk.st === 'reach' || pk.st === 'release' ? 0.85 * w : 0.9 + 0.1 * mv;
   // the right hand: from above while it lies on the desk, then holding it from behind, fingers round its left edge
   const gk = pk.st === 'reach' ? 0 : pk.st === 'lift' ? E(pk.t / D.lift * 1.6) : pk.st === 'lower' ? 1 - E((pk.t / D.lower - 0.4) / 0.6) : pk.st === 'release' ? 0 : 1;
+  const settled = Math.abs(tu.y - tc.y) + Math.abs(tu.p - tc.p) < 0.01;
   out.arms = (m: any) => {
-    const rest = humanGesture({ kind: 'sit', v: 0 }, t);
+    const rest = humanGesture({ kind: 'sit', v: 0 }, out.t != null ? out.t : t);
     if (w < 0.002) { pk.a.R = null; return {}; }
-    const g = phoneGrip(m, A.phoneAt, gk, w, rest.R, pk.a.R); pk.a.R = g.R;
+    // held: the hand finds a grip where nothing of it goes through the phone (a few tries each frame), then keeps it
+    if (gk > 0.5 && settled) phoneFit(m, A.phoneAt, pk, rest.R);
+    const tgt = pk.fit && pk.fit.done ? pk.fit.best : PH_FIT0, fo = pk.fo || (pk.fo = Object.assign({}, PH_FIT0)), kf = 1 - Math.exp(-dt * 5);
+    for (const key of Object.keys(PH_FIT0)) (fo as any)[key] += ((tgt as any)[key] - (fo as any)[key]) * kf;
+    const g = phoneGrip(m, A.phoneAt, gk, w, rest.R, pk.a.R, fo); pk.a.R = g.R;
     return g;
   };
   return out;
@@ -113,12 +131,38 @@ const PH_GRIP = {
   desk: { w: [0.078, -0.03, 0.034], F: [-1, -0.08, -0.42], N: [0, 0, -1], curl: 0.5, th: 0, k1: 1.15, k2: 1.25 },
   hold: { w: [0.052, -0.05, -0.025], F: [-1, -0.12, 0], N: [0, 0, 1], curl: 0.85, th: -0.7, k1: 1.6, k2: 0.65 },
 };
-/** The right arm and hand on the phone: k 0 the desk grip … 1 the hold, w how far the hand has come (0 at rest). */
-function phoneGrip(m: any, ph: any, k: number, w: number, restR: number[], prev?: number[]): any {
-  const T = THREE, G0 = PH_GRIP.desk, G1 = PH_GRIP.hold, V = (a: number[]) => new T.Vector3(a[0], a[1], a[2]);
+/** Small changes to the hold grip (the wrist along and off the phone, the thumb, how far the fingers close), found for
+ *  each person's hand so that nothing goes through the phone. */
+const PH_FIT0 = { dx: 0, dz: 0, th: 0, cs: 1 };
+/** Try a few grips this frame; when all are tried, keep the best: no skin inside the phone, the palm against its
+ *  back, as close to the usual grip as possible. */
+function phoneFit(m: any, ph: any, pk: any, restR: number[]) {
+  const T = THREE;
+  if (!pk.fit) { const C: any[] = []; for (const dx of [0, -0.004, 0.006, 0.012]) for (const dz of [0, -0.005, -0.01, 0.003]) for (const th of [0, -0.3, -0.6, 0.25]) for (const cs of [1, 0.85]) C.push({ dx, dz, th, cs }); pk.fit = { C, i: 0, best: null, bs: 1e9, done: false }; }
+  const F = pk.fit; if (F.done) return;
+  ph.updateMatrixWorld(true); m.root.updateMatrixWorld(true);
+  const toPh = new T.Matrix4().copy(ph.matrixWorld).invert().multiply(m.root.matrixWorld);
+  const X = 0.0375, Y = 0.0775, Z0 = -0.0122, Z1 = 0.0014;
+  for (let n = 0; n < 8 && F.i < F.C.length; n++) {
+    const c = F.C[F.i++], g = phoneGrip(m, ph, 1, 1, restR, pk.a.R, c), pts = humanHandPts(m, 'R', g.R, g.hand.R);
+    let pen = 0, inside = 0, back = 0;
+    for (const p of pts) {
+      const q = p.applyMatrix4(toPh), ax = Math.abs(q.x), ay = Math.abs(q.y);
+      if (ax < X && ay < Y && q.z > Z0 && q.z < Z1) { inside++; pen += Math.min(X - ax, Y - ay, q.z - Z0, Z1 - q.z); }
+      else if (ax < X && ay < Y && q.z <= Z0 && q.z > Z0 - 0.008) back++;
+    }
+    const sc = pen * 4000 + inside * 0.4 + Math.max(0, 40 - back) * 0.03 + (Math.abs(c.dx) + Math.abs(c.dz)) * 20 + Math.abs(c.th) * 0.6 + (1 - c.cs) * 2;
+    if (sc < F.bs) { F.bs = sc; F.best = c; }
+  }
+  if (F.i >= F.C.length) F.done = true;
+}
+/** The right arm and hand on the phone: k 0 the desk grip … 1 the hold, w how far the hand has come (0 at rest);
+ *  fo: the held grip's changes for this hand (phoneFit). */
+function phoneGrip(m: any, ph: any, k: number, w: number, restR: number[], prev?: number[], fo?: any): any {
+  const T = THREE, G0 = PH_GRIP.desk, G1 = PH_GRIP.hold, V = (a: number[]) => new T.Vector3(a[0], a[1], a[2]), f = fo || PH_FIT0;
   ph.updateMatrixWorld(true); m.root.updateMatrixWorld(true);
   const toRoot = new T.Matrix4().copy(m.root.matrixWorld).invert().multiply(ph.matrixWorld), rot = new T.Matrix3().setFromMatrix4(toRoot);
-  const wl = V(G0.w).lerp(V(G1.w), k).applyMatrix4(toRoot);
+  const wl = V(G0.w).lerp(V(G1.w).add(new T.Vector3(f.dx, 0, f.dz)), k).applyMatrix4(toRoot);
   // from one grip to the other the hand turns (the two frames blended as turns, so it never folds through itself)
   const frame = (G: any) => { const f = V(G.F).normalize(), n = V(G.N).sub(f.clone().multiplyScalar(V(G.N).dot(f))).normalize(); return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(f, n, f.clone().cross(n))); };
   const qf = frame(G0).slerp(frame(G1), k), Mf = new T.Matrix4().makeRotationFromQuaternion(qf);
@@ -128,8 +172,8 @@ function phoneGrip(m: any, ph: any, k: number, w: number, restR: number[], prev?
   const R = humanReach(m, 'R', to, prev || restR, J.w);
   const W = humanHandAim(m, 'R', R, Fd, Nd), q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().setFromMatrix3(W));
   q.slerp(new T.Quaternion(), 1 - Math.min(1, w * 1.25));
-  const curl = (G0.curl + (G1.curl - G0.curl) * k) * Math.max(0, Math.min(1, (w - 0.55) / 0.45));
-  const th = (G0.th + (G1.th - G0.th) * k) * Math.min(1, w);
+  const curl = (G0.curl + (G1.curl * f.cs - G0.curl) * k) * Math.max(0, Math.min(1, (w - 0.55) / 0.45));
+  const th = (G0.th + (G1.th + f.th - G0.th) * k) * Math.min(1, w);
   return { R, hand: { R: { W: new T.Matrix3().setFromMatrix4(new T.Matrix4().makeRotationFromQuaternion(q)), curl: Math.max(curl, 0.001), th, k1: G0.k1 + (G1.k1 - G0.k1) * k, k2: G0.k2 + (G1.k2 - G0.k2) * k } } };
 }
 /** The phone's screen on your screen, as it is held now. */
@@ -175,3 +219,9 @@ function phoneClose(R: any) {
   setTimeout(() => { ov.remove(); if (R.overlay === ov) R.overlay = null; document.body.classList.remove('of-over'); phoneUi(R); try { if (R.phoneAfter) R.phoneAfter(); } catch (e) { /* ui */ } }, 560);
 }
 
+
+/** Glass over a screen in a room (the laptop, the Operations monitor): dark, smooth and a little reflective, so the
+ *  room's light glints off it and slides over it as you move; the picture shows through, only a touch darker. */
+function roomGlassMat(T: any, opacity: number): any {
+  return new T.MeshPhysicalMaterial({ color: 0x000000, metalness: 0, roughness: 0.04, transparent: true, opacity, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.7, depthWrite: false, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 });
+}

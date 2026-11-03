@@ -181,7 +181,7 @@ function ofBuild(scene: any, q: number) {
   // the family photo, the phone, notes, coffee, pens
   A.photoAt = new T.Group(); A.photoAt.position.set(-0.42, 0.775, 0.3); A.photoAt.rotation.y = 0.5; root.add(A.photoAt);   // turned towards you
   // your phone, lying on the desk to your right, screen up
-  phoneMesh(T, root, A, [0.34, 0.777, 0.56], -0.35);
+  phoneMesh(T, root, A, [0.4, 0.784, 0.27], -0.35);   // on the leather, in front of the laptop
   bx(0.24, 0.015, 0.17, mat.white, 0.0, 0.783, 0.33, 0.1);   // a notepad
   add(new T.CylinderGeometry(0.006, 0.006, 0.15, 8), mat.black, 0.06, 0.79, 0.3).rotation.set(Math.PI / 2, 0, 0.6);
   add(new T.CylinderGeometry(0.04, 0.035, 0.09, 20), mat.white, 0.78, 0.82, 0.32); add(new T.TorusGeometry(0.025, 0.007, 8, 16), mat.white, 0.82, 0.82, 0.32).rotation.y = 0;
@@ -303,6 +303,8 @@ function ofLaptop3d(T: any, lt: any, slab: any, bx: any, screenTex: any) {
   bez.position.set(0, LH / 2, 0.0001); lid.add(bez);
   const scrW = W - 0.022, scrH = LH - 0.026;
   const sm = new T.Mesh(new T.PlaneGeometry(scrW, scrH), new T.MeshBasicMaterial({ map: screenTex, toneMapped: false })); sm.position.set(0, LH / 2 - 0.004, 0.0004); lid.add(sm);
+  // the glass over the screen: it catches the room's light, so a soft glare moves over it as you move
+  { const gl = new T.Mesh(new T.PlaneGeometry(scrW + 0.004, scrH + 0.004), roomGlassMat(T, 0.14)); gl.position.set(0, LH / 2 - 0.004, 0.0009); gl.renderOrder = 2; lid.add(gl); }
   const cam = new T.Mesh(new T.CircleGeometry(0.0022, 12), new T.MeshStandardMaterial({ color: 0x1D2733, roughness: 0.1 })); cam.position.set(0, LH - 0.006, 0.0005); lid.add(cam);
   sm.userData.size = [scrW, scrH];
   return sm;
@@ -664,7 +666,7 @@ function ofFrame() {
     // you in your chair: your body (leaning in and turning to reach for the photo), your eyes where your head is
     const P = R.pk ? ofPhoneStep(dt, now) : ofPhotoStep(dt, now), ph = R.ph, S = R.me;
     let eye = new T.Vector3(0, 1.2, 1.02);
-    if (S) { try { S.pitch = R.look.pitch * (1 - P.lookK); eye = selfPose(S, P.slide ? S.chair.clone().add(new T.Vector3(0, 0, -P.slide)) : S.chair, Math.PI + P.turn + clamp(R.look.yaw * 0.3, -0.4, 0.4) * (1 - P.lookK), P.lean, 1, 0, 0, now, dt, P.arms); } catch (e) { R.me = null; } }
+    if (S) { try { S.pitch = R.look.pitch * (1 - P.lookK); eye = selfPose(S, P.slide ? S.chair.clone().add(new T.Vector3(0, 0, -P.slide)) : S.chair, Math.PI + P.turn + clamp(R.look.yaw * 0.3, -0.4, 0.4) * (1 - P.lookK), P.lean, 1, 0, 0, P.t != null ? P.t : now, dt, P.arms); } catch (e) { R.me = null; } }
     R.cam.position.copy(eye);
     const yaw = Math.PI + R.look.yaw;   // facing −z
     const k = R.keys || {};
@@ -889,7 +891,7 @@ function ofPhotoUi() {
   R.root.appendChild(b);
 }
 /** Each frame in the chair: where the photo is, your hands on it, how far you lean in and turn, where you look. */
-function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; slide: number; lookK: number; at: any; arms: any } {
+function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; slide: number; lookK: number; at: any; arms: any; t?: number } {
   const R = OfficeRoom, ph = R.ph, A = R.A, T = THREE, out = { lean: 0, turn: 0, slide: 0, lookK: 0, at: null as any, arms: null as any };
   if (!ph || !A || !A.photoAt) return out;
   const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, D = OF_PH_D;

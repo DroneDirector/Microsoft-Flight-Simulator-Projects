@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.81 (2026-11-03)
+
+- the phone lies on the desk in the office (in front of the laptop) and in Operations (right of the keyboard), no longer past the desk edge
+- held phone: still body and phone (frozen body time), turn and tilt on request (phoneTurn; buttons, L1/R1, d-pad), grip fitted per hand against the phone (humanHandPts, phoneFit)
+- glass with reflections on the office laptop and the Operations monitor (roomGlassMat)
+- Operations monitor: twice the pixels on the PC, departures board and a 12-hour timeline at the screen's own proportions
+
 ## 0.9.80 (2026-11-03)
 
 - phone keyboard on the screen (letters, shift and caps lock, numbers and symbols, emoji, space, delete, send), toggle kept in settings.phoneKb; drafts kept while you type

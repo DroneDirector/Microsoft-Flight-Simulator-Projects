@@ -3575,3 +3575,5 @@ html.calm .ph-frame, html.calm .ph-screen { transition: none; }
 .ph-os .pk-sp { flex: 5 1 0; font-size: 14px; color: rgba(255,255,255,.8); }
 .ph-os .pk-go { flex: 2 1 0; background: #2F7BF6; font-size: 14px; font-weight: 600; }
 .ph-os .pcall.on .ph-kb { margin: 0 -12px; padding-bottom: 6px; }
+.of-pk .of-pk-turn { display: inline-flex; gap: 4px; margin-left: 6px; }
+.of-pk .of-pk-turn .btn { min-width: 34px; padding: 0 8px; font-size: 16px; }
