@@ -484,7 +484,7 @@ function ofExitToMain(msg?: string, to?: string) {
   exitSplash('office', 'Your office', [
     { pct: 30, step: 'Closing the office…', run: () => OfficeRoom.close(true) },
     { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
-    { pct: 85, step: to === 'hangars' ? 'Loading your hangars…' : 'Loading your airline…', run: () => { if (to) { try { closeAll(); go(to); } catch (e) { refresh(); } } else refresh(); } },
+    { pct: 85, step: to === 'hangars' ? 'Loading your hangars…' : 'Loading your airline…', run: () => { if (to) { try { roomGoTo(to); } catch (e) { refresh(); } } else refresh(); } },
   ], () => { if (msg) toast(msg, 'info'); });
 }
 
@@ -741,7 +741,7 @@ function ofClickAt(e?: PointerEvent) {
   if (a === 'bowl-water') { if (!petRefill(R.A, 'water')) toast('The water bowl is full', 'info'); return; }
   if (a === 'bowl-food') { ofBowlPick(); return; }
   if (R.seat) return;
-  if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); R.doorT = 1; setTimeout(() => ofExitToMain(), 650); }
+  if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); roomExitMenu(R.root, 'office', to => { R.doorT = 1; setTimeout(() => ofExitToMain('', to), 650); }); }
 }
 function ofSit() { aimUnlock(); const R = OfficeRoom; R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = true; ofVisitUi(); Sound.tick(); }
 function ofPad() {

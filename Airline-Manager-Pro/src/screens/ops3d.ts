@@ -362,7 +362,7 @@ function opsWalk(dt: number, now?: number) {
 function opsSit() { const R = OpsRoom; aimUnlock(); R.seat = true; R.look = { yaw: 0, pitch: -0.16 }; const d = R.root.querySelector('.op-dot') as HTMLElement; if (d) d.hidden = true; Sound.tick(); opsUi(); }
 function opsStand() { const R = OpsRoom; phoneReset(R); R.seat = false; R.free = { x: 0.3, z: 1.3, v: 0, bob: 0 }; R.look = { yaw: 0, pitch: -0.05 }; Sound.tick(); opsUi(); }
 /** Through the door: it opens, and you are back in the Overview. */
-function opsDoor() { const R = OpsRoom; Sound.tick(); R.doorT = 1; aimUnlock(); setTimeout(() => opsLeave(true), 650); }
+function opsDoor() { const R = OpsRoom; Sound.tick(); aimUnlock(); roomExitMenu(R.root, 'ops', to => { R.doorT = 1; setTimeout(() => opsLeave(to), 650); }); }
 function opsHover(e: PointerEvent) {
   const R = OpsRoom; if (R.loading || R.overlay || !R.seat) return;
   const T = THREE, rc = new T.Raycaster(), r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect();
@@ -490,12 +490,12 @@ OpsRoom.close = function (quiet?: boolean) {
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };
 /** Out of Operations: its own loading screen while the room is cleared from memory and the app comes back. */
-function opsLeave(toOverview?: boolean) {
+function opsLeave(toOverview?: boolean | string) {
   if (!OpsRoom.on || ExitSplash.on) return;
   exitSplash('ops', 'Operations', [
     { pct: 30, step: 'Switching off the screens…', run: () => OpsRoom.close(true) },
     { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
-    { pct: 85, step: toOverview ? 'Loading the Overview…' : 'Loading your airline…', run: () => { if (toOverview) { try { closeAll(); go('ops'); } catch (e) { refresh(); } } else refresh(); } },
+    { pct: 85, step: toOverview ? 'On your way…' : 'Loading your airline…', run: () => { if (toOverview) { try { roomGoTo(typeof toOverview === 'string' ? toOverview : 'overview'); } catch (e) { refresh(); } } else refresh(); } },
   ]);
 }
 

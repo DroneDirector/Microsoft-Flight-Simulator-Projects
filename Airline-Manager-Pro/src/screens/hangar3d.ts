@@ -994,7 +994,7 @@ function hgClickAt(e?: PointerEvent) {
   const R = HangarRoom; if (R.loading || R.overlay || R.panelOpen) return;
   if (R.talk >= 0) return;
   const o = hgAimedObj(e), a = o ? o.userData.act : '';
-  if (a === 'door') { hgLeave(); return; }
+  if (a === 'door') { roomExitMenu(R.root, 'hangars', to => hgLeave(to)); return; }
   if (a === 'monitor') { hgScreenOpen('schedule'); return; }
   if (a === 'mech') { hgTalkOpen(o.userData.i); return; }
   if (a === 'vend') { if (R.vend && R.vend.st === 'ready') { hgTake(); return; } hgVendOpen(); return; }
@@ -1320,13 +1320,38 @@ HangarRoom.close = function (quiet?: boolean) {
   if (R.root) R.root.remove();
   if (!quiet) { try { refresh(); } catch (e) { /* ignore */ } }
 };
-function hgLeave() {
+function hgLeave(to?: string) {
   if (!HangarRoom.on || ExitSplash.on) return;
   exitSplash('hangar', HangarRoom.sz ? HangarRoom.sz.name : 'Hangar', [
     { pct: 30, step: 'Closing the hangar…', run: () => HangarRoom.close(true) },
     { pct: 55, step: 'Clearing the hangar from memory…', run: exitFreeMemory },
-    { pct: 85, step: 'Loading your hangars…', run: () => { try { closeAll(); go('hangars'); } catch (e) { refresh(); } } },
+    { pct: 85, step: to && to !== 'hangars' ? 'On your way…' : 'Loading your hangars…', run: () => { try { roomGoTo(to || 'hangars'); } catch (e) { refresh(); } } },
   ]);
+}
+
+/* ---------- the door: where to next ---------- */
+// The doors of your office, the Operations office and the hangars ask where you are going: the Overview, the hangars,
+// your office or Operations (all at the airport), or the courtroom (in the city). The room you are in isn't offered.
+const ROOM_EXITS: [string, string, string][] = [['overview', 'The Overview', 'ops'], ['hangars', 'The hangars', 'wrench'], ['office', 'My office', 'jobs'], ['ops', 'Operations', 'clock'], ['court', 'The courtroom (in the city)', 'shield']];
+function roomExitMenu(root: HTMLElement, here: string, leave: (to: string) => void, stay?: () => void) {
+  if (!root || root.querySelector('.room-exit')) return;
+  try { aimUnlock(); } catch (e) { /* not locked */ }
+  const el = document.createElement('div'); el.className = 'room-exit';
+  el.innerHTML = `<div class="room-exit-box"><b>Where to?</b>${ROOM_EXITS.filter(x => x[0] !== here).map(x => `<button data-rx="${x[0]}">${icon(x[2])}<span>${x[1]}</span>${icon('chevron')}</button>`).join('')}<button data-rx="stay" class="stay">Stay here</button></div>`;
+  el.addEventListener('click', ev => { ev.stopPropagation(); const b = (ev.target as HTMLElement).closest('[data-rx]') as HTMLElement; if (!b && ev.target !== el) return; const to = b ? b.getAttribute('data-rx') : 'stay'; el.remove(); Sound.tick(); if (to === 'stay') { if (stay) stay(); return; } leave(to); });
+  el.addEventListener('pointerdown', ev => ev.stopPropagation()); el.addEventListener('pointerup', ev => ev.stopPropagation());
+  const esc$ = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (!el.isConnected) { window.removeEventListener('keydown', esc$, true); return; } e.preventDefault(); e.stopImmediatePropagation(); el.remove(); window.removeEventListener('keydown', esc$, true); if (stay) stay(); };
+  window.addEventListener('keydown', esc$, true);
+  root.appendChild(el);
+}
+/** After leaving a room: on to where you chose. */
+function roomGoTo(to: string) {
+  try { closeAll(); } catch (e) { /* nothing open */ }
+  if (to === 'hangars') go('hangars');
+  else if (to === 'office') { go('ops'); setTimeout(() => ACTIONS['office-open'](null, null), 60); }
+  else if (to === 'ops') { go('ops'); setTimeout(() => ACTIONS['ops-room'](null, null), 60); }
+  else if (to === 'court') { go('ops'); setTimeout(() => ACTIONS['court-enter'](null, null), 60); }
+  else go('ops');
 }
 
 ACTIONS['hangar-visit'] = el => { const g = (k: string) => el && el.getAttribute ? el.getAttribute(k) || '' : ''; closeAll(); HangarRoom.open(g('data-reg'), g('data-base'), g('data-size')); };

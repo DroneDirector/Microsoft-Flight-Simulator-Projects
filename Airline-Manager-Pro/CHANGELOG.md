@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.117 (2026-11-03)
+
+- Contrails: trail shifted with the view's origin (no jump in front), side vector falls back across the view when looking along the trail, half width 1.3 m + slow spread, fade 2.5 s in / pow(1-k, 1.6) out, dry air 22–31 s, 20 s hold against flicker
+- roomExitMenu / roomGoTo: the doors of the office, Operations and the hangars ask where to go (court offered, not from the court)
+
 ## 0.9.116 (2026-11-03)
 
 - Hangars page (SCREENS.hangars) from the Overview places card and the office; hgHangars per base and size, in-work aircraft only (hgInWork), hgCrewFor keeps mechIds on scheduled jobs
