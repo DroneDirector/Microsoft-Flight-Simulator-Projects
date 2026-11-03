@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.115 (2026-11-03)
+
+- hangar3d.ts: walkable hangar per aircraft size (HG_SIZES), sun/sky from astroSun at the base, sliding door leaves (hgDoors), mechanics (Human.build, humanTalk), ops monitor (opsMonitorDraw(A)), vending machine, held items (phoneGrip), placed items per size (State.hangarItems, 48 h)
+- Maintenance: hangar list (hgListHtml); models.ts: HANGAR_FILES (+ -pc on the PC), ITEM_FILES; vending machine named parts (hgVendFile)
+- update.ts: no-store, cache-busting release list; message when the download isn't attached yet
+
 ## 0.9.114 (2026-11-03)
 
 - v3d-contrails.ts (ribbons per engine), v3d-wet.ts (wet runways, reflected light streaks), v3d-ground.ts (gate vehicles, jet bridge)
