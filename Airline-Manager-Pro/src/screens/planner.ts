@@ -248,6 +248,19 @@ function plProfileDraw() {
     const x = X(d / path.len * pr.routeNm); g.strokeStyle = wp.id === U.sel ? '#fff' : 'rgba(224,75,214,.45)'; g.beginPath(); g.moveTo(x, T); g.lineTo(x, h - B); g.stroke();
     g.fillStyle = wp.id === U.sel ? '#fff' : '#93A9C1'; g.save(); g.translate(x + 3, h - B - 4); g.rotate(-Math.PI / 2); g.fillText(wp.name, 0, 0); g.restore();
   }
+  // the procedures' altitude limits at their fixes: a bar at the limit (above it: at or above; below it: at or below)
+  if (path && (path as any).fixes) {
+    g.font = '600 9.5px Inter, sans-serif';
+    for (const f of (path as any).fixes as ProcFix[]) {
+      if (!f.alt) continue;
+      let bi = 0, bd = 1e9; for (let i = 0; i < path.pts.length; i++) { const d = gcDistanceNm(path.pts[i], f.pos); if (d < bd) { bd = d; bi = i; } }
+      if (bd > 3) continue;
+      const x = X(path.cum[bi] / path.len * pr.routeNm), y = Y(f.alt);
+      g.strokeStyle = '#3FD0E8'; g.lineWidth = 2; g.beginPath(); g.moveTo(x - 6, y); g.lineTo(x + 6, y); g.stroke();
+      if (f.ad === '+' || f.ad === '-') { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + (f.ad === '+' ? -6 : 6)); g.stroke(); }
+      g.fillStyle = '#9FE8F4'; g.fillText(f.name, x + 4, y - 4);
+    }
+  }
   // TOC, TOD and the distance scale
   const toc = pr.pts.filter(p => p.ph === 'Cruise')[0], tod = pr.pts.filter(p => p.ph === 'Descent')[0];
   g.fillStyle = '#3FD0E8'; g.font = '700 10px Inter, sans-serif';

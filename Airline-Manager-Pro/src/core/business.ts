@@ -112,7 +112,7 @@ function marketPax(from: string, to: string, d?: Date): number {
   const bush = from[0] === 'P' && to[0] === 'P' && sa + sb <= 1;
   const dist = nm < 60 ? 0.5 : nm < 300 ? 0.9 : nm < 1500 ? 1.1 : nm < 4000 ? 0.85 : 0.6;
   const fixed = 0.85 + (hashMix([from, to].sort().join('')) % 30) / 100;   // some city pairs are simply busier
-  return Math.round((bush ? 22 : sizeK) * dist * fixed * routeSeason(from, to, d));
+  return Math.round((bush ? 22 : sizeK) * dist * fixed * routeSeason(from, to, d) * (typeof routeSpecial === 'function' ? routeSpecial(from, to, d) : 1));
 }
 function cargoMarketKg(from: string, to: string): number {
   const sa = aptSize(from), sb = aptSize(to);
