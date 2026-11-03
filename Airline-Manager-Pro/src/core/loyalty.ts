@@ -48,7 +48,7 @@ function ffDailyPax(cid: string): number {
 function ffPull(cid: string): number {
   const L = loyaltyOf(cid); if (!L || !L.ff.on) return 0;
   const daily = Math.max(50, ffDailyPaxCached(cid)), m = L.ff.members;
-  return Math.min(0.14, m / (m + daily * 90) * 0.25 * FF_PERKS[L.ff.perks].pull);
+  return Math.min(0.16, m / (m + daily * 90) * 0.25 * FF_PERKS[L.ff.perks].pull * (typeof allianceFf === 'function' ? allianceFf(cid) : 1));
 }
 const _ffPaxCache: { [cid: string]: { day: string; n: number } } = {};
 function ffDailyPaxCached(cid: string): number {
@@ -104,7 +104,8 @@ function flexK(r: any): number {
 /** How much more premium travellers choose you on a leg, from your lounges at either end (0.24 = 24%). */
 function loungePull(cid: string, from: string, to: string): number {
   const L = loyaltyOf(cid); if (!L) return 0;
-  const lv = (k: string) => L.lounges[k] ? LOUNGE_LEVELS[L.lounges[k].lvl].pull : 0;
+  const al = typeof allianceHubs === 'function' ? allianceHubs(cid) : [];
+  const lv = (k: string) => L.lounges[k] ? LOUNGE_LEVELS[L.lounges[k].lvl].pull : al.indexOf(k) >= 0 ? LOUNGE_LEVELS[0].pull : 0;
   return Math.max(lv(from), lv(to)) + Math.min(lv(from), lv(to)) * 0.3;
 }
 

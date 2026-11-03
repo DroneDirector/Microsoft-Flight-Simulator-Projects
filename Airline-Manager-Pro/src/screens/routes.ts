@@ -20,7 +20,7 @@ SCREENS.routes = {
       <button class="btn primary" data-act="new-route">${icon('plus')}New route</button>
     </div>
     ${hubCardHtml()}
-    ${soloMode() ? partnersHtml() + loungesCardHtml() : ''}
+    ${soloMode() ? partnersHtml() + loungesCardHtml() + alliancesHtml() + slotsSpareHtml() : ''}
     ${sortBar('routes', ROUTE_SORTS, 'Find a route')}
     <div class="route-list">${sortList('routes', rs, ROUTE_SORTS, (r: any) => `${r.code} ${r.legs.join(' ')} ${acType(r.typeId).model}`).map((r, i) => {
       const t = acType(r.typeId), p = r.pilotId ? pilot(r.pilotId) : null;

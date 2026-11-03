@@ -15,6 +15,14 @@ interface Job {
   pax: number; kg: number; pay: number; nm: number; posted: number; expires: number; due: number;
   status: 'open' | 'accepted' | 'flying' | 'done' | 'late' | 'failed'; by?: string; reg?: string; queued?: boolean; doneAt?: number; tx?: string;
 }
+/** Special cargo: loads that need the right aircraft, and pay for it. */
+const SPECIAL_CARGO: { id: string; title: string; client: string; chip: string; needText: string; need: (a: Aircraft, t: AircraftType, nm: number) => boolean; mult: number; dueH?: number }[] = [
+  { id: 'animals', title: 'Live animals: racehorses with their grooms', client: 'Bloodstock agent', chip: 'Live animals', needText: 'a jet with a heated, pressurised hold', need: (a, t) => t.cls === 'widebody' || t.cls === 'airliner', mult: 2.2 },
+  { id: 'cold', title: 'Vaccines kept at 2 to 8 °C', client: 'Pharmaceutical company', chip: 'Keep cold', needText: 'a flight of under 7 hours (as long as the cool boxes last)', need: (a, t, nm) => nm / Math.max(100, t.cruiseKt) < 7, mult: 2.0 },
+  { id: 'oversize', title: 'A helicopter in a crate', client: 'Helicopter operator', chip: 'Oversized', needText: 'a freighter or a widebody', need: (a, t) => !!cabinOf(a).freighter || t.cls === 'widebody', mult: 2.4 },
+  { id: 'aog', title: 'An engine part for a grounded airliner (AOG)', client: 'Another airline', chip: 'Urgent: AOG', needText: '', need: () => true, mult: 3, dueH: 10 },
+];
+function specialCargo(j: Job): typeof SPECIAL_CARGO[0] { const k = (j as any).special; return k ? SPECIAL_CARGO.filter(x => x.id === k)[0] || null : null; }
 interface Tour { id: string; name: string; desc: string; legs: string[]; reward: number; bush?: boolean }
 interface JobsState { list: Job[]; next: { [cid: string]: number }; tours: { [id: string]: { start: number; idx: number; done?: number } }; weekly: { [week: string]: number } }
 
@@ -58,6 +66,7 @@ function jobFits(j: Job, a: Aircraft): string {
   const t = acType(a.typeId);
   if (j.kind === 'pax' && cabinSeats(t, a) < j.pax) return `${cabinSeats(t, a)} seats, needs ${j.pax}`;
   if (j.kind === 'cargo' && cargoCapacity(a) < j.kg) return `${num(cargoCapacity(a))} kg of cargo room, needs ${num(j.kg)} kg`;
+  const sp = specialCargo(j); if (sp && !sp.need(a, t, j.nm)) return `${sp.chip.toLowerCase()}: needs ${sp.needText}`;
   if (j.nm > usableRange(t)) return `range ${num(usableRange(t))} nm, the job is ${num(j.nm)} nm`;
   const rc = legRunwayCheck(t.id, j.from, j.to, j.kind === 'pax' ? j.pax : 0);
   if (!rc.ok || (j.kind === 'pax' && rc.maxPax < j.pax)) return rc.why || 'the runways are too short for this load';
@@ -133,8 +142,16 @@ noticesAt(Date.now());
       pay = Math.round(pax * economyFare(t.id, from, to) * 1.4 + (bush ? 250 : 2500));
     }
     const hrs = 6 + Math.floor(Math.random() * 18);
-    return { id: 'job-' + uid(), companyId: c.id, kind: cargo ? 'cargo' : 'pax', title, client, from, to, pax, kg, pay: Math.round(pay / 10) * 10, nm, posted: now, expires: now + hrs * 3600e3,
+    const job: any = { id: 'job-' + uid(), companyId: c.id, kind: cargo ? 'cargo' : 'pax', title, client, from, to, pax, kg, pay: Math.round(pay / 10) * 10, nm, posted: now, expires: now + hrs * 3600e3,
       due: now + (hrs + 24 + Math.floor(Math.random() * 48) + Math.round(nm / 300)) * 3600e3, status: 'open' };
+    // now and then a special load: it needs the right aircraft, and pays for it
+    if (cargo && !bush && Math.random() < 0.25) {
+      const sp = SPECIAL_CARGO[Math.floor(Math.random() * SPECIAL_CARGO.length)];
+      job.special = sp.id; job.title = sp.title; job.client = sp.client; job.pay = Math.round(pay * sp.mult / 10) * 10;
+      if (sp.id === 'oversize') job.kg = Math.max(job.kg, 2500);
+      if (sp.dueH) { job.expires = now + 2 * 3600e3; job.due = now + (sp.dueH + Math.round(nm / 400)) * 3600e3; }
+    }
+    return job;
   },
 
   /** You fly it yourself. */

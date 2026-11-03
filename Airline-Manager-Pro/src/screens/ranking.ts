@@ -2,7 +2,7 @@
 // as you earn them (badges not yet earned stay hidden). Badges are yours only; hired pilots and crew level up without badges.
 
 let _rkGroup = 'all', _rkShowAll = false, _rkWho = 'you', _rkJob = 'all', _rkAllCos = false;
-const RK_TABS: [string, string][] = [['you', 'You'], ['airlines', 'Airline league'], ['pilots', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground crew'], ['pax', 'Passengers'], ['gifts', 'Gifts']];
+const RK_TABS: [string, string][] = [['you', 'You'], ['airlines', 'Airline league'], ['pilots', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground crew'], ['pax', 'Passengers'], ['gifts', 'Gifts'], ['achv', 'Achievements']];
 
 SCREENS.ranking = {
   title: 'Ranking', icon: 'trophy',
@@ -11,6 +11,7 @@ SCREENS.ranking = {
     const tabs = `<div class="filter-row rk-who">${RK_TABS.concat(soloMode() ? [['scen', 'Scenarios'] as [string, string]] : []).map(t => `<button class="fchip ${_rkWho === t[0] ? 'on' : ''}" data-act="rk-who" data-w="${t[0]}">${t[1]}</button>`).join('')}</div>`;
     if (_rkWho === 'scen') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Challenges with goals and medals</p></div></div>${tabs}${scenariosHtml()}`;
     if (_rkWho === 'airlines') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your airline against the others</p></div></div>${tabs}${leagueHtml()}`;
+    if (_rkWho === 'achv') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Achievements: what you have done, and how far you are with the rest</p></div></div>${tabs}${achievementsHtml()}`;
     if (_rkWho === 'gifts') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Gifts and commemorative plaques: tap one to turn it round in 3D</p></div></div>${tabs}${giftsHtml()}`;
     if (_rkWho === 'pax') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">What your passengers think</p></div></div>${tabs}${reviewsHtml()}`;
     if (_rkWho !== 'you') return `<div class="screen-head"><div><h1>Ranking</h1><p class="sub">Your staff by level and experience</p></div></div>${tabs}${staffRankHtml()}`;

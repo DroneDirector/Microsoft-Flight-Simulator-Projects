@@ -109,7 +109,7 @@ function bizRouteGate(typeId: string, stops: string[]): boolean {
     if (need > max) { toast(`The ${t.model} can't fly this route: it goes up to ${need} minutes from an alternate airport${max ? ` (it may fly at most ${max})` : ' (it has no ETOPS approval possible)'}`, 'warn'); return false; }
     if (etopsApproved(c.id, typeId) < need) { etopsPopup(typeId, need); return false; }
   }
-  const sl = stops.filter((k, i) => SLOTS[k] && stops.indexOf(k) === i); const key = stops.join('-');
+  const sl = stops.filter((k, i) => SLOTS[k] && stops.indexOf(k) === i && !slotSpareHas(c.id, k)); const key = stops.join('-');
   if (sl.length && _slotOk !== key) {
     const rows = sl.map(k => { const free = slotsFree(k); return { k, free, lease: slotLease(k), buy: slotLease(k) * 24 }; });
     const body = rows.map(r => r.free ? `${r.k}: a free slot pair, ${money(r.lease)} a month` : `${r.k}: none free this month; buy a pair from another airline for ${money(r.buy)} (then ${money(r.lease)} a month)`).join('. ');
@@ -122,7 +122,25 @@ function bizRouteGate(typeId: string, stops: string[]): boolean {
   }
   return true;
 }
-function bizRouteCreated(r: any) { const sl = r.legs.filter((k: string, i: number) => SLOTS[k] && r.legs.indexOf(k) === i); if (sl.length) bizState().slots[r.id] = sl; _slotOk = ''; }
+function bizRouteCreated(r: any) { const sl = r.legs.filter((k: string, i: number) => SLOTS[k] && r.legs.indexOf(k) === i); sl.forEach((k: string) => slotSpareTake(r.companyId || State.companyId, k)); if (sl.length) bizState().slots[r.id] = sl; _slotOk = ''; }
+/* ---------- spare slot pairs: kept from closed routes, used again, sold, or lost when unused ---------- */
+// Slots are "use it or lose it": a spare pair is kept for two months (its lease still paid), then the airport
+// hands it back. Until then a new route there uses it, or it can be sold to another airline.
+function slotSpares(cid: string): { k: string; since: number }[] { const b = bizState(); b.spare = b.spare || {}; return b.spare[cid] || (b.spare[cid] = []); }
+function slotSpareHas(cid: string, k: string): boolean { return slotSpares(cid).some(x => x.k === k); }
+function slotSpareTake(cid: string, k: string) { const l = slotSpares(cid), i = l.findIndex(x => x.k === k); if (i >= 0) l.splice(i, 1); }
+function slotsToSpare(routeId: string, cid: string) { const b = bizState(), sl: string[] = b.slots[routeId] || []; delete b.slots[routeId]; sl.forEach(k => slotSpares(cid).push({ k, since: Date.now() })); if (sl.length) toast(`Slot pairs kept at ${sl.join(', ')}: use them for a new route or sell them within two months`, 'info'); }
+function slotSellPrice(k: string): number { return Math.round(slotLease(k) * (SLOTS[k] === 'A' ? 30 : 18) * (0.9 + seeded('sell:' + k + _monthKey())() * 0.3) / 1000) * 1000; }
+function slotsSpareHtml(): string {
+  const l = slotSpares(State.companyId); if (!l.length) return '';
+  return `<div class="card loy"><div class="card-h"><b>${icon('clock')}Spare slot pairs</b><small>From routes you closed. Use it or lose it: a new route there takes one, or sell it; after two months unused the airport takes it back.</small></div>
+    ${l.map((x, i) => { const left = Math.max(0, Math.ceil((x.since + 60 * 864e5 - Date.now()) / 864e5)); return `<div class="lg-row"><span class="lg-ic">${icon('clock')}</span><span><b>${esc(x.k)}${SLOTS[x.k] === 'A' ? ' · one of the hardest airports' : ''}</b><small>${money(slotLease(x.k))} a month · ${left} days left to use it</small></span><button class="btn sm ghost" data-act="slot-sell" data-i="${i}">Sell to another airline<small>${money(slotSellPrice(x.k))}</small></button></div>`; }).join('')}</div>`;
+}
+ACTIONS['slot-sell'] = el => {
+  const c = company(), l = slotSpares(c.id), x = l[+el.getAttribute('data-i')]; if (!x) return;
+  const p = slotSellPrice(x.k); l.splice(l.indexOf(x), 1);
+  payTxn(c.id, `Slot pair at ${x.k} sold`, p, 'sale', [[`Slot pair at ${x.k}`, p]]); Store.soon(); Sound.tick(); toast(`Slot pair at ${x.k} sold for ${money(p)}`, 'ok'); refresh();
+};
 /** The route's page: ETOPS, curfews, slots and emissions. */
 function bizRouteInfo(r: any): string {
   const out: string[] = [], need = etopsNeed(r.typeId, r.legs);
@@ -406,6 +424,9 @@ function bizMonthly(month: string) {
   // slot leases
   const routes = State.routes.filter(r => r.companyId === c.id && b.slots[r.id]); let lease = 0; const lines: [string, number][] = [];
   routes.forEach(r => (b.slots[r.id] as string[]).forEach(k => { lease += slotLease(k); lines.push([`${r.code}: slot pair at ${k}`, -slotLease(k)]); }));
+  const sp = slotSpares(c.id), lost = sp.filter(x => Date.now() - x.since > 60 * 864e5);
+  sp.filter(x => lost.indexOf(x) < 0).forEach(x => { lease += slotLease(x.k); lines.push([`Spare slot pair at ${x.k}`, -slotLease(x.k)]); });
+  lost.forEach(x => { sp.splice(sp.indexOf(x), 1); State.notices.unshift({ id: uid(), kind: 'authority', title: `Slot pair at ${x.k} lost`, body: `It went unused for two months, so ${x.k} has given it to another airline (use it or lose it).`, time: 'Now', at: Date.now(), read: false } as any); });
   if (lease) payTxn(c.id, `Slot leases for ${_monthName(_monthKey())}`, -lease, 'fees', lines);
   // sustainable fuel: passengers notice
   const saf = safShare(c.id); if (saf) try { Progress.popularity(Math.min(2, saf * 10), 'Sustainable fuel'); } catch (e) { /* ignore */ }

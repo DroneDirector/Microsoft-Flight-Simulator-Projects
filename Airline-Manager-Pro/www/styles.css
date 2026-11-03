@@ -4046,3 +4046,48 @@ html.calm .dclock b em { animation: none; }
 .ff-chip.ff-gold { background: rgba(242, 193, 78, .16); }
 .ff-chip.ff-platinum, .ff-t-platinum { color: #9FE7F5; }
 .ff-chip.ff-platinum { background: linear-gradient(90deg, rgba(159, 231, 245, .2), rgba(196, 160, 255, .2)); }
+.job-sp { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; font-style: normal; font-size: 11px; font-weight: 700; vertical-align: 1px; background: rgba(63, 208, 232, .15); color: #7FE3F2; }
+.job-sp.sp-aog { background: rgba(242, 92, 84, .16); color: #FF8A80; }
+.job-sp.sp-cold { background: rgba(120, 180, 255, .16); color: #9CC8FF; }
+.job-sp.sp-animals { background: rgba(140, 220, 120, .15); color: #A9E59A; }
+.job-sp.sp-oversize { background: rgba(242, 181, 68, .16); color: #F2C66E; }
+/* achievements and the first week */
+.achv-sum { display: flex; align-items: center; gap: 12px; padding: 14px 18px; margin-bottom: 8px; }
+.achv-sum b { font-size: 22px; }
+.achv-sum .achv-bar { flex: 1; }
+.achv-bar { display: block; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; margin: 6px 0 2px; }
+.achv-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #3FD0E8, #8E7BFF); }
+.achv-g { margin: 18px 0 8px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.achv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.achv { display: flex; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--card, rgba(255, 255, 255, .03)); border: 1px solid var(--line); }
+.achv-ic { flex: none; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: rgba(255, 255, 255, .06); color: var(--muted); }
+.achv.got .achv-ic { background: linear-gradient(135deg, #F2C14E, #E08A2E); color: #241503; }
+.achv.got .achv-bar i { background: linear-gradient(90deg, #F2C14E, #E08A2E); }
+.achv-t { flex: 1; min-width: 0; }
+.achv-t small { display: block; color: var(--muted); }
+.achv-t em { font-style: normal; font-size: 12px; color: var(--muted); }
+.card.fw { padding: 14px 18px; margin-bottom: 14px; border: 1px solid rgba(63, 208, 232, .3); }
+.fw-h { display: flex; align-items: center; gap: 14px; }
+.fw-h > span:first-child small { display: block; color: var(--muted); }
+.fw-h .achv-bar { flex: 1; max-width: 260px; }
+.fw-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; margin-top: 10px; }
+.fw-step { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .03); }
+.fw-step > span:nth-child(2) { flex: 1; min-width: 0; }
+.fw-step small { display: block; color: var(--muted); }
+.fw-step.done { opacity: .6; }
+.fw-step.next { background: rgba(63, 208, 232, .08); }
+.fw-tick { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; }
+.fw-step.done .fw-tick { background: #3FD0A0; border-color: #3FD0A0; color: #062016; }
+.al-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-top: 10px; }
+.al-card { padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); }
+.al-card.mine { border-color: var(--al); box-shadow: 0 0 0 1px var(--al) inset; }
+.al-h { display: flex; align-items: center; gap: 10px; }
+.al-h > span:nth-child(2) { flex: 1; min-width: 0; }
+.al-h small { display: block; color: var(--muted); }
+.al-logo { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #071018; background: var(--al); }
+.al-m { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+.al-m span { padding: 3px 9px; border-radius: 99px; background: rgba(255, 255, 255, .05); font-size: 12px; }
+.al-m small { margin-left: 5px; color: var(--muted); }
+.al-req { color: #FF9C8F; }
+.al-req.ok { color: var(--muted); }
+.al-req em { color: #F2B544; font-style: normal; }

@@ -10,6 +10,7 @@ interface SetSection { id: string; title: string; icon: string; items: SetItem[]
 
 const SETTINGS: SetSection[] = [
   { id: 'general', title: 'General', icon: 'sliders', items: [
+    { type: 'html', html: () => soloMode() ? `<div class="set-card"><span><b>Your first week</b><small>The guided checklist for a new airline in the Overview: aircraft, crew, the first route and flight, a job and a frequent-flyer programme.</small></span><button class="btn ghost sm" data-act="fw-show">Show it</button></div>` : '' },
     { type: 'toggle', key: 'morningBrief', label: 'Morning briefing', hint: 'Once a day in the Overview: yesterday\'s result, today\'s flights, weather, crew and aircraft, and the special days coming up on your routes. Also opens from the Overview any time.' },
     { type: 'html', html: () => `<div class="set-card"><span class="brand-lg">${brandMark()}</span><span><b>${esc(APP.name)}</b><small>Version ${esc(APP.version)}</small></span><button class="btn ghost sm" data-act="whats-new">${icon('star')}What's new</button></div>` },
     { type: 'choice', key: 'units', label: 'Units', options: [['imperial', 'Feet, knots, nm'], ['metric', 'Metres, km/h, km']] },
