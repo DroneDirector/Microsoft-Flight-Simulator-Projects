@@ -355,7 +355,7 @@ OfficeRoom.open = function (inc?: any) {
   root.innerHTML = `<canvas></canvas>
     <div class="ct-top" data-of="boxopen" title="Show the conversation"><div><small>${esc(co.name)}</small><b>${inc ? `Your office: ${esc(p.name)}, ${esc(inc.title.toLowerCase())}` : 'Your office'}</b></div><i class="of-reopen">${icon('chevron')}</i></div>
     <button class="ct-leave" data-of="leave">${icon('close')}<span>Leave the office</span><kbd>Esc</kbd></button>
-    <div class="ct-box" hidden><button class="of-x" data-of="boxclose" aria-label="Close" title="Close (bring it back from the name at the top left)">${icon('close')}</button><button class="of-x of-min" data-of="boxmin" aria-label="Minimise" title="Minimise">${icon('down')}</button><div class="of-you"></div><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><p class="of-tell"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
+    <div class="ct-box" hidden><div class="box-grip" title="Drag to move the window (double-click to put it back)"><i></i></div><button class="of-x" data-of="boxclose" aria-label="Close" title="Close (bring it back from the name at the top left)">${icon('close')}</button><button class="of-x of-min" data-of="boxmin" aria-label="Minimise" title="Minimise">${icon('down')}</button><div class="of-you"></div><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><p class="of-tell"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
     <div class="ct-spots of-spots" hidden></div><div class="ct-hint" hidden></div><div class="walk-pad ct-pad" hidden><i></i></div><div class="of-aim" hidden>+</div>
     ${ctLoaderHtml('Your office', inc ? `${p.name} is on the way up…` : 'Unlocking the door…', OF_WINGS)}`;
   document.body.appendChild(root);
@@ -404,7 +404,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   };
   R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; };
   window.addEventListener('keydown', R.key$, true); window.addEventListener('keyup', R.ku$, true);
-  ofPad();
+  ofPad(); roomBoxDrag(root, 'office');
   // the family photo, then (for an interview) the crew member
   const next = () => {
     ctProgress(70, R.inc ? `${R.p.name} is at the door…` : 'Opening the blinds…', R);
@@ -1236,3 +1236,45 @@ function ofClick(b: HTMLElement) {
 
 ACTIONS['office-open'] = () => { closeAll(); OfficeRoom.open(); };
 ACTIONS['office-invite'] = el => { const inc = ((State as any).incidents || []).filter((x: any) => x.id === el.getAttribute('data-id'))[0]; if (!inc) return; closeAll(); OfficeRoom.open(inc); };
+
+/* ---------- the conversation window (conduct reports, talks, court): drag it where you like ---------- */
+/** Drag the window by its grip or its heading; it stays inside the view and is kept where you left it
+ *  (each room its own place). A double-click or double-tap on the grip puts it back. */
+function roomBoxDrag(root: HTMLElement, key: string) {
+  const box = root.querySelector('.ct-box') as HTMLElement; if (!box) return;
+  const S: any = State.settings, z = () => (window as any).__uiZoom || 1;
+  const place = (fx: number, fy: number) => {
+    const rr = root.getBoundingClientRect(), br = box.getBoundingClientRect(), Z = z();
+    const W = rr.width / Z, H = rr.height / Z, w = br.width / Z, h = br.height / Z;
+    const x = clamp(fx * W, 4, Math.max(4, W - w - 4)), y = clamp(fy * H, 4, Math.max(4, H - h - 4));
+    if (!box.style.width) box.style.width = w + 'px';   // keeps its width once it is free of the edges
+    box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.right = 'auto'; box.style.bottom = 'auto'; box.style.transform = 'none'; box.classList.add('moved');
+  };
+  const reset = () => { box.style.left = box.style.top = box.style.right = box.style.bottom = box.style.transform = box.style.width = ''; box.classList.remove('moved'); S.boxPos = S.boxPos || {}; delete S.boxPos[key]; Store.save(); };
+  const saved = S.boxPos && S.boxPos[key];
+  if (saved) { const apply = () => { if (!box.hidden) place(saved[0], saved[1]); }; new MutationObserver(apply).observe(box, { attributes: true, attributeFilter: ['hidden'] }); }
+  let d: any = null;
+  const start = (e: PointerEvent) => {
+    const t = e.target as HTMLElement;
+    if (!t.closest('.box-grip') && !(t.closest('.ct-who') && !t.closest('button'))) return;
+    const br = box.getBoundingClientRect(), Z = z();
+    d = { id: e.pointerId, x: e.clientX, y: e.clientY, l: (br.left - root.getBoundingClientRect().left) / Z, t: (br.top - root.getBoundingClientRect().top) / Z, moved: false };
+    box.setPointerCapture(e.pointerId); e.preventDefault(); e.stopPropagation();
+  };
+  box.addEventListener('pointerdown', start);
+  box.addEventListener('pointermove', e => {
+    if (!d || e.pointerId !== d.id) return;
+    const Z = z(), dx = (e.clientX - d.x) / Z, dy = (e.clientY - d.y) / Z; if (!d.moved && Math.hypot(dx, dy) < 4) return;
+    d.moved = true; box.classList.add('dragging');
+    const rr = root.getBoundingClientRect(); place((d.l + dx) / (rr.width / Z), (d.t + dy) / (rr.height / Z));
+  });
+  const end = (e: PointerEvent) => {
+    if (!d || e.pointerId !== d.id) return; box.classList.remove('dragging');
+    if (d.moved) { const rr = root.getBoundingClientRect(), br = box.getBoundingClientRect(); S.boxPos = S.boxPos || {}; S.boxPos[key] = [(br.left - rr.left) / rr.width, (br.top - rr.top) / rr.height]; Store.save(); }
+    if (d.moved) { const eat = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); }; box.addEventListener('click', eat, { capture: true, once: true }); setTimeout(() => box.removeEventListener('click', eat, true), 300); }   // a drag isn't a click
+    d = null;
+  };
+  box.addEventListener('pointerup', end); box.addEventListener('pointercancel', end);
+  box.addEventListener('dblclick', e => { if ((e.target as HTMLElement).closest('.box-grip')) reset(); });
+  let lastTap = 0; box.addEventListener('pointerup', e => { if (!(e.target as HTMLElement).closest('.box-grip')) return; const n = Date.now(); if (n - lastTap < 320) reset(); lastTap = n; });
+}

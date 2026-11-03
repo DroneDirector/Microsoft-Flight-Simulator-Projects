@@ -494,6 +494,7 @@ function ctOpen2(c: any, st: any, root: HTMLElement, q: number, appeal: boolean,
     if (R.empty) { if (aimLocked(cv)) { if (R.lockedOnce) ctUse(); R.lockedOnce = true; } else if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) ctUse(e); }
     drag = null; });
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-ct]') as HTMLElement; if (b) ctClick(b); });
+  roomBoxDrag(root, 'court');
   R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; }; window.addEventListener('keyup', R.ku$, true);
   R.key$ = (e: KeyboardEvent) => { if (!R.on) return; if (R.empty && e.key.toLowerCase() === 'h') { e.preventDefault(); R.root.classList.toggle('ui-off'); return; } if (R.empty && /^(w|a|s|d|arrow\w+|shift)$/.test(e.key.toLowerCase())) { R.keys[e.key.toLowerCase()] = true; e.preventDefault(); return; } if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; ctLeaveAsk(); } else if ((e.key === 'Enter' || e.key === ' ') && !root.querySelector('.ct-modal:not([hidden])')) { const n = root.querySelector('[data-ct="next"]') as HTMLElement; if (n) { e.preventDefault(); ctClick(n); } } };
   window.addEventListener('keydown', R.key$, true);
@@ -519,7 +520,7 @@ CourtRoom.open = function (c: any, st: any) {
     <button class="ct-leave" data-ct="leave">${icon('close')}<span>Leave court</span><kbd>Esc</kbd></button>
     <div class="ct-ex" hidden></div>${empty ? '<div class="of-aim" hidden>·</div>' : ''}
     <div class="ct-rate" hidden></div>
-    <div class="ct-box" hidden><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
+    <div class="ct-box" hidden><div class="box-grip" title="Drag to move the window (double-click to put it back)"><i></i></div><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
     ${empty ? `<div class="ct-spots">${[['bench', 'The bench'], ['witness', 'Witness box'], ['def', 'Defence table'], ['pub', 'Public benches'], ['door', 'The doors']].map(x => `<button data-ct="spot" data-k="${x[0]}">${x[1]}</button>`).join('')}</div><div class="ct-hint">${DESKTOP ? 'W A S D to walk · click the view and the mouse looks all the way round · H hides the controls · Esc gives the mouse back, Esc again leaves' : 'Stick to walk · drag to look around'}</div><div class="walk-pad ct-pad"><i></i></div>` : ''}
     ${ctLoaderHtml(empty ? 'The courtroom' : st.key === 'verdict' ? 'The verdict' : 'Court is in session', empty ? 'Opening the doors…' : 'The court is preparing…')}
     <div class="ct-modal" hidden></div>`;
