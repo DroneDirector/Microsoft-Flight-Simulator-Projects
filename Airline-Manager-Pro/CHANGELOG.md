@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.107 (2026-11-03)
+
+- Morning briefing (briefing.ts: once a day in the Overview after reveals; button; setting morningBrief)
+- Special days (special-days.ts: SPECIAL_DAYS with Easter, nth weekday and lunar lists; routeSpecial in marketPax; specialUpcoming)
+
 ## 0.9.106 (2026-11-03)
 
 - Descent profile meets the arrival's and approach's altitude and speed limits (flightperf cons; ARINC glide slope codes); chosen procedures are never swapped for a shorter path; limits drawn on the planner's profile

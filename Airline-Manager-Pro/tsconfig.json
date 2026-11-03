@@ -41,6 +41,7 @@
     "src/core/flightplan.ts",
     "src/core/economics.ts",
     "src/core/business.ts",
+    "src/core/special-days.ts",
     "src/core/ai-sim.ts",
     "src/core/procedures.ts",
     "src/core/delays.ts",
@@ -167,6 +168,7 @@
     "src/ui/title.ts",
     "src/ui/quit-save.ts",
     "src/ui/flight-pops.ts",
+    "src/ui/briefing.ts",
     "src/main.ts"
   ]
 }
