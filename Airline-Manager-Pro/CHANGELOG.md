@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.76 (2026-11-03)
+
+- phone-apps.ts: dock (Messages, Phone, Store) centred at the bottom of the phone home screen; Messages with threads, typing and replies (State.phoneMsgs) and notifications; Phone with favourites, recents, contacts, keypad and a call screen (calls not connected yet); Store
+- icons: phone, chat, store
+
 ## 0.9.75 (2026-11-03)
 
 - phone home screen: icons centred in a fixed 4-column grid, labels on two lines
