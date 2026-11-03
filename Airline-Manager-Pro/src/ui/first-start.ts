@@ -1,6 +1,8 @@
 // The very first start: after the start-up screen, look around the demo airline or start from nothing.
 
 function firstStartWelcome(withRestore: boolean) {
+  if (splashShowing()) { setTimeout(() => firstStartWelcome(withRestore), 1000); return; }
+  if (titleShowing()) return;   // the start screen offers New game and the demo itself
   openLayer('modal', `<div class="modal-head"><div><h2>Welcome to ${esc(APP.name)}</h2><small>How would you like to start?</small></div></div>
     <div class="fs-choice">
       <button class="fs-card" data-act="fs-demo"><span class="fs-ic">${icon('play')}</span><b>Explore the demo airlines</b><small>Three airlines with aircraft, routes, crew and flights already running. Look around, try everything, and start your own company any time.</small></button>
@@ -69,6 +71,7 @@ function wipeToScratch(o: { kind: string; name: string; icao: string; callsign: 
   ['aiNext', 'aiDay', 'payNext', 'poolNext', 'condTick', 'lastTouchdown'].forEach(k => { if (S[k] && !Array.isArray(S[k]) && typeof S[k] === 'object') S[k] = {}; else if (typeof S[k] === 'number') S[k] = 0; });
   S.scratch = true; S.difficulty = _fsDiff; S.mkt = null; S.stock = {};
   Store.save(); Store.flushNative();
+  try { sessionStorage.setItem('amp-title-next', 'game'); } catch (e) { /* ignore */ }
   try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: 'ops' })); localStorage.setItem('amp-tour', '1'); localStorage.removeItem('amp-ui'); } catch (e) { /* ignore */ }
   location.reload();
 }

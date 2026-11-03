@@ -41,7 +41,7 @@
   State.screen = back || 'ops';
   renderShell();
   try { if (_ui && _ui.scroll && _ui.screen === State.screen) setTimeout(() => { const v = $('#view'); if (v) v.scrollTop = _ui.scroll; }, 60); } catch (e) { /* ignore */ }
-  if (!Store.wasEmpty) setTimeout(checkBirthday, SPLASH_MS + 400);   // after the start-up screen (not over the first-start choice)
+  if (!Store.wasEmpty) setTimeout(() => titleDefer(checkBirthday), SPLASH_MS + 400);   // after the start-up screen (not over the first-start choice)
   scheduleBirthdayNotification();
   // the airline's clocks: paused while another of your devices runs the airline (Settings → Sync)
   syncGated(() => {
@@ -78,6 +78,7 @@
   // the voices download on the start-up screen the first time, also when the app reopens where it was
   // the start-up screen on every start: at least five seconds, longer while files download; afterwards the
   // Overview, or (opened again within 12 hours) right where it was
-  if (!back) showSplash(() => { if (State.screen !== 'ops' && !_layers.length) go('ops', true); });
-  else showSplash(() => { /* stays where it was */ });
+  // then the start screen (unless a new game or a loaded save is on its way in)
+  if (!back) showSplash(() => { if (State.screen !== 'ops' && !_layers.length) go('ops', true); titleAfterSplash(); });
+  else showSplash(() => { titleAfterSplash(); });
 })();

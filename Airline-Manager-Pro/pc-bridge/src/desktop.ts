@@ -116,11 +116,13 @@ export class Desktop {
     try { json(res, JSON.parse(fs.readFileSync(f, 'utf8'))); } catch (e) { json(res, {}); }
   }
 
-  /** The five backup saves, taken in turn: Documents\\Airline Manager Pro\\backups\\save-1 … save-5.json. */
+  /** The five backup saves, taken in turn: Documents\\Airline Manager Pro\\backups\\save-1 … save-5.json; and the
+   *  twenty saves of the start screen (slot g1 … g20): Documents\\Airline Manager Pro\\saves\\game-1 … game-20.json. */
   private saves(req: http.IncomingMessage, res: http.ServerResponse) {
-    const q = new URL(req.url || '', 'http://x').searchParams, n = +(q.get('slot') || 0);
-    if (!(n >= 1 && n <= 5)) { res.writeHead(400); res.end('slot'); return; }
-    const dir = path.join(this.backupDir(), 'backups'), f = path.join(dir, `save-${n}.json`);
+    const q = new URL(req.url || '', 'http://x').searchParams, sl = q.get('slot') || '', g = /^g(\d+)$/.exec(sl), n = g ? +g[1] : +sl;
+    if (g ? !(n >= 1 && n <= 20) : !(n >= 1 && n <= 5)) { res.writeHead(400); res.end('slot'); return; }
+    const dir = path.join(this.backupDir(), g ? 'saves' : 'backups'), f = path.join(dir, g ? `game-${n}.json` : `save-${n}.json`);
+    if (req.method === 'DELETE') { try { fs.unlinkSync(f); } catch (e) { /* not there */ } return json(res, { ok: true }); }
     if (req.method === 'PUT') return readBody(req, b => {
       try { JSON.parse(b); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(f + '.tmp', b); fs.renameSync(f + '.tmp', f); json(res, { ok: true, at: Date.now() }); }
       catch (e) { res.writeHead(500); res.end(String(e)); }

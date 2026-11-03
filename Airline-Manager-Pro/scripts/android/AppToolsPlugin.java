@@ -213,10 +213,16 @@ public class AppToolsPlugin extends Plugin {
 
     static final String BACKUP_FILE = "save-backup.json";
 
+    /** The start screen's music plays as soon as the app opens, without waiting for a tap. */
+    @Override
+    public void load() {
+        try { getBridge().getWebView().post(() -> { try { getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false); } catch (Exception e) { /* keeps waiting for a tap */ } }); } catch (Exception e) { /* ignore */ }
+    }
+
     @PluginMethod
     public void backupWrite(PluginCall call) {
         String data = call.getString("data", ""), name = call.getString("name", BACKUP_FILE);
-        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json")) { call.reject("Not a backup name"); return; }
+        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json") && !name.matches("game-([1-9]|1[0-9]|20)\\.json")) { call.reject("Not a backup name"); return; }
         File dir = getContext().getFilesDir(), tmp = new File(dir, name + ".tmp"), dst = new File(dir, name);
         try (OutputStream out = new FileOutputStream(tmp)) {
             out.write(data.getBytes(StandardCharsets.UTF_8));
@@ -229,7 +235,7 @@ public class AppToolsPlugin extends Plugin {
     public void backupRead(PluginCall call) {
         JSObject r = new JSObject();
         String name = call.getString("name", BACKUP_FILE);
-        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json")) name = BACKUP_FILE;
+        if (!BACKUP_FILE.equals(name) && !name.matches("save-[1-5]\\.json") && !name.matches("game-([1-9]|1[0-9]|20)\\.json")) name = BACKUP_FILE;
         File f = new File(getContext().getFilesDir(), name);
         if (f.exists()) {
             try (InputStream in = new FileInputStream(f)) {

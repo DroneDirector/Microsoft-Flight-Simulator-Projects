@@ -159,6 +159,7 @@
     "src/screens/view3d.ts",
     "src/ui/gamepad.ts",
     "src/ui/exit-splash.ts",
+    "src/ui/title.ts",
     "src/main.ts"
   ]
 }
