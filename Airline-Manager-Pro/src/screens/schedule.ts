@@ -112,9 +112,50 @@ function schedRepaintDay() {
 }
 /** Late or cancelled: the planned time, how late, and why. */
 function schedLateNote(b: Block, hm: (m: number) => string): string {
-  if (b.cancelled) return `<em class="dl-late cxl">Planned ${hm(b.start)}. ${esc(b.why || 'Cancelled')}. Flown the next day at the same time.</em>`;
+  if (b.cancelled) return `<em class="dl-late cxl">Planned ${hm(b.start)}. ${esc(b.why || 'Cancelled')}. Flown the next day at the same time.</em>${crewShortHtml(b)}`;
   if ((b.delayMin || 0) < 5) return '';
-  return `<em class="dl-late">${b.delayMin} min late${b.sched != null ? `, planned ${hm(b.sched)}` : ''}${b.why ? '. ' + esc(b.why) : ''}</em>${forceDepHtml(b.reg, b.from, b.to)}`;
+  return `<em class="dl-late">${b.delayMin} min late${b.sched != null ? `, planned ${hm(b.sched)}` : ''}${b.why ? '. ' + esc(b.why) : ''}</em>${crewShortHtml(b)}${forceDepHtml(b.reg, b.from, b.to)}`;
+}
+
+/** A delay or cancellation for want of people: exactly who is missing, how many are needed, how many there are
+ *  and why the rest can't work (sick, on strike, on leave, busy with another aircraft), worked out now. */
+function crewShortHtml(b: Block): string {
+  if (!b.why || !/crew|sick|pilot|mechanic|cabin|ground|strike|stand-in|cover/i.test(b.why)) return '';
+  const a: any = plane(b.reg); if (!a) return '';
+  const cid = a.companyId, t = acType(a.typeId), rows: [string, string, string, boolean][] = [];   // what, need/have, why not, short
+  const tally = (list: any[]) => { const sick = list.filter(x => isSick(x)).length, strike = list.filter(x => x.onStrike).length, leave = list.filter(x => x.apronLeave || x.status === 'off' && !isSick(x)).length;
+    return { ok: list.filter(x => !isSick(x) && !x.onStrike && !x.apronLeave && !x.left).length, sick, strike, leave }; };
+  const whyNot = (k: { sick: number; strike: number; leave: number }) => [k.sick ? `${k.sick} off sick` : '', k.strike ? `${k.strike} on strike` : '', k.leave ? `${k.leave} on leave` : ''].filter(Boolean).join(', ');
+  // the pilot
+  const n = forceDepLeg(b.reg, b.from, b.to) || (((State as any).aiNext || []) as any[]).filter(x => x.reg === b.reg)[0];
+  const p: any = n ? pilot(n.pilotId) : null;
+  if (!p) rows.push(['Pilot', '1 needed · none assigned', 'Assign a pilot to the route', true]);
+  else {
+    const sick = isSick(p), cover = p.coverAgency && p.coverAgency > Date.now();
+    const back = sick && p.sickUntil ? Math.max(1, Math.ceil((p.sickUntil - Date.now()) / 864e5)) : 0;
+    const st = sick ? `${p.name} off sick${back ? `, back in about ${back} day${back > 1 ? 's' : ''}` : ''}${cover ? ' (a contract pilot covers)' : ''}` : p.onStrike ? `${p.name} on strike` : p.status === 'training' ? `${p.name} away on a course` : p.status === 'off' ? `${p.name} off duty` : p.name;
+    rows.push(['Pilot', `1 needed · ${sick && !cover || p.onStrike || p.status === 'training' || p.status === 'off' ? '0' : '1'} available`, st, sick && !cover || !!p.onStrike || p.status === 'training']);
+  }
+  // cabin crew for this aircraft
+  const faN = t ? faNeeded(t) : 0;
+  if (faN) { const k = tally(staffOf(cid, 'fa')), agency = agencyOn(cid, 'fa');
+    rows.push(['Cabin crew', `${faN} needed for the ${t.model} · ${k.ok} available${agency ? ' + agency cover' : ''}`, whyNot(k) || '—', !agency && k.ok < faN]); }
+  // a mechanic to release the aircraft
+  const mechs = staffOf(cid, 'mech');
+  if (mechs.length || /mechanic/i.test(b.why)) { const k = tally(mechs), agency = agencyOn(cid, 'mech');
+    rows.push(['Mechanics', `1 needed to release it · ${k.ok} available${agency ? ' + agency cover' : ''}`, whyNot(k) || (mechs.length ? '—' : 'none hired'), !agency && k.ok < 1]); }
+  // ground crew at the airport, if it is one of your bases
+  try {
+    if (isBase(cid, b.from) && !groundGraceOn(cid)) {
+      const gN = GROUND_NEED[t ? t.cls : 'airliner'] || 0, all = ((State as any).staff || []).filter((x: any) => x.companyId === cid && x.role === 'ground' && x.base === b.from && !x.left);
+      const k = tally(all), free = groundCrewFree(cid, b.from).length, now = Date.now();
+      const busy = (((State as any).aiNext || []) as any[]).filter(x => x.reg !== b.reg && x.from === b.from && plane(x.reg) && plane(x.reg).companyId === cid && x.depAt > now && x.depAt - now < AI_TURN_MIN * 60e3).length;
+      if (gN) rows.push(['Ground crew at ' + b.from, `${gN} needed for one turnaround · ${free} at work of ${all.length} hired`, [whyNot(k), busy ? `${busy} other aircraft being turned round` : ''].filter(Boolean).join(', ') || (all.length ? '—' : 'none hired'), free < 1 || free < gN]);
+    }
+  } catch (e) { /* no ground data */ }
+  if (!rows.length) return '';
+  return `<div class="crew-short"><b>${icon('pilots')}Who is missing</b><table>${rows.map(r => `<tr class="${r[3] ? 'short' : ''}"><th>${esc(r[0])}</th><td>${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')}</table>
+    <button class="text-btn" data-act="go" data-screen="pilots">${icon('pilots')}Open Crew</button></div>`;
 }
 
 /* ---------- forcing a delayed departure at your home hub, once what held it up is fixed ---------- */

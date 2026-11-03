@@ -109,6 +109,7 @@ function viewer3dOpen(o: { title: string; sub?: string; info?: string; build: (T
   let obj: any = null; try { obj = o.build(T); } catch (e) { obj = null; }
   if (!obj) { obj = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshStandardMaterial({ color: 0x888888 })); }
   obj.traverse((m: any) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  const shine = { value: 0 }; v3vShine(obj, shine);
   const hgt = v3vFit(T, obj); pivot.add(obj);
   const st = { yaw: -0.5, pitch: 0.12, dist: 6.2, vy: 0, vp: 0, spin: o.spin !== false, tYaw: -0.5, tPitch: 0.12, tDist: 6.2 };
   const reset = () => { st.tYaw = -0.5; st.tPitch = 0.12; st.tDist = 6.2; };
@@ -178,7 +179,7 @@ function viewer3dOpen(o: { title: string; sub?: string; info?: string; build: (T
     }
     if (st.spin) st.tYaw += 0.35 * dt;
     st.yaw += (st.tYaw - st.yaw) * 0.18; st.pitch += (st.tPitch - st.pitch) * 0.18; st.dist += (st.tDist - st.dist) * 0.15;
-    pivot.rotation.y = st.yaw;
+    pivot.rotation.y = st.yaw; shine.value = st.yaw * 1.25 + st.pitch * 0.9;
     const cy = hgt * 0.45;
     cam.position.set(0, cy + Math.sin(st.pitch) * st.dist, Math.cos(st.pitch) * st.dist); cam.lookAt(0, cy, 0);
     R.render(sc, cam);
@@ -187,7 +188,7 @@ function viewer3dOpen(o: { title: string; sub?: string; info?: string; build: (T
   const onPad = () => helpUpdate();
   window.addEventListener('gamepadconnected', onPad); window.addEventListener('gamepaddisconnected', onPad);
   const padPoll = setInterval(helpUpdate, 1500);
-  V3V.on = true; V3V.host = host; V3V.R = R; V3V.sc = sc;
+  V3V.on = true; V3V.host = host; V3V.R = R; V3V.sc = sc; V3V.st = st;
   V3V.off = () => { window.removeEventListener('resize', resize); window.removeEventListener('keydown', kd, true); window.removeEventListener('keydown', useKb, true); window.removeEventListener('keyup', ku, true); window.removeEventListener('gamepadconnected', onPad); window.removeEventListener('gamepaddisconnected', onPad); clearInterval(padPoll); };
   Sound.tick();
   frame();
@@ -201,6 +202,33 @@ function viewer3dClose() {
   V3V.host = null; V3V.R = null; V3V.sc = null;
 }
 ACTIONS['v3v-close'] = () => viewer3dClose();
+
+/** A shine on the metal parts only (brass, gold, silver, bronze, chrome; not wood, glass, cloth or paint): a bright
+ *  streak across the metal that sweeps over it as you turn the object, on top of its reflections. */
+function v3vShine(obj: any, u: { value: number }) {
+  const done = new Set();
+  obj.traverse((o: any) => {
+    if (!o.isMesh) return;
+    for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+      if (!m || done.has(m) || !m.isMeshStandardMaterial || (m.metalness || 0) < 0.8 || m.transmission) continue;
+      done.add(m);
+      m.onBeforeCompile = (sh: any) => {
+        sh.uniforms.uShine = u;
+        sh.fragmentShader = 'uniform float uShine;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
+          {
+            // a diagonal streak across the metal, in the picture, that moves as the object is turned
+            vec3 vp = -vViewPosition;
+            float g = (vp.x * 0.78 + vp.y * 0.62) + 0.25 * dot(normalize(normal), vec3(0.6, 0.6, 0.5));
+            float c = 1.6 * sin(uShine);
+            float band = exp(-pow((g - c) / 0.11, 2.0)) + 0.6 * exp(-pow((g - c + 0.3) / 0.035, 2.0));
+            gl_FragColor.rgb += band * (diffuseColor.rgb * 0.6 + 0.4) * 0.7;
+          }`);
+      };
+      m.customProgramCacheKey = () => 'v3vshine';
+      m.needsUpdate = true;
+    }
+  });
+}
 
 /** A still of an object for a list, rendered once with the viewer's lighting (kept for the session). */
 const _v3vThumbs: { [k: string]: string } = {};

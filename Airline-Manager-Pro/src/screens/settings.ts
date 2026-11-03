@@ -178,6 +178,7 @@ const SETTINGS: SetSection[] = [
     { type: 'group', title: 'Other airlines' },
     { type: 'toggle', key: 'tfcRealNames', label: 'Real airline names on other aircraft', hint: 'Other airlines\' aircraft on the map and in the 3D view fly as real airlines (British Airways, Lufthansa, Emirates…) from their real home airports, with their flight codes and registrations. Off: made-up airlines. The league, takeovers and the newspaper always use made-up airlines.' },
   ] },
+  { id: 'flightpops', title: 'Flight pop-ups', icon: 'bell', items: [{ type: 'html', html: () => fpSettingsHtml() }] },
   { id: 'news', title: 'News', icon: 'news', items: [
     { type: 'choice', key: 'newsMode', label: 'Newspaper articles', hint: 'When your airline makes the papers. Every article is also in the inbox and under Newspaper in the menu.', options: [['popup', 'Open by themselves, animated'], ['notify', 'Only in the inbox, animated when opened'], ['plain', 'Only in the inbox, without animation']] },
   ] },
