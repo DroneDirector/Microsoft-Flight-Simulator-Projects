@@ -62,6 +62,7 @@ function renderTopbar() {
     </button>
     <button class="sync-chip" data-act="settings" data-section="cloud" style="display:none" aria-label="Sync"></button>
     <span class="batt-slot">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
+    ${dclockHtml()}
     <div class="top-spacer"></div>
     <button class="balance" data-balance data-act="go" data-screen="finance" aria-label="Balance ${money(c.balance)}. Open Finance"><small>Balance</small><b data-balance-val>${money(c.balance, { compact: true })}</b></button>
     <button class="icon-btn sound-btn ${State.settings.muteAll ? 'muted-btn' : ''}" data-act="sound-toggle" aria-label="${State.settings.muteAll ? 'Sounds are muted. Tap to turn sounds on' : 'Sounds are on. Tap to mute all sounds'}">${icon(State.settings.muteAll ? 'mute' : 'volume')}</button>
@@ -73,6 +74,20 @@ function renderTopbar() {
   const dot = $('[data-maint-dot]');
   if (dot) dot.style.display = State.issues.some(i => i.status === 'open' && plane(i.reg) && plane(i.reg).companyId === State.companyId) ? '' : 'none';
 }
+
+/* ---------- the digital clock by the battery: your device's time, and the game's date ---------- */
+function dclockHtml(): string { const d = dclockParts(); return `<span class="dclock" data-dclock role="timer" aria-label="Time ${d.t}, ${d.d}"><b><i data-dc-h>${d.h}</i><em>:</em><i data-dc-m>${d.m}</i><small data-dc-s>${d.s}</small></b><span data-dc-d>${d.d}</span></span>`; }
+function dclockParts(): { h: string; m: string; s: string; t: string; d: string } {
+  const now = new Date(), p = (n: number) => String(n).padStart(2, '0');
+  let g = now; try { g = companyDate(); } catch (e) { /* the device's date */ }
+  const h24 = State.settings.clock24 !== false, hh = h24 ? now.getHours() : (now.getHours() % 12 || 12);
+  return { h: p(hh), m: p(now.getMinutes()), s: p(now.getSeconds()) + (h24 ? '' : now.getHours() < 12 ? ' am' : ' pm'), t: p(hh) + ':' + p(now.getMinutes()), d: g.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) };
+}
+setInterval(() => {
+  const el = document.querySelector('[data-dclock]') as HTMLElement; if (!el) return;
+  const d = dclockParts(), set = (sel: string, v: string) => { const e = el.querySelector(sel) as HTMLElement; if (e && e.textContent !== v) e.textContent = v; };
+  set('[data-dc-h]', d.h); set('[data-dc-m]', d.m); set('[data-dc-s]', d.s); set('[data-dc-d]', d.d);
+}, 1000);
 
 let _navSeq = 0;
 function go(screen: string, instant?: boolean) {

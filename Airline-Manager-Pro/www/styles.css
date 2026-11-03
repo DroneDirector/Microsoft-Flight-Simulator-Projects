@@ -3799,3 +3799,14 @@ body.ts-on .tour, body.ts-on .tour-dim, body.ts-on .pull-ind { display: none !im
 .fin-hold > span { position: relative; z-index: 1; }
 .fin-hold .fh-t b { text-shadow: 0 1px 0 rgba(255, 240, 200, .5); }
 .fin-hold .fh-t small { color: rgba(48, 28, 4, .82); opacity: 1; font-weight: 600; }
+/* the digital clock by the battery */
+.dclock { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; height: 40px; padding: 0 11px; margin-left: 6px; border-radius: 12px; flex: none;
+  background: linear-gradient(180deg, rgba(4, 14, 24, .9), rgba(8, 22, 36, .9)); border: 1px solid rgba(63, 208, 232, .22); box-shadow: inset 0 0 12px rgba(63, 208, 232, .08); line-height: 1; }
+.dclock b { display: flex; align-items: baseline; font: 600 17px/1 'Inter Display', 'Inter', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: .04em; color: #7FF0FF; text-shadow: 0 0 6px rgba(63, 208, 232, .7), 0 0 14px rgba(63, 208, 232, .35); }
+.dclock b i { font-style: normal; }
+.dclock b em { font-style: normal; margin: 0 1px; animation: dcBlink 1s steps(1) infinite; }
+.dclock b small { font-size: 10.5px; margin-left: 3px; opacity: .75; }
+.dclock > span { margin-top: 3px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+@keyframes dcBlink { 50% { opacity: .25; } }
+html.calm .dclock b em { animation: none; }
+@media (max-width: 900px) { .dclock { padding: 0 8px; } .dclock b { font-size: 15px; } .dclock b small { display: none; } }
