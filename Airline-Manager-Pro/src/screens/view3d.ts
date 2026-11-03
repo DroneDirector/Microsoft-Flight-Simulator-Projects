@@ -751,6 +751,7 @@ function v3dLoop(now: number) {
     const PA: any = P; if (s.gear && s.gear.floats) { const wantA = v3dAmphibWheels(g, w, ph); PA.amph = PA.amph == null ? wantA : PA.amph + (wantA - PA.amph) * Math.min(1, dt * 0.6); }
     if (P.model.userData.set) P.model.userData.set({ flaps: P.flaps, gear: P.gear, spin: now / 18, spoilers: PSp.spoil, reverse: PR.rev, stopped: outI, amphib: PA.amph } as any);
     try { v3dEmergencyStep(P, g, fireI, feI, now, ground, w); } catch (e) { /* no effects */ }
+    try { v3dContrailStep(P, g, w, now); } catch (e) { /* no trail */ }
     // the air blown forward out of the open reversers kicks up spray and dust from the runway
     if (PR.rev > 0.6 && now - (PR.revAt || 0) > 90) {
       PR.revAt = now; const body = P.model.userData.body; body.updateMatrixWorld();
@@ -776,7 +777,11 @@ function v3dLoop(now: number) {
     if (PA.amph && P.model.userData.body && P.model.userData.body.userData.ampLift) P.model.position.y += P.model.userData.body.userData.ampLift * PG.gw;   // standing on the wheels below the floats
     P.model.rotateZ(-(P.pitch + tm[2]) * D2R);   // nose up
     P.model.rotateX(-(P.bank + tm[1]) * D2R);   // a turn to the right lowers the right wing
-    (P.model.userData as any).flex = tm[3] * Math.max(0.5, shapeOf(P.type).span / 30);
+    // the wings carry the aircraft: on the ground they droop a little under their own weight and the fuel, in the air
+    // they bend up with the lift (more in a turn and as the nose comes up at rotation), and turbulence flexes them
+    { const PW: any = P, g1 = w.onGround ? (PS.tdAt && now - PS.tdAt < 1500 ? -0.25 : -0.12) : 0.55 / Math.max(0.6, Math.cos(P.bank * D2R)) + (w.altM - ground < 60 && P.pitch > 4 ? 0.15 : 0);
+      PW.flexBase = PW.flexBase == null ? g1 : PW.flexBase + (g1 - PW.flexBase) * Math.min(1, dt * (w.onGround ? 3 : 1.2));
+      (P.model.userData as any).flex = (PW.flexBase + tm[3]) * Math.max(0.5, shapeOf(P.type).span / 30); }
     // touchdown: tyre smoke from the main wheels (left behind on the runway as the aircraft rolls on)
     if (touched) { PS.smokeUntil = now + 900; PS.smokeAt = 0; PS.smokeK = g.you && (State as any).lastTouchdown ? clamp(Math.abs((State as any).lastTouchdown.fpm || 150) / 200, 0.7, 2) : 1; }
     if (PS.smokeUntil > now && now - (PS.smokeAt || 0) > 40) {
@@ -790,7 +795,7 @@ function v3dLoop(now: number) {
     void s;
   }
   v3dSmokeStep(dt);
-  for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); delete V3d.planes[id]; }
+  for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); const PC: any = P; if (PC.ct) for (const r of PC.ct.rb) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } delete V3d.planes[id]; }
 
   // the camera follows the aircraft (or flies freely)
   const P = V3d.planes[f.id];
