@@ -158,7 +158,7 @@ function v3dClose() {
 ACTIONS['v3d-close'] = () => {
   if (!V3d.open || ExitSplash.on) return;
   const free = V3d.mode === 'free';
-  exitSplash('v3d', '3D view', [
+  exitSplash('v3d', 'Leaving the 3D viewer', [
     { pct: 30, step: 'Landing the camera…', run: () => { (V3d as any).fcLeaving = true; v3dClose(); (V3d as any).fcLeaving = false; } },
     { pct: 55, step: 'Clearing the 3D world from memory…', run: () => { try { if (CabinOut.rt) CabinOut.rt.dispose(); CabinOut.rt = null; } catch (e) { /* none */ } exitFreeMemory(); } },
     { pct: 85, step: (V3d as any).backTo ? 'Back to your office…' : free ? 'Loading the Overview…' : 'Loading the map…', run: () => { if (v3dRoomResume()) return; if (free) { try { closeAll(); go('ops'); } catch (e) { /* ignore */ } } else { try { refresh(); } catch (e) { /* ignore */ } } } },

@@ -43,8 +43,8 @@ function roomAskFlight(f: any) {
 function roomTo3d(id: string) {
   const go = () => { try { if (v3dSupported()) v3dOpen(id, _curMap(), null); else showFlightOnMap(id); } catch (e) { /* the overview */ } };
   const r = roomNow();
-  if (r === 'office') { exitSplash('office', 'Your office', [{ pct: 30, step: 'Closing the office…', run: () => OfficeRoom.close(true) }, { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory }, { pct: 85, step: 'Opening the 3D view…', run: () => refresh() }], go); return; }
-  if (r === 'ops') { exitSplash('ops', 'Operations', [{ pct: 30, step: 'Switching off the screens…', run: () => OpsRoom.close(true) }, { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory }, { pct: 85, step: 'Opening the 3D view…', run: () => refresh() }], go); return; }
+  if (r === 'office') { exitSplash('office', 'Leaving the office', [{ pct: 30, step: 'Closing the office…', run: () => OfficeRoom.close(true) }, { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory }, { pct: 85, step: 'Opening the 3D view…', run: () => refresh() }], go); return; }
+  if (r === 'ops') { exitSplash('ops', 'Leaving Operations', [{ pct: 30, step: 'Switching off the screens…', run: () => OpsRoom.close(true) }, { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory }, { pct: 85, step: 'Opening the 3D view…', run: () => refresh() }], go); return; }
   go();
 }
 

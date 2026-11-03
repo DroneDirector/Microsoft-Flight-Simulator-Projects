@@ -1332,7 +1332,7 @@ HangarRoom.close = function (quiet?: boolean) {
 };
 function hgLeave(to?: string) {
   if (!HangarRoom.on || ExitSplash.on) return;
-  exitSplash('hangar', HangarRoom.sz ? HangarRoom.sz.name : 'Hangar', [
+  exitSplash('hangar', HangarRoom.sz ? 'Leaving the ' + HangarRoom.sz.name.toLowerCase() : 'Leaving the hangar', [
     { pct: 30, step: 'Closing the hangar…', run: () => HangarRoom.close(true) },
     { pct: 55, step: 'Clearing the hangar from memory…', run: exitFreeMemory },
     { pct: 85, step: to && to !== 'hangars' ? 'On your way…' : 'Loading your hangars…', run: () => { try { roomGoTo(to || 'hangars'); } catch (e) { refresh(); } } },

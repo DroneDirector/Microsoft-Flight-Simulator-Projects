@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.120 (2026-11-03)
+
+- Exit splash titles: Leaving the <size> hangar / Operations / the office / the courtroom / the 3D viewer
+- openLayer marks __layerAt; av3Tick waits 400 ms after a window opens before building an uncached portrait
+
 ## 0.9.119 (2026-11-03)
 
 - lap-close and roomGo know the hangar's monitor; camera glide to the hangar monitor (monEye/monAt), rect from the standing view

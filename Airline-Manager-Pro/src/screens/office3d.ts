@@ -481,7 +481,7 @@ function ofLeave() {
 /** Out of the office: the office's loading screen while the room is cleared from memory and the app comes back. */
 function ofExitToMain(msg?: string, to?: string) {
   if (!OfficeRoom.on) return;
-  exitSplash('office', 'Your office', [
+  exitSplash('office', 'Leaving the office', [
     { pct: 30, step: 'Closing the office…', run: () => OfficeRoom.close(true) },
     { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
     { pct: 85, step: to === 'hangars' ? 'Loading your hangars…' : 'Loading your airline…', run: () => { if (to) { try { roomGoTo(to); } catch (e) { refresh(); } } else refresh(); } },
