@@ -626,8 +626,8 @@ function ofFrame() {
     const heard = R.p && humanVoiceOn(R.p.name);
     if (R.p && humanVoiceBusy(R.p.name)) { R.talkUntil = 0; R.sayText = ''; }   // the voice leads: still until it is heard, then with it
     const talking = heard || R.talkUntil > now;
-    let gT = V.state === 'walking' ? cabinLerpG(humanGesture(null, t), humanGesture({ kind: 'walk', v: 1 }, V.dist / 1.25), Math.min(1, V.v / 0.6)) : humanGesture(null, t);
-    gT = cabinLerpG(gT, humanGesture({ kind: 'sit', v: 0 }, t), sk);
+    let gT = V.state === 'walking' ? cabinLerpG(humanGesture(null, t), humanGesture({ kind: 'walk', v: Math.max(0.6, V.v), seed: R.p && R.p.name }, V.dist / 1.25), Math.min(1, V.v / 0.6)) : humanGesture(null, t);
+    gT = humanSitMove(cabinLerpG(gT, humanGesture({ kind: 'sit', v: 0 }, t), sk), sk);   // leaning forward as they sit down or stand up
     // body language: how they feel about what they say
     const att = V.say || V.attitude;
     if (seated && V.state === 'sitting') {

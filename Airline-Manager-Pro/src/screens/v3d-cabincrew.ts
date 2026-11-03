@@ -296,7 +296,7 @@ function cabinCrewStep(P: any, G: any, night: number) {
     // the gesture: steps follow the distance walked (they never slide); otherwise what they are doing; blended
     const tt = now + m.t0, walkK = Math.min(1, m.v / 0.6);
     const base = w.mood ? humanGesture(w.mood, w.mood.kind === 'push' ? m.dist / 0.85 : tt) : humanGesture(null, tt);
-    const walk = humanGesture({ kind: 'walk', v: 1 }, m.dist / 1.25);
+    const walk = humanGesture({ kind: 'walk', v: 1, seed: (m as any).voice || (m as any).id }, m.dist / 1.25);
     const sit = humanGesture({ kind: 'sit', v: 0 }, tt);
     let gT = cabinLerpG(base, walk, w.mood && w.mood.kind === 'push' ? 0 : walkK);
     gT = cabinLerpG(gT, sit, m.sitK);
@@ -314,7 +314,7 @@ function cabinCrewStep(P: any, G: any, night: number) {
 /** Blend two gestures (k = 0 … 1). */
 function cabinLerpG(a: any, b: any, k: number): any {
   const l = (x: number, y: number) => (x || 0) + ((y || 0) - (x || 0)) * k, la = (x: number[], y: number[]) => x.map((v, i) => l(v, y[i]));
-  return { L: la(a.L, b.L), R: la(a.R, b.R), legs: la(a.legs || [0, 0, 0, 0], b.legs || [0, 0, 0, 0]), lean: l(a.lean, b.lean), bob: l(a.bob, b.bob), roll: l(a.roll, b.roll), nod: l(a.nod, b.nod), shake: l(a.shake, b.shake), tilt: l(a.tilt, b.tilt), flush: l(a.flush, b.flush), calm: l(a.calm, b.calm) };
+  return { L: la(a.L, b.L), R: la(a.R, b.R), legs: la(a.legs || [0, 0, 0, 0], b.legs || [0, 0, 0, 0]), ank: la(a.ank || [0, 0], b.ank || [0, 0]), spine: la(a.spine || [0, 0, 0], b.spine || [0, 0, 0]), pelvis: l(a.pelvis, b.pelvis), lean: l(a.lean, b.lean), bob: l(a.bob, b.bob), roll: l(a.roll, b.roll), nod: l(a.nod, b.nod), shake: l(a.shake, b.shake), tilt: l(a.tilt, b.tilt), flush: l(a.flush, b.flush), calm: l(a.calm, b.calm) };
 }
 /** The passenger being talked to turns their head towards the aisle, and back. */
 function cabinTurnHead() {
