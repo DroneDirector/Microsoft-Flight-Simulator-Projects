@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.124 (2026-11-04)
+
+- Lounge seats: armchairs, sofa places and bar stools in A.seats (kind, hip); lgSeatHits ('sit' / 'taken'), lgSit, lgStand, lgSeated; lgFrame split into lgFrameRest; guests not on bar stools
+
 ## 0.9.123 (2026-11-03)
 
 - CRASH_FILES and CRASH_FX_FILES (models/crash/); Models.tex for pictures; index.json lists .png/.jpg/.webp too, only .glb are loaded as models
