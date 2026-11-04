@@ -849,7 +849,7 @@ function lgCupsStep(dt: number, now: number) {
     }
     if (c.w < 1) pos = c.from.clone().lerp(pos, c.w * c.w * (3 - 2 * c.w));
     c.g.position.copy(pos); c.g.rotation.set(0, yaw, 0); c.g.rotateX(tilt);
-    if (c.lvl != null && dt > 0) lgSlosh(c, dt);
+    if (c.lvl != null && dt > 0) { if (c.w >= 1) lgSlosh(c, dt); else { c.pv = null; c.sl = [0, 0]; } }   // picked up gently: it settles in your hand first
   }
   R.cups = (R.cups || []).filter((c: any) => c.st !== 'done');
 }
