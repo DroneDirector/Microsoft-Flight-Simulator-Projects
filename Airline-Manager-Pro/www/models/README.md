@@ -191,12 +191,16 @@ towards +Z (where you sit or stand to use it), standing on the floor; fitted to 
 | `lounge-props/napkin-stack.glb` | Napkins |
 | `lounge-props/fruit-bowl.glb` | Fruit bowl |
 | `lounge-props/drinks-fridge.glb` | Glass-fronted fridge (the drinks and snacks in it are the items/ files) |
-| `lounge-props/bar-counter.glb` | Bar counter (Business and Flagship) |
-| `lounge-props/bar-stool.glb` | Bar stool |
-| `lounge-props/bottle-shelf.glb` | Shelf of bottles behind the bar |
+| `lounge-props/bar-counter.glb` | Bar counter, L-shaped, black lacquer and brass (Business and Flagship) |
+| `lounge-props/bar-stool.glb` | Bar stool (brass legs, black seat) |
+| `lounge-props/bottle-shelf.glb` | Glass shelves of bottles behind the bar |
+| `lounge-props/bar-mirror.glb` | Mirrored back wall behind the bar, in a brass frame |
+| `lounge-props/bar-pendant-globe.glb` | Globe pendant light over the bar |
+| `lounge-props/ceiling-copper-waves.glb` | Lounge ceiling: copper waves with warm hidden light (every level) |
+| `lounge-props/welcome-mat.glb` | Welcome mat inside the lounge doors (where you arrive) |
 | `lounge-props/pendant-light.glb` | Pendant light (Business) |
 | `lounge-props/chandelier.glb` | Chandelier (Flagship) |
-| `lounge-props/fireplace.glb` | Fireplace (Flagship) |
+| `lounge-props/fireplace.glb` | Fireplace, art deco brass on black lacquer (Business and Flagship; the fire is drawn by the app) |
 | `lounge-props/grand-piano.glb` | Grand piano (Flagship) |
 | `lounge-props/wall-art.glb` | Framed art (Flagship) |
 | `lounge-props/champagne-bucket.glb` | Champagne bucket (Flagship) |

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.157
+- A new lounge: copper-wave ceiling and taller walls, a black and brass L-shaped bar with a real mirror behind the bottles, an art deco fireplace, more flight boards, a welcome mat where you arrive, subtle reflections on every metal.
+
 ## 0.9.156
 - Frame generation in the rooms draws real frames again (no more streaks); aircraft on the ground no longer jump: one ground model for every view; an intoxicated note with a countdown to sober.
 
