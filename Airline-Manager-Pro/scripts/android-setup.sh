@@ -32,6 +32,10 @@ mkdir -p "$RES/layout" "$RES/xml" "$RES/drawable"
 cp scripts/android/res/layout/amp_widget.xml "$RES/layout/"; cp scripts/android/res/xml/amp_widget*_info.xml "$RES/xml/"; cp scripts/android/res/drawable/amp_widget_*.xml "$RES/drawable/"
 # a game: Android's game mode (Android 12+) and the phone's own game booster recognise it and remember its mode
 cp scripts/android/res/xml/game_mode_config.xml "$RES/xml/"
+# the app icon: the same compass rose as the PC app (adaptive icon, with round and classic ones for older Android)
+for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do mkdir -p "$RES/mipmap-$d"; cp scripts/android/res/mipmap-$d/ic_launcher*.png "$RES/mipmap-$d/"; done
+mkdir -p "$RES/mipmap-anydpi-v26"; cp scripts/android/res/mipmap-anydpi-v26/ic_launcher*.xml "$RES/mipmap-anydpi-v26/"
+cp scripts/android/res/values/ic_launcher_background.xml "$RES/values/"
 # more memory for the app (big airports, the cabin and satellite imagery)
 grep -q 'largeHeap' "$MAN" || sed -i 's/<application/<application android:largeHeap="true"/' "$MAN"
 grep -q 'appCategory' "$MAN" || sed -i 's/<application/<application android:appCategory="game" android:isGame="true"/' "$MAN"

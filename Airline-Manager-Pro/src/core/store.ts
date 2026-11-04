@@ -125,9 +125,9 @@ const Store = {
     document.addEventListener('click', ev => { if ((ev.target as HTMLElement).closest('[data-act]')) this.soon(); }, true);
     // minimised or closed: save everything now and note where the app was, so that when it opens again
     // (after it was swiped away, exited, or closed by Android to free memory) it is right there
-    const away = () => { this.save(); this.flushNative(); try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: State.screen })); } catch (e) { /* ignore */ } };
+    const away = () => { this.save(); this.flushNative(); if ((window as any).__quitting) return; try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: State.screen })); } catch (e) { /* ignore */ } };
     document.addEventListener('visibilitychange', () => { if (document.hidden) away(); });
-    setInterval(() => { if (!document.hidden) try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: State.screen })); } catch (e) { /* ignore */ } }, 15000);
+    setInterval(() => { if (!document.hidden && !(window as any).__quitting) try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: State.screen })); } catch (e) { /* ignore */ } }, 15000);
     window.addEventListener('pagehide', away);
     setInterval(() => this.save(), 30000);
   },

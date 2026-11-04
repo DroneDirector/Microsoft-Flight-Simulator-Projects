@@ -333,22 +333,134 @@ function lgPlant(add: any, x: number, z: number, lv: number) {
 }
 
 /* ---------- guests ---------- */
+/** Who is in the lounge: the business and first class passengers of your next departures from here (the next four
+ *  hours), the same people (names, faces, clothes) as on those flights' passenger lists. The flight is given their
+ *  seed, so when it leaves they are on board. */
+function lgPassengers(): { name: string; look: any; cls: string; to: string; dep: number; callsign: string }[] {
+  const R = LoungeRoom, now = Date.now(), out: any[] = [], S: any = State;
+  const legs = ((S.aiNext || []) as any[]).filter(n => n && n.from === R.k && n.to && n.to !== n.from && n.depAt > now - 10 * 60e3 && n.depAt < now + 4 * 3600e3 && plane(n.reg))
+    .sort((a, b) => a.depAt - b.depAt);
+  for (const n of legs) {
+    let ld: any = null; try { ld = aiPlannedLoad(n); } catch (e) { ld = null; }
+    if (!ld || !(ld.paxF + ld.paxJ)) continue;
+    if (!n.paxSeed) { n.paxSeed = 'lp-' + uid(); try { Store.soon(); } catch (e) { /* saved later */ } }
+    const a = plane(n.reg), pseudo: any = { id: n.paxSeed, paxSeed: n.paxSeed, reg: n.reg, typeId: a.typeId, from: n.from, to: n.to, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF };
+    let list: any[] = []; try { list = manifestOf(pseudo).filter((p: any) => p.cls !== 'Y'); } catch (e) { list = []; }
+    for (const p of list) out.push({ name: p.name, look: p.look, cls: p.cls === 'F' ? 'First' : 'Business', to: n.to, dep: n.depAt, callsign: n.callsign || n.reg });
+  }
+  return out;
+}
+/** The places guests walk to when they are up: where they stand, which way they face, how long they stay. */
+function lgSpots(): { k: string; x: number; z: number; ry: number; t: [number, number] }[] {
+  const R = LoungeRoom, sp: LgSpec = R.spec, W = sp.W, D = sp.D, x0 = -W / 2, x1 = W / 2, z0 = -D / 2, z1 = D / 2, lv = R.lvl;
+  const cx = x1 - 3.0, cz = z1 - 1.0, out: any[] = [
+    { k: 'coffee', x: cx - 1.1, z: cz - 0.85, ry: 0, t: [8, 16] }, { k: 'tea', x: cx - 0.35, z: cz - 0.85, ry: 0, t: [8, 14] }, { k: 'snacks', x: cx + 1.0, z: cz - 0.85, ry: 0, t: [5, 10] },
+    { k: 'fridge', x: x1 - 1.45, z: cz - 1.6, ry: Math.PI / 2, t: [6, 12] },
+    { k: 'magazines', x: x0 + 1.2, z: z1 - 1.2, ry: 0, t: [8, 18] },
+    { k: 'departures', x: -W * 0.05, z: z1 - 2.6, ry: 0, t: [10, 22] },
+    { k: 'window', x: -W * 0.3, z: z0 + 0.9, ry: Math.PI, t: [15, 35] }, { k: 'window', x: W * 0.05, z: z0 + 0.9, ry: Math.PI, t: [15, 35] }, { k: 'window', x: W * 0.35, z: z0 + 0.9, ry: Math.PI, t: [15, 35] },
+  ];
+  if (lv >= 1) { const bxp = x0 + 3.2, bz = z1 - 1.2; out.push({ k: 'bar', x: bxp + 1.7, z: bz - 0.95, ry: -0.4, t: [12, 25] }); }
+  if (lv === 2) { out.push({ k: 'fireplace', x: x0 + 1.9, z: z0 + D * 0.72, ry: -Math.PI / 2, t: [15, 30] }, { k: 'piano', x: W * 0.28 - 1.6, z: z0 + D * 0.2 + 0.4, ry: Math.PI / 2, t: [10, 20] }); }
+  return out.filter(o => !lgBlocked(o.x, o.z));
+}
 function lgGuests() {
-  const R = LoungeRoom, T = THREE, A = R.A, seats = (A.seats || []).filter((x: any) => x.kind !== 'stool'), r = ctRng(7 + R.lvl * 31 + R.k.length);
-  R.guests = [];
-  // shuffle the seats, sit some guests down; one or two stand at the window with a cup
-  for (let i = seats.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = seats[i]; seats[i] = seats[j]; seats[j] = t; }
-  const n = R.spec.guests, q = R.q >= 2 ? 0.6 : 0.4;
-  for (let i = 0; i < n; i++) {
-    const sex: 'm' | 'f' = r() < 0.5 ? 'm' : 'f', look = ctLook('lounge-' + R.k + i, sex, i % 3 ? 'public' : 'lay');
-    let m: any = null; try { m = Human.build(dressed(look, 'fa' as any), 'fa', '#2C8CFF', av3Style(), q); } catch (e) { m = null; } if (!m) continue;
+  const R = LoungeRoom, T = THREE, A = R.A, r = ctRng(7 + R.lvl * 31 + R.k.length), q = R.q >= 2 ? 0.6 : 0.4;
+  R.guests = []; R.spots = lgSpots();
+  const pax = lgPassengers().slice(0, R.spec.guests * 2);
+  if (!pax.length) setTimeout(() => { if (R.on) toast('No one waiting yet: none of your departures from here in the next 4 hours has business or first class passengers', 'info'); }, 6500);
+  const free = () => (A.seats || []).filter((x: any) => !x.taken && x !== R.sit);
+  pax.forEach((P, i) => {
+    let m: any = null; try { m = Human.build(dressed(P.look, 'fa' as any), 'fa', '#2C8CFF', av3Style(), q); } catch (e) { m = null; } if (!m) return;
+    try { modelsPeople(m, P.look); } catch (e) { /* the app's own figure */ }
     const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); A.root.add(pivot);
     m.root.traverse((o: any) => { if (o.isMesh) { o.castShadow = R.q >= 1; o.receiveShadow = true; } });
-    const s = seats[i]; const standing = !s || i >= n - 2; if (s && !standing) s.taken = true;
-    if (!standing) { pivot.position.set(s.x + Math.sin(s.ry) * 0.06, 0.45, s.z + Math.cos(s.ry) * 0.06); pivot.rotation.y = s.ry; holder.position.y = -(m.top || 1.75) * 0.52; }
-    else { const x = -R.spec.W * 0.3 + r() * R.spec.W * 0.6, z = -R.spec.D / 2 + 0.9; pivot.position.set(x, 0, z); pivot.rotation.y = Math.PI + (r() - 0.5) * 0.8; A.blocks.push([x - 0.3, z - 0.3, x + 0.3, z + 0.3]); }
-    R.guests.push({ m, pivot, sit: !standing, seed: r() * 10 });
+    const G: any = { m, pivot, holder, P, seed: r() * 10, v: 0, dist: 0, sitK: 0, st: 'sit', timer: 0 };
+    // at the start most are sitting, the rest up and about
+    const fs = free(), seat = r() < 0.72 && fs.length ? fs[Math.floor(r() * fs.length)] : null;
+    if (seat) { lgTake(G, seat); G.sitK = 1; G.st = 'sit'; G.timer = 20 + r() * 120; const p = lgSeatPos(seat); G.x = p.x; G.z = p.z; G.yaw = seat.ry; }
+    else { const s = R.spots[Math.floor(r() * R.spots.length)]; G.st = 'use'; G.spot = s; G.x = s ? s.x + (r() - 0.5) * 0.3 : 0; G.z = s ? s.z : 0; G.yaw = s ? s.ry : 0; G.timer = 5 + r() * 15; }
+    R.guests.push(G);
+  });
+}
+function lgSeatPos(st: any) { return { x: st.x - Math.sin(st.ry) * 0.04, z: st.z - Math.cos(st.ry) * 0.04 }; }
+/** A guest takes a seat (no one else can have it, and it shows as taken when you look at it). */
+function lgTake(G: any, st: any) { G.seat = st; st.taken = true; lgSeatHit(st); }
+function lgFreeSeat(G: any) { if (G.seat) { G.seat.taken = false; lgSeatHit(G.seat); G.seat = null; } }
+function lgSeatHit(st: any) { const R = LoungeRoom, i = (R.A.seats || []).indexOf(st); for (const h of R.A.hits || []) if (h.userData.seat === i) h.userData.act = st.taken ? 'taken' : 'sit'; }
+/** Where to stand to sit down in a seat or get up from it: beside it, where there is room. */
+function lgSeatSide(st: any) {
+  const fx = Math.sin(st.ry), fz = Math.cos(st.ry);
+  for (const [a, b] of [[0.85, 0], [0, 0.85], [0, -0.85], [-0.85, 0], [1.3, 0], [0, 1.3], [0, -1.3]]) { const x = st.x + fx * a + fz * b, z = st.z + fz * a - fx * b; if (!lgBlocked(x, z)) return { x, z }; }
+  return { x: st.x + fx, z: st.z + fz };
+}
+/** What a guest does next when they have finished what they were doing. */
+function lgNext(G: any) {
+  const R = LoungeRoom, now = Date.now(), r = Math.random();
+  if (G.P.dep - now < 25 * 60e3) { lgFreeSeat(G); G.st = 'go'; G.goal = { x: R.A.door.x, z: R.A.door.z }; G.then = 'leave'; return; }   // their flight is boarding
+  if (G.st === 'sit') { const side = lgSeatSide(G.seat); G.st = 'stand'; G.timer = 0; G.side = side; return; }
+  const fs = (R.A.seats || []).filter((x: any) => !x.taken && x !== R.sit);
+  if ((G.st === 'use' && r < 0.7 && fs.length) || !R.spots.length) {   // somewhere to sit, the nearer the likelier
+    const pick = fs.map((x: any) => ({ x, d: Math.hypot(x.x - G.x, x.z - G.z) + Math.random() * 6 })).sort((a: any, b: any) => a.d - b.d)[0];
+    if (pick) { lgTake(G, pick.x); const sd = lgSeatSide(pick.x); G.st = 'go'; G.goal = sd; G.then = 'sitdown'; return; }
   }
+  const s = R.spots[Math.floor(Math.random() * R.spots.length)];
+  G.st = 'go'; G.spot = s; G.goal = { x: s.x + (Math.random() - 0.5) * 0.4, z: s.z + (Math.random() - 0.5) * 0.2 }; G.then = 'use';
+}
+/** One frame of a guest: sitting, getting up, walking round the furniture, standing at the coffee or the window. */
+function lgGuestStep(G: any, now: number, dt: number) {
+  const R = LoungeRoom;
+  G.timer -= dt;
+  if (G.st === 'sit') { G.sitK = Math.min(1, G.sitK + dt * 1.6); if (G.timer <= 0) lgNext(G); }
+  else if (G.st === 'stand') {   // getting up: out of the seat to its side
+    G.sitK = Math.max(0, G.sitK - dt * 1.6); const p = lgSeatPos(G.seat || { x: G.x, z: G.z, ry: G.yaw });
+    if (G.seat) { G.x = G.side.x + (p.x - G.side.x) * G.sitK; G.z = G.side.z + (p.z - G.side.z) * G.sitK; }
+    if (G.sitK <= 0) { lgFreeSeat(G); G.st = 'up'; G.timer = 0; lgNext(G); }   // up: off to do something first
+  } else if (G.st === 'sitdown') {   // into the seat
+    const st = G.seat, p = lgSeatPos(st); G.sitK = Math.min(1, G.sitK + dt * 1.4);
+    G.x = G.from.x + (p.x - G.from.x) * G.sitK; G.z = G.from.z + (p.z - G.from.z) * G.sitK; G.yaw += angDiffRad(G.yaw, st.ry) * Math.min(1, dt * 6);
+    if (G.sitK >= 1) { G.st = 'sit'; G.timer = 40 + Math.random() * 120; }
+  } else if (G.st === 'use') { if (G.spot) G.yaw += angDiffRad(G.yaw, G.spot.ry) * Math.min(1, dt * 4); if (G.timer <= 0) lgNext(G); }
+  else if (G.st === 'go') {
+    const dx = G.goal.x - G.x, dz = G.goal.z - G.z, d = Math.hypot(dx, dz);
+    if (d < 0.12) {
+      G.v = 0;
+      if (G.then === 'leave') { R.A.root.remove(G.pivot); G.gone = true; if (G.seat) lgFreeSeat(G); return; }
+      if (G.then === 'sitdown') { G.st = 'sitdown'; G.from = { x: G.x, z: G.z }; G.sitK = 0; return; }
+      G.st = 'use'; G.timer = G.spot ? G.spot.t[0] + Math.random() * (G.spot.t[1] - G.spot.t[0]) : 8; return;
+    }
+    G.v += (Math.min(1.05, d * 1.5) - G.v) * Math.min(1, dt * 3);
+    // walk straight there, turning aside round the furniture when the way is blocked
+    const want = Math.atan2(dx, dz); let moved = false;
+    for (const off of [0, 0.5, -0.5, 1.0, -1.0, 1.5, -1.5, 2.2, -2.2]) {
+      const h = want + off * (G.side2 || 1), nx = G.x + Math.sin(h) * G.v * dt, nz = G.z + Math.cos(h) * G.v * dt;
+      if (!lgBlockedG(nx, nz, G) || d < 0.6) { G.x = nx; G.z = nz; G.yaw += angDiffRad(G.yaw, h) * Math.min(1, dt * 7); moved = true; if (off) G.side2 = off > 0 ? 1 : -1; break; }
+    }
+    G.dist += G.v * dt;
+    G.stuck = moved ? 0 : (G.stuck || 0) + dt;
+    if (G.stuck > 3 || G.timer < -60) { G.stuck = 0; G.timer = 0; if (G.seat && G.then === 'sitdown') lgFreeSeat(G); G.st = 'use'; G.spot = null; lgNext(G); }
+  }
+  // place and pose them: sitting down lowers them into the seat
+  const st = G.seat, hip = st ? st.hip : 0.55, k = G.sitK;
+  G.pivot.position.set(G.x, (hip - 0.1) * k, G.z); G.pivot.rotation.y = G.yaw; G.holder.position.y = -(G.m.top || 1.75) * 0.52 * k;
+  const t = now + G.seed; let g = humanGesture(null, t);
+  if (G.v > 0.05) g = cabinLerpG(g, humanGesture({ kind: 'walk', v: Math.max(0.6, G.v), seed: G.P.name } as any, G.dist / 1.25), Math.min(1, G.v / 0.6));
+  if (k > 0) g = cabinLerpG(g, humanGesture({ kind: 'sit', v: 0 }, t), k);
+  try { G.m.pose({ t, yaw: 0, gaze: [Math.sin(t * 0.3) * 0.3, 0], blink: (t % 4.2) < 0.12 ? 1 : 0, g, talk: 0 }); } catch (e) { /* still */ }
+}
+function angDiffRad(a: number, b: number): number { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
+/** Blocked for a guest: the furniture and walls, and the other people (not themselves). */
+function lgBlockedG(x: number, z: number, G: any): boolean {
+  if (lgBlocked(x, z)) return true;
+  const R = LoungeRoom; for (const o of R.guests) if (o !== G && !o.gone && o.st !== 'sit' && Math.hypot(o.x - x, o.z - z) < 0.45 && Math.hypot(o.x - G.x, o.z - G.z) > Math.hypot(o.x - x, o.z - z)) return true;
+  if (R.free && !R.sit && Math.hypot(R.free.x - x, R.free.z - z) < 0.5) return true;
+  return false;
+}
+/** The passenger you are looking at (near the middle of the view, within 5 m): name, class and flight. */
+function lgGuestAt(): any {
+  const R = LoungeRoom, T = THREE, c = R.cam.position, f = new T.Vector3(); R.cam.getWorldDirection(f); let best: any = null, bd = 1e9;
+  for (const G of R.guests || []) { if (G.gone) continue; const v = new T.Vector3(G.x - c.x, (G.sitK ? 1.0 : 1.5) - c.y, G.z - c.z), d = v.length(); if (d > 5 || d < 0.3) continue; const ang = v.normalize().angleTo(f); if (ang < 0.12 && d < bd) { bd = d; best = G; } }
+  return best;
 }
 
 /* ---------- the loop ---------- */
@@ -436,7 +548,8 @@ function lgFrame() {
 function lgFrameRest(now: number, dt: number) {
   const R = LoungeRoom;
   // guests: sitting back, talking now and then, sipping; the fire flickers; steam rises from fresh cups
-  for (const G of R.guests || []) { const t = now + G.seed; let g = humanGesture(null, t); if (G.sit) g = cabinLerpG(g, humanGesture({ kind: 'sit', v: 0 }, t), 1); try { G.m.pose({ t, yaw: 0, gaze: [Math.sin(t * 0.3) * 0.3, 0], blink: (t % 4.2) < 0.12 ? 1 : 0, g, talk: Math.sin(t * 0.21) > 0.6 ? humanSpeech('Our flight leaves at ten, there is time for another coffee.', (G.seed * 1000) | 0, ((t * 1000) | 0)) : 0 }); } catch (e) { /* still */ } }
+  for (const G of R.guests || []) if (!G.gone) lgGuestStep(G, now, dt);
+  if (R.guests && R.guests.some((G: any) => G.gone)) R.guests = R.guests.filter((G: any) => !G.gone);
   for (const fl of R.A.flames) { fl.scale.y = 0.85 + 0.25 * Math.abs(Math.sin(now * 7.3) * Math.sin(now * 3.1)); fl.material.opacity = 0.8 + 0.2 * Math.sin(now * 11); }
   if (R.A.fireL) R.A.fireL.intensity = 1.4 + 0.5 * Math.sin(now * 9) * Math.sin(now * 4.7);
   for (let i = R.A.steam.length - 1; i >= 0; i--) { const s = R.A.steam[i]; s.t += dt; s.m.position.y += dt * 0.08; s.m.material.opacity = Math.max(0, 0.35 * (1 - s.t / 4)); s.m.scale.setScalar(1 + s.t * 0.6); if (s.t > 4) { R.A.root.remove(s.m); R.A.steam.splice(i, 1); } }
@@ -445,7 +558,7 @@ function lgFrameRest(now: number, dt: number) {
   const mine = obj && obj.userData.seat != null && R.A.seats[obj.userData.seat] === R.sit;   // the seat you're in doesn't glow
   if (R.glow) { if (obj && !mine) R.glow.showObj(obj); else R.glow.hide(); R.glow.step(dt); }
   if (dot) { const seat = obj && obj.userData.seat != null ? R.A.seats[obj.userData.seat] : null;
-    const tx = hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''; dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
+    const tx = hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 /** A frame while you are sitting: your body in the seat, the view from your eyes, the room carrying on around you. */

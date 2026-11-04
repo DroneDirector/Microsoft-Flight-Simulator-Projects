@@ -61,10 +61,10 @@ rotor is shown as it is in the file (the app's own model turns its rotors).
 | `helicopters/helicopter-airbus-h145.glb` | Airbus Helicopters H145 |
 | `helicopters/helicopter-airbus-h160.glb` | Airbus Helicopters H160 |
 | `helicopters/helicopter-airbus-h175.glb` | Airbus Helicopters H175 |
-| `helicopters/helicopter-bell-407gxi.glb` | Bell Bell 407GXi |
-| `helicopters/helicopter-bell-429.glb` | Bell Bell 429 |
-| `helicopters/helicopter-bell-505.glb` | Bell Bell 505 |
-| `helicopters/helicopter-bell-525-relentless.glb` | Bell Bell 525 Relentless |
+| `helicopters/helicopter-bell-407gxi.glb` | Bell 407GXi |
+| `helicopters/helicopter-bell-429.glb` | Bell 429 |
+| `helicopters/helicopter-bell-505.glb` | Bell 505 |
+| `helicopters/helicopter-bell-525-relentless.glb` | Bell 525 Relentless |
 | `helicopters/helicopter-leonardo-aw109-trekker.glb` | Leonardo AW109 Trekker |
 | `helicopters/helicopter-leonardo-aw139.glb` | Leonardo AW139 |
 | `helicopters/helicopter-leonardo-aw169.glb` | Leonardo AW169 |

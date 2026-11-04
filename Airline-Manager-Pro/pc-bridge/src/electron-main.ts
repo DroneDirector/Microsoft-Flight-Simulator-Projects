@@ -82,11 +82,15 @@ function bringSavedData(engineDir: string): string {
   return note;
 }
 
-let win: any = null, tray: any = null, last: { url: string; prefs: DesktopPrefs } | null = null;
+let win: any = null, tray: any = null, last: { url: string; prefs: DesktopPrefs } | null = null, hidden = false;
 
 function openWindow(url: string, prefs: DesktopPrefs): boolean {
   last = { url, prefs };
-  if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); return true; }
+  if (win && !win.isDestroyed()) {
+    // quit earlier (running unseen): opening the app again starts it afresh, from the start screen
+    if (hidden) { hidden = false; win.setSkipTaskbar(false); win.loadURL(url); win.once('ready-to-show', () => { win.show(); win.focus(); }); setTimeout(() => { if (win && !win.isDestroyed() && !win.isVisible()) { win.show(); win.focus(); } }, 4000); return true; }
+    if (win.isMinimized()) win.restore(); win.show(); win.focus(); return true;
+  }
   const icon = path.join(here, 'app.ico');
   win = new BrowserWindow({
     width: prefs.width || 1600, height: prefs.height || 900, minWidth: 960, minHeight: 600, center: true, show: false,
@@ -144,7 +148,9 @@ if (!toTools()) {
     app.on('will-quit', () => { setTimeout(() => process.exit(0), 300); });
     app.whenReady().then(() => {
       const note = bringSavedData(engineDir);
-      Desktop.host = { exe: path.basename(process.execPath, '.exe').toLowerCase(), open: openWindow, close: () => { if (win && !win.isDestroyed()) win.destroy(); }, pid: () => process.pid };
+      Desktop.host = { exe: path.basename(process.execPath, '.exe').toLowerCase(), open: openWindow, close: () => { if (win && !win.isDestroyed()) win.destroy(); }, pid: () => process.pid,
+        hide: () => { if (win && !win.isDestroyed()) { hidden = true; win.setSkipTaskbar(true); win.hide(); writeLog('Quit from the app: running unseen, the airline carries on'); } },
+        show: () => { if (win && !win.isDestroyed()) { hidden = false; win.setSkipTaskbar(false); win.show(); win.focus(); } } };
       main();   // opens the log first thing
       writeLog(`Own browser engine: Electron ${process.versions.electron}, Chromium ${process.versions.chrome}`);
       if (note) writeLog(note);

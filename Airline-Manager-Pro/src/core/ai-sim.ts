@@ -330,7 +330,7 @@ function aiAdvance(now?: number, quiet?: boolean, away?: boolean) {
       try { const arr = depAt + prof.totalS * 1000 / (n.spd || 1); if (!test && curfewAt(n.to, arr)) { wait(depAt + (curfewEnd(n.to, arr) - arr) + 60e3, `Night curfew at ${n.to}: timed to land when it opens`); continue; } } catch (e) { /* ignore */ }
       const f: any = { id: 'ai-' + uid(), reg: n.reg, pilotId: n.pilotId, from: n.from, to: n.to, t: 0, rate: 0, callsign: n.callsign, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF, cargoKg: ld.cargoKg, paxMax: cabinSeats(acType(a.typeId), a) || n.paxMax, test,
         alt: 0, phase: 'Taxi out', depAt, spd: n.spd || 1, durMs: prof.totalS * 1000, dutyMin: n.dutyMin, leg: n.leg, ferry: !!n.ferry, job: n.job || undefined, jobNext: n.jobNext || undefined,
-        sched: n.sched || depAt, waitWhy: n.why || '', retry: !!n.retry };
+        sched: n.sched || depAt, waitWhy: n.why || '', retry: !!n.retry, paxSeed: n.paxSeed || undefined };   // paxSeed: its passengers already waiting in the lounge
       f.schedEnd = f.sched + prof.totalS * 1000 / (n.spd || 1);
       if (n.medicalDone) { f.medicalDone = true; f.routeFrom = n.routeFrom; }
       // rarely, a passenger falls ill on the way: the flight will divert (planned now, told when it happens)

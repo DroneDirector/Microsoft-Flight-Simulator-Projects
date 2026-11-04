@@ -34,8 +34,11 @@
   // after the start-up screen, back right where it was. After a longer break: the Overview.
   let resume: any = null;
   try { resume = JSON.parse(localStorage.getItem('amp-resume') || 'null'); localStorage.removeItem('amp-resume'); } catch (e) { /* none */ }
+  // quit last time (Quit, not just put away): start afresh at the Overview, after the start screen
+  let quitLast = false; try { quitLast = !!localStorage.getItem('amp-quit'); localStorage.removeItem('amp-quit'); } catch (e) { /* none */ }
+  if (quitLast) resume = null;
   if (resume && Date.now() - resume.at > 12 * 3600e3 && (State.settings as any).rememberUi === false) resume = null;
-  let _ui: any = null; try { _ui = uiMemRestore(); } catch (e) { /* ignore */ }
+  let _ui: any = null; try { _ui = quitLast ? null : uiMemRestore(); } catch (e) { /* ignore */ }
   if (!resume && _ui && SCREENS[_ui.screen]) resume = { screen: _ui.screen };
   const back = resume && SCREENS[resume.screen] ? resume.screen : null;
   State.screen = back || 'ops';

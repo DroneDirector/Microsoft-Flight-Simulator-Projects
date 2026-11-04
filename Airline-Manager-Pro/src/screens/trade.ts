@@ -49,7 +49,8 @@ function ferryCost(t: AircraftType, from: string, to: string): number {
 }
 
 function usedMarketHtml(): string {
-  const c = company(), list = usedList();
+  const c = company(), list = usedList().filter(u => mkKindOk(u.typeId));   // the kind chosen above (jets, turboprops, helicopters)
+  if (!list.length) return `<p class="fine-print">${icon('info')}No used aircraft of this kind for sale this week.</p>`;
   return `<div class="mk-grid">${list.map((u, i) => {
     const t = acType(u.typeId);
     return `<div class="mk-card used" style="--i:${i}">
