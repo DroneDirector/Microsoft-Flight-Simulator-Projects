@@ -3,6 +3,7 @@
 ## 0.9.129 (2026-11-04)
 
 - Jet engines: inner duct (BackSide, dark) inside the cowl so it is never see-through
+- Jet engine fans: merged twisted blades (fanblade), spinner pointing forwards, turned by userData.set spin
 
 ## 0.9.128 (2026-11-04)
 
