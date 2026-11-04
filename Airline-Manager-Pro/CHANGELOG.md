@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.140 (2026-11-04)
+
+- Computers/phone: lap-files.ts (FileDb, explorer, folders, drag, menus, documents, printing, recorder, start menu, search, per-device settings with Update); Mail folders, Spam, Deleted, drag, menus, guide
+- Settings → Devices (devices.ts): bindings with combos, live input, sound devices, pairing (AppTools audioDevices/btScan/btPair, Windows ms-settings:bluetooth); controller hints in 3D places
+- scene-gear.ts: Settings in every 3D place; v3d-sound follow voice; Outside noise slider; sfx.ts replaceable sounds, Sound.door/pour
+- Overview: rail wider, plain clock
+
 ## 0.9.139 (2026-11-04)
 
 - Joined building: doorway guidance (trDoorAssist, host.assist), open from 55%, locked doors never pass

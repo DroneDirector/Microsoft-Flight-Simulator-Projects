@@ -4,8 +4,8 @@
   "shortName": "Airline Manager",
   "appId": "com.dronedirector.airlinemanagerpro",
   "publisher": "DroneDirector",
-  "version": "0.9.139",
-  "versionCode": 173,
+  "version": "0.9.140",
+  "versionCode": 174,
   "updates": {
     "repo": "DroneDirector/Microsoft-Flight-Simulator-Projects",
     "tagPrefix": "airline-manager-pro-v"
