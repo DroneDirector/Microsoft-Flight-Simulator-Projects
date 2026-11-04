@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.125 (2026-11-04)
+
+- Lounge guests: lgPassengers (premium passengers of State.aiNext legs from the lounge airport, n.paxSeed → f.paxSeed, manifestOf seeds from paxSeed), lgSpots, lgGuestStep (sit, stand, go, use, sitdown, leave), lgGuestAt hint
+- Quit: quitMark (no resume, amp-quit), quitUnseen on the PC (/api/hide, window hidden and off the taskbar; second-instance reloads; /api/show from a notification), soundSuspend
+- Continue: enterSplash (exitSplash 'enter', 5 s minimum, steps that wait for World, runways, Models, Human)
+- Market: _mkKind (all, jet, prop, heli) menu beside the mode menu, Sell mode (mkSellHtml), used list filtered by kind; Bell model names without the maker
+- Android: launcher icons (adaptive, round, classic) from pc-bridge/ci/app.ico, copied by android-setup.sh
+
 ## 0.9.124 (2026-11-04)
 
 - Lounge seats: armchairs, sofa places and bar stools in A.seats (kind, hip); lgSeatHits ('sit' / 'taken'), lgSit, lgStand, lgSeated; lgFrame split into lgFrameRest; guests not on bar stools
