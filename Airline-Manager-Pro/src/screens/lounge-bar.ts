@@ -368,6 +368,7 @@ function lgDrunkCam(R: any, dt: number, now: number, moving: boolean) {
     cam.rotateX(0.02 * k * Math.sin(now * 0.7 + 2));
   }
   lgDrunkScreen(R, k, now);
+  lgIntoxNote(R);
 }
 /** The blur and the double image: a copy of the picture, small and soft, a little to the side; works on any screen
  *  shape (it stretches with the picture). */
@@ -388,7 +389,20 @@ function lgDrunkScreen(R: any, k: number, now: number) {
   (o.querySelector('i') as HTMLElement).style.opacity = (0.55 * k).toFixed(3);
   cv.style.filter = `blur(${(0.3 + 1.2 * k).toFixed(2)}px)`;
 }
-function lgDrunkClear(R: any) { if (R.drunkEl) { R.drunkEl.remove(); R.drunkEl = null; } try { if (R.ren && R.ren.domElement) R.ren.domElement.style.filter = ''; } catch (e) { /* gone */ } LgDrunk.pend = 0; LgDrunk.bac = 0; }
+/** A small note while you're intoxicated: how drunk, and a countdown to sober (it keeps counting with what is still
+ *  coming into your blood). Kept clear of the blur, out of the way at the top. */
+function lgIntoxNote(R: any) {
+  const D = LgDrunk; let sex: 'm' | 'f' = 'm'; try { sex = myVoiceChoice().sex; } catch (e) { /* a man */ }
+  const pendBac = D.pend / ((sex === 'f' ? 0.55 : 0.68) * (sex === 'f' ? 65 : 80)), total = D.bac + pendBac;
+  let el = R.intoxEl as HTMLElement;
+  if (total < 0.3 || !R.root) { if (el) { el.classList.add('out'); const e2 = el; setTimeout(() => e2.remove(), 400); R.intoxEl = null; } return; }
+  if (!el || !el.isConnected) { el = document.createElement('div'); el.className = 'lg-intox'; el.setAttribute('role', 'status'); el.innerHTML = '<b>You\'re intoxicated</b><small>You\'ve had too much to drink</small><span class="lg-ix-t"></span><i><em></em></i>'; R.root.appendChild(el); R.intoxEl = el; R.intoxMax = 0; }
+  const secs = Math.ceil(total / Math.max(0.004, D.rate || 0.004)); R.intoxMax = Math.max(R.intoxMax || 0, secs);
+  const txt = `Sober in ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} · ${D.bac.toFixed(2)}‰`;
+  const t = el.querySelector('.lg-ix-t') as HTMLElement; if (t.textContent !== txt) t.textContent = txt;
+  (el.querySelector('em') as HTMLElement).style.width = (100 * secs / Math.max(1, R.intoxMax)).toFixed(1) + '%';
+}
+function lgDrunkClear(R: any) { if (R.intoxEl) { R.intoxEl.remove(); R.intoxEl = null; } if (R.drunkEl) { R.drunkEl.remove(); R.drunkEl = null; } try { if (R.ren && R.ren.domElement) R.ren.domElement.style.filter = ''; } catch (e) { /* gone */ } LgDrunk.pend = 0; LgDrunk.bac = 0; }
 
 /* ---------- guests at the bar ---------- */
 /** A guest standing at the bar: they order when the bartender is free, pick up their glass when it is poured, and
