@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.130 (2026-11-04)
+
+- Window seat views: default zoom 0.7 (v3dWinZoom)
+
 ## 0.9.129 (2026-11-04)
 
 - Jet engines: inner duct (BackSide, dark) inside the cowl so it is never see-through
