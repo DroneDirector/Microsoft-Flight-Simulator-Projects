@@ -101,6 +101,18 @@ export class Desktop {
       res.writeHead(200, isolate({ 'Content-Type': 'application/octet-stream', 'Content-Length': String(fs.statSync(f).size), 'Cache-Control': 'no-cache' }));
       fs.createReadStream(f).pipe(res); return true;
     }
+    // a photo from the game into your Pictures folder (Pictures\Airline Manager Pro)
+    if (url === '/api/photo' && req.method === 'POST') return readBody(req, b => {
+      try {
+        const p = JSON.parse(b), m = /^data:image\/(jpeg|png);base64,(.+)$/.exec(String(p.data || ''));
+        if (!m) { json(res, { ok: false, error: 'not a picture' }); return; }
+        const pics = path.join(os.homedir(), 'Pictures', 'Airline Manager Pro'); fs.mkdirSync(pics, { recursive: true });
+        const name = String(p.name || 'photo').replace(/[^\w .\-]+/g, '_').slice(0, 80) + (m[1] === 'png' ? '.png' : '.jpg'), f = path.join(pics, name);
+        fs.writeFileSync(f, Buffer.from(m[2], 'base64')); json(res, { ok: true, path: f });
+      } catch (e: any) { json(res, { ok: false, error: String(e && e.message || e) }); }
+    }), true;
+    // the machine, for the recommended graphics settings: memory, processor, graphics cards
+    if (url === '/api/sysinfo') { listGpus().then(g => json(res, { ramMb: Math.round(os.totalmem() / 1048576), cores: os.cpus().length, cpu: (os.cpus()[0] || { model: '' }).model, gpus: g })); return true; }
     if (url === '/api/flightplan') return readBody(req, b => { try { const p = JSON.parse(b); json(res, { ok: true, path: saveFlightPlan(p.name, p.text) }); } catch (e: any) { json(res, { ok: false, error: String(e && e.message || e) }); } }), true;
     const dir = this.appDir(); if (!dir) return false;
     let rel = decodeURIComponent(url === '/' ? '/index.html' : url);

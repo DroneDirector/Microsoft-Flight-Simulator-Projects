@@ -1407,7 +1407,8 @@ ACTIONS['v3d-shot'] = () => {
     const f: any = State.live.filter(x => x.id === V3d.target)[0], cap = `3D view${f ? ` · ${f.reg}, ${f.from} to ${f.to}` : V3d.icao ? ` · ${V3d.icao}` : ''}`;
     const flash = document.createElement('div'); flash.className = 'v3d-flash'; V3d.root.appendChild(flash); setTimeout(() => flash.remove(), 600);
     try { Sound.tick(); } catch (e) { /* quiet */ }
-    PhotoDb.put({ id: uid(), log: '3d', at: Date.now(), data: big.toDataURL('image/jpeg', 0.9), thumb: th.toDataURL('image/jpeg', 0.75), w: big.width, h: big.height, cap, mode: Mode.coop() ? 'coop' : 'solo' })
-      .then(() => toast('Screenshot saved: see it on your laptop, in the office', 'ok')).catch(() => toast('The screenshot could not be saved', 'warn'));
+    const full = big.toDataURL('image/jpeg', 0.9);
+    Promise.all([PhotoDb.put({ id: uid(), log: '3d', at: Date.now(), data: full, thumb: th.toDataURL('image/jpeg', 0.75), w: big.width, h: big.height, cap, mode: Mode.coop() ? 'coop' : 'solo' }).then(() => true, () => false), photoToDevice(full, cap)])
+      .then(([inGame, where]) => { if (!inGame && !where) { toast('The screenshot could not be saved', 'warn'); return; } toast(`Screenshot saved${inGame ? ' on your laptop, in the office' : ''}${inGame && where ? ', and ' : ' '}${where}`, 'ok'); });
   } catch (e) { toast('The screenshot could not be taken', 'warn'); }
 };
