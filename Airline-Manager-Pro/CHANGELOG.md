@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.149
+- The lounge bar: a bartender who waves and pours your drink in front of you, eleven drinks with their strength and alcohol, new bottles and a glass rack, and the effects of drinking.
+
 ## 0.9.148
 - Flight trace: no false "no touchdown" reports after the app was away during a landing, or for very short landings.
 

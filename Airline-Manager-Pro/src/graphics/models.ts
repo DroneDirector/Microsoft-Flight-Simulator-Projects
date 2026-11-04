@@ -47,6 +47,12 @@ const LOUNGE_PROP_FILES: [string, string][] = [
   ['bar-counter', 'Bar counter (Business and Flagship)'], ['bar-stool', 'Bar stool'], ['bottle-shelf', 'Shelf of bottles behind the bar'],
   ['pendant-light', 'Pendant light (Business)'], ['chandelier', 'Chandelier (Flagship)'], ['fireplace', 'Fireplace (Flagship)'], ['grand-piano', 'Grand piano (Flagship)'],
   ['wall-art', 'Framed art (Flagship)'], ['champagne-bucket', 'Champagne bucket (Flagship)'], ['departures-screen', 'Departures screen frame (the list is drawn by the app)'],
+  ['glass-rack', 'Glass rack hanging from the ceiling over the bar (the glasses are their own files)'],
+  ['bottle-red', 'Bottle of red wine (the bartender takes it from the shelf and pours)'], ['bottle-white', 'Bottle of white wine'], ['bottle-champagne', 'Bottle of champagne'],
+  ['bottle-whisky', 'Bottle of single malt whisky'], ['bottle-gin', 'Bottle of gin'], ['bottle-vodka', 'Bottle of vodka'], ['bottle-aquavit', 'Bottle of aquavit'],
+  ['bottle-rum', 'Bottle of dark rum'], ['bottle-cognac', 'Bottle of cognac'], ['bottle-port', 'Bottle of port'], ['bottle-amaretto', 'Bottle of amaretto'],
+  ['glass-wine', 'Wine glass (hung upside down on the rack; the app pours the drink in it)'], ['glass-flute', 'Champagne flute'], ['glass-tumbler', 'Tumbler (whisky, gin, rum, amaretto)'],
+  ['glass-snifter', 'Brandy snifter (cognac)'], ['glass-shot', 'Shot glass (vodka, aquavit)'], ['glass-small', 'Small wine glass (port)'],
 ];
 /** The Training room (the Academy), one file each (training-props/<name>.glb): front towards +Z (the side you sit at or
  *  look at), standing on the floor (or the desk); fitted to the size of the app's own. */

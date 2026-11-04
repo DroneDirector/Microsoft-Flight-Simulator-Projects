@@ -276,7 +276,8 @@ function lgBuild(scene: any, q: number): any {
     for (let i = 0; i < 4; i++) { const sx = bxp - 1.3 + i * 0.86, sz = bz - 0.75;
       prop('bar-stool', sx, sz, 0, () => { add(new T.CylinderGeometry(0.2, 0.2, 0.08, 20), fabric, sx, 0.78, sz); add(new T.CylinderGeometry(0.025, 0.025, 0.74, 10), lv === 2 ? gold : chrome, sx, 0.38, sz); add(new T.TorusGeometry(0.16, 0.012, 8, 24), lv === 2 ? gold : chrome, sx, 0.3, sz).rotation.x = Math.PI / 2; add(new T.CylinderGeometry(0.2, 0.22, 0.02, 20), lv === 2 ? gold : chrome, sx, 0.01, sz); });
       block(sx - 0.25, sz - 0.25, sx + 0.25, sz + 0.25); seats.push({ x: sx, z: sz, ry: 0, hip: 0.84, kind: 'stool' }); }
-    prop('bottle-shelf', bxp, z1 - 0.2, Math.PI, () => { for (const y of [1.4, 1.8, 2.2]) { bx(3.0, 0.03, 0.25, lv === 2 ? brass : walnut, bxp, y, z1 - 0.2); for (let i = 0; i < 12; i++) { const h = 0.22 + (i % 3) * 0.04, col = [0x2F6B34, 0x7A3E14, 0xD9D2C0, 0x4A1A20, 0xC9A55B][i % 5]; const b = add(new T.CylinderGeometry(0.035, 0.04, h, 12), new T.MeshPhysicalMaterial({ color: col, roughness: 0.1, transparent: true, opacity: 0.85 }), bxp - 1.35 + i * 0.245, y + 0.015 + h / 2, z1 - 0.2); b.castShadow = false; add(new T.CylinderGeometry(0.012, 0.015, 0.06, 8), new T.MeshPhysicalMaterial({ color: col, roughness: 0.1 }), bxp - 1.35 + i * 0.245, y + 0.045 + h, z1 - 0.2); } } }); }
+    prop('bottle-shelf', bxp, z1 - 0.2, Math.PI, () => { for (const y of [1.4, 1.8, 2.2]) bx(3.0, 0.03, 0.25, lv === 2 ? brass : walnut, bxp, y, z1 - 0.2); bx(3.0, 1.2, 0.03, lv === 2 ? brass : walnut, bxp, 1.8, z1 - 0.33 + 0.3); });
+    try { lgBarBuild(A, root, lv, bxp, bz, z1, H, q); } catch (e) { console.error(e); } }
   // Flagship: a fireplace, a grand piano, art and a champagne bucket
   if (lv === 2) {
     const fx = x0 + 0.3, fz = z0 + D * 0.72;
@@ -548,7 +549,7 @@ function lgInput(root: HTMLElement, cv: HTMLCanvasElement) {
       const up = (e: PointerEvent) => { if (e.pointerId !== id) return; id = -1; R.stick = [0, 0]; knob.style.transform = ''; }; pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up); } }
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-op]') as HTMLElement; if (!b) return; ev.stopPropagation(); const k = b.getAttribute('data-op');
     if (k === 'leave') lgLeave(); else if (k === 'goto') lgGoto(b.getAttribute('data-k'));
-    else if (k === 'coffee-pick') lgCoffeePick(b.getAttribute('data-k') || 'espresso'); else if (k === 'coffee-cancel') lgCoffeePick('');
+    else if (k === 'coffee-pick') lgCoffeePick(b.getAttribute('data-k') || 'espresso'); else if (k === 'bar-pick') lgBarPick(b.getAttribute('data-k') || ''); else if (k === 'bar-close') lgBarClose(); else if (k === 'coffee-cancel') lgCoffeePick('');
     else if (k === 'vend-pick') { HG_VR = LoungeRoom; hgVendPick(b.getAttribute('data-k')); } else if (k === 'panel-close') { HG_VR = LoungeRoom; hgPanelClose(); } }, { signal: R.sig });
   R.key$ = (e: KeyboardEvent) => { if (!R.on) return; const k = e.key.toLowerCase();
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; lgLeave(); return; }
@@ -565,10 +566,11 @@ function lgFrame() {
   const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], rr = (K.d ? 1 : 0) - (K.a ? 1 : 0) + R.stick[0];
   if (R.sit && Math.hypot(f, rr) > 0.3) lgStand();   // walking gets you up
   if (R.sit) { lgSeated(now, dt); return; }
-  const mag = R.press ? 0 : Math.min(1, Math.hypot(f, rr)), vmax = K.shift ? 2.4 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
+  const mag = R.press ? 0 : Math.min(1, Math.hypot(f, rr)), vmax = (K.shift ? 2.4 : 1.2) * (1 - 0.25 * lgDrunkK()); F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
   try { lgPressStep(dt); } catch (e) { R.press = null; }
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-  let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; if (R.host && R.host.assist && ml > 0.05) { const g2 = R.host.assist('lounge', F.x, F.z, mx, mz); mx = g2[0]; mz = g2[1]; }   // eased through an open doorway
+  const drift = mag > 0.05 ? lgDrunkK() * (0.45 * Math.sin(now * 1.1) + 0.2 * Math.sin(now * 2.7)) : 0;   // drunk: hard to walk straight
+  let mx = fx * f + rx * (rr + drift), mz = fz * f + rz * (rr + drift); const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; if (R.host && R.host.assist && ml > 0.05) { const g2 = R.host.assist('lounge', F.x, F.z, mx, mz); mx = g2[0]; mz = g2[1]; }   // eased through an open doorway
   const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!lgBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!lgBlocked(nx, F.z)) F.x = nx; else if (!lgBlocked(F.x, nz)) F.z = nz; F.bob += step; }
   if (R.host && R.host.out('lounge', F.x, F.z, R.look, F.v)) return;   // out through the doors: the concourse takes over
@@ -584,6 +586,8 @@ function lgFrame() {
 function lgDoorsTo(k: number) { const A = LoungeRoom.A; if (!A || !A.doorLeaves) return; if (A.doorTo !== k) { try { sfxDoor('sliding', k > 0); } catch (e) { /* quiet */ } } A.doorTo = k; }
 function lgFrameRest(now: number, dt: number) {
   const R = LoungeRoom;
+  try { lgBarStep(dt, now); } catch (e) { /* the bar rests */ }
+  try { lgDrunkStep(dt); lgDrunkCam(R, dt, now, !!(R.free && R.free.v > 0.2 && !R.sit)); } catch (e) { /* clear-headed */ }
   if (R.A && R.A.doorLeaves && R.A.doorK !== R.A.doorTo) { const A = R.A; A.doorK += Math.sign(A.doorTo - A.doorK) * Math.min(Math.abs(A.doorTo - A.doorK), dt * 1.6); const e = A.doorK * A.doorK * (3 - 2 * A.doorK); for (const L of A.doorLeaves) L.position.x = L.userData.x0 + (L.userData.x1 - L.userData.x0) * e; }
   // guests: sitting back, talking now and then, sipping; the fire flickers; steam rises from fresh cups
   for (const G of R.guests || []) if (!G.gone) lgGuestStep(G, now, dt);
@@ -600,8 +604,9 @@ function lgFrameRest(now: number, dt: number) {
   const mine = obj && obj.userData.seat != null && R.A.seats[obj.userData.seat] === R.sit;   // the seat you're in doesn't glow
   if (R.glow) { if (obj && !mine) R.glow.showObj(obj); else R.glow.hide(); R.glow.step(dt); }
   if (dot) { const seat = obj && obj.userData.seat != null ? R.A.seats[obj.userData.seat] : null;
-    const held0 = lgHeldCup(), tx = hint === 'cup' ? (held0 ? 'You already have something in your hand' : 'Click to pick it up') : hint === 'surface' ? 'Click to put it down here' : held0 && !hint ? (held0.snack && hgProd(held0.snack).type === 'bar' ? 'Click to take a bite · aim at a table or a counter to put it down' : 'Click to sip · aim at a table or a counter to put it down') : hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'vend' ? (R.vend && R.vend.st === 'ready' ? 'Open the flap at the bottom to take it' : 'Click to choose a snack or a drink') : hint === 'flap' ? (R.vend && R.vend.st === 'ready' ? 'Click to take it' : 'The tray') : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
+    const held0 = lgHeldCup(), tx = hint === 'bartender' ? 'Click to order a drink at the bar' : hint === 'cup' ? (held0 ? 'You already have something in your hand' : 'Click to pick it up') : hint === 'surface' ? 'Click to put it down here' : held0 && !hint ? (held0.snack && hgProd(held0.snack).type === 'bar' ? 'Click to take a bite · aim at a table or a counter to put it down' : 'Click to sip · aim at a table or a counter to put it down') : hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'vend' ? (R.vend && R.vend.st === 'ready' ? 'Open the flap at the bottom to take it' : 'Click to choose a snack or a drink') : hint === 'flap' ? (R.vend && R.vend.st === 'ready' ? 'Click to take it' : 'The tray') : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
+  try { lgDrunkScreen(R, lgDrunkK(), now); } catch (e) { /* clear */ }   // straight after drawing: a copy of this picture
 }
 /** A frame while you are sitting: your body in the seat, the view from your eyes, the room carrying on around you. */
 function lgSeated(now: number, dt: number) {
@@ -625,6 +630,7 @@ function lgClickAt(e?: PointerEvent) {
   if (a === 'door') { if (R.sit) lgStand(); lgDoorsTo(1); setTimeout(() => { if (R.on) roomExitMenu(R.root, 'lounges', to => lgLeave(to), () => lgDoorsTo(0)); }, 450); return; }
   if (a === 'coffee') { if (R.sit) lgStand(); lgPour(); return; }
   if (a === 'vend' || a === 'flap') { HG_VR = LoungeRoom; if (R.sit) lgStand(); if (R.vend && R.vend.st === 'ready') hgTake(); else if (a === 'vend') hgVendOpen(); return; }
+  if (a === 'bartender') { if (R.sit) lgStand(); lgBarMenu(); return; }
   if (a === 'cup') { lgPickCup(o); return; }
   if (a === 'surface' && lgHeldCup()) { lgPutCup(o, R.aimPoint || o.position); return; }
   if (lgHeldCup()) { lgSip(); return; }   // holding a cup: a click anywhere else is a sip
@@ -749,6 +755,7 @@ function lgLiquid(c: any) {
   const qs = new T.Quaternion().setFromEuler(new T.Euler(sl[1], 0, -sl[0]));
   const qp = (LoungeRoom.A && LoungeRoom.A.root) ? LoungeRoom.A.root.getWorldQuaternion(new T.Quaternion()) : new T.Quaternion();
   L.lg.quaternion.copy(qc).multiply(qp).multiply(qs);
+  if (L.vol) lgGlassVolume(L, c.lvl);   // a glass: the drink seen through it, not only its surface
 }
 /** The drink moving in the cup as you carry it: the surface swings against how the cup is moved, settles again, and
  *  if you swing it hard enough it goes over the rim: a little less in the cup, and drops on the floor. */
@@ -766,7 +773,7 @@ function lgSlosh(c: any, dt: number) {
     if (!c.spilt) { c.spilt = true; toast('Careful, you spilt some', 'info'); }
     c.dropT = (c.dropT || 0) - dt;
     if (c.dropT <= 0) { c.dropT = 0.05; R.drops = R.drops || [];
-      const m = new T.Mesh(new T.SphereGeometry(0.006, 6, 4), new T.MeshStandardMaterial({ color: (LG_DRINKS[c.kind] || LG_DRINKS.espresso).col, roughness: 0.1 }));
+      const m = new T.Mesh(new T.SphereGeometry(0.006, 6, 4), new T.MeshStandardMaterial({ color: c.spirit && lgSpirit(c.spirit) ? lgSpirit(c.spirit).col : (LG_DRINKS[c.kind] || LG_DRINKS.espresso).col, roughness: 0.1, transparent: !!c.spirit, opacity: c.spirit ? Math.max(0.5, lgSpirit(c.spirit).op) : 1 }));
       const at = R.A.root.worldToLocal(w.clone().add(new T.Vector3(0, L.h, 0))); m.position.copy(at); R.A.root.add(m);
       const dir = new T.Vector3(c.sl[0], 0, c.sl[1]).normalize();
       R.drops.push({ m, v: R.A.root.worldToLocal(w.clone().add(dir.multiplyScalar(0.4).add(new T.Vector3(0, 0.3, 0)))).sub(R.A.root.worldToLocal(w.clone())), floor: 0.003 }); }
@@ -845,11 +852,11 @@ function lgCupsStep(dt: number, now: number) {
     if (c.use) {   // up to the mouth, a sip, back down
       c.use.t += dt; const t = c.use.t, e = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, k = t < 0.5 ? e(t / 0.5) : t < 1.6 ? 1 : 1 - e((t - 1.6) / 0.5);
       pos = pos.lerp(eye.clone().add(rot(0.0, -0.09, -0.13)), k); tilt = 0.75 * k;
-      if (c.lvl != null && t > 0.55 && t < 1.6) { if (c.sip0 == null) c.sip0 = c.lvl; c.lvl = Math.max(0, c.sip0 - (c.full / 3) * clamp((t - 0.55) / 1.0, 0, 1)); }
+      if (c.lvl != null && t > 0.55 && t < 1.6) { if (c.sip0 == null) c.sip0 = c.lvl; const was = c.lvl; c.lvl = Math.max(0, c.sip0 - (c.full / 3) * clamp((t - 0.55) / 1.0, 0, 1)); if (c.alc && c.lvl < was) lgBarIntake(c.alc.g * (was - c.lvl) / c.full); }   // a drink with alcohol: into you, sip by sip
       if (t >= 2.1) { c.use = null; c.sips++; c.sip0 = null;
         if (c.lvl != null && c.lvl < 0.03) c.sips = 99;
         if (c.snack && c.sips < c.n) { try { c.g.remove(c.mesh); c.mesh = hgItemMesh(c.snack, c.sips, c.n); c.g.add(c.mesh); } catch (e) { /* as it was */ } }
-        if (c.sips >= (c.snack ? c.n : 3)) { R.A.root.remove(c.g); c.g = null; c.st = 'done'; toast(c.snack ? `${hgProd(c.snack).name} finished` : c.tea ? 'Tea finished' : 'Coffee finished', 'ok'); continue; } }
+        if (c.sips >= (c.snack ? c.n : 3)) { R.A.root.remove(c.g); c.g = null; c.st = 'done'; toast(c.snack ? `${hgProd(c.snack).name} finished` : c.drinkName ? `${c.drinkName} finished` : c.tea ? 'Tea finished' : 'Coffee finished', 'ok'); continue; } }
     }
     if (c.w < 1) pos = c.from.clone().lerp(pos, c.w * c.w * (3 - 2 * c.w));
     c.g.position.copy(pos); c.g.rotation.set(0, yaw, 0); c.g.rotateX(tilt);
@@ -876,6 +883,7 @@ function lgGoto(where: string) {
 /* ---------- leaving ---------- */
 LoungeRoom.close = function (quiet?: boolean) {
   const R = LoungeRoom; if (!R.on) return; R.on = false;
+  try { lgDrunkClear(R); } catch (e) { /* clear */ }
   if (R.host) {   // in the building: only the room's own controls go; the building keeps the room (and its guests)
     const H = R.host; R.host = null;
     clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); document.removeEventListener('mousemove', R.mm$);

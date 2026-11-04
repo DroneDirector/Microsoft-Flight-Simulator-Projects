@@ -201,6 +201,24 @@ towards +Z (where you sit or stand to use it), standing on the floor; fitted to 
 | `lounge-props/wall-art.glb` | Framed art (Flagship) |
 | `lounge-props/champagne-bucket.glb` | Champagne bucket (Flagship) |
 | `lounge-props/departures-screen.glb` | Departures screen frame (the list is drawn by the app) |
+| `lounge-props/glass-rack.glb` | Glass rack hanging from the ceiling over the bar (the glasses are their own files) |
+| `lounge-props/bottle-red.glb` | Bottle of red wine (the bartender takes it from the shelf and pours) |
+| `lounge-props/bottle-white.glb` | Bottle of white wine |
+| `lounge-props/bottle-champagne.glb` | Bottle of champagne |
+| `lounge-props/bottle-whisky.glb` | Bottle of single malt whisky |
+| `lounge-props/bottle-gin.glb` | Bottle of gin |
+| `lounge-props/bottle-vodka.glb` | Bottle of vodka |
+| `lounge-props/bottle-aquavit.glb` | Bottle of aquavit |
+| `lounge-props/bottle-rum.glb` | Bottle of dark rum |
+| `lounge-props/bottle-cognac.glb` | Bottle of cognac |
+| `lounge-props/bottle-port.glb` | Bottle of port |
+| `lounge-props/bottle-amaretto.glb` | Bottle of amaretto |
+| `lounge-props/glass-wine.glb` | Wine glass (hung upside down on the rack; the app pours the drink in it) |
+| `lounge-props/glass-flute.glb` | Champagne flute |
+| `lounge-props/glass-tumbler.glb` | Tumbler (whisky, gin, rum, amaretto) |
+| `lounge-props/glass-snifter.glb` | Brandy snifter (cognac) |
+| `lounge-props/glass-shot.glb` | Shot glass (vodka, aquavit) |
+| `lounge-props/glass-small.glb` | Small wine glass (port) |
 
 ## Training room (`training-props/`)
 

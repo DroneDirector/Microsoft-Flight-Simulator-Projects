@@ -1,0 +1,25 @@
+Lounge bar: the drinks, their strength and serving, and how being drunk is worked out.
+
+Grams of alcohol in a serving = millilitres × ABV × 0.789 (the density of ethanol, g/ml).
+A standard drink is 10 g of alcohol (WHO and most of Europe; 14 g in the United States).
+
+drink                ABV     serving   grams   standard drinks
+Red wine (Bordeaux)  13.5 %  150 ml    16.0    1.6
+White wine (Chablis) 12.5 %  150 ml    14.8    1.5
+Champagne (brut)     12 %    125 ml    11.8    1.2
+Single malt whisky   40 %     40 ml    12.6    1.3
+London dry gin       40 %     40 ml    12.6    1.3
+Vodka                40 %     40 ml    12.6    1.3
+Aquavit              42 %     40 ml    13.3    1.3
+Dark rum             40 %     40 ml    12.6    1.3
+Cognac (VSOP)        40 %     40 ml    12.6    1.3
+Port (tawny)         20 %     75 ml    11.8    1.2
+Amaretto             28 %     40 ml     8.8    0.9
+
+Blood alcohol (Widmark formula): BAC (per mille) = grams / (r × body weight in kg), r = 0.68 for men and 0.55 for
+women; the game uses 80 kg for a man and 65 kg for a woman (your pilot's sex). One glass of red wine: about 0.29 ‰
+for a man, 0.45 ‰ for a woman. Around 0.2 ‰ judgement starts to change, 0.5 ‰ is the drink-drive limit in most of
+Europe, 0.8 ‰ clearly impaired; the game's effect is full at 0.8 ‰.
+
+In real life the liver breaks down about 0.1–0.15 ‰ an hour; in the game the alcohol arrives over a few seconds and
+the effect wears off in 10 to 25 seconds (10 s for a little, 25 s from 1.0 ‰ up), so it stays a short effect.
