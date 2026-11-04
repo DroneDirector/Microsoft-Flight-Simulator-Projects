@@ -127,7 +127,7 @@ const FrameGen = {
     else real = !G.fresh || !st.realAt || t - st.realAt >= 1000 / cap - 3;
     if (real) {
       // the real frame: drawn into the picture, with the camera it was drawn from
-      const q = this.gpuBegin(ren); ren.setRenderTarget(G.rt); ren.render(scene, cam); this.layer(G, st, ren, cam); ren.setRenderTarget(null); this.gpuEnd(q);
+      const q = this.gpuBegin(ren); ren.setRenderTarget(G.rt); ren.render(scene, cam); this.layer(G, st, ren, cam, scene); ren.setRenderTarget(null); this.gpuEnd(q);
       G.prevVP.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); G.fresh = true; st.realAt = t; st.real = (st.real || 0) + 1; st.madeRun = 0;
       G.aOn = 0; const A = st.anchor; if (A && A.parent) { G.aPrev.copy(A.matrixWorld); G.aOn = st.anchorAll ? 2 : G.layOk ? 1 : 0; }
     } else { st.made = (st.made || 0) + 1; st.madeRun = (st.madeRun || 0) + 1; }
@@ -154,11 +154,26 @@ const FrameGen = {
   samples(ren: any): number {
     try { const gl = ren.getContext(), a = gl.getContextAttributes(); if (!a || !a.antialias || !ren.capabilities.isWebGL2) return 0; return Math.min(4, gl.getParameter(gl.MAX_SAMPLES) || 0); } catch (e) { return 0; }
   },
+  /** Every light's glow in the scene (sprites, points and small additive glows; never the sky's own layers): they
+   *  leave no depth in the picture, so the motion layer gives them their own. Lights added later count by themselves. */
+  glows(G: any, scene: any, A: any): any[] {
+    if (!scene) return [];
+    const now = performance.now(); if (G.glowAt && now - G.glowAt < 2000 && G.glowScene === scene) return G.glowList;
+    G.glowAt = now; G.glowScene = scene; const out: any[] = [], T = THREE;
+    scene.traverse((o: any) => {
+      if (o === A) return;   // the followed aircraft's own lights move with it: left out of its layer, as see-through parts
+      const m = o.material; if (!m || Array.isArray(m) || !m.transparent || m.depthWrite || m.depthTest === false || m.side === T.BackSide) return;
+      let glow = o.isSprite || o.isPoints;
+      if (!glow && o.isMesh && m.blending === T.AdditiveBlending) { const g = o.geometry; if (g && !g.boundingSphere && g.computeBoundingSphere) g.computeBoundingSphere(); const r = g && g.boundingSphere ? g.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) : 1e9; glow = r < 60; }
+      if (glow) { let p = o.parent, inA = false; while (p) { if (p === A) { inA = true; break; } p = p.parent; } if (!inA) out.push(o); }
+    });
+    G.glowList = out; return out;
+  },
   /** With a real frame: the motion layer, a small picture of the aircraft you follow (st.anchor) and of the clouds'
    *  distance (st.depthOnly), so made frames move each by its own motion. Nothing to do inside the aircraft. */
-  layer(G: any, st: any, ren: any, cam: any) {
+  layer(G: any, st: any, ren: any, cam: any, scene?: any) {
     G.layOk = false;
-    const A = st.anchor && st.anchor.visible && st.anchor.parent ? st.anchor : null, extra: any[] = (st.depthOnly || []).filter((o: any) => o && o.visible && o.parent);
+    const A = st.anchor && st.anchor.visible && st.anchor.parent ? st.anchor : null, extra: any[] = (st.depthOnly || []).concat(this.glows(G, scene, A)).filter((o: any) => o && o.visible && o.parent);
     if (st.anchorAll) return;   // inside the aircraft: everything moves with it, no layer needed
     try {
       const T = THREE, sz = ren.getDrawingBufferSize(new T.Vector2()), w = sz.x, h = sz.y;
@@ -177,13 +192,18 @@ const FrameGen = {
         L.overrideMaterial = G.white; L.children = [A];
         try { ren.render(L, cam); } finally { for (const o of off) o.visible = true; }
       }
-      // the clouds: only their distance, where they are thick enough to be seen
+      // the clouds and every light's glow: only their distance (the clouds where they are thick enough to be seen), all
+      // in one go
       L.overrideMaterial = null;
-      for (const o of extra) {
-        const m = o.material, U = m && m.uniforms; if (!m) continue;
-        const dw = m.depthWrite, cw = m.colorWrite, cut = U && U.uCut ? U.uCut.value : null;
-        m.depthWrite = true; m.colorWrite = false; if (cut != null) U.uCut.value = 0.25;
-        L.children = [o]; try { ren.render(L, cam); } finally { m.depthWrite = dw; m.colorWrite = cw; if (cut != null) U.uCut.value = cut; }
+      if (extra.length) {
+        const keep: any[] = [];
+        for (const o of extra) {
+          const m = o.material, U = m && m.uniforms; if (!m) continue;
+          keep.push([m, m.depthWrite, m.colorWrite, U && U.uCut ? U.uCut.value : null]);
+          m.depthWrite = true; m.colorWrite = false; if (U && U.uCut) U.uCut.value = 0.25;
+        }
+        L.children = extra;
+        try { ren.render(L, cam); } finally { for (const k of keep.reverse()) { k[0].depthWrite = k[1]; k[0].colorWrite = k[2]; if (k[3] != null) k[0].uniforms.uCut.value = k[3]; } }
       }
       L.children = []; ren.autoClear = was; ren.setClearColor(col, alpha); ren.setRenderTarget(G.rt);
       G.layOk = !!A;
