@@ -28,7 +28,7 @@ SCREENS.pilots = {
     const co: any = State.pilots.filter((p: any) => p.coPilotFor === c.id)[0];
     const myA = plane(State.myReg[c.id]);
     const cands = (State as any).staffCandidates.filter((x: any) => (_hireRole === 'all' || x.role === _hireRole) && (_hireRole !== 'ground' || _hireJob === 'all' || x.job === _hireJob));
-    const tabs = [['pilots', 'Pilots', crew.length + (co ? 1 : 0)], ['cabin', 'Cabin crew', fa.length], ['mech', 'Mechanics', mech.length], ['ground', 'Ground staff', ground.length], ['hire', 'Hire staff', (State as any).staffCandidates.length + State.candidates.length]].concat([['court', 'Court', ((State as any).cases || []).filter((x: any) => x.status === 'open' || x.appealing).length]] as any);
+    const tabs = [['pilots', 'Pilots', crew.length + (co ? 1 : 0)], ['cabin', 'Cabin crew', fa.length], ['mech', 'Mechanics', mech.length], ['ground', 'Ground staff', ground.length], ['training', 'Training', inTrainingNow().length], ['hire', 'Hire staff', (State as any).staffCandidates.length + State.candidates.length]].concat([['court', 'Court', ((State as any).cases || []).filter((x: any) => x.status === 'open' || x.appealing).length]] as any);
     let body = '';
     if (_pilotTab === 'pilots') body = `
       ${co ? `<div class="co-card">
@@ -43,7 +43,7 @@ SCREENS.pilots = {
           <button class="avatar av-btn" data-act="staff-detail" data-id="${p.id}" aria-label="${esc(p.name)}">${avatarSvg(p.look, personRole(p), { view: 'bust', accent: c.color })}</button>
           <span class="cr-name"><b>${esc(p.name)} ${levelChip(p)}</b><small>${esc(levelTitle(p))}, ${flag(p.nat)} ${ageOf(p.dob)}, ${num(p.hoursMin / 60)} h, ${esc(p.base)}</small></span>
           <span class="cr-now">${f ? `${liveChip(f.reg, 'flying')}<small>${esc(f.callsign)} ${esc(f.from)} to ${esc(f.to)}, ${Math.round(f.t * 100)}%</small>` : `${statusChip(p.status)}<small>${route ? 'Next: ' + esc(route.code) : 'No route assigned'}</small>`}</span>
-          <span class="cr-rules">${(p.types || []).map((t: string) => acType(t) ? `<i class="rating">${esc(acType(t).model)}</i>` : '').join('')}${p.status === 'training' && p.training ? `<i class="rating training">${esc(acType(p.training.typeId).model)} course until ${esc(dateStr(new Date(p.training.until)).slice(5, 16))}</i>` : ''}${p.rules ? `<i>${p.rules.maxDutyHrs} h duty</i>` : ''}</span>
+          <span class="cr-rules">${(p.types || []).map((t: string) => acType(t) ? `<i class="rating">${esc(acType(t).model)}</i>` : '').join('')}${p.status === 'training' && p.course && CrewTraining.course(p.course.id) ? `<i class="rating training">${esc(CrewTraining.course(p.course.id).name)} until ${esc(dateStr(new Date(p.course.until)).slice(5, 16))}</i>` : ''}${p.status === 'training' && p.training ? `<i class="rating training">${esc(acType(p.training.typeId).model)} course until ${esc(dateStr(new Date(p.training.until)).slice(5, 16))}</i>` : ''}${p.rules ? `<i>${p.rules.maxDutyHrs} h duty</i>` : ''}</span>
           <span class="cr-btns">${f ? `<button class="btn ghost sm" data-act="watch-pilot" data-id="${f.id}">${icon('map')}Watch</button>` : ''}<button class="btn sm" data-act="pilot-rules" data-id="${p.id}">Assign</button></span>
         </div>`;
       }).join('') || emptyState('No pilots hired yet', 'Hire pilots to fly your other aircraft while you fly your own trips.', 'Hire staff', 'pilot-hire')}</div>`;
@@ -57,6 +57,7 @@ SCREENS.pilots = {
       <p class="fine-print">${icon('info')}The people on the ramp: baggage handlers, push-back, fuel, catering and de-icing drivers, apron buses, stairs and ramp agents. They load every flight within the loadsheet's limits.</p>
       ${GROUND_JOBS.map(j => { const ps = ground.filter((p: any) => p.job === j[0]); return ps.length ? `<h4 class="grp-h">${esc(j[1])} · ${ps.length}</h4><div class="staff-grid">${ps.map((p, i) => staffCard(p, i)).join('')}</div>` : ''; }).join('') || emptyState('No ground staff yet', 'Hire baggage handlers, drivers and ramp agents under Hire staff.', 'Hire staff', 'pilot-hire')}`;
     else if (_pilotTab === 'court') body = courtTabHtml();
+    else if (_pilotTab === 'training') body = crewTrainingHtml();
     else body = `
       <div class="filter-row">${(coopOn() ? [['all', 'Everyone']] : [['all', 'Everyone'], ['captain', 'Captains'], ['fo', 'First officers']]).concat([['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['ground', 'Ground staff']]).map(r => `<button class="fchip ${_hireRole === r[0] ? 'on' : ''}" data-act="hire-role" data-r="${r[0]}">${r[1]}</button>`).join('')}</div>
       ${_hireRole === 'ground' ? `<div class="filter-row sub">${[['all', 'All jobs']].concat(GROUND_JOBS as any).map((r: any) => `<button class="fchip ${_hireJob === r[0] ? 'on' : ''}" data-act="hire-job" data-j="${r[0]}">${esc(r[1])}</button>`).join('')}</div>` : ''}
@@ -193,3 +194,37 @@ function courtTabHtml(): string {
   return `<div class="court-hero">${icon('shield')}<div><b>The District Court in ${esc(hub ? hub.city : 'town')}</b><small>${esc(status)}</small></div><button class="btn primary" data-act="court-enter">${live || verdict ? 'Go to court' : 'Enter the courtroom'}</button></div>
     <div class="case-list">${cases.map(c => `<button class="case-row" data-act="court-open" data-id="${esc(c.id)}"><div><b>${esc(c.name)}: ${esc(c.offence)}</b><small>${esc(role(c))} · opened ${esc(atText(c.opened))}${c.sentence ? ' · ' + esc(c.sentence) : ''}</small></div>${statusChip(c.status === 'open' || c.appealing ? 'open' : c.status === 'guilty' ? 'guilty' : 'acquitted')}</button>`).join('') || emptyState('No court cases', 'Criminal cases against your staff, passengers or the airline show up here.')}</div>`;
 }
+
+/* ---------- Training: courses for everyone, each kind of crew in its own section ---------- */
+let _ctGroup = 'fa';
+function crewTrainingHtml(): string {
+  const now = inTrainingNow(), c = company();
+  const who = (p: any) => { const C = p.course ? CrewTraining.course(p.course.id) : null, t = p.training ? acType(p.training.typeId) : null;
+    const until = p.course ? p.course.until : p.training ? p.training.until : 0;
+    return `<div class="ct-now-row"><span class="avatar">${avatarSvg(p.look, personRole(p), { view: 'bust', accent: c.color })}</span><span><b>${esc(p.name)}</b><small>${C ? esc(C.name) : t ? `Type rating: ${esc(t.maker)} ${esc(t.model)}` : 'Course'}${until ? ` · until ${esc(dateStr(new Date(until)).slice(5, 16))}` : ''}</small></span></div>`; };
+  const group = CREW_COURSE_GROUPS.filter(g => g[0] === _ctGroup)[0] || CREW_COURSE_GROUPS[1];
+  const people = courseCandidates(group[0]);
+  const rows = CREW_COURSES.filter(x => x.who === group[0]).map(C => {
+    const free = people.filter((p: any) => !onCourse(p) && !CrewTraining.done(p, C.id)), done = people.filter((p: any) => CrewTraining.done(p, C.id)).length;
+    return `<div class="ct-course"><span class="ct-c-txt"><b>${esc(C.name)}</b><small>${esc(C.what)}</small><small class="ct-c-meta">${money(C.price)} a person · ${C.days} day${C.days > 1 ? 's' : ''}${done ? ` · ${done} done` : ''}</small></span>
+      <span class="ct-c-go">${free.length ? `<select class="ct-pick" aria-label="Who goes on the course">${free.map((p: any) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><button class="btn sm primary" data-act="ct-send" data-c="${C.id}">Send ${money(C.price, { compact: true })}</button>` : `<small class="muted">${people.length ? 'Everyone has done it or is on a course' : 'Nobody hired yet'}</small>`}</span></div>`;
+  }).join('');
+  return `<div class="ct-now"><div class="ct-now-head"><h3>In the Training room now</h3><button class="btn ghost sm" data-act="ct-visit">${icon('jobs')}Go to the Training room</button></div>
+      ${now.length ? `<div class="ct-now-list">${now.slice(0, 12).map(who).join('')}</div>${now.length > 12 ? `<p class="fine-print">${now.length - 12} more wait for a seat in the next class.</p>` : ''}` : `<p class="fine-print">${icon('info')}Nobody is on a course. Send someone below: they sit in the Training room (the Academy) in the staff corridor until it ends, and don't work meanwhile.</p>`}</div>
+    <div class="filter-row">${CREW_COURSE_GROUPS.map(g => `<button class="fchip ${g[0] === group[0] ? 'on' : ''}" data-act="ct-group" data-g="${g[0]}">${esc(g[1])}</button>`).join('')}</div>
+    ${group[0] === 'pilot' ? `<p class="fine-print">${icon('info')}Type ratings for new aircraft are in each pilot's details (Assign).</p>` : ''}
+    <div class="ct-courses">${rows}</div>
+    <p class="fine-print">${icon('info')}Prices are what training centres charge for these courses. A course runs on the real clock (faster with a faster virtual pilot speed); a finished course is on the person's record and makes them a little better at their job.</p>`;
+}
+ACTIONS['ct-group'] = el => { _ctGroup = el.getAttribute('data-g') || 'fa'; Sound.tick(); refresh(); };
+ACTIONS['ct-send'] = el => {
+  const sel = el.parentElement && el.parentElement.querySelector('.ct-pick') as HTMLSelectElement, id = sel && sel.value, C = CrewTraining.course(el.getAttribute('data-c') || '');
+  const p: any = id ? staffById(id) : null; if (!p || !C) return;
+  if (company().balance < C.price) { toast(`Not enough money for ${C.name}`, 'warn'); return; }
+  if (CrewTraining.start(p, C.id)) { Haptics.success(); toast(`${p.name} is on the course: ${C.name}`, 'ok'); refresh(); }
+};
+ACTIONS['ct-visit'] = () => {
+  Sound.tick();
+  if (TestRooms.on && TestRooms.game) { const s = TR_SPOTS.training; if (TestRooms.free) { TestRooms.free.x = s.x; TestRooms.free.z = s.z; TestRooms.look = { yaw: s.yaw, pitch: -0.05 }; } return; }
+  closeAll(); setTimeout(() => TestRooms.open({ game: true, room: 'training' }), 60);
+};

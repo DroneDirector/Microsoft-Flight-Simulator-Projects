@@ -48,6 +48,19 @@ const LOUNGE_PROP_FILES: [string, string][] = [
   ['pendant-light', 'Pendant light (Business)'], ['chandelier', 'Chandelier (Flagship)'], ['fireplace', 'Fireplace (Flagship)'], ['grand-piano', 'Grand piano (Flagship)'],
   ['wall-art', 'Framed art (Flagship)'], ['champagne-bucket', 'Champagne bucket (Flagship)'], ['departures-screen', 'Departures screen frame (the list is drawn by the app)'],
 ];
+/** The Training room (the Academy), one file each (training-props/<name>.glb): front towards +Z (the side you sit at or
+ *  look at), standing on the floor (or the desk); fitted to the size of the app's own. */
+const TRAINING_PROP_FILES: [string, string][] = [
+  ['student-desk', 'Student desk (12 in the room; the front is where the student sits)'], ['student-chair', 'Student chair'],
+  ['teacher-desk', 'Teacher desk (the front is the side the teacher sits at)'], ['teacher-chair', 'Teacher chair'],
+  ['whiteboard', 'Whiteboard with its pen tray (a material named board shows the lesson the app draws)'],
+  ['academy-notebook', 'The airline Academy notebook on every desk (a material named cover shows the airline cover: its mark, its name, Academy)'],
+  ['pen', 'Pen (the app gives each one its colour)'], ['pencil', 'Pencil'], ['calculator', 'Calculator'], ['paper-sheet', 'Sheet of paper'],
+  ['bookshelf', 'Bookshelf, 2.7 m wide, five shelves'], ['book', 'Book on the shelf, spine out (the app gives each one its size and colour)'],
+  ['book-cover', 'Book with its cover showing (a material named cover shows the cover and title the app draws)'],
+  ['poster', 'Academy poster in its frame'], ['wall-clock', 'Wall clock (the app draws its hands, which keep the time)'],
+  ['double-door-leaf', 'One leaf of the double doors (opens inwards; the app turns it)'],
+];
 /** The shared props, one file each (props/<name>.glb). */
 const PROP_FILES: [string, string][] = [
   ['plant-1', 'Potted plant 1: fiddle-leaf fig in a glazed ceramic pot (about 1.6 m)'],

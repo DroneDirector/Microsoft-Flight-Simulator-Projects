@@ -4399,3 +4399,21 @@ body.scn-set-on .scn-rec { display: none; }
 .fgm-fg { align-self: flex-start; padding: 3px 8px; border-radius: 7px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06); color: #DCE6F0; font: 600 11px Inter, sans-serif; cursor: pointer; }
 .fgm-fg.on { background: rgba(61,220,132,.2); border-color: rgba(61,220,132,.6); color: #7FF0B0; }
 body.scn-set-on .fg-mon { z-index: 1201; }
+
+/* Crew → Training: courses for every kind of crew, and who is in the Training room now */
+.ct-now { padding: 12px 14px; margin-bottom: 12px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line-2); }
+.ct-now-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ct-now-head h3 { margin: 0; }
+.ct-now-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 10px; }
+.ct-now-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ct-now-row .avatar { width: 40px; height: 40px; flex: none; border-radius: 50%; overflow: hidden; }
+.ct-now-row span { min-width: 0; } .ct-now-row b, .ct-now-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ct-courses { display: grid; gap: 8px; margin: 10px 0; }
+.ct-course { display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line-2); }
+.ct-c-txt { flex: 1 1 260px; min-width: 0; } .ct-c-txt b, .ct-c-txt small { display: block; } .ct-c-meta { margin-top: 4px; opacity: .85; }
+.ct-c-go { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ct-pick { max-width: 200px; height: 32px; border-radius: 10px; padding: 0 8px; background: var(--panel-2, rgba(255,255,255,.06)); color: inherit; border: 1px solid var(--line-2); }
+/* the Training room's speech box (the teacher's lesson, or who a student is) */
+.trn-box { position: absolute; left: 50%; transform: translateX(-50%); bottom: 96px; width: min(560px, calc(100% - 32px)); z-index: 30; }
+.trn-box[hidden] { display: none; }
+.trn-box .of-x { position: absolute; right: 8px; top: 8px; }

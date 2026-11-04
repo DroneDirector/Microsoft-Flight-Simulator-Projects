@@ -245,7 +245,7 @@ function crewCheck(cid?: string): CrewCheck {
   const fl = State.fleet.filter(a => a.companyId === c);
   const active = fl.filter(a => a.status !== 'grounded' && a.status !== 'maintenance');
   const order = active.slice().sort((a, b) => (a.status === 'flying' ? 0 : 1) - (b.status === 'flying' ? 0 : 1));
-  const faHave = staffOf(c, 'fa').length, mechHave = staffOf(c, 'mech').length;
+  const faHave = staffOf(c, 'fa').filter((s: any) => s.status !== 'training').length, mechHave = staffOf(c, 'mech').filter((s: any) => s.status !== 'training').length;   // on a course: not at work
   let faNeed = 0, faLeft = faHave, winchNeed = 0, winchLeft = staffOf(c, 'fa').filter(isWinchOp).length;
   const winchHave = winchLeft;
   const blocked: { [reg: string]: string[] } = {};

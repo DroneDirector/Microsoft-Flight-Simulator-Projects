@@ -202,6 +202,31 @@ towards +Z (where you sit or stand to use it), standing on the floor; fitted to 
 | `lounge-props/champagne-bucket.glb` | Champagne bucket (Flagship) |
 | `lounge-props/departures-screen.glb` | Departures screen frame (the list is drawn by the app) |
 
+## Training room (`training-props/`)
+
+One file for each kind of thing in the Training room (the Academy), used for every one of that kind. Metres, front
+towards +Z (the side you sit at or look at), standing on the floor (or the desk); fitted to the size of the app's own.
+The plants are the shared ones (`props/plant-3.glb`). The people are the people files.
+
+| File | What |
+|---|---|
+| `training-props/student-desk.glb` | Student desk (12 in the room; the front is where the student sits) |
+| `training-props/student-chair.glb` | Student chair |
+| `training-props/teacher-desk.glb` | Teacher desk (the front is the side the teacher sits at) |
+| `training-props/teacher-chair.glb` | Teacher chair |
+| `training-props/whiteboard.glb` | Whiteboard with its pen tray (a material named board shows the lesson the app draws) |
+| `training-props/academy-notebook.glb` | The airline Academy notebook on every desk (a material named cover shows the airline cover: its mark, its name, Academy) |
+| `training-props/pen.glb` | Pen (the app gives each one its colour) |
+| `training-props/pencil.glb` | Pencil |
+| `training-props/calculator.glb` | Calculator |
+| `training-props/paper-sheet.glb` | Sheet of paper |
+| `training-props/bookshelf.glb` | Bookshelf, 2.7 m wide, five shelves |
+| `training-props/book.glb` | Book on the shelf, spine out (the app gives each one its size and colour) |
+| `training-props/book-cover.glb` | Book with its cover showing (a material named cover shows the cover and title the app draws) |
+| `training-props/poster.glb` | Academy poster in its frame |
+| `training-props/wall-clock.glb` | Wall clock (the app draws its hands, which keep the time) |
+| `training-props/double-door-leaf.glb` | One leaf of the double doors (opens inwards; the app turns it) |
+
 ## Crash scene (`crash/`)
 
 What is at a crash site besides the aircraft itself (the wreck is the aircraft's own model, broken and scorched).

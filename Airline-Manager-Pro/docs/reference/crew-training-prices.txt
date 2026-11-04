@@ -1,0 +1,40 @@
+Crew training prices (Crew → Training), per person, in US dollars. Courses run 1–5 days in the game.
+Found = a published price (converted to US dollars, rounded). Est. = worked out from the usual market range where the
+providers ask you to contact them for a price.
+
+PILOTS (type ratings are separate: src/core/ratings.ts)
+crm        Crew resource management (recurrent)        600   est.
+uprt       Upset prevention and recovery (UPRT)       2400   found: British Aerobatic Academy, advanced UPRT £1,565 + £300 for an EASA licence
+dg-fc      Dangerous goods for flight crew             200   found: IATA DGR e-learning USD 170 (IATA, Dangerous Goods Regulations for Loadmasters and Load Planners)
+opc        Recurrent simulator check (OPC/LPC)        8000   est. (full flight simulator time and an examiner)
+command    Command upgrade course                     12000   est.
+
+CABIN CREW
+cc-initial Cabin crew attestation (initial)           1000   found: Reed course listing, cabin crew initial training for attestation £795
+sep        Safety and emergency procedures (recurr.)   450   est.
+cc-fire    Fire fighting for cabin crew                150   found: CPH (Copenhagen Airport) Business, cabin crew initial fire training DKK 10,000 per group of up to 10
+cc-aid     First aid and aviation medicine             150   found: CPH Business, first aid for cardiac arrest DKK 10,000 per group of up to 10
+dg-cc      Dangerous goods awareness (category 10)     170   found: IATA DGR e-learning USD 170
+purser     Senior cabin crew (purser) course          1500   est.
+
+MECHANICS
+type-b1    Aircraft type course (B1)                 18000   est. (Part-66 type training: providers quote on request)
+hf         Human factors in maintenance                150   found: CPH Business, human factors DKK 10,000 per group of up to 10
+ewis       Electrical wiring (EWIS)                    500   est.
+runup      Engine run-up                              2500   est.
+borescope  Borescope inspection                       2200   est.
+hot-work   Hot work and fire watch                     150   found: CPH Business, hot work DKK 10,000 per group of up to 10
+
+GROUND STAFF
+adp        Airside driving permit                      250   est.
+pushback   Pushback and towing                        1200   est.
+deice      De-icing and anti-icing (level 1)           600   est.
+dg-gnd     Dangerous goods for ground staff            200   found: IATA DGR e-learning USD 170
+load       Load control and loadsheets                1800   est.
+gnd-fire   Elementary fire fighting                    150   found: CPH Business, elementary fire fighting DKK 10,000 per group of 2–10
+
+Sources:
+https://www.cph.dk/cph-business/carfa/prisliste
+https://britishaerobaticacademy.com/uprt/advanced-upset-prevention-recovery-uprt/
+https://www.reed.co.uk/courses/cabin-crew-initial-training-for-attestation/68877
+https://www.iata.org/en/training/courses/dgr-loadmaster-loadplanner/dgc004elen01/en/

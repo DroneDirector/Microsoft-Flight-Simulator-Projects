@@ -84,6 +84,7 @@
     "src/core/bases.ts",
     "src/core/bank.ts",
     "src/core/ratings.ts",
+    "src/core/crew-training.ts",
     "src/core/jobs.ts",
     "src/core/online.ts",
     "src/core/g2p.ts",
@@ -193,6 +194,7 @@
     "src/core/ops-decisions.ts",
     "src/screens/hangar3d.ts",
     "src/screens/lounge3d.ts",
+    "src/screens/training3d.ts",
     "src/screens/testrooms.ts",
     "src/screens/gfx-advice.ts",
     "src/main.ts"
