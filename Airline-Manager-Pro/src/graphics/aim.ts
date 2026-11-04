@@ -20,7 +20,8 @@ function aimLocked(el?: HTMLElement): boolean { return !!document.pointerLockEle
 function aimEscUsed(): boolean { return performance.now() - AimLock.unlockedAt < 450; }
 /** Turning with the captured mouse: as far as you like, round and round (only looking up and down stops). */
 function aimTurn(look: { yaw: number; pitch: number }, e: MouseEvent, pitchMin = -1.3, pitchMax = 1.2, sens = 0.0024) {
-  look.yaw -= e.movementX * sens; look.pitch = Math.max(pitchMin, Math.min(pitchMax, look.pitch - e.movementY * sens));
+  const S: any = (typeof State !== 'undefined' && State.settings) || {}, k = sens * (+S.mouseLook || 1), iy = S.mouseInvertY ? -1 : 1;   // Settings → Devices: speed and invert
+  look.yaw -= e.movementX * k; look.pitch = Math.max(pitchMin, Math.min(pitchMax, look.pitch - e.movementY * k * iy));
   if (look.yaw > Math.PI * 64 || look.yaw < -Math.PI * 64) look.yaw = Math.atan2(Math.sin(look.yaw), Math.cos(look.yaw));   // kept small, the same direction
 }
 

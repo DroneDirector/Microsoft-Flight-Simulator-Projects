@@ -18,6 +18,12 @@ import android.provider.DocumentsContract;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
+import com.getcapacitor.JSArray;
 
 import androidx.core.content.ContextCompat;
 
@@ -44,6 +50,143 @@ import java.nio.charset.StandardCharsets;
  */
 @CapacitorPlugin(name = "AppTools")
 public class AppToolsPlugin extends Plugin {
+
+    /* ---------- Settings → Devices: sound devices, and pairing controllers and headsets ---------- */
+
+    /** The sound devices Android has now: speakers, wired headphones, USB and Bluetooth headsets, microphones. */
+    @PluginMethod
+    public void audioDevices(PluginCall call) {
+        JSObject r = new JSObject(); JSArray list = new JSArray();
+        try {
+            AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+            if (am != null && Build.VERSION.SDK_INT >= 23) {
+                for (int flag : new int[] { AudioManager.GET_DEVICES_OUTPUTS, AudioManager.GET_DEVICES_INPUTS }) {
+                    for (AudioDeviceInfo d : am.getDevices(flag)) {
+                        int t = d.getType(); String how = "";
+                        if (t == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || t == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || (Build.VERSION.SDK_INT >= 31 && (t == AudioDeviceInfo.TYPE_BLE_HEADSET || t == AudioDeviceInfo.TYPE_BLE_SPEAKER))) how = "Bluetooth";
+                        else if (t == AudioDeviceInfo.TYPE_USB_HEADSET || t == AudioDeviceInfo.TYPE_USB_DEVICE) how = "USB";
+                        else if (t == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || t == AudioDeviceInfo.TYPE_WIRED_HEADSET) how = "Cable";
+                        else if (t == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER || t == AudioDeviceInfo.TYPE_BUILTIN_MIC || t == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE) how = "Built in";
+                        else if (t == AudioDeviceInfo.TYPE_TELEPHONY || t == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE) continue;
+                        if (t == AudioDeviceInfo.TYPE_TELEPHONY || t == AudioDeviceInfo.TYPE_REMOTE_SUBMIX || t == AudioDeviceInfo.TYPE_FM_TUNER) continue;
+                        String name = String.valueOf(d.getProductName());
+                        if ("Built in".equals(how)) name = t == AudioDeviceInfo.TYPE_BUILTIN_MIC ? "Built-in microphone" : t == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE ? "Earpiece" : "Built-in speaker";
+                        JSObject o = new JSObject(); o.put("name", name); o.put("type", d.isSink() ? "out" : "in"); o.put("how", how); list.put(o);
+                    }
+                }
+            }
+        } catch (Exception e) { r.put("error", String.valueOf(e.getMessage())); }
+        r.put("devices", list); call.resolve(r);
+    }
+
+    private boolean btAllowed() {
+        if (Build.VERSION.SDK_INT >= 31) {
+            boolean ok = ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+            if (!ok) androidx.core.app.ActivityCompat.requestPermissions(getActivity(), new String[] { android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT }, 4711);
+            return ok;
+        }
+        boolean loc = ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        if (!loc) androidx.core.app.ActivityCompat.requestPermissions(getActivity(), new String[] { android.Manifest.permission.ACCESS_FINE_LOCATION }, 4712);
+        return loc;
+    }
+    private BluetoothAdapter btAdapter() {
+        BluetoothManager bm = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+        return bm != null ? bm.getAdapter() : null;
+    }
+
+    /** Look for controllers and headsets in pairing mode for about 12 seconds; paired ones are listed too. */
+    @PluginMethod
+    public void btScan(final PluginCall call) {
+        final JSObject r = new JSObject(); final JSArray list = new JSArray();
+        try {
+            final BluetoothAdapter ad = btAdapter();
+            if (ad == null) { r.put("error", "This device has no Bluetooth"); r.put("devices", list); call.resolve(r); return; }
+            if (!btAllowed()) { r.put("error", "Allow Nearby devices for the app, then search again"); r.put("devices", list); call.resolve(r); return; }
+            if (!ad.isEnabled()) { r.put("error", "Switch Bluetooth on, then search again"); r.put("devices", list); call.resolve(r); return; }
+            final java.util.LinkedHashMap<String, JSObject> found = new java.util.LinkedHashMap<>();
+            for (BluetoothDevice d : ad.getBondedDevices()) { JSObject o = new JSObject(); o.put("name", d.getName()); o.put("address", d.getAddress()); o.put("bonded", true); found.put(d.getAddress(), o); }
+            final BroadcastReceiver rc = new BroadcastReceiver() {
+                @Override public void onReceive(Context c, Intent i) {
+                    if (!BluetoothDevice.ACTION_FOUND.equals(i.getAction())) return;
+                    BluetoothDevice d = i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE); if (d == null) return;
+                    try { String n = d.getName(); if (n == null || n.isEmpty()) return; JSObject o = new JSObject(); o.put("name", n); o.put("address", d.getAddress()); o.put("bonded", d.getBondState() == BluetoothDevice.BOND_BONDED); found.put(d.getAddress(), o); } catch (SecurityException ignored) { }
+                }
+            };
+            ContextCompat.registerReceiver(getContext(), rc, new IntentFilter(BluetoothDevice.ACTION_FOUND), ContextCompat.RECEIVER_EXPORTED);
+            ad.startDiscovery();
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try { ad.cancelDiscovery(); } catch (SecurityException ignored) { }
+                try { getContext().unregisterReceiver(rc); } catch (Exception ignored) { }
+                for (JSObject o : found.values()) list.put(o);
+                r.put("devices", list); call.resolve(r);
+            }, 12000);
+        } catch (SecurityException e) { r.put("error", "Allow Nearby devices for the app, then search again"); r.put("devices", list); call.resolve(r); }
+        catch (Exception e) { r.put("error", String.valueOf(e.getMessage())); r.put("devices", list); call.resolve(r); }
+    }
+
+    /** Pair with one of the devices found (Android may ask to confirm). */
+    @PluginMethod
+    public void btPair(PluginCall call) {
+        JSObject r = new JSObject();
+        try {
+            BluetoothAdapter ad = btAdapter(); String a = call.getString("address", "");
+            if (ad == null || a.isEmpty() || !btAllowed()) { r.put("ok", false); r.put("error", "Allow Nearby devices for the app first"); call.resolve(r); return; }
+            try { ad.cancelDiscovery(); } catch (SecurityException ignored) { }
+            r.put("ok", ad.getRemoteDevice(a).createBond());
+        } catch (Exception e) { r.put("ok", false); r.put("error", String.valueOf(e.getMessage())); }
+        call.resolve(r);
+    }
+
+    /* ---------- printing a document on a real printer (Android's print screen) ---------- */
+
+    /** A page made in the game (a report, a schedule): Android's print screen with the page ready to print or save as PDF. */
+    @PluginMethod
+    public void printHtml(final PluginCall call) {
+        final String html = call.getString("html", ""), name = call.getString("name", "Document");
+        getActivity().runOnUiThread(() -> {
+            try {
+                final android.webkit.WebView wv = new android.webkit.WebView(getActivity());
+                wv.setWebViewClient(new android.webkit.WebViewClient() {
+                    @Override public void onPageFinished(android.webkit.WebView view, String url) {
+                        android.print.PrintManager pm = (android.print.PrintManager) getActivity().getSystemService(Context.PRINT_SERVICE);
+                        if (pm != null) pm.print(name, view.createPrintDocumentAdapter(name), new android.print.PrintAttributes.Builder().build());
+                        call.resolve(new JSObject());
+                    }
+                });
+                wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+            } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
+        });
+    }
+
+    /** A PDF (from your device, kept in the game): straight to Android's print screen. */
+    @PluginMethod
+    public void printPdf(final PluginCall call) {
+        try {
+            final byte[] data = android.util.Base64.decode(call.getString("base64", ""), android.util.Base64.DEFAULT);
+            final String name = call.getString("name", "Document");
+            android.print.PrintManager pm = (android.print.PrintManager) getActivity().getSystemService(Context.PRINT_SERVICE);
+            if (pm == null) { call.reject("No printing on this device"); return; }
+            pm.print(name, new android.print.PrintDocumentAdapter() {
+                @Override public void onLayout(android.print.PrintAttributes o, android.print.PrintAttributes n, android.os.CancellationSignal c, LayoutResultCallback cb, android.os.Bundle b) {
+                    if (c.isCanceled()) { cb.onLayoutCancelled(); return; }
+                    cb.onLayoutFinished(new android.print.PrintDocumentInfo.Builder(name + ".pdf").setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build(), true);
+                }
+                @Override public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor dest, android.os.CancellationSignal c, WriteResultCallback cb) {
+                    try (OutputStream out = new FileOutputStream(dest.getFileDescriptor())) { out.write(data); cb.onWriteFinished(new android.print.PageRange[] { android.print.PageRange.ALL_PAGES }); }
+                    catch (Exception e) { cb.onWriteFailed(String.valueOf(e.getMessage())); }
+                }
+            }, null);
+            call.resolve(new JSObject());
+        } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
+    }
+
+    /** Android's own Bluetooth settings. */
+    @PluginMethod
+    public void btSettings(PluginCall call) {
+        try { Intent i = new Intent(Settings.ACTION_BLUETOOTH_SETTINGS); i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); getContext().startActivity(i); } catch (Exception ignored) { }
+        call.resolve(new JSObject());
+    }
 
     static final String CRASH_FILE = "last-crash.txt";
     private static final String ACTION_STATUS = ".INSTALL_STATUS";

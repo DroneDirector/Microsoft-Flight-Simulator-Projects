@@ -15,7 +15,7 @@ const V3dSound: any = {
   /** The output for the 3D view's sounds (null when sound is off). */
   out(): GainNode {
     const ctx = audio(); if (!ctx) return null;
-    if (this.ctx !== ctx || !this.master) { this.ctx = ctx; this.master = ctx.createGain(); this.master.connect(ctx.destination); this.jet = this.prop = this.cab = null; }
+    if (this.ctx !== ctx || !this.master) { this.ctx = ctx; this.master = ctx.createGain(); this.master.connect(ctx.destination); this.jet = this.prop = this.cab = this.fol = null; }
     this.master.gain.setTargetAtTime(this.vol(), ctx.currentTime, 0.1);
     return this.master;
   },
@@ -47,6 +47,23 @@ const V3dSound: any = {
     src.start(t0); src.stop(t0 + dur + 0.1);
   },
 
+  /** The outside sound's own level (Settings → Sound and feel: Outside noise). */
+  outVol(): number { const v = (State.settings as any).v3dOutVol; return clamp(v == null ? 1 : +v, 0, 1.5); },
+  /** The aircraft you follow, heard round it: an exhaust roar, the fan's whine, the intake's hiss and a propeller's
+   *  beat, mixed by where the camera is, panned to its side. */
+  followVoice(): any {
+    const ctx = this.ctx, out = this.master, bus = ctx.createGain(); bus.gain.value = 0;
+    const pan: any = (ctx as any).createStereoPanner ? (ctx as any).createStereoPanner() : { pan: ctx.createGain().gain, connect: (x: any) => bus.connect(x) };
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 6000;
+    bus.connect(lp); if ((ctx as any).createStereoPanner) { lp.connect(pan); pan.connect(out); } else lp.connect(out);
+    const n = ctx.createBufferSource(); n.buffer = this.noise(ctx, 3, true); n.loop = true; n.start();
+    const rlp = ctx.createBiquadFilter(); rlp.type = 'lowpass'; rlp.frequency.value = 500; const rg = ctx.createGain(); rg.gain.value = 0; n.connect(rlp); rlp.connect(rg); rg.connect(bus);
+    const w = ctx.createBufferSource(); w.buffer = this.noise(ctx, 2, false); w.loop = true; w.start();
+    const hbp = ctx.createBiquadFilter(); hbp.type = 'bandpass'; hbp.frequency.value = 2400; (hbp as any).Q.value = 0.8; const hg = ctx.createGain(); hg.gain.value = 0; w.connect(hbp); hbp.connect(hg); hg.connect(bus);
+    const wo = ctx.createOscillator(); wo.type = 'sine'; wo.frequency.value = 3200; const wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 3200; (wf as any).Q.value = 5; const wg = ctx.createGain(); wg.gain.value = 0; wo.connect(wf); wf.connect(wg); wg.connect(bus); wo.start();
+    const po = ctx.createOscillator(); po.type = 'sawtooth'; po.frequency.value = 90; const plp = ctx.createBiquadFilter(); plp.type = 'lowpass'; plp.frequency.value = 420; const pg = ctx.createGain(); pg.gain.value = 0; po.connect(plp); plp.connect(pg); pg.connect(bus); po.start();
+    return { bus, pan, lp, rg, rlp, hg, hbp, wo, wf, wg, po, pg };
+  },
   /** A running engine voice: its noise and tone sources, with gains and filters set every frame. */
   voice(prop: boolean): any {
     const ctx = this.ctx, out = this.master;
@@ -92,7 +109,7 @@ const V3dSound: any = {
     const out = this.out(); if (!out) return;
     const ctx = this.ctx, cam = V3d.cam.position, cabin = /^(cabin|walk|winL|winR)$/.test(V3d.mode), inside = cabin || V3d.mode === 'fwd';
     const own = cabin ? ((V3d as any).cabinFwdFor || (V3d as any).cabinFor) : null;
-    let jetL = 0, propL = 0, jetN = 0, propN = 0, cabP = -1, cabProp = false, cabKt = 0;
+    let jetL = 0, propL = 0, jetN = 0, propN = 0, cabP = -1, cabProp = false, cabKt = 0, follow: any = null;
     for (const id in V3d.planes || {}) {
       const P: any = (V3d.planes as any)[id]; if (!P || !P.pos || P.model && !P.model.visible && id !== own) continue;
       const d = P.pos.distanceTo(cam); if (d > 4000) continue;
@@ -103,6 +120,7 @@ const V3dSound: any = {
       const loud = pw / (1 + Math.pow(d / 120, 2));   // falls off with distance (about the inverse square past the first hundred metres)
       let prop = false; try { const t: any = acType(P.type); prop = !!t && /bush|turboprop|ga/.test(t.cls); } catch (e) { /* jet */ }
       if (id === own) { cabP = pw; cabProp = prop; cabKt = kt; continue; }   // the aircraft you sit in: heard from inside (below)
+      if (id === V3d.target && /^(chase|side)$/.test(V3d.mode) && P.model) { follow = { P, d, pw, prop }; continue; }   // the one you follow: heard round it (below)
       if (prop) { propL += loud; propN = Math.max(propN, pw); } else { jetL += loud; jetN = Math.max(jetN, pw); }
     }
     const T = ctx.currentTime, set = (p: AudioParam, v: number) => p.setTargetAtTime(v, T, 0.25);
@@ -110,10 +128,33 @@ const V3dSound: any = {
     if (propL > 0.0005 && !this.prop) this.prop = this.voice(true);
     const muffle = cabin ? 0.18 : inside ? 0.45 : 1;   // others' engines, heard through the hull
     if (this.jet) {
-      const J = this.jet, l = Math.min(1, jetL) * muffle;
+      const J = this.jet, l = Math.min(1, jetL) * muffle * this.outVol();
       set(J.ng.gain, l * 0.55); set(J.lp.frequency, cabin ? 350 : (inside ? 500 : 700) + 1600 * jetN);
       set(J.og.gain, l * 0.05 * (0.4 + jetN)); set(J.o.frequency, 2400 + 1800 * jetN); set(J.of.frequency, 2400 + 1800 * jetN);
     }
+    // the aircraft you follow (Behind, Around): what you hear depends on where you are round it. In front, the
+    // fan's whine and the intake's hiss; behind, the deep roar of the exhaust; to one side it comes from that side;
+    // further away it is quieter and duller.
+    if (follow) {
+      const T3 = THREE, F = follow, q = F.P.model.getWorldQuaternion(new T3.Quaternion()), fwd = new T3.Vector3(-1, 0, 0).applyQuaternion(q).normalize();
+      const toCam = cam.clone().sub(F.P.pos).normalize(), front = fwd.dot(toCam);   // 1 straight ahead of the nose, −1 right behind the tail
+      const camR = new T3.Vector3(1, 0, 0).applyQuaternion(V3d.cam.quaternion), toPl = F.P.pos.clone().sub(cam).normalize(), pan = clamp(camR.dot(toPl), -1, 1);
+      const near = F.pw / (1 + Math.pow(F.d / 90, 2)), behind = clamp((-front + 0.2) / 1.2, 0, 1), ahead = clamp((front + 0.1) / 1.1, 0, 1), side = 1 - Math.abs(front);
+      if (!this.fol) this.fol = this.followVoice();
+      const V = this.fol, ex = this.outVol();
+      set(V.bus.gain, Math.min(1.2, near) * ex);
+      set(V.pan.pan, pan * 0.85);
+      // the roar: loudest behind, still there to the side, little of it in front
+      set(V.rg.gain, (F.prop ? 0.35 : 0.85) * (0.18 + 0.82 * behind) * (0.5 + F.pw)); set(V.rlp.frequency, 260 + 900 * behind * (0.4 + F.pw) + 400 * side);
+      // the whine and the fan: strongest in front, some to the side
+      const whine = F.prop ? 0 : (0.1 + 0.9 * ahead + 0.3 * side) * (0.35 + F.pw);
+      set(V.wg.gain, 0.06 * whine); set(V.wo.frequency, 2600 + 2200 * F.pw); set(V.wf.frequency, 2600 + 2200 * F.pw);
+      set(V.hg.gain, (F.prop ? 0.05 : 0.22) * (0.2 + 0.8 * ahead) * (0.3 + F.pw)); set(V.hbp.frequency, 1800 + 1400 * ahead);
+      // a propeller's beat, from any side
+      set(V.pg.gain, F.prop ? 0.25 * (0.4 + F.pw) : 0); set(V.po.frequency, 60 + 55 * F.pw);
+      // far away the high notes go first
+      set(V.lp.frequency, 900 + 9000 / (1 + F.d / 120));
+    } else if (this.fol) { this.fol.bus.gain.setTargetAtTime(0, T, 0.25); }
     // inside your own aircraft
     const cv = this.cabVol();
     if (cabP >= 0 && cv > 0 && !this.cab) this.cab = this.cabinVoice();
@@ -130,8 +171,8 @@ const V3dSound: any = {
     }
     if (this.prop) {
       const Pv = this.prop, l = Math.min(1, propL) * muffle;
-      set(Pv.ng.gain, l * 0.25); set(Pv.lp.frequency, 500 + 900 * propN);
-      set(Pv.og.gain, l * 0.22); set(Pv.o.frequency, 60 + 55 * propN); if (Pv.lfo) set(Pv.lfo.frequency, 12 + 14 * propN);
+      set(Pv.ng.gain, l * 0.25 * this.outVol()); set(Pv.lp.frequency, 500 + 900 * propN);
+      set(Pv.og.gain, l * 0.22 * this.outVol()); set(Pv.o.frequency, 60 + 55 * propN); if (Pv.lfo) set(Pv.lfo.frequency, 12 + 14 * propN);
     }
   },
 
@@ -141,6 +182,7 @@ const V3dSound: any = {
     const T = this.ctx.currentTime;
     for (const v of [this.jet, this.prop]) if (v) { v.ng.gain.setTargetAtTime(0, T, 0.2); v.og.gain.setTargetAtTime(0, T, 0.2); }
     if (this.cab) this.cab.bus.gain.setTargetAtTime(0, T, 0.2);
+    if (this.fol) this.fol.bus.gain.setTargetAtTime(0, T, 0.2);
   },
   stop() {
     this.quiet();

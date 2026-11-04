@@ -923,7 +923,7 @@ function lerpAng(a: number, b: number, k: number): number { let d = b - a; while
 function hgRoomDoor(i: number) {
   const R = HangarRoom, A = R.A, D0 = A && A.rdoors && A.rdoors[i]; if (!D0) return;
   if (D0.to) { const F = R.free, d = D0.d, zf = D0.pv.position.z; if (F && F.x > d[0] - 0.3 && F.x < d[1] + 0.3 && F.z > zf - 1.25 && F.z < zf + 0.3) { toast('Step out of the doorway first', 'info'); return; } }
-  D0.to = D0.to ? 0 : 1; try { Sound.tick(); } catch (e) { /* quiet */ }
+  D0.to = D0.to ? 0 : 1; try { sfxDoor('metal', D0.to === 1); } catch (e) { /* quiet */ }
   const at = A.blocks.indexOf(D0.blk); if (D0.to && at >= 0) A.blocks.splice(at, 1); if (!D0.to && at < 0) A.blocks.push(D0.blk);
 }
 /** The rooms' doors swinging, a little each frame. */
@@ -1313,9 +1313,11 @@ function hgRefresh() {
 }
 
 /* ---------- sounds: the machine, the can, the bites (made here, no recordings) ---------- */
+const HG_SFX: { [k: string]: string } = { beep: 'vending-button', motor: 'vending-coil', thunk: 'vending-drop', flap: 'vending-flap', put: 'put-down', open: 'can-open', sip: 'drink-sip', bite: 'snack-bite' };
 function hgSnd(kind: string) {
   try {
     if ((State.settings as any).muteAll) return;
+    if (HG_SFX[kind] && Sfx.play(HG_SFX[kind])) return;   // a file in www/sounds
     const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext, ac = HangarRoom.ac || (HangarRoom.ac = new AC()); if (ac.state !== 'running') ac.resume();
     const t0 = ac.currentTime + 0.02, out = ac.createGain(); out.gain.value = 0.8; out.connect(ac.destination);
     const noise = (dur: number) => { const n = ac.createBuffer(1, Math.max(1, Math.floor(ac.sampleRate * dur)), ac.sampleRate), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = ac.createBufferSource(); s.buffer = n; return s; };

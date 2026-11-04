@@ -135,6 +135,8 @@ function padLoop() {
     const B: boolean[] = []; for (let i = 0; i < 18; i++) B[i] = bt(i);
     const hit = (i: number) => B[i] && !Pad.prev[i], rel = (i: number) => !B[i] && Pad.prev[i];
     const any = lx || ly || rx || ry || l2 > 0.05 || r2 > 0.05 || B.some(Boolean);
+    if (typeof Dev !== 'undefined' && Dev.cap && Dev.cap.kind === 'pad') { devPadCapture(B, Pad.prev); Pad.prev = B; return; }   // a button is being chosen in Settings → Devices
+    const act = (id: string) => padAct(id, B, Pad.prev);
     if (any) Pad.last = now;
     // the 3D object viewer (gifts, plaques, badges) reads the controller itself; the water salute film closes on Circle
     if (typeof V3V !== 'undefined' && V3V.on) { Pad.prev = B; try { padCursor(false); } catch (e) { /* none */ } return; }
@@ -145,21 +147,21 @@ function padLoop() {
     // ---- the world views: the sticks move and look ----
     if (v3) {
       const VV: any = V3d, F = VV.fc;
-      if (V3d.mode === 'walk') { CabinWalk.stick = [lx, -ly]; CabinWalk.keys.shift = B[10]; }
+      if (V3d.mode === 'walk') { CabinWalk.stick = [lx, -ly]; CabinWalk.keys.shift = padActHeld('run', B); }
       else if (V3d.mode === 'free' && F) { try { v3dFreePush(lx * dt * 2.5, (r2 - l2) * dt * 2.5, -ly * dt * 2.5); } catch (e) { /* not ready */ } }
       else if (lx || ly) { V3d.yaw -= lx * dt * 1.8; V3d.pitch = clamp(V3d.pitch - ly * dt * 1.2, -1.2, 1.2); }
       if (V3d.mode === 'free' && F) { F.yaw += rx * dt * 1.9 * sens; F.pitch = clamp(F.pitch - ry * dt * 1.5 * sens, -1.5, 1.4); }
       else if (rx || ry) { V3d.yaw -= rx * dt * 2.0 * sens; V3d.pitch = clamp(V3d.pitch - ry * dt * 1.5 * sens, -1.2, 1.2); }
       if (V3d.mode !== 'free' && (l2 > 0.1 || r2 > 0.1) && now - Pad.wheelT > 90) { Pad.wheelT = now; padEvt('wheel', V3d.cv, 0, { clientX: innerWidth / 2, clientY: innerHeight / 2, deltaY: (l2 - r2) * 120 }); }
-      if (hit(4) || hit(5)) { const b = document.createElement('b'); b.setAttribute('data-d', hit(4) ? '-1' : '1'); try { ACTIONS['v3d-next'](b, null); } catch (e) { /* none */ } }
-      if (hit(2)) { const ms = Array.from(V3d.root.querySelectorAll('.v3d-modes [data-m]')) as HTMLElement[], i = ms.findIndex(m => m.getAttribute('data-m') === V3d.mode); if (ms.length) { try { ACTIONS['v3d-mode'](ms[(i + 1) % ms.length], null); } catch (e) { /* none */ } } }
-      if (hit(3)) { padCursor(!Pad.shown); }   // the 3D view's own buttons, with the cursor
-      if (hit(11) && /^(walk|free)$/.test(V3d.mode)) { try { v3dUi(); } catch (e) { /* none */ } }   // R3: hide or show the controls
+      if (act('prev') || act('next')) { const b = document.createElement('b'); b.setAttribute('data-d', act('prev') ? '-1' : '1'); try { ACTIONS['v3d-next'](b, null); } catch (e) { /* none */ } }
+      if (act('nextCam')) { const ms = Array.from(V3d.root.querySelectorAll('.v3d-modes [data-m]')) as HTMLElement[], i = ms.findIndex(m => m.getAttribute('data-m') === V3d.mode); if (ms.length) { try { ACTIONS['v3d-mode'](ms[(i + 1) % ms.length], null); } catch (e) { /* none */ } } }
+      if (act('pointer')) { padCursor(!Pad.shown); }   // the 3D view's own buttons, with the cursor
+      if (act('centre') && /^(walk|free)$/.test(V3d.mode)) { try { v3dUi(); } catch (e) { /* none */ } }   // R3: hide or show the controls
     } else if (of || ct) {
       const R: any = op ? OpsRoom : of ? OfficeRoom : CourtRoom;
       if (R.stick) R.stick = [lx, -ly];
       if (R.look && (rx || ry)) { R.look.yaw = R.look.yaw - rx * dt * 1.6 * sens; R.look.pitch = clamp(R.look.pitch - ry * dt * 1.2 * sens, -1.0, 0.8); }   // all the way round
-      if (hit(3)) padCursor(!Pad.shown);
+      if (act('pointer')) padCursor(!Pad.shown);
       // the phone in your hand: Cross brings its screen up (unless you are pointing at something with the cursor)
       if (!ct && R.pk && R.pk.st === 'hold' && !R.overlay && !Pad.shown && hit(0)) { try { phoneOpen(R); } catch (e) { /* none */ } Pad.prev = B; return; }
       // L1 / R1 turn it in your hand, the d-pad up and down tilts it
@@ -175,17 +177,18 @@ function padLoop() {
     if (!(v3 || of || ct)) {
       if (ry || rx) padScrollAt(ry * 900 * dt, rx * 900 * dt);
       if ((l2 > 0.1 || r2 > 0.1) && now - Pad.wheelT > 100) { const el = padHover(); if (el && el.closest('canvas, .maplibregl-canvas')) { Pad.wheelT = now; padEvt('wheel', el, 0, { deltaY: (l2 - r2) * 120 }); } }
-      if (hit(4)) padGo(-1); if (hit(5)) padGo(1);
+      if (act('prev')) padGo(-1); if (act('next')) padGo(1);
       if (now - Pad.navT > 160) { const dx = (B[15] ? 1 : 0) - (B[14] ? 1 : 0), dy = (B[13] ? 1 : 0) - (B[12] ? 1 : 0); if (dx || dy) { Pad.navT = now; if (!(dx && padAdjust(dx))) padJump(dx, dy); } }
     } else if (V3d && V3d.open && V3d.mode === 'walk') {
       const K = CabinWalk.keys; K.arrowup = B[12]; K.arrowdown = B[13]; K.arrowleft = B[14]; K.arrowright = B[15];
     }
     // ---- buttons ----
     const clickBtn = (i: number) => { if (hit(i)) { if (!Pad.shown) { padCursor(true); } padPress(true); } if (rel(i)) padPress(false); };
-    if (pointerOn || hit(0) || hit(17)) { clickBtn(0); clickBtn(17); }
-    if (hit(1)) padBack();
-    if (hit(9)) { try { if (document.querySelector('.settings-pop')) closeAll(); else ACTIONS.settings(null as any, null); } catch (e) { /* none */ } }
-    if (hit(11)) { Pad.x = innerWidth / 2; Pad.y = innerHeight / 2; padCursor(true); }
+    const ck = padBind('click');
+    if (pointerOn || act('click') || hit(17)) { if (act('click')) { if (!Pad.shown) padCursor(true); padPress(true); } if (padActUp('click', B, Pad.prev)) padPress(false); if (ck.b !== 17) clickBtn(17); }
+    if (act('back')) padBack();
+    if (act('settings')) { try { if (document.querySelector('.settings-pop')) closeAll(); else ACTIONS.settings(null as any, null); } catch (e) { /* none */ } }
+    if (act('centre')) { Pad.x = innerWidth / 2; Pad.y = innerHeight / 2; padCursor(true); }
     Pad.prev = B;
   };
   Pad.raf = requestAnimationFrame(step);

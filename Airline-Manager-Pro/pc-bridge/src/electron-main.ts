@@ -101,7 +101,7 @@ function openWindow(url: string, prefs: DesktopPrefs): boolean {
   win.once('ready-to-show', () => win.show());
   const wc = win.webContents, origin = new URL(url).origin;
   // links to other sites open in the normal browser, never inside the app
-  wc.setWindowOpenHandler((d: any) => { if (/^https?:/i.test(d.url)) shell.openExternal(d.url); return { action: 'deny' }; });
+  wc.setWindowOpenHandler((d: any) => { if (/^https?:/i.test(d.url) || /^ms-settings:(bluetooth|sound)$/i.test(d.url)) shell.openExternal(d.url); return { action: 'deny' }; });
   wc.on('will-navigate', (ev: any, to: string) => { if (new URL(to).origin !== origin) { ev.preventDefault(); if (/^https?:/i.test(to)) shell.openExternal(to); } });
   // the laptop's web browser (a <webview> in the office): web pages only, sandboxed, nothing of the app's own powers;
   // signed-in sites stay signed in (its own saved partition)

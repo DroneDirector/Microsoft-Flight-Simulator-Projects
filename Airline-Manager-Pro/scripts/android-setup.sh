@@ -46,8 +46,12 @@ grep -q '"\.StatusWidget"' "$MAN" || sed -i 's|</application>|    <receiver andr
 for K in Small Medium Large; do k=$(echo "$K" | tr 'A-Z' 'a-z')
   grep -q "\.StatusWidget$K\"" "$MAN" || sed -i "s|</application>|    <receiver android:name=\".StatusWidget$K\" android:label=\"Airline Manager Pro ($k)\" android:exported=\"false\"><intent-filter><action android:name=\"android.appwidget.action.APPWIDGET_UPDATE\" /></intent-filter><meta-data android:name=\"android.appwidget.provider\" android:resource=\"@xml/amp_widget_${k}_info\" /></receiver>\n    </application>|" "$MAN"
 done
-for P in ACCESS_WIFI_STATE ACCESS_NETWORK_STATE CHANGE_WIFI_MULTICAST_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION KILL_BACKGROUND_PROCESSES; do
+for P in ACCESS_WIFI_STATE ACCESS_NETWORK_STATE CHANGE_WIFI_MULTICAST_STATE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION POST_NOTIFICATIONS REQUEST_INSTALL_PACKAGES UPDATE_PACKAGES_WITHOUT_USER_ACTION KILL_BACKGROUND_PROCESSES BLUETOOTH_SCAN BLUETOOTH_CONNECT; do
   grep -q "android.permission.$P\"" "$MAN" || sed -i "s|</manifest>|    <uses-permission android:name=\"android.permission.$P\" />\n</manifest>|" "$MAN"
+done
+# pairing controllers and headsets inside the app (Settings → Devices): the older Bluetooth permissions up to Android 11
+for P in BLUETOOTH BLUETOOTH_ADMIN; do
+  grep -q "android.permission.$P\"" "$MAN" || sed -i "s|</manifest>|    <uses-permission android:name=\"android.permission.$P\" android:maxSdkVersion=\"30\" />\n</manifest>|" "$MAN"
 done
 # Game Booster (Android 13 and older): the apps on the home screen it may close in the background
 grep -q '<queries>' "$MAN" || sed -i 's|<application|<queries><intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent></queries>\n    <application|' "$MAN"

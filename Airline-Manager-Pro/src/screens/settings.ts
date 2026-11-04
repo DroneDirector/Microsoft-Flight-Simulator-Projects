@@ -19,7 +19,7 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => { if (typeof DESKTOP !== 'undefined' && DESKTOP) return ''; const on = (State.settings as any).gameLock === true; return `<label class="tg-row"><span><b>Lock to the game</b><small>Stops the notification panel and the system buttons from opening by accident while you play: swipes from the edges do nothing (Android's app pinning). Android asks once to confirm. To leave the app while it is on, hold Back and Recents together, or with gesture navigation swipe up and hold; switching this off lets go at once.</small></span><button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="gamelock-toggle"><i></i></button></label>`; } },
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
   ] },
-  { id: 'pad', title: 'Controller', icon: 'play', items: [{ type: 'html', html: () => padSettingsHtml() }] },
+  { id: 'devices', title: 'Devices', icon: 'play', items: [{ type: 'html', html: () => devicesHtml() }] },
   { id: 'booster', title: 'Game Booster', icon: 'power', items: [
     { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); boostDraw(); boostSample(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
   ] },
@@ -246,7 +246,9 @@ const SETTINGS: SetSection[] = [
         + `<div class="set-card col"><div class="sc-h">${icon('volume')}<span><b class="v3v-h">3D view volume: ${v}%</b><small>Engines and thunder together. The app's other sounds keep their own level.</small></span></div>
         <input type="range" class="v3d-vol" min="0" max="100" step="5" value="${v}" aria-label="3D view volume"></div>`
         + `<div class="set-card col"><div class="sc-h">${icon('volume')}<span><b class="v3c-h">Cabin sound: ${cv ? cv + '%' : 'Muted'}</b><small>Inside the cabin and at the window seats: the deep rumble and drone of your own engines through the hull, the air rushing past, louder on the engine's side at a window. All the way down mutes it.</small></span></div>
-        <input type="range" class="v3d-cvol" min="0" max="100" step="5" value="${cv}" aria-label="Cabin sound volume"></div>`;
+        <input type="range" class="v3d-cvol" min="0" max="100" step="5" value="${cv}" aria-label="Cabin sound volume"></div>`
+        + (() => { const ov = Math.round((S.v3dOutVol == null ? 1 : +S.v3dOutVol) * 100); return `<div class="set-card col"><div class="sc-h">${icon('volume')}<span><b class="v3o-h">Outside noise: ${ov ? ov + '%' : 'Muted'}</b><small>Outside the aircraft: the engines as you circle one (Behind and Around), the roar behind it, the whine in front, and the aircraft around you.</small></span></div>
+        <input type="range" class="v3d-ovol" min="0" max="150" step="5" value="${ov}" aria-label="Outside noise volume"></div>`; })();
     } },
   ] },
   { id: 'profiles', title: 'Profiles and companies', icon: 'pilots', items: [
@@ -612,6 +614,8 @@ document.addEventListener('change', e => {
 // how often conduct reports happen
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-vol')) return; (State.settings as any).v3dVol = +el.value / 100; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.v3v-h'); if (h) h.textContent = '3D view volume: ' + el.value + '%'; });
 document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (el && el.classList && (el.classList.contains('v3d-vol') || el.classList.contains('v3d-cvol'))) Store.save(); });
+document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-ovol')) return; (State.settings as any).v3dOutVol = +el.value / 100; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.v3o-h'); if (h) h.textContent = 'Outside noise: ' + (+el.value ? el.value + '%' : 'Muted'); });
+document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (el && el.classList && el.classList.contains('v3d-ovol')) Store.save(); });
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-cvol')) return; (State.settings as any).v3dCabinVol = +el.value / 100; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.v3c-h'); if (h) h.textContent = 'Cabin sound: ' + (+el.value ? el.value + '%' : 'Muted'); });
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('cr-range')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.cr-h'); if (h) h.textContent = 'Conduct reports: ' + ['Never', 'Rarely', 'Less often', 'Normal', 'Often'][+el.value]; });
 document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('cr-range')) return; (State.settings as any).conductLevel = +el.value; Store.save(); rerenderSettingsBody(); });
