@@ -112,7 +112,7 @@ LoungeRoom.open = function (k: string) {
   const it = lgList().filter(l => l.k === k)[0] || lgList()[0]; if (!it) { toast('Build a lounge first (Lounges)', 'info'); return; }
   for (const X of [typeof OfficeRoom !== 'undefined' ? OfficeRoom : null, typeof OpsRoom !== 'undefined' ? OpsRoom : null, typeof HangarRoom !== 'undefined' ? HangarRoom : null]) { try { if (X && X.on) X.close(true); } catch (e) { /* none */ } }
   R.on = true; R.loading = true; R.k = it.k; R.lvl = it.lvl; R.spec = LG_SPECS[it.lvl]; R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now(); R.overlay = null;
-  const q = Gfx.roomQ(), co: any = company(), A: any = apt(it.k);
+  const q = Gfx.placeQ('lounge'), co: any = company(), A: any = apt(it.k);
   const root = document.createElement('div'); root.className = 'court3d office3d ops3d hg3d lg3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
     <div class="ct-top"><div><small>${esc(co.name)} · ${esc(it.k)}${A ? ' · ' + esc(A.city || A.name) : ''}</small><b>${esc(R.spec.name)}</b></div></div>
@@ -365,8 +365,9 @@ function lgSpots(): { k: string; x: number; z: number; ry: number; t: [number, n
   return out.filter(o => !lgBlocked(o.x, o.z));
 }
 function lgGuests() {
-  const R = LoungeRoom, T = THREE, A = R.A, r = ctRng(7 + R.lvl * 31 + R.k.length), q = R.q >= 2 ? 0.6 : 0.4;
+  const R = LoungeRoom, T = THREE, A = R.A, r = ctRng(7 + R.lvl * 31 + R.k.length), q = Gfx.placePeopleQ('lounge', R.q >= 2 ? 0.6 : 0.4);
   R.guests = []; R.spots = lgSpots();
+  if (!Gfx.placePeople('lounge')) return;   // Settings → Graphics → Lounges: no guests (quicker)
   const pax = lgPassengers().slice(0, R.spec.guests * 2);
   if (!pax.length) setTimeout(() => { if (R.on) toast('No one waiting yet: none of your departures from here in the next 4 hours has business or first class passengers', 'info'); }, 6500);
   const free = () => (A.seats || []).filter((x: any) => !x.taken && x !== R.sit);
@@ -467,8 +468,8 @@ function lgGuestAt(): any {
 function lgOpen2(root: HTMLElement, q: number) {
   const R = LoungeRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement; R.q = q;
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
-  ren.setPixelRatio(Gfx.pr(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
-  ren.shadowMap.enabled = q >= 2; ren.shadowMap.type = T.PCFSoftShadowMap;
+  ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('lounge', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
+  ren.shadowMap.enabled = Gfx.placeShadow('lounge', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
   const cam = new T.PerspectiveCamera(62, 1, 0.03, 200); R.cam = cam;
   const S = hgSun(R.k); R.hemi = new T.HemisphereLight(0xFFF4E6, 0x40362E, 0.55 + 0.35 * S.k); scene.add(R.hemi);

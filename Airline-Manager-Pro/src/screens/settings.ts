@@ -73,6 +73,12 @@ const SETTINGS: SetSection[] = [
     } },
     { type: 'html', html: () => cabinSettingsHtml() },
     { type: 'html', html: () => animSettingsHtml() },
+    { type: 'group', title: 'Lounges' },
+    { type: 'html', html: () => placeSettingsHtml('lounge') },
+    { type: 'group', title: 'Hangars' },
+    { type: 'html', html: () => placeSettingsHtml('hangar') },
+    { type: 'group', title: 'Offices and rooms' },
+    { type: 'html', html: () => placeSettingsHtml('room') },
     { type: 'html', html: () => perfSettingsHtml() },
     ...(DESKTOP ? [] : [{ type: 'group', title: 'Light and shadow' } as SetItem, { type: 'html', html: () => gfxPhoneHtml() } as SetItem]),
     { type: 'group', title: 'Sky and water' },
@@ -641,6 +647,26 @@ function cabinSettingsHtml(): string {
     ${seg('cabHdQ', 'Detail of each passenger', 'How finely each detailed passenger is made: faces, hair and clothes.', CABIN_HD_Q.map((n, i) => [String(i), n] as [string, string]), hdqAuto)}
   </div>`;
 }
+/** Graphics → Lounges, Hangars, Offices and rooms: each place's own quality and its parts, as for the cabin. Automatic
+ *  follows the Rooms setting (and says what that is now). Changes apply the next time you go in. */
+function placeSettingsHtml(pl: 'lounge' | 'hangar' | 'room'): string {
+  const S: any = State.settings, rq = Gfx.roomQ(), q = Gfx.placeQ(pl), QN = ['Low', 'Medium', 'Very high', 'Ultra'];
+  const cur = (k: string) => S[k] == null ? 'auto' : String(S[k]);
+  const seg = (key: string, label: string, hint: string, opts: [string, string][], auto: string) => `<div class="ch-row"><span><b>${label}</b><small>${hint}</small></span><div class="seg">${([['auto', `Automatic (${auto})`]] as [string, string][]).concat(opts).map(o => `<button class="${cur(key) === o[0] ? 'on' : ''}" data-act="place-opt" data-key="${key}" data-v="${o[0]}">${esc(o[1])}</button>`).join('')}</div></div>`;
+  const tg = (k: string, label: string, hint: string) => `<label class="tg-row"><span><b>${label}</b><small>${hint}</small></span><button class="tg ${S[k] !== false ? 'on' : ''}" role="switch" aria-checked="${S[k] !== false}" data-act="v3d-opt" data-key="${k}"><i></i></button></label>`;
+  const what = pl === 'lounge' ? 'your lounges' : pl === 'hangar' ? 'the hangars' : 'your office, the operations room and the courtroom';
+  const shAuto = (pl === 'room' ? q >= 1 : q >= 2) ? 'On' : 'Off', scAuto = q >= 3 ? 'up to 200%' : q >= 2 ? 'up to 150%' : '100%';
+  return `<div class="set-card col cab-opts">
+    <div class="sc-h">${icon('sliders')}<span><b>${pl === 'lounge' ? 'Lounges' : pl === 'hangar' ? 'Hangars' : 'Offices and rooms'}, part by part</b><small>How finely ${what} are made and drawn. Each starts on Automatic, which follows Rooms (now ${QN[rq]}). Changes apply the next time you go in.</small></span></div>
+    ${pl === 'room' ? seg('gfxRoomQ', 'Quality', 'Furniture, curves, light and textures in your office, the operations room and the courtroom.', QN.map((n, i) => [String(i), n] as [string, string]), QN[typeof cabinQ === 'function' ? cabinQ() : 2])
+      : seg(pl + 'Q', 'Quality', pl === 'lounge' ? 'Furniture, carpets, curves, light and the view from the windows.' : 'The building, the aircraft inside, the equipment and the light.', QN.map((n, i) => [String(i), n] as [string, string]), QN[rq])}
+    ${seg(pl + 'Sharp', 'Sharpness', 'How finely it is drawn against your screen. Above 100% edges are smoother, at the cost of speed.', [['0', '75%'], ['1', '100%'], ['2', '150%'], ['3', '200%'], ['4', '300%']], scAuto)}
+    ${seg(pl + 'Shadow', 'Shadows', 'Real shadows from the lights. Off: quicker on slower devices.', [['on', 'On'], ['off', 'Off']], shAuto)}
+    ${pl === 'room' ? '' : `${tg(pl + 'People', pl === 'lounge' ? 'Guests' : 'Mechanics', pl === 'lounge' ? 'Your waiting business and first class passengers, sitting, walking about and helping themselves. Off: an empty lounge (quicker on slower devices).' : 'The mechanics working on the aircraft. Off: an empty hangar floor (quicker on slower devices).')}
+    ${seg(pl + 'PplQ', pl === 'lounge' ? 'Detail of each guest' : 'Detail of each mechanic', 'How finely each person is made: faces, hair and clothes.', [['0', 'Light'], ['1', 'Normal'], ['2', 'High'], ['3', 'Highest']], q >= 2 ? 'High' : 'Light')}`}
+  </div>`;
+}
+ACTIONS['place-opt'] = el => { const S: any = State.settings, k = el.getAttribute('data-key'), v = el.getAttribute('data-v'); if (v === 'auto') delete S[k]; else S[k] = /^\d$/.test(v) ? +v : v; Sound.tick(); Store.save(); rerenderSettingsBody(); };
 /** How finely people move, everywhere they appear: walking, speaking and body language. */
 function animSettingsHtml(): string {
   const S: any = State.settings, auto = ANIM_NAMES[animAuto()];

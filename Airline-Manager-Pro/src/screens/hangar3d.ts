@@ -234,7 +234,7 @@ HangarRoom.open = function (reg: string, base?: string, sizeK?: string) {
   R.on = true; R.loading = true; R.reg = a ? a.reg : ''; R.sz = sz; R.base = a ? hgWhere(a) : base || (a0 ? hgWhere(a0) : co.hub); R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now();
   R.overlay = null; R.hold = null; R.vend = null; R.talk = -1; R.hover = null;
   if (hgClean()) hgSave();
-  const q = Gfx.roomQ();
+  const q = Gfx.placeQ('hangar');
   const root = document.createElement('div'); root.className = 'court3d office3d ops3d hg3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
     <div class="ct-top"><div><small>${esc(co.name)} · ${esc(R.base)}</small><b>${esc(sz.name)} · ${a ? esc(a.reg) : 'empty'}</b></div></div>
@@ -735,12 +735,12 @@ function hgMechanics(scene: any) {
   // the mechanics on this aircraft's work (an empty hangar has nobody in it)
   let list: any[] = R.reg ? hgCrewFor(R.reg) : [];
   R.noMech = !!R.reg && !list.length;
-  list = list.slice(0, 3); R.mechs = [];
+  list = Gfx.placePeople('hangar') ? list.slice(0, 3) : []; R.mechs = [];   // Settings → Graphics → Hangars: without the people (quicker)
   const ab = A.acBox || new T.Box3(new T.Vector3(-10, 0, -10), new T.Vector3(10, 6, 10)), nose = ab.max.z, mid = (ab.min.z + ab.max.z) / 2, span = ab.max.x - ab.min.x;
   const spots = [[2.9, nose + 1.4, -0.9], [Math.max(3.2, span * 0.17) + 0.6, mid + 3.4, Math.PI], [-span * 0.22 - 0.9, mid + 3.0, 0.6]];
   list.forEach((p, i) => {
     try {
-      const m = Human.build(p.look, 'mech', co.color || '#2C8CFF', av3Style(), R.q >= 2 ? 0.7 : 0.45);
+      const m = Human.build(p.look, 'mech', co.color || '#2C8CFF', av3Style(), Gfx.placePeopleQ('hangar', R.q >= 2 ? 0.7 : 0.45));
       const pivot = new T.Group(); pivot.add(m.root); A.root.add(pivot);
       const s = spots[i]; pivot.position.set(s[0], 0, s[1]); pivot.rotation.y = s[2];
       m.root.traverse((o: any) => { if (o.isMesh) { o.castShadow = R.q >= 1; o.receiveShadow = true; } });
@@ -779,8 +779,8 @@ function hgSkyUpdate() {
 function hgOpen2(root: HTMLElement, q: number) {
   const R = HangarRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement; R.q = q;
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
-  ren.setPixelRatio(Gfx.pr(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
-  ren.shadowMap.enabled = q >= 2; ren.shadowMap.type = T.PCFSoftShadowMap;
+  ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('hangar', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
+  ren.shadowMap.enabled = Gfx.placeShadow('hangar', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
   const cam = new T.PerspectiveCamera(60, 1, 0.03, 400); R.cam = cam;
   R.hemi = new T.HemisphereLight(0xEAF2FF, 0x3A3F46, 0.9); scene.add(R.hemi);

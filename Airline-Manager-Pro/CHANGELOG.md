@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.126 (2026-11-04)
+
+- Gfx.placeQ / placeSharp / placeShadow / placePeople / placePeopleQ for lounge, hangar and room; placeSettingsHtml tabs Lounges, Hangars, Offices and rooms (place-opt)
+
 ## 0.9.125 (2026-11-04)
 
 - Lounge guests: lgPassengers (premium passengers of State.aiNext legs from the lounge airport, n.paxSeed → f.paxSeed, manifestOf seeds from paxSeed), lgSpots, lgGuestStep (sit, stand, go, use, sitdown, leave), lgGuestAt hint

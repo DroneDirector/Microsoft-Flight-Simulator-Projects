@@ -451,9 +451,9 @@ function ctOpen2(c: any, st: any, root: HTMLElement, q: number, appeal: boolean,
   const R = CourtRoom, T = THREE;
   const cv = root.querySelector('canvas') as HTMLCanvasElement;
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' });
-  ren.setPixelRatio(Gfx.pr(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1)));
+  ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('room', q)));
   ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.05;
-  ren.shadowMap.enabled = q >= 1; ren.shadowMap.type = T.PCFSoftShadowMap;
+  ren.shadowMap.enabled = Gfx.placeShadow('room', q >= 1); ren.shadowMap.type = T.PCFSoftShadowMap;
   R.ren = ren;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x1A120C); scene.fog = new T.Fog(0x2A2018, 22, 40);
   const cam = new T.PerspectiveCamera(46, 1, 0.05, 80); R.cam = cam;
