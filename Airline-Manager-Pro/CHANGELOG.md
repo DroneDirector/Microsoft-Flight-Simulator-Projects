@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.147
+- Family photo held still and flush in both hands; Cinema at the top right, Satellite and Other airlines in blue at the bottom right; frame generation fixes for the cabin windows and for circling the aircraft.
+
 ## 0.9.146
 - The Training room (the Academy) off the staff corridor, with the class and its teacher; Crew → Training with courses for every kind of crew; corridor rails stop at doorways.
 

@@ -124,12 +124,21 @@ const FrameGen = {
     cam.updateMatrixWorld();
     let real: boolean;
     if (always) { if (st.plan) { real = st.plan === 'real' || !G.fresh; st.plan = ''; } else { const n = this.between(st); real = !G.fresh || n === 0 || (st.madeRun || 0) >= n; } }
+    // circling round the aircraft you follow: when the camera has swung round it too far since the drawn picture, the
+    // picture can't be shifted far enough without gaps opening round the aircraft (the jumping): a real frame instead
+    if (!real && G.aOn === 1 && st.anchor && st.anchor.parent && G.camA) {
+      const A = st.anchor; A.updateMatrix(); const aNow = G.tmp2.multiplyMatrices(A.parent.matrixWorld, A.matrix), inA = aNow.invert().multiply(cam.matrixWorld);
+      const e = inA.elements, p = G.camA.elements, f0 = [p[8], p[9], p[10]], f1 = [e[8], e[9], e[10]];
+      const dot = (f0[0] * f1[0] + f0[1] * f1[1] + f0[2] * f1[2]) / Math.max(1e-6, Math.hypot(f0[0], f0[1], f0[2]) * Math.hypot(f1[0], f1[1], f1[2]));
+      const moved = Math.hypot(e[12] - p[12], e[13] - p[13], e[14] - p[14]), dist = Math.max(1, Math.hypot(p[12], p[13], p[14]));
+      if (dot < Math.cos(0.03) || moved / dist > 0.03) real = true;
+    }
     else real = !G.fresh || !st.realAt || t - st.realAt >= 1000 / cap - 3;
     if (real) {
       // the real frame: drawn into the picture, with the camera it was drawn from
       const q = this.gpuBegin(ren); ren.setRenderTarget(G.rt); ren.render(scene, cam); this.layer(G, st, ren, cam, scene); ren.setRenderTarget(null); this.gpuEnd(q);
       G.prevVP.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); G.fresh = true; st.realAt = t; st.real = (st.real || 0) + 1; st.madeRun = 0;
-      G.aOn = 0; const A = st.anchor; if (A && A.parent) { G.aPrev.copy(A.matrixWorld); G.aOn = st.anchorAll ? 2 : G.layOk ? 1 : 0; }
+      G.aOn = 0; const A = st.anchor; if (A && A.parent) { G.aPrev.copy(A.matrixWorld); G.aOn = st.anchorAll ? 2 : G.layOk ? 1 : 0; G.camA = (G.camA || new THREE.Matrix4()).copy(A.matrixWorld).invert().multiply(cam.matrixWorld); }
     } else { st.made = (st.made || 0) + 1; st.madeRun = (st.madeRun || 0) + 1; }
     st.lastWasReal = real;
     // on the screen: the picture, shifted from the camera it was drawn from to the camera now
@@ -185,9 +194,11 @@ const FrameGen = {
       L.matrixWorldAutoUpdate = false;
       // the aircraft in plain white (it keeps its place in the scene: only drawn from here)
       if (A) {
-        // only its solid parts: lights' glows, halos and other see-through bits would mark the sky round them as aircraft
-        const off: any[] = [];
-        A.traverseVisible((o: any) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && (Array.isArray(m) ? m.some((x: any) => x.transparent) : m.transparent))) off.push(o); });
+        // all of it but its lights: glows and halos (points, sprites, lines and anything added on as light) would mark the
+        // sky round them as aircraft. See-through parts that belong to it stay: the cabin windows, their glass, blinds and
+        // the view through them, the propeller discs, so they move with the aircraft
+        const off: any[] = [], T0 = THREE, glowM = (x: any) => x && (x.blending === T0.AdditiveBlending || (x.userData && x.userData.fgGlow));
+        A.traverseVisible((o: any) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && (Array.isArray(m) ? m.some(glowM) : glowM(m)))) off.push(o); });
         for (const o of off) o.visible = false;
         L.overrideMaterial = G.white; L.children = [A];
         try { ren.render(L, cam); } finally { for (const o of off) o.visible = true; }
@@ -266,7 +277,7 @@ const FrameGen = {
         depthTest: false, depthWrite: false,
       });
       const scene = new T.Scene(), cam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1), q = new T.Mesh(new T.PlaneGeometry(2, 2), mat); q.frustumCulled = false; scene.add(q);
-      return { rt, lay, mat, scene, cam, prevVP: new T.Matrix4(), tmp: new T.Matrix4(), aPrev: new T.Matrix4(), aNow: new T.Matrix4(), aOn: 0, layOk: false, lscene: new T.Scene(), white: new T.MeshBasicMaterial({ color: 0xffffff }), fresh: false };
+      return { rt, lay, mat, scene, cam, prevVP: new T.Matrix4(), tmp: new T.Matrix4(), tmp2: new T.Matrix4(), camA: null as any, aPrev: new T.Matrix4(), aNow: new T.Matrix4(), aOn: 0, layOk: false, lscene: new T.Scene(), white: new T.MeshBasicMaterial({ color: 0xffffff }), fresh: false };
     } catch (e) { return null; }
   },
   dispose(st: any) { const G = st && st.gen; if (!G) return; try { G.rt.dispose(); G.lay.dispose(); G.mat.dispose(); G.white.dispose(); } catch (e) { /* gone */ } st.gen = null; },
