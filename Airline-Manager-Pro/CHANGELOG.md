@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.142 (2026-11-04)
+
+- Hair: hairMode strands / cards / flat (automatic: strands on PC, cards on phones); buildHair cards
+- Split-flap text only in FLAP_WHERE (.sel-pop, Overview, Ranking, .v3d, .apv)
+
 ## 0.9.141 (2026-11-04)
 
 - FrameGen 'on' (default): adaptive made frames (FrameGen.between, up to 2), measured real/made intervals, GPU timer, FgStat; the cabin included
