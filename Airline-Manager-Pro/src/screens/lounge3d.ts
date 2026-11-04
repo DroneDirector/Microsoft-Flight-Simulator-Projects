@@ -126,7 +126,7 @@ LoungeRoom.open = function (k: string) {
 /* ---------- the room ---------- */
 function lgBuild(scene: any, q: number): any {
   const R = LoungeRoom, T = THREE, sp: LgSpec = R.spec, lv = R.lvl, W = sp.W, D = sp.D, H = sp.H, co: any = company();
-  const A: any = { hits: [], blocks: [] as number[][], flames: [], steam: [] };
+  const A: any = { hits: [], blocks: [] as number[][], flames: [], steam: [], surf: [] as any[] };
   const root = new T.Group(); scene.add(root); A.root = root;
   const shadow = q >= 1;
   const M = (o: any) => new T.MeshStandardMaterial(Object.assign({ roughness: 0.6 }, o));
@@ -192,7 +192,7 @@ function lgBuild(scene: any, q: number): any {
   const clusters: number[][] = [];
   { const nx = lv === 0 ? 2 : lv === 1 ? 3 : 4; for (let i = 0; i < nx; i++) for (let j = 0; j < (lv === 0 ? 1 : 2); j++) clusters.push([-W * 0.3 + (i + 0.5) * W * 0.6 / nx, z0 + 2.6 + j * 3.3]); }
   clusters.forEach((c, ci) => {
-    table(c[0], c[1]); block(c[0] - 0.55, c[1] - 0.55, c[0] + 0.55, c[1] + 0.55);
+    table(c[0], c[1]); block(c[0] - 0.55, c[1] - 0.55, c[0] + 0.55, c[1] + 0.55); A.surf.push({ x: c[0], z: c[1], top: 0.445, r: 0.46 });
     for (const [dx, dz, ry] of [[0, -1.0, 0], [0, 1.0, Math.PI], [-1.0, 0, Math.PI / 2], [1.0, 0, -Math.PI / 2]] as number[][]) {
       if (ci % 2 && dx === 0 && dz < 0) continue;
       armchair(c[0] + dx, c[1] + dz, ry); block(c[0] + dx - 0.45, c[1] + dz - 0.45, c[0] + dx + 0.45, c[1] + dz + 0.45);
@@ -218,7 +218,7 @@ function lgBuild(scene: any, q: number): any {
   // the refreshment corner (back right): counter, espresso machine, tea urn, teapot, cups, napkins, fruit, the fridge
   { const cx = x1 - 3.0, cz = z1 - 1.0, top = lv === 2 ? marble : lv === 1 ? M({ color: 0x2B2F36, roughness: 0.25 }) : M({ color: 0xE9E4DA, roughness: 0.35 });
     prop('buffet-counter', cx, cz, Math.PI, () => { bx(3.2, 0.88, 0.7, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, cx, 0.44, cz); bx(3.3, 0.05, 0.78, top, cx, 0.905, cz); });
-    block(cx - 1.7, cz - 0.45, cx + 1.7, z1);
+    block(cx - 1.7, cz - 0.45, cx + 1.7, z1); A.surf.push({ x: cx, z: cz - 0.05, top: 0.93, w: 3.2, d: 0.66 });
     prop('espresso-machine', cx - 1.1, cz, Math.PI, () => { bx(0.5, 0.42, 0.42, chrome, cx - 1.1, 1.14, cz); bx(0.46, 0.08, 0.38, black, cx - 1.1, 1.39, cz); for (const s of [-1, 1]) { add(new T.CylinderGeometry(0.03, 0.03, 0.12, 12), black, cx - 1.1 + s * 0.12, 1.05, cz - 0.24); } bx(0.4, 0.02, 0.16, chrome, cx - 1.1, 0.94, cz - 0.24); });
     prop('tea-urn', cx - 0.35, cz, 0, () => lgUrn(add, lv === 0 ? chrome : brass, black, cx - 0.35, 0.93, cz, lv));
     prop('teapot', cx + 0.2, cz - 0.1, 0.6, () => lgTeapot(add, lv === 2 ? porcelain : lv === 1 ? M({ color: 0x1E2F4F, roughness: 0.25 }) : porcelain, lv === 2 ? gold : null, cx + 0.2, 0.93, cz - 0.1));
@@ -249,7 +249,7 @@ function lgBuild(scene: any, q: number): any {
   // Business and Flagship: the bar with stools and a shelf of bottles (back left)
   if (lv >= 1) { const bxp = x0 + 3.2, bz = z1 - 1.2;
     prop('bar-counter', bxp, bz, Math.PI, () => { bx(3.6, 1.08, 0.6, walnut, bxp, 0.54, bz); bx(3.8, 0.06, 0.8, lv === 2 ? marble : M({ color: 0x1A1C20, roughness: 0.2 }), bxp, 1.1, bz); if (lv === 2) bx(3.62, 0.04, 0.02, gold, bxp, 0.2, bz - 0.31); });
-    block(bxp - 1.9, bz - 0.5, bxp + 1.9, z1);
+    block(bxp - 1.9, bz - 0.5, bxp + 1.9, z1); A.surf.push({ x: bxp, z: bz - 0.1, top: 1.13, w: 3.7, d: 0.7 });
     for (let i = 0; i < 4; i++) { const sx = bxp - 1.3 + i * 0.86, sz = bz - 0.75;
       prop('bar-stool', sx, sz, 0, () => { add(new T.CylinderGeometry(0.2, 0.2, 0.08, 20), fabric, sx, 0.78, sz); add(new T.CylinderGeometry(0.025, 0.025, 0.74, 10), lv === 2 ? gold : chrome, sx, 0.38, sz); add(new T.TorusGeometry(0.16, 0.012, 8, 24), lv === 2 ? gold : chrome, sx, 0.3, sz).rotation.x = Math.PI / 2; add(new T.CylinderGeometry(0.2, 0.22, 0.02, 20), lv === 2 ? gold : chrome, sx, 0.01, sz); });
       block(sx - 0.25, sz - 0.25, sx + 0.25, sz + 0.25); seats.push({ x: sx, z: sz, ry: 0, hip: 0.84, kind: 'stool' }); }
@@ -488,10 +488,10 @@ function lgOpen2(root: HTMLElement, q: number) {
     for (let i = 0; i < nL; i++) { const L = new T.PointLight(0xFFE6C4, (R.lvl === 2 ? 9 : 7) * (1.2 - 0.5 * sunK), 12, 1.6); L.position.set(-sp.W * 0.35 + (i % 3) * sp.W * 0.35, sp.H - 0.4, -sp.D * 0.2 + Math.floor(i / 3) * sp.D * 0.45); scene.add(L); }
     ctProgress(60, 'The guests are arriving…', R);
     try { lgGuests(); } catch (e) { R.guests = []; }
-    try { lgSeatHits(); } catch (e) { /* no seats to click */ }
+    try { lgSeatHits(); lgSurfHits(); } catch (e) { /* no seats to click */ }
     const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
     fit(); R.fit = fit; window.addEventListener('resize', fit);
-    R.free = { x: A.door.x - 0.2, z: A.door.z - 0.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.04 }; R.sit = null;
+    R.free = { x: A.door.x - 0.2, z: A.door.z - 0.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.04 }; R.sit = null; R.cups = [];
     lgInput(root, cv);
     ctProgress(85, 'Opening the doors…', R);
     setTimeout(() => {
@@ -554,12 +554,13 @@ function lgFrameRest(now: number, dt: number) {
   for (const fl of R.A.flames) { fl.scale.y = 0.85 + 0.25 * Math.abs(Math.sin(now * 7.3) * Math.sin(now * 3.1)); fl.material.opacity = 0.8 + 0.2 * Math.sin(now * 11); }
   if (R.A.fireL) R.A.fireL.intensity = 1.4 + 0.5 * Math.sin(now * 9) * Math.sin(now * 4.7);
   for (let i = R.A.steam.length - 1; i >= 0; i--) { const s = R.A.steam[i]; s.t += dt; s.m.position.y += dt * 0.08; s.m.material.opacity = Math.max(0, 0.35 * (1 - s.t / 4)); s.m.scale.setScalar(1 + s.t * 0.6); if (s.t > 4) { R.A.root.remove(s.m); R.A.steam.splice(i, 1); } }
+  try { lgCupsStep(dt, now); } catch (e) { /* no cups */ }
   // what you look at glows
   const obj = lgAimedObj(), hint = obj ? obj.userData.act : '', dot = R.root.querySelector('.op-dot') as HTMLElement;
   const mine = obj && obj.userData.seat != null && R.A.seats[obj.userData.seat] === R.sit;   // the seat you're in doesn't glow
   if (R.glow) { if (obj && !mine) R.glow.showObj(obj); else R.glow.hide(); R.glow.step(dt); }
   if (dot) { const seat = obj && obj.userData.seat != null ? R.A.seats[obj.userData.seat] : null;
-    const tx = hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
+    const tx = hint === 'cup' ? (lgHeldCup() ? 'You already have a cup in your hand' : 'Your cup: click to pick it up') : hint === 'surface' ? 'Click to put your cup down here' : lgHeldCup() && !hint ? 'Click to sip · aim at a table or a counter to put it down' : hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 /** A frame while you are sitting: your body in the seat, the view from your eyes, the room carrying on around you. */
@@ -576,12 +577,15 @@ function lgAimedObj(e?: PointerEvent): any {
   const R = LoungeRoom, T = THREE, rc = new T.Raycaster();
   if (e && !aimLocked()) { const r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect(); rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam); }
   else rc.setFromCamera(new T.Vector2(0, 0), R.cam);
-  const h = R.A ? rc.intersectObjects(R.A.hits, false)[0] : null; return h && h.distance < 3.2 ? h.object : null;
+  const hs = R.A ? rc.intersectObjects(R.A.hits, false).filter((x: any) => x.object.userData.act !== 'surface' || lgHeldCup()) : [], h = hs[0] || null; R.aimPoint = h ? h.point : null; return h && h.distance < 3.2 ? h.object : null;
 }
 function lgClickAt(e?: PointerEvent) {
   const R = LoungeRoom; if (R.loading) return; const o = lgAimedObj(e), a = o ? o.userData.act : '';
   if (a === 'door') { roomExitMenu(R.root, 'lounges', to => lgLeave(to)); return; }
   if (a === 'coffee') { if (R.sit) lgStand(); lgPour(); return; }
+  if (a === 'cup') { lgPickCup(o); return; }
+  if (a === 'surface' && lgHeldCup()) { lgPutCup(o, R.aimPoint || o.position); return; }
+  if (lgHeldCup()) { lgSip(); return; }   // holding a cup: a click anywhere else is a sip
   if (a === 'sit' && o.userData.seat != null && R.A.seats[o.userData.seat] !== R.sit) { lgSit(o.userData.seat); return; }
   if (a === 'taken') { toast('Someone is sitting there', 'info'); return; }
   if (R.sit) lgStand();   // sitting: a click anywhere else stands you up
@@ -609,17 +613,84 @@ function lgStand() {
     const x = st.x + fx * a + fz * b, z = st.z + fz * a - fx * b; if (!lgBlocked(x, z)) { R.free.x = x; R.free.z = z; return; }
   }
 }
+/** Order a coffee or a tea: one at a time. The cup has to be picked up, drunk or put down somewhere before the next. */
 function lgPour() {
-  const R = LoungeRoom, T = THREE, A = R.A; if (!A || !A.coffeeAt) return;
+  const R = LoungeRoom, A = R.A; if (!A || !A.coffeeAt) return;
+  R.cups = R.cups || [];
+  const waiting = R.cups.filter((c: any) => c.st === 'ready' || c.st === 'pour')[0], held = R.cups.filter((c: any) => c.st === 'held')[0];
+  if (waiting) { toast('Your cup is waiting on the counter: pick it up first', 'info'); return; }
+  if (held) { toast('Drink your cup or put it down first', 'info'); return; }
   Sound.tick(); try { hgSnd('motor'); } catch (e) { /* quiet */ }
+  const tea = Math.random() < 0.4, c: any = { st: 'pour', tea, sips: 0, hotUntil: Date.now() + 4 * 60e3 }; R.cups.push(c);
   setTimeout(() => {
-    if (!R.on) return; const p = A.coffeeAt, tea = Math.random() < 0.4;
-    const add = (g: any, m: any, x: number, y: number, z: number) => { const o = new T.Mesh(g, m); o.position.set(x, y, z); A.root.add(o); return o; };
-    lgCup(add, new T.MeshStandardMaterial({ color: 0xF7F5F0, roughness: 0.2 }), R.lvl === 2 ? new T.MeshStandardMaterial({ color: 0xD4AF37, metalness: 1, roughness: 0.25 }) : null, p.x + (Math.random() - 0.5) * 0.1, p.y, p.z, tea, tea ? 0x7A3E14 : 0x3A1F0E);
-    for (let i = 0; i < 6; i++) { const s = new T.Mesh(new T.SphereGeometry(0.02, 8, 6), new T.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.35, depthWrite: false })); s.position.set(p.x + (Math.random() - 0.5) * 0.03, p.y + 0.09 + i * 0.03, p.z); A.root.add(s); A.steam.push({ m: s, t: i * 0.5 }); }
-    toast(tea ? 'A cup of tea, fresh from the urn' : 'A fresh espresso', 'ok');
+    if (!R.on) return; const p = A.coffeeAt;
+    c.g = lgCupGroup(tea); c.g.position.set(p.x + (Math.random() - 0.5) * 0.08, p.y, p.z); A.root.add(c.g); c.st = 'ready';
+    toast(tea ? 'A cup of tea, fresh from the urn: click it to pick it up' : 'A fresh espresso: click it to pick it up', 'ok');
   }, 1500);
 }
+/** A cup on its saucer as one group (to carry and put down), with its hit box and the heat shimmer above it. */
+function lgCupGroup(tea: boolean): any {
+  const R = LoungeRoom, T = THREE, g = new T.Group();
+  const add = (geo: any, m: any, x: number, y: number, z: number) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+  lgCup(add, new T.MeshStandardMaterial({ color: 0xF7F5F0, roughness: 0.2 }), R.lvl === 2 ? new T.MeshStandardMaterial({ color: 0xD4AF37, metalness: 1, roughness: 0.25 }) : null, 0, 0, 0, tea, tea ? 0x7A3E14 : 0x3A1F0E);
+  const hit = new T.Mesh(new T.BoxGeometry(0.2, 0.16, 0.2), new T.MeshBasicMaterial({ visible: false })); hit.position.y = 0.07; hit.userData.act = 'cup'; g.add(hit); R.A.hits.push(hit); g.userData.hit = hit;
+  // the heat rising from a hot drink: a little of the shimmer behind the engines, bending what is behind it
+  const hz = new T.Group(); for (const r of [0, Math.PI / 2]) { const q = new T.Mesh(new T.PlaneGeometry(0.075, 0.17), lgHeatMat()); q.rotation.y = r; q.position.y = 0.17; hz.add(q); }
+  g.add(hz); g.userData.heat = hz;
+  return g;
+}
+let _lgHeat: any = null;
+function lgHeatMat(): any {
+  if (_lgHeat) return _lgHeat;
+  const T = THREE; _lgHeat = v3dHazeMat().clone(); _lgHeat.normalMap = v3dHazeMat().normalMap.clone(); _lgHeat.normalMap.needsUpdate = true; _lgHeat.normalMap.repeat.set(1, 1.6);
+  _lgHeat.normalScale = new T.Vector2(0.22, 0.22); _lgHeat.thickness = 0.05; return _lgHeat;
+}
+/** Every table, the refreshment counter and the bar: places to put a cup down (they only glow while you hold one). */
+function lgSurfHits() {
+  const R = LoungeRoom, T = THREE, A = R.A, m = new T.MeshBasicMaterial({ visible: false });
+  for (const s of A.surf || []) { const h = new T.Mesh(s.r ? new T.CylinderGeometry(s.r, s.r, 0.04, 16) : new T.BoxGeometry(s.w, 0.04, s.d), m); h.position.set(s.x, s.top + 0.01, s.z); h.userData.act = 'surface'; h.userData.top = s.top; A.root.add(h); A.hits.push(h); }
+}
+function lgHeldCup(): any { const R = LoungeRoom; return (R.cups || []).filter((c: any) => c.st === 'held')[0] || null; }
+/** Pick up a cup (from the counter, or where you put it down). */
+function lgPickCup(o: any) {
+  const R = LoungeRoom; if (lgHeldCup()) { toast('You already have a cup in your hand', 'info'); return; }
+  const c = (R.cups || []).filter((x: any) => x.g && x.g.userData.hit === o)[0]; if (!c) return;
+  Sound.tick(); c.st = 'held'; c.w = 0; c.from = c.g.position.clone(); c.g.userData.hit.visible = false; R.A.hits = R.A.hits.filter((h: any) => h !== o);
+}
+/** Put the cup down where you are aiming, on a table or a counter. */
+function lgPutCup(hit: any, point: any) {
+  const R = LoungeRoom, c = lgHeldCup(); if (!c) return;
+  Sound.tick(); c.st = 'placed'; c.g.position.set(point.x, hit.userData.top, point.z); c.g.rotation.set(0, Math.random() * 6.28, 0); c.use = null;
+  R.A.hits.push(c.g.userData.hit);
+}
+/** A sip: the cup comes up to your mouth and back down. Three sips and it is finished. */
+function lgSip() {
+  const R = LoungeRoom, c = lgHeldCup(); if (!c || c.use) return;
+  c.use = { t: 0 }; setTimeout(() => { if (R.on) try { hgSnd('sip'); } catch (e) { /* quiet */ } }, 450);
+}
+/** Each frame: cups in your hand follow your view; hot cups shimmer, less as they cool. */
+function lgCupsStep(dt: number, now: number) {
+  const R = LoungeRoom, T = THREE, S: any = State.settings, heatOn = S.loungeHeat !== false;
+  if (_lgHeat && _lgHeat.normalMap) _lgHeat.normalMap.offset.set(Math.sin(now * 0.9) * 0.05, -now * 0.45);   // rising
+  for (const c of R.cups || []) {
+    if (!c.g) continue;
+    const hot = clamp((c.hotUntil - Date.now()) / (4 * 60e3), 0, 1) * (1 - c.sips / 3);
+    c.g.userData.heat.visible = heatOn && hot > 0.05; c.g.userData.heat.scale.set(1, 0.5 + 0.5 * hot, 1);
+    if (c.st !== 'held') continue;
+    const yaw = R.look.yaw, rot = (x: number, y: number, z: number) => new T.Vector3(x, y, z).applyAxisAngle(new T.Vector3(0, 1, 0), yaw), eye = R.cam.position;
+    c.w = Math.min(1, (c.w || 0) + dt * 2.5);
+    let pos = eye.clone().add(rot(0.13, -0.26, -0.38)), tilt = 0;
+    if (c.use) {   // up to the mouth, a sip, back down
+      c.use.t += dt; const t = c.use.t, e = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, k = t < 0.5 ? e(t / 0.5) : t < 1.6 ? 1 : 1 - e((t - 1.6) / 0.5);
+      pos = pos.lerp(eye.clone().add(rot(0.0, -0.09, -0.13)), k); tilt = 0.75 * k;
+      if (t >= 2.1) { c.use = null; c.sips++; if (c.sips >= 3) { R.A.root.remove(c.g); c.g = null; c.st = 'done'; toast(c.tea ? 'Tea finished' : 'Coffee finished', 'ok'); continue; } }
+    }
+    if (c.w < 1) pos = c.from.clone().lerp(pos, c.w * c.w * (3 - 2 * c.w));
+    c.g.position.copy(pos); c.g.rotation.set(0, yaw, 0); c.g.rotateX(tilt);
+  }
+  R.cups = (R.cups || []).filter((c: any) => c.st !== 'done');
+}
+
 function lgUi(first?: boolean) {
   const R = LoungeRoom; if (!R.on) return;
   const sp = R.root.querySelector('.hg-spots') as HTMLElement; sp.hidden = false;

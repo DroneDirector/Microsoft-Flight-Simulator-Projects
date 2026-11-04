@@ -25,11 +25,14 @@ const Perf = {
   /** The sharpest it may draw now (warm: less, hot: less again). */
   kMax(): number { return !this.on() ? 1 : this.thermal >= 4 ? 0.6 : this.thermal >= 3 ? 0.7 : this.thermal >= 2 ? 0.85 : 1; },
   /** A renderer's own state. */
-  state(): any { return { t0: 0, n: 0, k: 1, base: 0, last: 0 }; },
+  state(): any { return { t0: 0, n: 0, k: 1, base: 0, last: 0, lowN: 0, highN: 0, pending: 0, ren: null }; },
   /** Skip this frame? (Call first each frame; with a cap of 30, every other frame of a 60 Hz screen is skipped.) */
   skip(st: any, now?: number): boolean {
     if (!st) return false;
     this.poll();
+    // a new sharpness is put in at the start of a frame, just before it is drawn: changing it resizes the drawing
+    // surface, which clears it, so done after a frame the screen showed an empty picture for a moment (a flicker)
+    if (st.pending && st.ren) { const r = st.ren, want = st.pending; st.pending = 0; if (Math.abs(r.getPixelRatio() - want) > 0.02) { r.setPixelRatio(want); try { r.domElement && r.domElement.dispatchEvent(new Event('perf')); } catch (e) { /* ignore */ } } }
     const cap = this.fpsCap(), t = now == null ? performance.now() : now;
     if (cap && FrameGen.on()) { st.last = t; return false; }   // frame generation fills the frames in between instead
     if (cap && st.last && t - st.last < 1000 / cap - 3) return true;
@@ -45,13 +48,15 @@ const Perf = {
     if (now - st.t0 < 1500) return;
     const lim = Math.min(this.fpsCap() || 999, top || 999), full = lim < 999 ? lim : 0;
     const fps = st.n * 1000 / (now - st.t0), goal = full ? Math.min(28, full * 0.88) : 28; st.n = 0; st.t0 = now;
-    if (!this.on()) st.k = 1;
-    else if (fps < goal) st.k = Math.max(PERF_MIN_K, st.k - 0.1);
-    else if (fps > (full ? full * 0.95 : 42)) st.k = Math.min(1, st.k + 0.05);
+    // only after two readings in a row the same way, so the sharpness doesn't swing back and forth around the limit
+    if (!this.on()) { st.k = 1; st.lowN = st.highN = 0; }
+    else if (fps < goal) { st.highN = 0; if (++st.lowN >= 2) { st.k = Math.max(PERF_MIN_K, st.k - 0.1); st.lowN = 0; } }
+    else if (fps > (full ? full * 0.95 : 42)) { st.lowN = 0; if (++st.highN >= 2) { st.k = Math.min(1, st.k + 0.05); st.highN = 0; } }
+    else st.lowN = st.highN = 0;
     st.k = Math.min(st.k, this.kMax());
     st.fps = Math.round(fps);
     const want = Math.max(0.5, st.base * st.k);
-    if (Math.abs(r.getPixelRatio() - want) > 0.02) { r.setPixelRatio(want); try { r.domElement && r.domElement.dispatchEvent(new Event('perf')); } catch (e) { /* ignore */ } }
+    if (Math.abs(r.getPixelRatio() - want) > 0.02) { st.pending = want; st.ren = r; }   // put in before the next frame is drawn (see skip)
     Perf.lastK = st.k; Perf.lastFps = st.fps;
   },
   lastK: 1, lastFps: 0,
