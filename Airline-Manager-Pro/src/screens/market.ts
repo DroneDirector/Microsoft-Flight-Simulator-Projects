@@ -36,7 +36,7 @@ SCREENS.market = {
           <div class="mk-foot">
             ${_mkMode === 'lease' ? `<b class="mk-price"><small>from </small>${money(leaseMonthly(t.price, 6), { compact: true })}<small> /month</small></b>` : `<b class="mk-price">${money(t.price, { compact: true })}</b>`}
             ${owned ? `<small class="owned">You have ${owned}</small>` : ''}
-            ${t.installed ? '' : `<small class="muted" title="You can't fly it yourself until it is in your simulator; your hired pilots fly it">Not in your sim: your pilots fly it</small>`}<button class="btn ghost mk-view" data-act="mk-view" data-id="${t.id}" title="See it in a hangar and walk round it">${icon('focus')}View</button>${_mkMode === 'lease' ? `<button class="btn primary" data-act="lease" data-id="${t.id}">Lease</button>` : `<button class="btn primary" data-act="buy" data-id="${t.id}">Buy</button>`}
+            ${t.installed ? '' : `<small class="muted" title="You can't fly it yourself until it is in your simulator; your hired pilots fly it">Not in your sim: your pilots fly it</small>`}<button class="btn ghost mk-view" title="See it in a hangar and walk round it" data-act="mk-view" data-id="${t.id}">${icon('focus')}View</button>${_mkMode === 'lease' ? `<button class="btn primary" data-act="lease" data-id="${t.id}">Lease</button>` : `<button class="btn primary" data-act="buy" data-id="${t.id}">Buy</button>`}
           </div>
         </div>
       </div>`;

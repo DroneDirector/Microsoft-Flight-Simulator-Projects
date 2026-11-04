@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.128 (2026-11-04)
+
+- v3dAirportNear (main and world airports); free camera always centres on an airport within 4 nm (the 10 nm rule kept airports undrawn after coming back); v3dCentre also draws an airport within 3 nm that is neither departure nor destination
+- v3d-close asks first (v3d-ask), v3d-close-go leaves with the splash
+- Cinema button (v3d-cine, cinema icon) in place of the photo mode star
+- Market card foot: wraps, View and Buy together, notes below
+
 ## 0.9.127 (2026-11-04)
 
 - Terrain: V3dTerrain.retire / swapIn / dropOld (old ground kept, moved and tilted to the new centre, new rings and sea hidden until complete with satellite), v3dNeedRecentre (35% of the fine ring's half width; 75% while a swap is pending), v3dFreeMesh
