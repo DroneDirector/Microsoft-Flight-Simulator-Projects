@@ -86,7 +86,7 @@ const FrameGen = {
   between(st: any): number {
     const r = st.realDt || 16, g = Math.max(4, st.genDt || 8);
     if (r < 21 || r < g * 1.35) return 0;
-    return Math.max(1, Math.min(3, Math.round(r / Math.max(g, 1000 / 75)) - 1));
+    return Math.max(1, Math.min(2, Math.round(r / Math.max(g, 1000 / 75)) - 1));   // at most two: real motion (other aircraft, people) stays at a good pace
   },
   /** One second of counts and times for the monitor. */
   tick(t: number, real: boolean, cpu: number) {
