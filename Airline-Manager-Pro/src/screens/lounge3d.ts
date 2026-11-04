@@ -606,7 +606,11 @@ function lgFrameRest(now: number, dt: number) {
   if (R.A.fireL) R.A.fireL.intensity = 1.4 + 0.5 * Math.sin(now * 9) * Math.sin(now * 4.7);
   for (let i = R.A.steam.length - 1; i >= 0; i--) { const s = R.A.steam[i]; s.t += dt; s.m.position.y += dt * 0.07; s.m.position.x += Math.sin(now * 1.7 + i) * dt * 0.01; s.m.material.opacity = Math.max(0, 0.32 * Math.min(1, s.t * 4) * (1 - s.t / 2.2)); s.m.scale.setScalar(0.03 + s.t * 0.05); if (s.t > 2.2) { R.A.root.remove(s.m); s.m.material.dispose(); R.A.steam.splice(i, 1); } }
   for (let i = (R.drops || []).length - 1; i >= 0; i--) { const D = R.drops[i]; D.v.y -= 9.81 * dt; D.m.position.addScaledVector(D.v, dt); if (D.m.position.y <= D.floor) { D.m.position.y = D.floor + 0.002; D.m.scale.set(2.2, 0.15, 2.2); R.drops.splice(i, 1); D.land = now; R.spots = R.spots || []; R.spots.push(D); } }
-  for (let i = (R.spots || []).length - 1; i >= 0; i--) { const D = R.spots[i]; if (now - D.land > 20) { R.A.root.remove(D.m); R.spots.splice(i, 1); } }
+  // spills dry up: after a while they fade away (every kind of drink), never vanish at once
+  for (let i = (R.spots || []).length - 1; i >= 0; i--) { const D = R.spots[i], age = now - D.land, FADE = 4;
+    if (age > 20 - FADE) { const m = D.m.material; if (!D.faded) { D.faded = true; D.m.material = m.clone(); D.m.material.transparent = true; D.op0 = m.opacity == null ? 1 : m.opacity; }
+      const k = clamp((20 - age) / FADE, 0, 1); D.m.material.opacity = D.op0 * k * k; D.m.scale.set(2.2 * (0.85 + 0.15 * k), 0.15, 2.2 * (0.85 + 0.15 * k)); }
+    if (age > 20) { R.A.root.remove(D.m); try { if (D.faded) D.m.material.dispose(); } catch (e) { /* gone */ } R.spots.splice(i, 1); } }
   try { lgCupsStep(dt, now); } catch (e) { /* no cups */ }
   if (R.A.vend) { try { HG_VR = LoungeRoom; hgVendStep(dt); } catch (e) { /* the machine rests */ } }
   // what you look at glows
@@ -615,6 +619,8 @@ function lgFrameRest(now: number, dt: number) {
   if (R.glow) { if (obj && !mine) R.glow.showObj(obj); else R.glow.hide(); R.glow.step(dt); }
   if (dot) { const seat = obj && obj.userData.seat != null ? R.A.seats[obj.userData.seat] : null;
     const held0 = lgHeldCup(), tx = hint === 'bartender' ? 'Click to order a drink at the bar' : hint === 'cup' ? (held0 ? 'You already have something in your hand' : 'Click to pick it up') : hint === 'surface' ? 'Click to put it down here' : held0 && !hint ? (held0.snack && hgProd(held0.snack).type === 'bar' ? 'Click to take a bite · aim at a table or a counter to put it down' : 'Click to sip · aim at a table or a counter to put it down') : hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'vend' ? (R.vend && R.vend.st === 'ready' ? 'Open the flap at the bottom to take it' : 'Click to choose a snack or a drink') : hint === 'flap' ? (R.vend && R.vend.st === 'ready' ? 'Click to take it' : 'The tray') : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
+  // frame generation: the cup, glass or snack in your hand moves with your view, not with the room
+  if (R.perf) { const held = lgHeldCup(); R.perf.anchor = held && held.g ? R.cam : null; R.perf.anchorDraw = held && held.g ? [held.g] : null; }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
   try { lgDrunkScreen(R, lgDrunkK(), now); } catch (e) { /* clear */ }   // straight after drawing: a copy of this picture
 }

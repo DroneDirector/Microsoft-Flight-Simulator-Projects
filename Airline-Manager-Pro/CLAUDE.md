@@ -57,6 +57,8 @@
   airports, vehicles, rooms) is kept out of frame generation's aircraft layer and gets its own distance in its motion
   layer (`FrameGen.glows` in `src/graphics/perf.ts` finds sprites, points and small additive glows by itself). A new
   light effect made another way must be added there too, so the frames in between don't smear the sky or ground round it.
+- **Spilled fluids fade away**: every spill or puddle of any drink or fluid (now and later) fades out over a few seconds before it
+  is removed; nothing on the floor disappears at once.
 - **The PC gets extra quality** (`hiQ()` in `src/core/util.ts`, true in the PC app): real lights and shadows instead of
   drawn ones, bigger shadow maps, a higher pixel ratio, sharper pictures and finer detail. Anything made lighter for
   phones and tablets stays full quality on the PC. Applies to everything from the seven batches of 0.9.105–0.9.111 on.
