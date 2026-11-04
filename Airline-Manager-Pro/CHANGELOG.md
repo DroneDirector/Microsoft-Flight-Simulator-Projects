@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.143 (2026-11-04)
+
+- Settings: save graphics and other settings yourself (setSaveCardHtml, setPick/setApply), to a file and back
+
 ## 0.9.142 (2026-11-04)
 
 - Hair: hairMode strands / cards / flat (automatic: strands on PC, cards on phones); buildHair cards
