@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.144
+- Frame generation: frames in between skip the scene work and follow the screen's pace, so they are actually made (the monitor no longer shows 0 made); the cabin gets them too.
+
 ## 0.9.143 (2026-11-04)
 
 - Settings: save graphics and other settings yourself (setSaveCardHtml, setPick/setApply), to a file and back

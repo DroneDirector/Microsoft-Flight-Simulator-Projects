@@ -655,10 +655,13 @@ function v3dLoop(now: number) {
   if (!V3d.open) return;
   V3d.raf = requestAnimationFrame(v3dLoop);
   if ((V3d as any).cloudReload && !document.querySelector('#set-body')) { v3dReloadAll(); return; }   // the clouds changed between 3D and 2D: once out of the settings, everything again
-  const VP: any = (V3d as any).perf, gen = FrameGen.on() && !(V3d as any).dprWas; if (VP) VP.genCap = gameBoost() ? 0 : V3D_FPS;   // frame generation fills the screen's other frames (not in the cabin)
+  const VP: any = (V3d as any).perf, gen = FrameGen.on() && (!(V3d as any).dprWas || FrameGen.mode() === 'on'); if (VP) VP.genCap = gameBoost() ? 0 : V3D_FPS;   // frame generation fills the screen's other frames (not in the cabin)
   if (document.hidden || now - V3d.last < 1000 / (gameBoost() || gen ? 60 : V3D_FPS) - 2) return;
   if (Perf.skip((V3d as any).perf, now)) return;   // warm, or saving battery: fewer frames
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
+  // frame generation: a made frame only moves the camera (from your input); the aircraft, the sky, the weather and
+  // the rest are worked out on the real frames, so made frames cost next to nothing
+  const made = V3d.loaded && FrameGen.plan(VP, now) === 'made';
   V3d.frames = (V3d.frames || 0) + 1;   // counted for the Game Booster's frame-rate chart
   if (V3d.root && V3d.root.getAttribute('data-m') !== V3d.mode) { V3d.root.setAttribute('data-m', V3d.mode); if (!/^(walk|free)$/.test(V3d.mode)) v3dUi(true); }
   const T = THREE, VK: any = V3d;
@@ -674,13 +677,14 @@ function v3dLoop(now: number) {
   const ctr = v3dCentre(f, [w0.lon, w0.lat]);
   if (V3d.mode === 'free' && V3d.origin) v3dFreeRecentre();
   else if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && v3dNeedRecentre(w0))) v3dRecentre(f, w0);
-  v3dPrefetch(f, w0);
-  if (V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
+  if (!made) v3dPrefetch(f, w0);
+  if (!made && V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
   v3dLoaderTick(now);
   try { v3dWetTick(now); } catch (e) { /* dry */ }
 
   // aircraft within about 40 km
   const seen: { [id: string]: boolean } = {};
+  if (!made) {
   // other airlines' aircraft: only those near enough and in front of the camera are drawn
   const tfc = Traffic.live(), fr = new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(V3d.cam.projectionMatrix, V3d.cam.matrixWorldInverse));
   const tfcNear = tfc.filter((g: any) => { const a = apt(g.from), b = apt(g.to); if (!a || !b || !V3d.origin) return false; const pp = flightPathPos(g); if (!pp) return false; g._ll = pp.pos; return gcDistanceNm(V3d.origin, pp.pos) < 24; });
@@ -848,6 +852,7 @@ function v3dLoop(now: number) {
   }
   v3dSmokeStep(dt);
   for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); const PC: any = P; if (PC.ct) for (const r of PC.ct.rb) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } delete V3d.planes[id]; }
+  }   // the aircraft: real frames only
 
   // the camera follows the aircraft (or flies freely)
   const P = V3d.planes[f.id];
@@ -912,20 +917,20 @@ function v3dLoop(now: number) {
       if (V3d.cam.fov !== 50) { V3d.cam.fov = 50; V3d.cam.updateProjectionMatrix(); }
     }
   }
-  try { v3dCloudsStep(now); } catch (e) { /* no clouds this frame */ }
-  try { v3dWeatherStep(now); } catch (e) { /* no weather this frame */ }
+  if (!made) try { v3dCloudsStep(now); } catch (e) { /* no clouds this frame */ }
+  if (!made) try { v3dWeatherStep(now); } catch (e) { /* no weather this frame */ }
   try { V3dSound.step(now); } catch (e) { /* no sound this frame */ }
-  try { v3dCrashStep(now); v3dCrashFocusStep(); } catch (e) { /* the crash site as it was */ }
-  try { v3dSkyStep(now); } catch (e) { /* the sky as it was */ }
-  try { v3dEnvStep(now); } catch (e) { /* the reflections as they were */ }
-  try { v3dRainbowStep(); } catch (e) { /* no rainbow */ }
-  try { v3dAuroraStep(now); } catch (e) { /* no aurora */ }
+  if (!made) try { v3dCrashStep(now); v3dCrashFocusStep(); } catch (e) { /* the crash site as it was */ }
+  if (!made) try { v3dSkyStep(now); } catch (e) { /* the sky as it was */ }
+  if (!made) try { v3dEnvStep(now); } catch (e) { /* the reflections as they were */ }
+  if (!made) try { v3dRainbowStep(); } catch (e) { /* no rainbow */ }
+  if (!made) try { v3dAuroraStep(now); } catch (e) { /* no aurora */ }
   // while the loading screen covers the view, the scene is drawn only a few times a second: the loading
   // screen stays smooth and the device's time goes to loading instead
   const VL: any = V3d;
   if (V3d.loaded || !VL.drawnAt || now - VL.drawnAt > 450) {
     VL.drawnAt = now;
-    if (VL.cabinFwdFor) { try { cabinOutsidePass(V3d.planes[VL.cabinFwdFor]); } catch (e) { /* the windows keep the last view */ } }
+    if (VL.cabinFwdFor && !made) { try { cabinOutsidePass(V3d.planes[VL.cabinFwdFor]); } catch (e) { /* the windows keep the last view */ } }
     if (V3d.loaded && (!(V3d as any).dprWas || FrameGen.mode() === 'on')) FrameGen.draw((V3d as any).perf, V3d.r, V3d.scene, V3d.cam, now); else V3d.r.render(V3d.scene, V3d.cam);
     if (V3d.loaded && !(V3d as any).dprWas) Perf.frame((V3d as any).perf, V3d.r, gameBoost() ? 60 : V3D_FPS);   // the cabin keeps its own sharpness
   }

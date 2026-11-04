@@ -84,9 +84,15 @@ const FrameGen = {
   /** How many made frames to put after each real one (always on): as many as fit while a real frame takes its time,
    *  none when real frames come as fast as the screen anyway. */
   between(st: any): number {
-    const r = st.realDt || 16, g = Math.max(4, st.genDt || 8);
-    if (r < 21 || r < g * 1.35) return 0;
-    return Math.max(1, Math.min(2, Math.round(r / Math.max(g, 1000 / 75)) - 1));   // at most two: real motion (other aircraft, people) stays at a good pace
+    // the screen's own pace: the shortest wait between frames lately (60 Hz: about 17 ms)
+    const vs = Math.max(6, Math.min(17.5, st.vsync || 16.7)), r = st.realDt || vs;
+    if (r < vs * 1.4) return 0;   // real frames keep up with the screen: nothing to add
+    return Math.max(1, Math.min(2, Math.round(r / vs) - 1));   // at most two: real motion (other aircraft, people) stays at a good pace
+  },
+  /** Before a frame's work (the 3D view): real or made? A made frame can skip the heavy work; draw() follows it. */
+  plan(st: any, now: number): 'real' | 'made' {
+    if (!st || !this.on() || this.mode() !== 'on' || !st.gen || !st.gen.fresh) { if (st) st.plan = 'real'; return 'real'; }
+    st.plan = (st.madeRun || 0) >= this.between(st) ? 'real' : 'made'; return st.plan;
   },
   /** One second of counts and times for the monitor. */
   tick(t: number, real: boolean, cpu: number) {
@@ -108,7 +114,8 @@ const FrameGen = {
   draw(st: any, ren: any, scene: any, cam: any, now?: number): boolean {
     const t = now == null ? performance.now() : now, c0 = performance.now(), always = this.mode() === 'on', cap = Perf.fpsCap() || (st && st.genCap) || 0;
     // how long the screen waited after a real frame and after a made one (always on: decides how many to make)
-    if (st) { const dt = st.prevT ? t - st.prevT : 0; st.prevT = t; if (dt > 0 && dt < 250) { if (st.lastWasReal) st.realDt = st.realDt ? st.realDt * 0.85 + dt * 0.15 : dt; else st.genDt = st.genDt ? st.genDt * 0.85 + dt * 0.15 : dt; } }
+    if (st) { const dt = st.prevT ? t - st.prevT : 0; st.prevT = t; if (dt > 0 && dt < 250) { if (st.lastWasReal) st.realDt = st.realDt ? st.realDt * 0.85 + dt * 0.15 : dt; else st.genDt = st.genDt ? st.genDt * 0.85 + dt * 0.15 : dt;
+      if (!st.vsync || dt < st.vsync) st.vsync = st.vsync ? st.vsync * 0.5 + dt * 0.5 : dt; else st.vsync = Math.min(17.5, st.vsync * 1.002); } }   // the screen's pace: follows the shortest waits, creeps up slowly
     if (!st || !this.on() || (!cap && !always)) { const q = this.gpuBegin(ren); ren.render(scene, cam); this.gpuEnd(q); if (st) st.lastWasReal = true; this.tick(t, true, performance.now() - c0); return true; }
     const G = st.gen || (st.gen = this.make());
     if (!G) { ren.render(scene, cam); return true; }
@@ -116,7 +123,7 @@ const FrameGen = {
     if (G.rt.width !== sz.x || G.rt.height !== sz.y) { G.rt.setSize(sz.x, sz.y); G.fresh = false; }
     cam.updateMatrixWorld();
     let real: boolean;
-    if (always) { const n = this.between(st); real = !G.fresh || n === 0 || (st.madeRun || 0) >= n; }
+    if (always) { if (st.plan) { real = st.plan === 'real' || !G.fresh; st.plan = ''; } else { const n = this.between(st); real = !G.fresh || n === 0 || (st.madeRun || 0) >= n; } }
     else real = !G.fresh || !st.realAt || t - st.realAt >= 1000 / cap - 3;
     if (real) {
       // the real frame: drawn into the picture, with the camera it was drawn from
