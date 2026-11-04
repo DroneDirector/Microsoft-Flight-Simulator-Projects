@@ -32,6 +32,11 @@ export interface WindowHost {
   /** The program name the window runs as (the Game Booster never closes it). */
   exe: string;
   open(url: string, prefs: DesktopPrefs): boolean;
+  /** Quit from the app: the window goes away (no window, nothing in the taskbar) while the airline keeps running unseen,
+   *  with its notifications; opening the app again starts it afresh. */
+  hide?(): void;
+  /** A notification was clicked: the window back as it is. */
+  show?(): void;
   close(): void;
   pid(): number;
 }
@@ -72,6 +77,8 @@ export class Desktop {
     if (url === '/api/link-info') { json(res, Object.assign({ phones: Desktop.phones }, Desktop.linkInfo())); return true; }
     // a newer copy of the PC app starting up asks this one to make way: close the window, then quit
     if (url === '/api/quit' && req.method === 'POST') { json(res, { ok: true }); this.closeWindow(); setTimeout(() => process.exit(0), 1500); return true; }
+    if (url === '/api/hide' && req.method === 'POST') { json(res, { ok: true }); if (Desktop.host && Desktop.host.hide) Desktop.host.hide(); else { this.closeWindow(); setTimeout(() => process.exit(0), 1500); } return true; }
+    if (url === '/api/show' && req.method === 'POST') { json(res, { ok: true }); if (Desktop.host && Desktop.host.show) Desktop.host.show(); return true; }
     if (url === '/api/backup') return this.backup(req, res), true;
     if (url === '/api/saves') return this.saves(req, res), true;
     // Game Booster: readings for the charts, the programs you can pick to close, and the app saying it is open

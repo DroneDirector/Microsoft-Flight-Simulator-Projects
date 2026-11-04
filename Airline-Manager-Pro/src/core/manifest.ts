@@ -46,6 +46,9 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
   const F: any = f, n = Math.max(0, f.pax || 0), key = f.id + '|' + n;
   const hit = _manifests.get(key); if (hit) return hit;
   const t = acType(flightTypeId(f)) || AIRCRAFT[0];
+  // who they are comes from the flight, or from the seed it was given before it left (the people already waiting in
+  // your lounge for it are the same people on board)
+  const sid = F.paxSeed || f.id;
   const nF = Math.min(n, F.paxF || 0), nJ = Math.min(n - nF, F.paxJ || 0);
   const abreast = t.seats > 250 ? 9 : t.seats > 100 ? 6 : t.seats > 40 ? 4 : t.seats > 12 ? 3 : 2;
   const letters = 'ABCDEFGHJK'.slice(0, abreast).split('');
@@ -64,7 +67,7 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
       // economy passengers spread over the whole economy cabin as booked (window seats first, middle seats
       // last), not packed into the front rows
       if (!ySlots) {
-        const nY = n - nF - nJ, capY = Math.max(nY, (t.seats || nY) - nF - nJ), rowsY = Math.ceil(capY / abreast), rnd = seeded(f.id + '|seats');
+        const nY = n - nF - nJ, capY = Math.max(nY, (t.seats || nY) - nF - nJ), rowsY = Math.ceil(capY / abreast), rnd = seeded(sid + '|seats');
         const middles = abreast === 6 ? [1, 4] : abreast >= 9 ? [1, 4, 7] : [];
         const all: { r: number; c: number; w: number }[] = [];
         for (let rr = 0; rr < rowsY; rr++) for (let c = 0; c < abreast; c++) all.push({ r: row + rr, c, w: (c === 0 || c === abreast - 1 ? 0 : middles.indexOf(c) >= 0 ? 0.6 : 0.25) + rnd() * 0.8 });
@@ -73,7 +76,7 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
       seat = ySlots[yi++] || seat;
     }
     col++; if (col >= per) { col = 0; row++; }
-    const seed = f.id + ':' + i, r = seeded(seed + 'n'), roll = r();
+    const seed = sid + ':' + i, r = seeded(seed + 'n'), roll = r();
     const nat = roll < 0.6 && natFrom ? natFrom[Math.floor(r() * natFrom.length)] : roll < 0.85 && natTo ? natTo[Math.floor(r() * natTo.length)] : undefined;
     const p: any = makePerson(seed, 'fa', '', f.from, r() < 0.5 ? 'f' : 'm', nat);
     p.look.uniform = Math.floor(r() * 6);
@@ -99,8 +102,8 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
     out.push({ key: pkey, name: p.name, nat: p.nat, sex: p.sex, age: clamp(age, 2, 92), seat, cls, look: p.look, record: rec, pet: age >= 18 ? paxPet(pkey, f) : null });
   }
   // a celebrity on about one flight in 20: in first or business if there is one, otherwise up front in economy
-  if (out.length >= 2 && seeded(f.id + 'celeb')() < 0.05) {
-    const r = seeded(f.id + 'celeb2'), prem = out.filter(p => p.cls !== 'Y'), pool = prem.length ? prem : out.slice(0, Math.min(12, out.length));
+  if (out.length >= 2 && seeded(sid + 'celeb')() < 0.05) {
+    const r = seeded(sid + 'celeb2'), prem = out.filter(p => p.cls !== 'Y'), pool = prem.length ? prem : out.slice(0, Math.min(12, out.length));
     const who = pool[Math.floor(r() * pool.length)];
     who.famous = CELEB_JOBS[Math.floor(r() * CELEB_JOBS.length)]; who.age = clamp(who.age, 22, 78); who.record = null;
   }

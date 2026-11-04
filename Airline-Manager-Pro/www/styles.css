@@ -4210,3 +4210,6 @@ html.calm .dclock b em { animation: none; }
 .apt-btn .hp-chip { font-style: normal; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px; margin-left: 4px; background: rgba(255, 92, 92, .16); color: #ff8a8a; vertical-align: middle; }
 .job-sp.sp-hems, .job-sp.sp-sar { background: rgba(242, 92, 84, .16); color: #FF8A80; }
 .job-sp.sp-offshore { background: rgba(255, 170, 60, .16); color: #FFC274; }
+.mk-menus { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; }
+.mk-menus .mk-mode { margin: 0; }
+.mk-kind button i { font-style: normal; font-size: 10.5px; margin-left: 5px; opacity: .65; }

@@ -316,7 +316,21 @@ function titleKey(e: KeyboardEvent) {
   else if (e.key === 'Escape' && T.panel) { e.preventDefault(); titlePanel(''); }
 }
 function titleGo(then: () => void) { Sound.tick(); titleClose(then); }
-ACTIONS['ts-continue'] = () => titleGo(() => { /* back into the game, where you were */ });
+ACTIONS['ts-continue'] = () => { Sound.tick(); enterSplash(); titleClose(() => { /* back into the game, where you were */ }); };
+/** Continue: a loading screen (at least 5 seconds) while the game opens behind it, saying what is loading; when the
+ *  loading takes longer, the bar follows it and the screen stays until everything is ready. */
+function enterSplash() {
+  const c: any = company(), W: any = World;
+  exitSplash('enter', c ? `Opening ${c.name}` : 'Opening your airline', [
+    { pct: 18, step: 'Loading your airline…', run: () => { /* already in memory */ } },
+    { pct: 36, step: 'Loading the world\'s airports…', run: () => { try { W.load(); } catch (e) { /* loading */ } }, wait: () => !!W.ready },
+    { pct: 50, step: 'Loading the runways…', run: () => { try { W.loadRunways(); } catch (e) { /* later */ } }, wait: () => !!W.runways },
+    { pct: 62, step: 'Loading the aircraft and models…', run: () => { try { Models.init(); } catch (e) { /* none */ } }, wait: () => !!Models.list },
+    { pct: 74, step: 'Loading the people…', run: () => { try { Human.load(); } catch (e) { /* later */ } }, wait: () => Human.ready },
+    { pct: 88, step: 'Catching up on everything that happened while you were away…', run: () => { try { refresh(); } catch (e) { /* drawn next */ } } },
+    { pct: 100, step: 'Opening the Overview…', run: () => { /* the screen behind is ready */ } },
+  ], undefined, 5000);
+}
 ACTIONS['ts-demo'] = () => titleGo(() => { try { const S: any = State; S.settings.tourDone = S.settings.tourDone || false; ACTIONS['fs-demo'](null as any, null as any); } catch (e) { /* ignore */ } });
 ACTIONS['ts-options'] = () => { titlePanel(''); ACTIONS.settings(null as any, null as any); };
 ACTIONS['ts-quit'] = () => { titlePanel(''); ACTIONS.exit(null as any, null as any); };

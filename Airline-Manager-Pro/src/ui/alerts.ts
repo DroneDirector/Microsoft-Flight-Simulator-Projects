@@ -56,7 +56,7 @@ function alertOs(n: any) {
     return;
   }
   if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && (DESKTOP || document.hidden)) {
-    try { const w = new Notification(title, { body, tag: n.id }); w.onclick = () => { try { window.focus(); const e = document.createElement('b'); e.setAttribute('data-id', n.id); ACTIONS['open-notice'](e, null); } catch (e) { /* closed */ } w.close(); }; } catch (e) { /* not supported */ }
+    try { const w = new Notification(title, { body, tag: n.id }); w.onclick = () => { try { if ((window as any).__unseen) { (window as any).__unseen = false; (window as any).__quitting = false; try { localStorage.removeItem('amp-quit'); } catch (x) { /* ignore */ } fetch('/api/show', { method: 'POST' }).catch(() => { /* older PC app */ }); } window.focus(); const e = document.createElement('b'); e.setAttribute('data-id', n.id); ACTIONS['open-notice'](e, null); } catch (e) { /* closed */ } w.close(); }; } catch (e) { /* not supported */ }
   }
 }
 

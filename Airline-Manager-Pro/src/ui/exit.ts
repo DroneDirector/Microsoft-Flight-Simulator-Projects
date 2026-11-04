@@ -73,12 +73,35 @@ function farewell() {
   requestAnimationFrame(() => f.classList.add('on'));
   setTimeout(() => {
     const app = (window as any).Capacitor && (window as any).Capacitor.Plugins && (window as any).Capacitor.Plugins.App;
-    try { localStorage.setItem('amp-resume', JSON.stringify({ at: Date.now(), screen: State.screen })); } catch (e) { /* ignore */ }
+    // quitting: the next time the app is opened it starts afresh (the start-up screen, then the start screen), not
+    // back where you were; the airline itself keeps running on the real clock, and its notifications still come
+    quitMark();
+    try { Store.save(); (Store as any).flushNative && (Store as any).flushNative(); } catch (e) { /* saved as it goes */ }
+    try { aiScheduleNotifications(); } catch (e) { /* none to schedule */ }
     if (app && app.exitApp) { app.exitApp(); return; }
+    if (DESKTOP) { quitUnseen(f); return; }
     // In a browser preview there is nothing to close: bring the app back.
     window.close();
     setTimeout(() => { f.classList.remove('on'); setTimeout(() => f.remove(), 500); closeAll(); }, 1200);
   }, reducedMotion() ? 300 : 1500);
+}
+
+/** Remember that the app was quit (not just put away): the next start skips "back where you were". */
+function quitMark() {
+  (window as any).__quitting = true;
+  try { localStorage.removeItem('amp-resume'); localStorage.removeItem('amp-ui'); localStorage.setItem('amp-quit', String(Date.now())); } catch (e) { /* ignore */ }
+}
+/** On the PC: the window goes away and the app keeps running unseen (the airline carries on, notifications still
+ *  show); opening the app again starts it afresh. Everything open is closed and every sound stops. */
+function quitUnseen(f: HTMLElement) {
+  (window as any).__unseen = true;
+  try { Voice.stop(); } catch (e) { /* none */ }
+  for (const R of [OfficeRoom, OpsRoom, CourtRoom, HangarRoom, LoungeRoom] as any[]) { try { if (R && R.on) R.close(true); } catch (e) { /* closed */ } }
+  try { if (typeof v3dClose === 'function') v3dClose(); } catch (e) { /* closed */ }
+  try { TitleScreen.audio && TitleScreen.audio.pause(); } catch (e) { /* none */ }
+  try { soundSuspend(); } catch (e) { /* none */ }
+  fetch('/api/hide', { method: 'POST' }).catch(() => { window.close(); });
+  setTimeout(() => { f.remove(); closeAll(); try { go('ops', true); } catch (e) { /* ignore */ } }, 600);
 }
 
 // Android back button / back gesture: close what's open, step back, and only offer exit at the top.

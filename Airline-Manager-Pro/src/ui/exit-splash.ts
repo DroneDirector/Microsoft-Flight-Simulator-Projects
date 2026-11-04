@@ -6,14 +6,15 @@
 const EXIT_MIN_MS = 6000;
 const ExitSplash: any = { on: false };
 
-interface ExitStep { pct: number; step: string; run: () => void }
+interface ExitStep { pct: number; step: string; run: () => void; wait?: () => boolean }   // wait: the step lasts until this is true (at most 40 s)
 
-function exitSplash(kind: 'office' | 'ops' | 'court' | 'v3d' | 'hangar' | 'lounge', title: string, steps: ExitStep[], then?: () => void) {
+function exitSplash(kind: 'office' | 'ops' | 'court' | 'v3d' | 'hangar' | 'lounge' | 'enter', title: string, steps: ExitStep[], then?: () => void, minMs?: number) {
+  const MIN = minMs || EXIT_MIN_MS;
   if (ExitSplash.on && ExitSplash.el) { try { ExitSplash.el.remove(); } catch (e) { /* gone */ } }
   const el = document.createElement('div'); el.className = 'exit-splash exit-' + kind;
   const first = steps.length ? steps[0].step : 'Loading…';
   if (kind === 'v3d') el.innerHTML = v3dLoaderHtml().replace('<b>3D view</b>', `<b>${esc(title)}</b>`).replace('Loading the mountains and the sea…', esc(first));
-  else el.innerHTML = ctLoaderHtml(title, first, kind === 'office' ? OF_WINGS : kind === 'ops' ? OPS_EMBLEM : kind === 'hangar' ? HG_EMBLEM : kind === 'lounge' ? LG_EMBLEM : undefined, kind === 'ops' ? OPS_SCENE : kind === 'hangar' ? HG_SCENE : undefined);
+  else el.innerHTML = ctLoaderHtml(title, first, kind === 'office' ? OF_WINGS : kind === 'enter' ? OF_WINGS.replace('>OFFICE<', '>' + esc(((company() as any) || {}).icao || 'AIRLINE') + '<') : kind === 'ops' ? OPS_EMBLEM : kind === 'hangar' ? HG_EMBLEM : kind === 'lounge' ? LG_EMBLEM : undefined, kind === 'ops' || kind === 'enter' ? OPS_SCENE : kind === 'hangar' ? HG_SCENE : undefined);
   document.body.appendChild(el); ExitSplash.on = true; ExitSplash.el = el;
   // first of all, everything you did there is saved (only the graphics are cleared, never your data)
   steps = [{ pct: 10, step: 'Saving your changes…', run: () => { try { Store.save(); Store.flushNative(); } catch (e) { /* saved with the next change */ } } } as ExitStep].concat(steps);
@@ -28,14 +29,19 @@ function exitSplash(kind: 'office' | 'ops' | 'court' | 'v3d' | 'hangar' | 'loung
   const runNext = () => {
     if (i >= steps.length) { done = true; return; }
     const s = steps[i++]; set(shown, s.step);
-    setTimeout(() => { try { s.run(); } catch (e) { /* carry on */ } target = s.pct; setTimeout(runNext, 160); }, 60);
+    setTimeout(() => {
+      try { s.run(); } catch (e) { /* carry on */ }
+      const w0 = performance.now(), on = () => { let ok = true; try { ok = !s.wait || s.wait(); } catch (e) { ok = true; }
+        if (ok || performance.now() - w0 > 40000) { target = s.pct; setTimeout(runNext, 160); } else setTimeout(on, 120); };
+      on();
+    }, 60);
   };
   // what is shown moves towards the step reached, never faster than the 6 seconds
   const tick = () => {
-    const nowT = performance.now(), age = nowT - t0, cap = Math.min(100, age / EXIT_MIN_MS * 100), goal = done ? cap : Math.min(target, cap);
+    const nowT = performance.now(), age = nowT - t0, cap = Math.min(100, age / MIN * 100), goal = done ? cap : Math.min(target, cap);
     const dt = Math.min(0.25, (nowT - (lastT || nowT)) / 1000); lastT = nowT;
     shown = Math.min(goal, shown + Math.max(0, goal - shown) * Math.min(1, dt * 6) + dt * 4); set(shown);
-    if (done && age >= EXIT_MIN_MS && shown >= 99.5) {
+    if (done && age >= MIN && shown >= 99.5) {
       set(100, 'Ready'); el.classList.add('out'); ExitSplash.on = false;
       setTimeout(() => { el.remove(); if (ExitSplash.el === el) ExitSplash.el = null; }, 800);
       try { if (then) then(); } catch (e) { /* shown anyway */ }
