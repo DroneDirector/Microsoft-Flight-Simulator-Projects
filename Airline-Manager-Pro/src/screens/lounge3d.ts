@@ -266,9 +266,8 @@ function lgBuild(scene: any, q: number): any {
   { const mx = x0 + 1.2, mz = z1 - 0.5;
     prop('magazine-rack', mx, mz, Math.PI, () => { bx(0.7, 1.0, 0.3, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, mx, 0.5, mz); const cols = [0xC0392B, 0x2E5C8A, 0xF2B544, 0x2F6B4A, 0x8E44AD, 0xE67E22]; for (let r = 0; r < 3; r++) for (let i = 0; i < 2; i++) { const m = new T.Mesh(new T.PlaneGeometry(0.26, 0.3), M({ color: cols[(r * 2 + i) % cols.length] })); m.position.set(mx - 0.16 + i * 0.32, 0.3 + r * 0.3, mz - 0.17); m.rotation.set(0.15, Math.PI, 0); root.add(m); } });
     block(mx - 0.45, mz - 0.3, mx + 0.45, z1);
-    const [c] = ctCanvas(1024, 512); A.depCv = c; lgDepartures(c, R.k); A.depTex = ctTex(c);
-    prop('departures-screen', -W * 0.05, z1 - 0.06, Math.PI, () => { bx(2.1, 1.12, 0.06, black, -W * 0.05, 2.0, z1 - 0.05); });
-    const scr = new T.Mesh(new T.PlaneGeometry(2.0, 1.0), new T.MeshBasicMaterial({ map: A.depTex, toneMapped: false })); scr.position.set(-W * 0.05, 2.0, z1 - 0.09); scr.rotation.y = Math.PI; scr.userData.keep = true; root.add(scr); }
+    // the flight boards: Departures and Arrivals side by side, 30 cm apart (fids3d.ts)
+    try { A.fids = fidsPair(root, R.k, -W * 0.05, 2.0, z1 - 0.07, Math.PI, 1.6); } catch (e) { A.fids = []; } }
   // Business and Flagship: the bar with stools and a shelf of bottles (back left)
   if (lv >= 1) { const bxp = x0 + 3.2, bz = z1 - 1.2;
     prop('bar-counter', bxp, bz, Math.PI, () => { bx(3.6, 1.08, 0.6, walnut, bxp, 0.54, bz); bx(3.8, 0.06, 0.8, lv === 2 ? marble : M({ color: 0x1A1C20, roughness: 0.2 }), bxp, 1.1, bz); if (lv === 2) bx(3.62, 0.04, 0.02, gold, bxp, 0.2, bz - 0.31); });
@@ -531,7 +530,7 @@ function lgStart(root: HTMLElement, ren: any, scene: any, cam: any) {
       const wait = Math.max(300, 5000 - (performance.now() - R.loadT0));   // at least 5 seconds, and until it is all here
       setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); } lgUi(true); }, wait);
     }, 40);
-    R.iv = setInterval(() => { if (R.on && !document.hidden && R.A) { lgDepartures(R.A.depCv, R.k); R.A.depTex.needsUpdate = true; } }, 30000);
+    R.iv = 0;   // the flight boards update themselves (fidsStep)
     R.perf = Perf.state();
     if (H) return;   // the building draws it
     const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !Perf.skip(R.perf)) lgFrame(); };
@@ -587,6 +586,7 @@ function lgDoorsTo(k: number) { const A = LoungeRoom.A; if (!A || !A.doorLeaves)
 function lgFrameRest(now: number, dt: number) {
   const R = LoungeRoom;
   try { lgBarStep(dt, now); } catch (e) { /* the bar rests */ }
+  try { fidsStep(R.A && R.A.fids); } catch (e) { /* the boards wait */ }
   try { lgDrunkStep(dt); lgDrunkCam(R, dt, now, !!(R.free && R.free.v > 0.2 && !R.sit)); } catch (e) { /* clear-headed */ }
   if (R.A && R.A.doorLeaves && R.A.doorK !== R.A.doorTo) { const A = R.A; A.doorK += Math.sign(A.doorTo - A.doorK) * Math.min(Math.abs(A.doorTo - A.doorK), dt * 1.6); const e = A.doorK * A.doorK * (3 - 2 * A.doorK); for (const L of A.doorLeaves) L.position.x = L.userData.x0 + (L.userData.x1 - L.userData.x0) * e; }
   // guests: sitting back, talking now and then, sipping; the fire flickers; steam rises from fresh cups

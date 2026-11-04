@@ -46,7 +46,7 @@ const LOUNGE_PROP_FILES: [string, string][] = [
   ['drinks-fridge', 'Glass-fronted fridge (the drinks and snacks in it are the items/ files)'],
   ['bar-counter', 'Bar counter (Business and Flagship)'], ['bar-stool', 'Bar stool'], ['bottle-shelf', 'Shelf of bottles behind the bar'],
   ['pendant-light', 'Pendant light (Business)'], ['chandelier', 'Chandelier (Flagship)'], ['fireplace', 'Fireplace (Flagship)'], ['grand-piano', 'Grand piano (Flagship)'],
-  ['wall-art', 'Framed art (Flagship)'], ['champagne-bucket', 'Champagne bucket (Flagship)'], ['departures-screen', 'Departures screen frame (the list is drawn by the app)'],
+  ['wall-art', 'Framed art (Flagship)'], ['champagne-bucket', 'Champagne bucket (Flagship)'], ['departures-screen', 'Departures screen frame (the list is drawn by the app; also hanging in the concourse)'], ['arrivals-screen', 'Arrivals screen frame (beside the departures screen)'],
   ['glass-rack', 'Glass rack hanging from the ceiling over the bar (the glasses are their own files)'],
   ['bottle-red', 'Bottle of red wine (the bartender takes it from the shelf and pours)'], ['bottle-white', 'Bottle of white wine'], ['bottle-champagne', 'Bottle of champagne'],
   ['bottle-whisky', 'Bottle of single malt whisky'], ['bottle-gin', 'Bottle of gin'], ['bottle-vodka', 'Bottle of vodka'], ['bottle-aquavit', 'Bottle of aquavit'],
