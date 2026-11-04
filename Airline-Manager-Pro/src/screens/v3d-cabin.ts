@@ -94,6 +94,8 @@ function cabWinParts(st: CabinStyle, kind: 'deep' | 'row'): any {
 }
 /** Where the shade's bottom edge is for how far it is down (0 up, the lip just showing at the top; 1 shut). */
 function cabWinShadeY(W: any, k: number): number { const top = W.wh / 2 + 0.004; return top - 0.012 - k * (W.wh - 0.043); }   // shut: the lip and its grip a little above the bottom, as on board
+/** How much of the shade shows: from its bottom edge up to just inside the window's top (no more). */
+function cabWinShadeH(W: any, y: number): number { return Math.max(0.002, W.wh / 2 + 0.01 - y); }
 const CABWIN_MAT: any = {};
 function cabWinMats(): any {
   if (CABWIN_MAT.ring) return CABWIN_MAT;
@@ -127,13 +129,13 @@ function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
   const pane = new T.Mesh(W.pane, new T.MeshBasicMaterial({ color: 0x9FB4C8, transparent: true, opacity: 0.08, depthWrite: false, side: T.DoubleSide })); pane.material.userData.noDim = true; wg.add(pane);
   const shadeAt = (par: any, k: number) => {
     if (st.shade !== 'blind') return;
-    const y = cabWinShadeY(W, k), sh = new T.Mesh(W.shade, WM.shade); sh.position.set(0, y, W.shadeZ); sh.scale.y = W.wh + 0.08; par.add(sh);
+    const y = cabWinShadeY(W, k), sh = new T.Mesh(W.shade, WM.shade); sh.position.set(0, y, W.shadeZ); sh.scale.y = cabWinShadeH(W, y); par.add(sh);
     const lp = new T.Mesh(W.lip, WM.lip); lp.position.set(0, y, W.shadeZ); par.add(lp); const gp = new T.Mesh(W.grip, WM.lip); gp.position.set(0, y, W.shadeZ); par.add(gp);
     return [sh, lp, gp];
   };
   const own = shadeAt(wg, 0.02);
   if (own) g.userData.shade = { parts: own, hit: [pane, own[0]], W, k: [0.02], to: [0.02], from: [0.02], p: [1], live: [true], moving: [] as number[],
-    set: (i: number) => { const y = cabWinShadeY(W, g.userData.shade.k[i]); for (const m of own) m.position.y = y; } };
+    set: (i: number) => { const y = cabWinShadeY(W, g.userData.shade.k[i]); for (const m of own) m.position.y = y; own[0].scale.y = cabWinShadeH(W, y); } };
   if (st.shade === 'dim') {   // the dimming button under the window
     const btn = new T.Mesh(new T.BoxGeometry(0.03, 0.06, 0.012), mat(0x2C3138, 0.4, 0.4)); btn.position.set(0, -wh / 2 - 0.1, 0.03); g.add(btn);
   }
@@ -627,7 +629,7 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
       if (!live[i]) return r2 < 0.86 ? 1 : 0.02;
       return r2 < (night ? 0.45 : 0.26) ? 1 : r2 < (night ? 0.58 : 0.38) ? 0.5 : 0.02; });
     const SH: any = { k: ks, to: ks.slice(), from: ks.slice(), p: ks.map(() => 1), live, frames, moving: [] as number[] };
-    SH.at = (i: number, F: any, sh: boolean) => F.clone().multiply(new T.Matrix4().compose(new T.Vector3(0, cabWinShadeY(WR, SH.k[i]), WR.shadeZ), new T.Quaternion(), new T.Vector3(1, sh ? WR.wh + 0.08 : 1, 1)));
+    SH.at = (i: number, F: any, sh: boolean) => { const y = cabWinShadeY(WR, SH.k[i]); return F.clone().multiply(new T.Matrix4().compose(new T.Vector3(0, y, WR.shadeZ), new T.Quaternion(), new T.Vector3(1, sh ? cabWinShadeH(WR, y) : 1, 1))); };   // only the part below the window's top shows (the rest is rolled up out of sight)
     SH.ims = [inst(WR.shade, WMr.shade, (i, F) => SH.at(i, F, true)), inst(WR.lip, WMr.lip, (i, F) => SH.at(i, F, false)), inst(WR.grip, WMr.lip, (i, F) => SH.at(i, F, false))];
     for (const im of SH.ims) im.userData.shades = true;
     g.userData.shades = SH;
