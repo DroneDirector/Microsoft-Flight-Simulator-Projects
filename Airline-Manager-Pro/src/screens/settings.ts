@@ -10,7 +10,6 @@ interface SetSection { id: string; title: string; icon: string; items: SetItem[]
 
 const SETTINGS: SetSection[] = [
   { id: 'general', title: 'General', icon: 'sliders', items: [
-    { type: 'html', html: () => setSaveCardHtml('other') },
     { type: 'html', html: () => soloMode() ? `<div class="set-card"><span><b>Your first week</b><small>The guided checklist for a new airline in the Overview: aircraft, crew, the first route and flight, a job and a frequent-flyer programme.</small></span><button class="btn ghost sm" data-act="fw-show">Show it</button></div>` : '' },
     { type: 'toggle', key: 'morningBrief', label: 'Morning briefing', hint: 'Once a day in the Overview: yesterday\'s result, today\'s flights, weather, crew and aircraft, and the special days coming up on your routes. Also opens from the Overview any time.' },
     { type: 'html', html: () => `<div class="set-card"><span class="brand-lg">${brandMark()}</span><span><b>${esc(APP.name)}</b><small>Version ${esc(APP.version)}</small></span><button class="btn ghost sm" data-act="whats-new">${icon('star')}What's new</button></div>` },
@@ -33,7 +32,6 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'aiNotify', label: 'Notify me when my pilots land', hint: 'A phone notification when a hired pilot reaches the gate, even when the app is closed.' },
   ] },
   { id: 'view3d', title: 'Graphics', icon: 'map', items: [
-    { type: 'html', html: () => setSaveCardHtml('gfx') },
     { type: 'group', title: 'Recommended' }, { type: 'html', html: () => gfxAdviceHtml() },
     { type: 'html', html: () => { const on = (State.settings as any).joinedRooms !== false; return `<label class="tg-row set-card"><span><b>Walk between your rooms</b><small>Your office, the Operations office and your hub's lounge in one building: a staff corridor and the concourse join them, and you walk from one to the other through their doors. The Office, Operations and Lounge buttons still take you straight to your chair. Off: each room on its own, with a loading screen in between.</small></span><button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="joined-rooms"></button></label>`; } },
     ...(DESKTOP ? [{ type: 'group', title: 'PC graphics' } as SetItem, { type: 'html', html: () => gfxSettingsHtml() } as SetItem] : []),
@@ -379,7 +377,8 @@ function settingsBody(): string {
   const S: any = State.settings, groups = setGroups(sec), gi = setSubOf(sec.id, groups.length);
   // two or more parts: a switch at the top, one part shown at a time
   const sw = groups.length > 1 ? `<div class="seg set-sub" role="tablist">${groups.map((g, i) => `<button class="${i === gi ? 'on' : ''}" role="tab" aria-selected="${i === gi}" data-act="set-sub" data-g="${i}">${esc(g.title)}</button>`).join('')}</div>` : '';
-  return `<h2>${esc(sec.title)}</h2>` + sw + groups[gi].items.map(it => {
+  const saveCard = sec.id === 'view3d' ? setSaveCardHtml('gfx') : sec.id === 'general' && gi === 0 ? setSaveCardHtml('other') : '';
+  return `<h2>${esc(sec.title)}</h2>` + sw + saveCard + groups[gi].items.map(it => {
     if ((it as any).when && !(it as any).when()) return '';
     if (it.type === 'toggle') return `<label class="tg-row"><span><b>${esc(it.label)}</b>${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span>${toggle(it.key, !!S[it.key])}</label>`;
     if (it.type === 'choice') return `<div class="ch-row"><span><b>${esc(it.label)}</b>${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span><div class="seg">${it.options.map(o => `<button class="${S[it.key] === o[0] ? 'on' : ''}" data-act="set-choice" data-key="${it.key}" data-v="${o[0]}">${esc(o[1])}</button>`).join('')}</div></div>`;
