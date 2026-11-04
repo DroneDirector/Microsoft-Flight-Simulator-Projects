@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.146
+- The Training room (the Academy) off the staff corridor, with the class and its teacher; Crew → Training with courses for every kind of crew; corridor rails stop at doorways.
+
 ## 0.9.145
 - Frame generation: no glitches on the followed aircraft, the cabin, clouds or lights; edge smoothing; crash fix after recentring. Settings gear in the 3D view's top bar.
 
