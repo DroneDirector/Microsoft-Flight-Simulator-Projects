@@ -63,6 +63,11 @@
   drawn ones, bigger shadow maps, a higher pixel ratio, sharper pictures and finer detail. Anything made lighter for
   phones and tablets stays full quality on the PC. Applies to everything from the seven batches of 0.9.105–0.9.111 on.
 
+- **Mod Manager on phones has its own layout**: `.mm.phone` (set from the device's screen, shorter side under 600 px,
+  never on the PC) makes the whole page scroll, with a smaller header and tools and details over the list. Every later
+  change to the Mod Manager's sizes or layout for phones goes in `.mm.phone` rules only; tablets (the iPad mini and up)
+  and the PC keep their layout untouched by phone changes.
+
 ## Before the final release (1.0)
 Remind the owner of this when the app is made final (version 1.0 or the release called final), before publishing:
 - **VATSIM**: its user agreement forbids using its data in a paid app without written permission.
