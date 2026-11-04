@@ -86,6 +86,7 @@
     "src/core/ratings.ts",
     "src/core/crew-training.ts",
     "src/core/lounge-drunk.ts",
+    "src/core/security.ts",
     "src/core/jobs.ts",
     "src/core/online.ts",
     "src/core/g2p.ts",

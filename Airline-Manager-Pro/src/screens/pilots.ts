@@ -23,12 +23,12 @@ SCREENS.pilots = {
     const log = State.logbook.filter(l => plane(l.reg) && plane(l.reg).companyId === State.companyId && l.result !== 'crash');
     const avg = log.length ? log.reduce((s, l) => s + Math.abs(l.landingFpm), 0) / log.length : 0;
     const crew = crewOf();
-    const fa = staffOf(c.id, 'fa'), mech = staffOf(c.id, 'mech'), ground = staffOf(c.id, 'ground');
+    const fa = staffOf(c.id, 'fa'), mech = staffOf(c.id, 'mech'), ground = staffOf(c.id, 'ground').filter((p: any) => !isSecurity(p)), secs = staffOf(c.id, 'ground').filter(isSecurity);
     const cc = crewCheck();
     const co: any = State.pilots.filter((p: any) => p.coPilotFor === c.id)[0];
     const myA = plane(State.myReg[c.id]);
-    const cands = (State as any).staffCandidates.filter((x: any) => (_hireRole === 'all' || x.role === _hireRole) && (_hireRole !== 'ground' || _hireJob === 'all' || x.job === _hireJob));
-    const tabs = [['pilots', 'Pilots', crew.length + (co ? 1 : 0)], ['cabin', 'Cabin crew', fa.length], ['mech', 'Mechanics', mech.length], ['ground', 'Ground staff', ground.length], ['training', 'Training', inTrainingNow().length], ['hire', 'Hire staff', (State as any).staffCandidates.length + State.candidates.length]].concat([['court', 'Court', ((State as any).cases || []).filter((x: any) => x.status === 'open' || x.appealing).length]] as any);
+    const cands = (State as any).staffCandidates.filter((x: any) => (isSecurity(x) ? secOn() && (_hireRole === 'all' || _hireRole === 'security') : (_hireRole === 'all' || x.role === _hireRole)) && (_hireRole !== 'ground' || _hireJob === 'all' || x.job === _hireJob));
+    const tabs = [['pilots', 'Pilots', crew.length + (co ? 1 : 0)], ['cabin', 'Cabin crew', fa.length], ['mech', 'Mechanics', mech.length], ['ground', 'Ground staff', ground.length], ...(secOn() ? [['security', 'Security', secs.length]] : []), ['training', 'Training', inTrainingNow().length], ['hire', 'Hire staff', (State as any).staffCandidates.length + State.candidates.length]].concat([['court', 'Court', ((State as any).cases || []).filter((x: any) => x.status === 'open' || x.appealing).length]] as any);
     let body = '';
     if (_pilotTab === 'pilots') body = `
       ${co ? `<div class="co-card">
@@ -58,8 +58,11 @@ SCREENS.pilots = {
       ${GROUND_JOBS.map(j => { const ps = ground.filter((p: any) => p.job === j[0]); return ps.length ? `<h4 class="grp-h">${esc(j[1])} · ${ps.length}</h4><div class="staff-grid">${ps.map((p, i) => staffCard(p, i)).join('')}</div>` : ''; }).join('') || emptyState('No ground staff yet', 'Hire baggage handlers, drivers and ramp agents under Hire staff.', 'Hire staff', 'pilot-hire')}`;
     else if (_pilotTab === 'court') body = courtTabHtml();
     else if (_pilotTab === 'training') body = crewTrainingHtml();
+    else if (_pilotTab === 'security') body = `<p class="fine-print">${icon('info')}Your own security officers: gate checks (they spot drunk and banned passengers), guarding the aircraft parked overnight, and collecting a drunk passenger from your lounge. The more of them at an airport, and the better they are, the safer it is there. Train them in the Training room.</p>
+      <div class="sec-cover">${Array.from(new Set(State.fleet.filter(a => a.companyId === c.id).map(a => a.base).concat(secs.map((p: any) => p.base)))).map((b: any) => { const q = secQuality(b), n = secs.filter((p: any) => p.base === b).length; return `<span class="chip ${q > 0.6 ? 'ok' : q > 0.25 ? 'amber' : 'bad'}">${esc(b)}: ${n} officer${n === 1 ? '' : 's'} · ${q > 0.6 ? 'well covered' : q > 0.25 ? 'thinly covered' : 'not covered'}</span>`; }).join('')}</div>
+      ${sortBar('staff', STAFF_SORTS, 'Find someone')}<div class="staff-grid">${sortList('staff', secs, STAFF_SORTS, (p: any) => `${p.name} ${p.base}`).map((p, i) => staffCard(p, i)).join('') || emptyState('No security officers yet', 'Hire security officers to check passengers at the gate and guard your aircraft.', 'Hire staff', 'pilot-hire')}</div>`;
     else body = `
-      <div class="filter-row">${(coopOn() ? [['all', 'Everyone']] : [['all', 'Everyone'], ['captain', 'Captains'], ['fo', 'First officers']]).concat([['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['ground', 'Ground staff']]).map(r => `<button class="fchip ${_hireRole === r[0] ? 'on' : ''}" data-act="hire-role" data-r="${r[0]}">${r[1]}</button>`).join('')}</div>
+      <div class="filter-row">${(coopOn() ? [['all', 'Everyone']] : [['all', 'Everyone'], ['captain', 'Captains'], ['fo', 'First officers']]).concat([['fa', 'Flight attendants'], ['mech', 'Mechanics'], ['ground', 'Ground staff']].concat(secOn() ? [['security', 'Security']] : [])).map(r => `<button class="fchip ${_hireRole === r[0] ? 'on' : ''}" data-act="hire-role" data-r="${r[0]}">${r[1]}</button>`).join('')}</div>
       ${_hireRole === 'ground' ? `<div class="filter-row sub">${[['all', 'All jobs']].concat(GROUND_JOBS as any).map((r: any) => `<button class="fchip ${_hireJob === r[0] ? 'on' : ''}" data-act="hire-job" data-j="${r[0]}">${esc(r[1])}</button>`).join('')}</div>` : ''}
       <div class="staff-grid">
         ${!coopOn() && (_hireRole === 'all' || _hireRole === 'captain') ? State.candidates.map((p: any, i) => `<button class="staff-card hire" data-act="hire" data-id="${p.id}" style="--i:${i}">

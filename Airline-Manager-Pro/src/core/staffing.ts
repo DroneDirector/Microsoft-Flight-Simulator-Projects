@@ -20,6 +20,7 @@ function poolTopUp(): number {
     while (have < POOL_MIN) { S.staffCandidates.push(makePerson('cand-' + role + uid(), role, '', POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)])); have++; n++; }
   }
   while (State.candidates.length < POOL_MIN) { State.candidates.push(makePilotCandidate('cap' + uid())); n++; }
+  n += secPoolTop(8);
   return n;
 }
 const POOL_BASES = ['EKVG', 'EKCH', 'ENGM', 'BIKF', 'EGLL', 'EDDF', 'PALH', 'EKBI', 'KJFK', 'CYYZ'];
@@ -66,6 +67,14 @@ function makePilotCandidate(seed: string): any {
 }
 
 /** The job market moves: candidates leave, new ones arrive (some days more, some days fewer). */
+/** Security officers on the hiring list (at least `min`, a few new ones now and then). */
+function secPoolTop(min: number): number {
+  if (typeof secOn !== 'function' || !secOn()) return 0;
+  const S: any = State; S.staffCandidates = S.staffCandidates || []; let n = 0;
+  const have = () => S.staffCandidates.filter((x: any) => x.job === 'security').length;
+  while (have() < min) { S.staffCandidates.push(makeSecurity('cand-sec' + uid(), POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)], '')); n++; }
+  return n;
+}
 function poolAdvance() {
   const S: any = State, now = Date.now();
   if (S.poolFill) { S.poolFill = false; if (poolTopUp()) Store.soon(); }   // a new career: the list starts full
@@ -73,6 +82,7 @@ function poolAdvance() {
   let rounds = 0, arrived = 0;
   while (S.poolNext <= now && rounds < 20) {
     rounds++;
+    try { if (Math.random() < 0.5) secPoolTop(4 + Math.floor(Math.random() * 6)); } catch (e) { /* none */ }
     const busy = Math.random();   // a busy day brings more people, a quiet one fewer
     for (const role of POOL_ROLES) {
       const list = S.staffCandidates.filter((x: Staff) => x.role === role);

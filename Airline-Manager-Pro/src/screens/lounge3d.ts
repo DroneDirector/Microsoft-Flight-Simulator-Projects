@@ -433,6 +433,7 @@ function lgNext(G: any) {
 function lgGuestStep(G: any, now: number, dt: number) {
   const R = LoungeRoom;
   G.timer -= dt;
+  if (G.st === 'led') G.timer = 99;   // being led out by Security (lgSecStep moves them)
   if (G.st === 'sit') { G.sitK = Math.min(1, G.sitK + dt * 1.6); if (G.timer <= 0) lgNext(G); }
   else if (G.st === 'stand') {   // getting up: out of the seat to its side
     G.sitK = Math.max(0, G.sitK - dt * 1.6); const p = lgSeatPos(G.seat || { x: G.x, z: G.z, ry: G.yaw });
@@ -595,6 +596,7 @@ function lgFrameRest(now: number, dt: number) {
   const R = LoungeRoom;
   try { lgBarStep(dt, now); } catch (e) { /* the bar rests */ }
   try { fidsStep(R.A && R.A.fids); } catch (e) { /* the boards wait */ }
+  try { lgSecStep(dt, now); } catch (e) { R.sec = null; }
   try { lgDrunkStep(dt); lgDrunkCam(R, dt, now, !!(R.free && R.free.v > 0.2 && !R.sit)); } catch (e) { /* clear-headed */ }
   if (R.A && R.A.doorLeaves && R.A.doorK !== R.A.doorTo) { const A = R.A; A.doorK += Math.sign(A.doorTo - A.doorK) * Math.min(Math.abs(A.doorTo - A.doorK), dt * 1.6); const e = A.doorK * A.doorK * (3 - 2 * A.doorK); for (const L of A.doorLeaves) L.position.x = L.userData.x0 + (L.userData.x1 - L.userData.x0) * e; }
   // guests: sitting back, talking now and then, sipping; the fire flickers; steam rises from fresh cups

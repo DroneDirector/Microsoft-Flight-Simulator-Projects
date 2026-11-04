@@ -42,7 +42,8 @@ function drunkAsk() {
     openLayer('modal', `<div class="drunk-ask"><h2>${icon('alert')}A passenger is ${very ? 'very ' : ''}drunk</h2>
       <p><b>${esc(d.name)}</b>, ${esc(d.cls.toLowerCase())} class on <b>${esc(d.callsign)}</b> to ${esc(A ? A.city || d.to : d.to)}, departing ${esc(dateStr(new Date(d.dep)).slice(11, 16))}, has been drinking in your lounge: about <b>${d.bac.toFixed(1)} per mille</b>${very ? ', unsteady on their feet and slurring' : ', loud and unsteady'}.</p>
       <p class="fine-print">${icon('info')}Airlines may refuse anyone who is drunk: a drunk passenger can be a danger to themselves and others, and can't follow the crew in an emergency. If you don't decide before boarding, the cabin crew will deny boarding.</p>
-      <div class="btn-row"><button class="btn" data-act="drunk-allow" data-k="${esc(d.key)}">Let them board</button><button class="btn primary" data-act="drunk-deny" data-k="${esc(d.key)}">Deny boarding</button></div></div>`, { cls: 'drunk-pop' });
+      ${typeof secStaff === 'function' && secStaff(d.from).length ? `<p class="fine-print">${icon('user')}Security at ${esc(d.from)} spotted them at the gate. You can send an officer to collect them from the lounge.</p>` : ''}
+      <div class="btn-row"><button class="btn" data-act="drunk-allow" data-k="${esc(d.key)}">Let them board</button>${typeof secStaff === 'function' && secStaff(d.from).length ? `<button class="btn" data-act="drunk-escort" data-k="${esc(d.key)}">Send Security</button>` : ''}<button class="btn primary" data-act="drunk-deny" data-k="${esc(d.key)}">Deny boarding</button></div></div>`, { cls: 'drunk-pop' });
   } catch (e) { /* asked later */ }
 }
 function drunkDecide(key: string, how: 'allow' | 'deny', crew?: boolean) {
@@ -57,7 +58,7 @@ function drunkDecide(key: string, how: 'allow' | 'deny', crew?: boolean) {
       : `You refused ${d.name} on ${d.callsign} to ${dest}: too drunk to fly (about ${d.bac.toFixed(1)} per mille). The seat flies empty.`, time: 'Now', read: false } as any);
   } else {
     // letting a drunk passenger fly: the other passengers notice, and so does word of mouth
-    try { const co: any = company(); if (co) co.reputation = clamp(Math.round(((co.reputation || 50) - (d.bac >= 1.5 ? 1.5 : 0.8)) * 10) / 10, 0, 100); } catch (e) { /* as it was */ }
+    try { Progress.popularity(-(d.bac >= 1.5 ? 1.5 : 0.8), `${d.name} flew drunk on ${d.callsign}`); } catch (e) { const co: any = company(); if (co) co.reputation = clamp(Math.round(((co.reputation || 50) - (d.bac >= 1.5 ? 1.5 : 0.8)) * 10) / 10, 0, 100); }
     State.notices.unshift({ id: uid(), kind: 'flight', title: `${d.name} may board`, body: `${d.name} boards ${d.callsign} to ${dest}. The cabin crew will keep an eye on them and serve no more alcohol on board; the other passengers notice (your popularity drops a little).`, time: 'Now', read: false } as any);
   }
   try { Store.soon(); renderTopbar(); } catch (e) { /* later */ }

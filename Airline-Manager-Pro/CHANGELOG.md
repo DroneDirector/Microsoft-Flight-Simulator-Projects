@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.152
+- Security officers: hiring, gate checks, Send Security for drunk passengers (seen in the lounge), overnight guarding, reports, training, a pause switch.
+
 ## 0.9.151
 - Lounge guests drink at the bar (paid into your balance); drunk passengers reported to you or refused by the crew; spirits stock in storage.
 

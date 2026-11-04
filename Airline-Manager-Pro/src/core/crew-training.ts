@@ -4,7 +4,7 @@
 // meanwhile the person doesn't work and sits in the Training room (the Academy) in the staff corridor. A finished
 // course is on the person's record and lifts their rating a little.
 
-interface CrewCourse { id: string; who: 'pilot' | 'fa' | 'mech' | 'ground'; name: string; price: number; days: number; what: string; rating: number }
+interface CrewCourse { id: string; who: 'pilot' | 'fa' | 'mech' | 'ground' | 'security'; name: string; price: number; days: number; what: string; rating: number }
 const CREW_COURSES: CrewCourse[] = [
   // pilots (the type ratings are in each pilot's own details)
   { id: 'crm', who: 'pilot', name: 'Crew resource management (recurrent)', price: 600, days: 1, rating: 0.1, what: 'Working as a crew: communication, workload, decisions, threat and error management.' },
@@ -32,17 +32,23 @@ const CREW_COURSES: CrewCourse[] = [
   { id: 'deice', who: 'ground', name: 'De-icing and anti-icing (level 1)', price: 600, days: 1, rating: 0.1, what: 'Fluids, hold-over times, the de-icing truck and the critical surfaces.' },
   { id: 'dg-gnd', who: 'ground', name: 'Dangerous goods for ground staff', price: 200, days: 1, rating: 0.05, what: 'Labels, the loading rules and what to do with a damaged package.' },
   { id: 'load', who: 'ground', name: 'Load control and loadsheets', price: 1800, days: 3, rating: 0.25, what: 'Mass and balance, the load plan and the loadsheet: trim, limits and last-minute changes.' },
+  // security officers
+  { id: 'sec-initial', who: 'security', name: 'Aviation security officer (initial)', price: 1200, days: 3, rating: 0.25, what: 'Screening passengers and bags, prohibited items, the rules and the law, searching people respectfully.' },
+  { id: 'sec-xray', who: 'security', name: 'X-ray image interpretation', price: 450, days: 1, rating: 0.15, what: 'Reading the x-ray: weapons, explosives and what hides them in a bag.' },
+  { id: 'sec-conflict', who: 'security', name: 'Conflict management and restraint', price: 350, days: 1, rating: 0.15, what: 'Calming a drunk or angry passenger, and safe, lawful restraint when there is no other way.' },
+  { id: 'sec-aware', who: 'security', name: 'Security awareness (recurrent)', price: 170, days: 1, rating: 0.05, what: 'The year\'s threats and rule changes, insider risks and reporting.' },
   { id: 'gnd-fire', who: 'ground', name: 'Elementary fire fighting', price: 150, days: 1, rating: 0.05, what: 'Fires on the ramp: extinguishers, fuel spills and calling the fire service.' },
 ];
-const CREW_COURSE_GROUPS: [string, string][] = [['pilot', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground staff']];
+const CREW_COURSE_GROUPS: [string, string][] = [['pilot', 'Pilots'], ['fa', 'Cabin crew'], ['mech', 'Mechanics'], ['ground', 'Ground staff'], ['security', 'Security']];
 
 /** Which section a person belongs to. */
-function courseGroupOf(p: any): string { return p && (p.role === 'fa' || p.role === 'mech' || p.role === 'ground') ? p.role : 'pilot'; }
+function courseGroupOf(p: any): string { return p && p.job === 'security' ? 'security' : p && (p.role === 'fa' || p.role === 'mech' || p.role === 'ground') ? p.role : 'pilot'; }
 /** The people of a section in your airline. */
 function courseCandidates(who: string): any[] {
   const c = company(); if (!c) return [];
   if (who === 'pilot') return (State.pilots as any[]).filter((p: any) => !p.you && pilotCompany(p) === c.id);
-  return staffOf(c.id, who as any);
+  if (who === 'security') return staffOf(c.id, 'ground').filter((p: any) => p.job === 'security');
+  return staffOf(c.id, who as any).filter((p: any) => who !== 'ground' || p.job !== 'security');
 }
 /** Is the person on a course now (any course, or a type rating)? */
 function onCourse(p: any): boolean { return !!p && p.status === 'training'; }

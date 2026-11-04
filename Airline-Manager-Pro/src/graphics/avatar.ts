@@ -44,7 +44,8 @@ function shade(hex: string, f: number): string {
 /** Make sure a look is complete and dressed, whatever was stored. */
 function dressed(l: Look, role: CrewRole): Look {
   const d: Look = Object.assign(defaultLook(l && l.sex || 'm', role), l || {});
-  if ((role === 'mech' || role === 'ground')) { d.top = 'overalls'; d.bottom = 'trousers'; if (d.hat === 'pillbox') d.hat = 'none'; }
+  if ((d as any).sec && role === 'ground') { d.top = 'jacket'; d.bottom = 'trousers'; d.neck = 'tie'; if (d.hat === 'pillbox') d.hat = 'none'; }   // security officers: a dark jacket and tie, not overalls
+  else if ((role === 'mech' || role === 'ground')) { d.top = 'overalls'; d.bottom = 'trousers'; if (d.hat === 'pillbox') d.hat = 'none'; }
   if ((role === 'captain' || role === 'fo') && d.hat === 'pillbox') d.hat = 'cap';
   if (d.top === 'overalls') d.bottom = 'trousers';
   if (!d.top) d.top = 'jacket';
