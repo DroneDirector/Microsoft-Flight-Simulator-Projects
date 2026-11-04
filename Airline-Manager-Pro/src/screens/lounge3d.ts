@@ -577,7 +577,7 @@ function lgAimedObj(e?: PointerEvent): any {
   const R = LoungeRoom, T = THREE, rc = new T.Raycaster();
   if (e && !aimLocked()) { const r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect(); rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam); }
   else rc.setFromCamera(new T.Vector2(0, 0), R.cam);
-  const hs = R.A ? rc.intersectObjects(R.A.hits, false).filter((x: any) => x.object.userData.act !== 'surface' || lgHeldCup()) : [], h = hs[0] || null; R.aimPoint = h ? h.point : null; return h && h.distance < 3.2 ? h.object : null;
+  const hs = R.A ? rc.intersectObjects(R.A.hits, false).filter((x: any) => x.object.userData.act !== 'surface' || lgHeldCup()) : [], h = hs.filter((x: any) => x.object.userData.act === 'cup' && x.distance < 3.2)[0] || hs[0] || null; R.aimPoint = h ? h.point : null; return h && h.distance < 3.2 ? h.object : null;
 }
 function lgClickAt(e?: PointerEvent) {
   const R = LoungeRoom; if (R.loading) return; const o = lgAimedObj(e), a = o ? o.userData.act : '';

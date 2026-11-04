@@ -71,7 +71,7 @@ function v3dSeaPlane(x0: number, z0: number, x1: number, z1: number) {
   const VT: any = V3dTerrain;
   if (VT.seaPlane) { V3d.scene.remove(VT.seaPlane); VT.seaPlane.geometry.dispose(); }
   const m = new T.Mesh(geo, v3dGroundMat(one(4, 11, 22), one(255, 255, 255))); m.renderOrder = -30; m.frustumCulled = false;
-  VT.seaPlane = m; V3d.scene.add(m);
+  VT.seaPlane = m; V3d.scene.add(m); if (VT.old) m.visible = false;   // shown with the rest of the new ground
 }
 function v3dSatQ(): number { const v = (State.settings as any).v3dSatQ; return v == null ? 1 : clamp(Math.round(+v), 0, 3); }
 
@@ -87,24 +87,67 @@ function v3dRange(lat?: number): { rings: number[]; fog: number[]; far: number }
 /** How far below the flat plane the ground lies at a distance (m), from the earth's curvature. */
 function v3dCurve(x: number, z: number): number { return (x * x + z * z) / (2 * EARTH_R); }
 
+/** Free a ground mesh: its shape, its material and every picture the material uses. */
+function v3dFreeMesh(m: any) {
+  try {
+    m.geometry.dispose(); const mt: any = m.material; if (!mt) return;
+    for (const k in mt) if (mt[k] && mt[k].isTexture) mt[k].dispose();
+    if (mt.uniforms) for (const k in mt.uniforms) { const v = mt.uniforms[k] && mt.uniforms[k].value; if (v && v.isTexture) v.dispose(); }
+    mt.dispose();
+  } catch (e) { /* gone */ }
+}
 const V3dTerrain = {
   rings: [] as V3dRing[], done: false, gen: 0, origin: null as number[], prog: { got: 0, want: 1, sat: 0 } as any, _satBusy: false, _satQ: [] as V3dRing[],
 
   /** Load the rings around a point (the view's origin), finest first, so the near ground shows quickly. */
   load(centre: number[]) {
     const gen = ++this.gen;
-    this.clear(); this.origin = centre.slice();
+    // moving the view's centre (flying on, or arriving at an airport): the ground already there stays on screen,
+    // moved to the new centre, while the new ground loads unseen; the new comes in all at once when it is complete
+    // (with its satellite pictures), so nothing disappears and pops back
+    if (this.rings.length && this.origin) this.retire(); else this.clear();
+    this.origin = centre.slice();
     const zs = v3dRange(centre[1]).rings;
     this.prog = { got: 0, want: 27 + (V3d.icao ? 1 : 0), sat: 0 }; this._satQ = []; this._satBusy = false;
     let prev: V3dRing = null; this.done = false;
     const next = (i: number) => {
       if (gen !== this.gen || !V3d.open) return;
-      if (i >= zs.length) { this.done = true; return; }   // every ring within the view distance is in
-      this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; if (this.rings.length === 1 && (V3d as any).lastL && V3d.icao && (V3d as any).lastL.icao === V3d.icao) { try { v3dBuildAirport((V3d as any).lastL); } catch (e) { /* ignore */ } } } setTimeout(() => next(i + 1), V3d.loaded ? 30 : 90); });
+      if (i >= zs.length) { this.done = true; if (this.old) this.swapIn(gen); return; }   // every ring within the view distance is in
+      this.loadRing(zs[i], centre, prev, gen).then(r => { if (r) { this.rings.push(r); prev = r; if (this.old && r.mesh) r.mesh.visible = false; if (this.rings.length === 1 && (V3d as any).lastL && V3d.icao && (V3d as any).lastL.icao === V3d.icao) { try { v3dBuildAirport((V3d as any).lastL); } catch (e) { /* ignore */ } } } setTimeout(() => next(i + 1), V3d.loaded ? 30 : 90); });
     };
     next(0);
   },
+  /** The ground on screen, kept until the new ground is ready: moved and tilted to sit right around the new centre. */
+  old: null as any[],
+  retire() {
+    const VT: any = this, pending = !!this.old;
+    // still waiting for a swap: the ground that never showed is let go, the ground on screen stays and moves again
+    const keep: any[] = (this.old || []).slice();
+    const place = (m: any, o: number[]) => { const q = v3dXY(o[0], o[1]), dx = q[0], dz = q[1]; m.position.set(dx, -(dx * dx + dz * dz) / (2 * EARTH_R), dz); m.rotation.set(dz / EARTH_R, 0, -dx / EARTH_R); m.updateMatrixWorld(true); };
+    if (pending) { for (const r of this.rings) if (r.mesh) { V3d.scene.remove(r.mesh); v3dFreeMesh(r.mesh); } if (VT.seaPlane) { V3d.scene.remove(VT.seaPlane); v3dFreeMesh(VT.seaPlane); } }
+    else {
+      for (const r of this.rings) if (r.mesh) { r.mesh.userData.o0 = this.origin.slice(); keep.push(r.mesh); }
+      if (VT.seaPlane) { VT.seaPlane.userData.o0 = this.origin.slice(); keep.push(VT.seaPlane); }
+    }
+    for (const m of keep) place(m, m.userData.o0);
+    VT.seaPlane = null; VT.seaSpan = 0; this.rings = []; this.old = keep;
+  },
+  /** The new ground is complete: shown, and the old taken away, in the same frame (waiting for the satellite
+   *  pictures when they are on, at most 20 seconds). */
+  swapIn(gen: number) {
+    const t0 = performance.now(), sat = !!(State.settings as any).v3dSat;
+    const tick = () => {
+      if (gen !== this.gen || !V3d.open) return;
+      if (sat && performance.now() - t0 < 20000 && this.rings.some(r => r.mesh && !r.satTex)) { setTimeout(tick, 250); return; }
+      for (const r of this.rings) if (r.mesh) r.mesh.visible = true;
+      const VT: any = this; if (VT.seaPlane) VT.seaPlane.visible = true;
+      this.dropOld();
+    };
+    tick();
+  },
+  dropOld() { for (const m of this.old || []) { V3d.scene.remove(m); v3dFreeMesh(m); } this.old = null; },
   clear() {
+    this.dropOld();
     { const VT: any = V3dTerrain; if (VT.seaPlane) { V3d.scene.remove(VT.seaPlane); VT.seaPlane.geometry.dispose(); VT.seaPlane = null; VT.seaSpan = 0; } }
     for (const r of this.rings) { if (r.mesh) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } if (r.mapTex) r.mapTex.dispose(); if (r.satTex) r.satTex.dispose(); const R: any = r; if (R.wetTex) R.wetTex.dispose(); if (R.cityTex) R.cityTex.dispose(); if (r.mesh && r.mesh.material) r.mesh.material.dispose(); }
     this.rings = [];

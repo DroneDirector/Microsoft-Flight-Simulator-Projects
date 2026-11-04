@@ -315,7 +315,12 @@ function v3dCloudsStep(now: number) {
   const cam = V3d.cam.position, detail = cloudDetail();
   const ll = v3dLonLat(cam.x, cam.z);
   v3dCloudFetch(ll[0], ll[1], km);
-  const key = V3d.origin.join(',') + '|' + km + '|' + detail;
+  // the view's centre moved (flying on): the clouds stay where they are in the world, only their place in the scene
+  // is worked out again, so nothing disappears or pops in; later changes fade in and out as usual
+  const oKey = V3d.origin.join(',');
+  if (V3dClouds.oKey && V3dClouds.oKey !== oKey && V3dClouds.list.length) v3dCloudReplace();
+  V3dClouds.oKey = oKey;
+  const key = km + '|' + detail;
   if (!V3dClouds.mesh || V3dClouds.mesh.parent !== V3d.scene) { V3dClouds.mesh = v3dCloudMesh(12000); V3d.scene.add(V3dClouds.mesh); V3dClouds.key = ''; V3dClouds.list = []; V3dClouds.built = false; }
   const M: any = V3dClouds.mesh, t = cloudClock();
   M.visible = V3d.mode !== 'cabin'; M.material.uniforms.uTime.value = t;
@@ -323,8 +328,8 @@ function v3dCloudsStep(now: number) {
     // a different place or different settings: start over without fading; otherwise the changes fade
     const restart = !!V3dClouds.key && V3dClouds.key !== key;
     if (restart) { V3dClouds.list = []; V3dClouds.built = false; }
-    V3dClouds.key = key; V3dClouds.at = now; V3dClouds.cx = cam.x; V3dClouds.cz = cam.z;
-    v3dCloudMerge(v3dCloudBuild(cam.x, cam.z, km, detail));
+    V3dClouds.key = key; V3dClouds.at = now; V3dClouds.cx = cam.x; V3dClouds.cz = cam.z; V3dClouds.cll = v3dLonLat(cam.x, cam.z);
+    v3dCloudMerge(v3dCloudBuild(cam.x, cam.z, km, detail).map(p => { const P: any = p, q = v3dLonLat(p.x, p.z); P.lon = q[0]; P.lat = q[1]; P.cv = v3dCurve(p.x, p.z); return p; }));
     V3dClouds.sx = 1e9;   // sort and upload now
     M.material.uniforms.uFar.value = km * 1000; M.material.uniforms.uDetail.value = detail >= 2 ? 1 : 0;
   }
@@ -349,7 +354,17 @@ function v3dCloudsStep(now: number) {
     for (const k of ['iOff', 'iData', 'iDir', 'iFade']) g.attributes[k].needsUpdate = true;
   }
 }
-function v3dCloudsClear() { V3dClouds.mesh = null; V3dClouds.key = ''; V3dClouds.list = []; V3dClouds.built = false; }
+/** After the view's centre moved: every cloud to where its place in the world now is in the scene (the earth's curve too). */
+function v3dCloudReplace() {
+  for (const p of V3dClouds.list as any[]) {
+    if (p.lon == null) continue;
+    const q = v3dXY(p.lon, p.lat), cv = v3dCurve(q[0], q[1]);
+    p.y += (p.cv || 0) - cv; p.x = q[0]; p.z = q[1]; p.cv = cv;
+  }
+  if (V3dClouds.cll) { const q = v3dXY(V3dClouds.cll[0], V3dClouds.cll[1]); V3dClouds.cx = q[0]; V3dClouds.cz = q[1]; }
+  V3dClouds.sx = 1e9;   // sorted and sent to the graphics card again
+}
+function v3dCloudsClear() { V3dClouds.oKey = ''; V3dClouds.mesh = null; V3dClouds.key = ''; V3dClouds.list = []; V3dClouds.built = false; }
 
 /* ---------- the map: see-through layers ---------- */
 

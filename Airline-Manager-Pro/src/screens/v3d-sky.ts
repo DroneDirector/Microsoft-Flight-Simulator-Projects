@@ -59,14 +59,17 @@ vec3 skyCol(vec3 d) {
   float h = max(d.y, 0.0);
   vec3 zen = mix(vec3(0.006, 0.010, 0.026), vec3(0.17, 0.36, 0.74), uDay);
   vec3 hor = mix(vec3(0.022, 0.032, 0.058), vec3(0.64, 0.76, 0.90), uDay);
-  float tw = clamp(1.0 - abs(uSunAlt + 0.02) * 6.0, 0.0, 1.0);
+  // sunrise and sunset: a deep orange band towards the sun, a soft pink belt opposite, a richer violet-blue overhead
+  float tw = clamp(1.0 - abs(uSunAlt + 0.02) * 4.6, 0.0, 1.0);
   vec2 dh = normalize(d.xz + 1e-5), sh = normalize(uSun.xz + 1e-5);
-  float toward = pow(dot(dh, sh) * 0.5 + 0.5, 2.5);
-  hor = mix(hor, vec3(1.0, 0.46, 0.18) * (0.3 + 0.7 * uDay), tw * (0.25 + 0.75 * toward) * 0.8);
-  zen = mix(zen, zen * vec3(0.8, 0.75, 1.1), tw * 0.5);
+  float toward = pow(dot(dh, sh) * 0.5 + 0.5, 2.5), away = pow(0.5 - dot(dh, sh) * 0.5, 2.0);
+  hor = mix(hor, mix(vec3(1.0, 0.40, 0.12), vec3(1.0, 0.55, 0.22), h * 3.0) * (0.3 + 0.7 * uDay), tw * (0.28 + 0.72 * toward) * 0.88);
+  hor = mix(hor, vec3(0.80, 0.50, 0.62) * (0.25 + 0.75 * uDay), tw * away * 0.32 * smoothstep(-0.03, 0.04, uSunAlt));
+  zen = mix(zen, zen * vec3(0.85, 0.7, 1.18), tw * 0.55);
   vec3 c = mix(hor, zen, pow(h, 0.42));
   float sd = max(dot(d, uSun), 0.0);
-  c += vec3(1.0, 0.82, 0.58) * (pow(sd, 700.0) * 1.2 + pow(sd, 14.0) * 0.16 + pow(sd, 3.0) * 0.05 * tw) * smoothstep(-0.06, 0.03, uSunAlt);
+  c += vec3(1.0, 0.82, 0.58) * (pow(sd, 700.0) * 1.2 + pow(sd, 14.0) * 0.16 + pow(sd, 3.0) * 0.06 * tw) * smoothstep(-0.06, 0.03, uSunAlt);
+  c += vec3(1.0, 0.5, 0.2) * pow(sd, 6.0) * 0.14 * tw * smoothstep(-0.08, 0.02, uSunAlt);   // the warm glow round a low sun
   c += vec3(0.55, 0.6, 0.72) * pow(max(dot(d, uMoon), 0.0), 260.0) * 0.12 * uMoonK;
   float g = dot(c, vec3(0.33));
   c = mix(c, vec3(g) * 0.82, uCloud * 0.6);
@@ -107,10 +110,12 @@ function skyColJs(d: number[], u: any): number[] {
   const mix = (a: number[], b: number[], t: number) => a.map((v, i) => v + (b[i] - v) * t);
   const h = Math.max(d[1], 0), day = u.uDay.value, sa = u.uSunAlt.value, S = u.uSun.value;
   let zen = mix([0.006, 0.010, 0.026], [0.17, 0.36, 0.74], day), hor = mix([0.022, 0.032, 0.058], [0.64, 0.76, 0.90], day);
-  const tw = clamp(1 - Math.abs(sa + 0.02) * 6, 0, 1);
-  const dl = Math.hypot(d[0], d[2]) || 1, sl = Math.hypot(S.x, S.z) || 1, toward = Math.pow(((d[0] * S.x + d[2] * S.z) / dl / sl) * 0.5 + 0.5, 2.5);
-  hor = mix(hor, [1.0, 0.46, 0.18].map(v => v * (0.3 + 0.7 * day)), tw * (0.25 + 0.75 * toward) * 0.8);
-  zen = mix(zen, [zen[0] * 0.8, zen[1] * 0.75, zen[2] * 1.1], tw * 0.5);
+  const tw = clamp(1 - Math.abs(sa + 0.02) * 4.6, 0, 1);
+  const dl = Math.hypot(d[0], d[2]) || 1, sl = Math.hypot(S.x, S.z) || 1, cs = (d[0] * S.x + d[2] * S.z) / dl / sl, toward = Math.pow(cs * 0.5 + 0.5, 2.5), away = Math.pow(0.5 - cs * 0.5, 2);
+  const band = mix([1.0, 0.40, 0.12], [1.0, 0.55, 0.22], clamp(h * 3, 0, 1));
+  hor = mix(hor, band.map(v => v * (0.3 + 0.7 * day)), tw * (0.28 + 0.72 * toward) * 0.88);
+  hor = mix(hor, [0.80, 0.50, 0.62].map(v => v * (0.25 + 0.75 * day)), tw * away * 0.32 * clamp((sa + 0.03) / 0.07, 0, 1));
+  zen = mix(zen, [zen[0] * 0.85, zen[1] * 0.7, zen[2] * 1.18], tw * 0.55);
   let c = mix(hor, zen, Math.pow(h, 0.42));
   const g = (c[0] + c[1] + c[2]) * 0.33; c = mix(c, [g * 0.82, g * 0.82, g * 0.82], u.uCloud.value * 0.6);
   return c;
@@ -456,13 +461,13 @@ function v3dSkyStep(now: number) {
   U.uMoonVis.value = moonUp * A.illum * (1 - sstep(-6, 4, sunAlt)) * (1 - 0.8 * A.wx.cloud) * 0.6;
   U.uNight.value = 1 - sstep(-14, -3, sunAlt);
   // the sun's colour: white high up, gold and then red near the horizon
-  const ts = sstep(0, 22, sunAlt), sunCol = [1, 0.45 + 0.53 * ts, 0.18 + 0.74 * ts];
+  const ts = sstep(0, 24, sunAlt), sunCol = [1, 0.38 + 0.6 * ts, 0.12 + 0.8 * ts];   // white high up; gold, then a deep orange-red near the horizon
   U.uSunCol.value.setRGB(sunCol[0], sunCol[1], sunCol[2], T.SRGBColorSpace);
   // the light on everything: daylight, warm at sunset, blue-grey moonlight at night
   const day = sstep(-7, 14, sunAlt) * (1 - 0.32 * A.wx.cloud), moon = U.uMoonK.value * 0.09, amb = 0.055 + day * 0.945 + moon;
-  const warm = sstep(-6, 0, sunAlt) * (1 - sstep(2, 9, sunAlt)) * (1 - A.wx.cloud * 0.7);   // golden light only with the sun low
-  const nightTint = [0.62, 0.7, 0.95], dayTint = [1, 1, 1], warmTint = [1, 0.8, 0.62];
-  const tint = [0, 1, 2].map(i => (nightTint[i] + (dayTint[i] - nightTint[i]) * sstep(-6, 6, sunAlt)) * (1 - warm * 0.6) + warmTint[i] * warm * 0.6);
+  const warm = sstep(-6, 0, sunAlt) * (1 - sstep(3, 12, sunAlt)) * (1 - A.wx.cloud * 0.7);   // golden light while the sun is low (a little longer and warmer than before)
+  const nightTint = [0.62, 0.7, 0.95], dayTint = [1, 1, 1], warmTint = [1, 0.72, 0.5];
+  const tint = [0, 1, 2].map(i => (nightTint[i] + (dayTint[i] - nightTint[i]) * sstep(-6, 6, sunAlt)) * (1 - warm * 0.68) + warmTint[i] * warm * 0.68);
   V3dSky.amb = amb; V3dSky.tint = tint;
   U.uAmb.value = amb * amb;   // as linear light
   U.uLightsOn.value = 1 - sstep(-2, 5, sunAlt) * (1 - A.wx.cloud * 0.6);
@@ -514,7 +519,7 @@ function v3dSkyStep(now: number) {
   try {
     const C: any = V3dClouds.mesh; if (C) {
       const k = 0.08 + 0.92 * sstep(-8, 10, sunAlt) + U.uMoonK.value * 0.08;
-      C.material.uniforms.uLight.value.setRGB(0.97 * k * (tint[0] * 0.7 + 0.3), 0.98 * k * (tint[1] * 0.7 + 0.3), k * (tint[2] * 0.7 + 0.3));
+      C.material.uniforms.uLight.value.setRGB(0.97 * k * (tint[0] * 0.85 + 0.15), 0.98 * k * (tint[1] * 0.85 + 0.15), k * (tint[2] * 0.85 + 0.15));   // lit clouds take the sunset's colour
       C.material.uniforms.uDark.value.setRGB(0.5 * k * tint[0], 0.55 * k * tint[1], 0.63 * k * tint[2]);
       const useSun = sunAlt > -4 || !(moonUp > 0), v = useSun ? A.sv : A.mv;
       C.material.uniforms.uSun.value.set(v[0], Math.max(0.03, v[1]), v[2]).normalize();
