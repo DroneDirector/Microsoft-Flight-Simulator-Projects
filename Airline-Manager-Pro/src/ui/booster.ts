@@ -19,7 +19,7 @@ function boosterSync(): Promise<any> {
   try {
     if (typeof DESKTOP !== 'undefined' && DESKTOP) { Desk.save({ boost: gameBoost() }); return Promise.resolve({ pc: true }); }
     const t = appTools(); if (!t || !t.display) return Promise.resolve(null);
-    return t.display({ fullScreen: fullScreenOn(), boost: gameBoost() }).then((r: any) => { (window as any).__boostInfo = r; return r; }).catch(() => null);
+    return t.display({ fullScreen: fullScreenOn(), boost: gameBoost(), gameLock: (State.settings as any).gameLock === true }).then((r: any) => { (window as any).__boostInfo = r; return r; }).catch(() => null);
   } catch (e) { return Promise.resolve(null); }
 }
 /** Memory the app can give back at once: pictures and caches that are made again when needed. */
@@ -35,6 +35,7 @@ ACTIONS['boost-toggle'] = () => {
   const el = document.querySelector('.boost-hero'); if (el) { el.classList.toggle('on', !!S.gameBoost); if (S.gameBoost) { el.classList.remove('surge'); void (el as HTMLElement).offsetWidth; el.classList.add('surge'); } }
   boostAnim();
 };
+ACTIONS['gamelock-toggle'] = () => { const S: any = State.settings; S.gameLock = S.gameLock !== true; Store.save(); Sound.tick(); boosterSync(); rerenderSettingsBody(); if (S.gameLock) toast('Android asks once to pin the app: confirm it. To leave, hold Back and Recents, or swipe up and hold', 'info'); };
 ACTIONS['fullscreen-toggle'] = () => { const S: any = State.settings; S.fullScreen = S.fullScreen === false; Store.save(); Sound.tick(); boosterSync(); rerenderSettingsBody(); };
 
 /** The Game Booster page: an engine core that spins up, speed lines, a surge of sparks and a gauge filling to full. */
