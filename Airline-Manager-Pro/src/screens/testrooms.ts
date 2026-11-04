@@ -292,7 +292,7 @@ function trReady() {
 }
 function trFrame() {
   const R = TestRooms, T = THREE, now = (performance.now() - R.t0) / 1000, raw = Math.max(0, now - (R.last || now)), dt = Math.min(0.05, raw); R.last = now;
-  if (R.stress) { try { petStep(R.of, now, dt); } catch (e) { /* no pet */ } for (const D of R.doors) D.set(D.k0); gfxStressFrame(raw); if (R.stress) R.ren.render(R.scene, R.cam); return; }
+  if (R.stress) { const c0 = performance.now(); try { petStep(R.of, now, dt); } catch (e) { /* no pet */ } for (const D of R.doors) D.set(D.k0); gfxStressFrame(raw); if (R.stress) { R.stress.frameCpu = performance.now() - c0; gfxStressDraw(() => R.ren.render(R.scene, R.cam)); } return; }
   if (R.in && R.in !== 'halls') { trRoomFrame(dt); return; }
   try { if (R.of) petStep(R.of, now, dt); } catch (e) { /* no pet */ }
   for (const D of R.doors) if (D.k0 !== D.to) { D.k0 += Math.sign(D.to - D.k0) * Math.min(Math.abs(D.to - D.k0), dt * (D.slide ? 1.6 : 1.4)); const e = D.k0 * D.k0 * (3 - 2 * D.k0); D.set(e); }

@@ -42,9 +42,10 @@ function gfxRecommend(s: DevSpec): { preset: string; why: string } {
   const tier = gfxGpuTier(s.gpu + ' ' + s.name, s.pc), gb = s.ramMb / 1024, px = s.w * s.h * s.dpr * s.dpr;
   let p = 0;   // 0 low … 3 ultra
   if (s.pc) p = tier >= 3 && gb >= 15 ? 3 : tier >= 2 ? 2 : tier >= 1 && gb >= 8 ? 1 : 0;
-  else p = tier >= 3 && gb >= 7 ? 2 : tier >= 2 && gb >= 5.5 ? 2 : tier >= 1 && gb >= 3.5 ? 1 : 0;
-  if (px > 3.6e6 && tier <= 1 && p > 0) p--;   // a very sharp screen with a modest chip: one step lighter
+  else p = tier >= 3 && gb >= 7 ? 2 : tier >= 2 && gb >= 5.5 ? 2 : (tier >= 1 && gb >= 3.5) || gb >= 5.5 ? 1 : 0;
+  if (px > 3.6e6 && tier <= 1 && p > 1) p--;   // a very sharp screen with a modest chip: one step lighter (never below Medium for that alone)
   if (gb && gb < 3 && p > 0) p = 0;
+  if (!s.pc && gb >= 5.5 && p < 1) p = 1;   // 6 GB and more: at least Medium
   const names = ['low', 'medium', 'high', 'ultra'];
   const why = [tier >= 3 ? 'a very strong graphics chip' : tier >= 2 ? 'a strong graphics chip' : tier >= 1 ? 'a mid-range graphics chip' : 'a modest graphics chip', gb ? `${Math.round(gb)} GB of memory` : '', px > 3.6e6 ? 'a very sharp screen' : ''].filter(Boolean).join(', ');
   return { preset: names[p], why };
@@ -99,10 +100,11 @@ const GFX_STRESS_STAGES: { name: string; pr: number; shadow: number; extra: numb
 function gfxStressStart() {
   const R = TestRooms; if (!R.on) return;
   for (const D of R.doors) { D.to = 1; D.k0 = 1; D.set(1); }
-  const el = document.createElement('div'); el.className = 'gs-hud'; el.innerHTML = `<b>Stress test</b><span class="gs-st">Getting ready…</span><i class="gs-bar"><i></i></i><button class="btn ghost sm" data-gs="stop">${icon('close')}Stop</button>`;
+  const el = document.createElement('div'); el.className = 'gs-hud'; el.innerHTML = `<div class="gs-row"><b>Stress test</b><span class="gs-st">Getting ready…</span><i class="gs-bar"><i></i></i><button class="btn ghost sm" data-gs="stop">${icon('close')}Stop</button></div>
+    <div class="gs-graph"><canvas width="560" height="150"></canvas><div class="gs-keys"><span class="k-f"><i></i>Frames a second <b class="gs-fps">–</b></span><span class="k-c"><i></i>Processor <b class="gs-cpu">–</b></span><span class="k-g"><i></i>Graphics <b class="gs-gpu">–</b></span></div></div>`;
   R.root.appendChild(el); el.addEventListener('click', e => { if ((e.target as HTMLElement).closest('[data-gs="stop"]')) gfxStressEnd(true); });
   for (const s of ['.tr-go', '.walk-pad', '.tr-hint']) { const x = R.root.querySelector(s) as HTMLElement; if (x) x.style.display = 'none'; }
-  R.stress = { i: -1, t: 0, frames: [], results: [], extras: [], hz: GfxAdvice.spec ? GfxAdvice.spec.hz : 60, path: 0, hud: el, dpr: window.devicePixelRatio || 1 };
+  R.stress = { i: -1, t: 0, frames: [], results: [], extras: [], hz: GfxAdvice.spec ? GfxAdvice.spec.hz : 60, path: 0, hud: el, dpr: window.devicePixelRatio || 1, hist: [] as number[][], gq: gfxGpuTimer(R.ren) };
   gfxStressNext();
 }
 function gfxStressNext() {
@@ -136,34 +138,85 @@ function gfxStressFrame(dt: number) {
   const a2 = P[s2], b2 = P[s2 + 1] || P[0], f2 = clamp((ahead - L2) / Math.max(0.01, lens[s2] || 1), 0, 1), lx = a2[0] + (b2[0] - a2[0]) * f2, lz = a2[1] + (b2[1] - a2[1]) * f2;
   R.cam.position.set(x, 1.64, z); R.cam.lookAt(new T.Vector3(lx, 1.5, lz));
   // the frame times: the first second of a stage is skipped (shaders and shadow maps being made)
+  gfxStressGraph(S, dt);
   S.t += Math.min(dt, 0.25); S.n = (S.n || 0) + 1; if (S.t > 1.2 && S.n > 20) S.frames.push(Math.min(dt * 1000, 250));   // a one-off pause (a shader being made) is not the device's speed
   const bad = S.frames.length >= 12 && S.frames.slice(-12).reduce((p: number, q: number) => p + q, 0) / 12 > 75;   // slower than ~13 frames a second: stop now
   if ((S.t > 4.5 && S.frames.length >= 20) || bad || S.t > 30) {
     const fr = S.frames.slice().sort((p: number, q: number) => p - q), avg = fr.length ? fr.reduce((p: number, q: number) => p + q, 0) / fr.length : 999, p95 = fr.length ? fr[Math.floor(fr.length * 0.95)] : 999;
-    const fps = 1000 / avg; S.results.push({ stage: S.i, name: GFX_STRESS_STAGES[S.i].name, fps: Math.round(fps), p95: Math.round(p95) });
+    const fps = 1000 / avg, cpu = S.cpuN ? S.cpuSum / S.cpuN : 0, gpu = S.gpuN ? S.gpuSum / S.gpuN : 0; S.cpuSum = S.cpuN = S.gpuSum = S.gpuN = 0;
+    S.results.push({ stage: S.i, name: GFX_STRESS_STAGES[S.i].name, fps: Math.round(fps), p95: Math.round(p95), cpu: Math.round(cpu), gpu: Math.round(gpu) });
     // close to the limit: stop here, nothing further
-    if (bad || fps < 24 || p95 > 66) { gfxStressEnd(false); return; }
+    if (bad || fps < 18 || p95 > 90) { gfxStressEnd(false); return; }
     gfxStressNext();
   }
 }
 function gfxStressEnd(stopped: boolean) {
   const R = TestRooms, S = R.stress; if (!S) return; R.stress = null;
-  const res = S.results as any[], hz = Math.max(30, S.hz || 60), smooth = Math.min(hz, 60) * 0.92;
-  // the highest stage that stayed smooth decides the recommendation
-  let best = -1; for (const r of res) if (r.fps >= smooth * 0.98 || (r.fps >= 50 && r.p95 <= 26)) best = Math.max(best, r.stage);
-  let ok = -1; for (const r of res) if (r.fps >= 30) ok = Math.max(ok, r.stage);
-  const pc = !!DESKTOP, preset = best >= 6 ? (pc ? 'ultra' : 'high') : best >= 4 ? 'high' : best >= 2 ? 'medium' : 'low';
-  const rating = best >= 5 ? 'Excellent: it handled even the heaviest stages smoothly' : best >= 4 ? 'Very good: smooth with sharp pictures, shadows and busy rooms' : best >= 2 ? 'Good: smooth at normal sharpness with shadows' : best >= 1 ? 'Fair: smooth at normal sharpness without shadows' : 'Modest: the lightest settings keep it smooth';
+  const res = S.results as any[], hz = Math.max(30, S.hz || 60), pc = !!DESKTOP;
+  // smooth enough: on a PC about 50 frames a second; on phones and tablets 30 is how most games run, and fine
+  const need = pc ? Math.min(hz, 60) * 0.82 : 28;
+  let best = -1; for (const r of res) if (r.fps >= need && r.p95 <= (pc ? 34 : 60)) best = Math.max(best, r.stage);
+  let ok = -1; for (const r of res) if (r.fps >= 20) ok = Math.max(ok, r.stage);
+  const order = ['low', 'medium', 'high', 'ultra'];
+  let pi = best >= 6 ? (pc ? 3 : 2) : best >= 3 ? 2 : best >= 1 ? 1 : 0;
+  // never far below what this device is (a few slow moments shouldn't make a capable device Low)
+  const spec = GfxAdvice.spec ? order.indexOf(gfxRecommend(GfxAdvice.spec).preset) : 0;
+  pi = Math.max(pi, spec - 1, !pc && GfxAdvice.spec && GfxAdvice.spec.ramMb >= 5600 ? 1 : 0);
+  const preset = order[pi];
+  const rating = best >= 5 ? 'Excellent: it handled even the heaviest stages smoothly' : best >= 3 ? 'Very good: smooth with sharp pictures, shadows and busy rooms' : best >= 2 ? 'Good: smooth with shadows' : best >= 1 ? 'Good: smooth at normal sharpness' : ok >= 1 ? 'Fair: playable, with a few slower moments in the busiest places' : 'Modest: lighter settings keep it smooth';
   if (!stopped && res.length) { const Sx: any = State.settings; Sx.gfxStress = { at: Date.now(), preset, rating, best, results: res }; Store.save(); }
-  const rows = res.map(r => `<tr class="${r.stage <= best ? 'ok' : r.stage <= ok ? 'mid' : 'bad'}"><td>${esc(r.name)}</td><td>${r.fps} fps</td><td>${r.p95} ms</td></tr>`).join('');
+  const rows = res.map(r => `<tr class="${r.stage <= best ? 'ok' : r.stage <= ok ? 'mid' : 'bad'}"><td>${esc(r.name)}</td><td>${r.fps} fps</td><td>${r.p95} ms</td><td>${r.cpu} / ${r.gpu} ms</td></tr>`).join('');
   const s = GfxAdvice.spec as DevSpec;
   try { TestRooms.close(true); } catch (e) { /* closed */ }
   if (stopped && !res.length) return;
   const wrap = openLayer('modal', `<div class="modal-head"><div><h2>Stress test${stopped ? ' (stopped)' : ''}</h2><small>${s ? esc([s.name, s.gpu].filter(Boolean).join(' · ')) : ''}</small></div></div>
     <div class="gs-report"><p><b>${esc(rating)}.</b> It went through ${res.length} of ${GFX_STRESS_STAGES.length} stages${res.length < GFX_STRESS_STAGES.length && !stopped ? ' and stopped close to the limit of this device, as it should' : ''}. Screen: ${hz} Hz.</p>
-      <table class="gs-t"><tr><th>Stage</th><th>Average</th><th>Slowest frames</th></tr>${rows}</table>
+      <table class="gs-t"><tr><th>Stage</th><th>Average</th><th>Slowest frames</th><th>Processor / graphics</th></tr>${rows}</table>
       <p>Recommended: <b>${GFX_PRESET_LABEL[preset]}</b>.</p></div>
     <div class="modal-actions center"><button class="btn ghost" data-act="close-layer">Keep my settings</button><button class="btn primary" data-gs-apply="${preset}">${icon('check')}Change to recommended settings</button></div>`, { cls: 'narrow gs-layer' });
   const b = wrap && wrap.querySelector('[data-gs-apply]') as HTMLElement;
   if (b) b.addEventListener('click', () => { closeTop(); ACTIONS['gfx-rec-apply'](b, null as any); });
+}
+
+/** A timer on the graphics chip, where the device offers one (most PCs; few phones): how long it really took to draw. */
+function gfxGpuTimer(ren: any): any {
+  try { const gl = ren.getContext(), ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); return ext ? { gl, ext, q: null as any, pend: [] as any[] } : null; } catch (e) { return null; }
+}
+/** The live graph: frames a second, and how long the processor and the graphics chip take for each frame. The
+ *  processor's part is our own work for the frame; the graphics chip's is measured where the device can, otherwise
+ *  it is what is left of the frame (marked "about"). */
+function gfxStressGraph(S: any, dt: number) {
+  const R = TestRooms, frameMs = dt * 1000, cpu = S.lastCpu || 0;
+  let gpu = Math.max(0, frameMs - cpu), est = true;
+  const G = S.gq;
+  if (G) {
+    try {
+      const gl = G.gl, ext = G.ext;
+      // collect a finished query, then start the next around this frame's drawing
+      for (let i = G.pend.length - 1; i >= 0; i--) { const q = G.pend[i]; if (gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE) && !gl.getParameter(ext.GPU_DISJOINT_EXT)) { S.gpuReal = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; gl.deleteQuery(q); G.pend.splice(i, 1); } }
+      if (S.gpuReal != null) { gpu = S.gpuReal; est = false; }
+    } catch (e) { S.gq = null; }
+  }
+  if (S.t > 1.2) { S.cpuSum = (S.cpuSum || 0) + cpu; S.cpuN = (S.cpuN || 0) + 1; S.gpuSum = (S.gpuSum || 0) + gpu; S.gpuN = (S.gpuN || 0) + 1; }
+  S.hist.push([frameMs, cpu, gpu]); if (S.hist.length > 140) S.hist.shift();
+  if ((S.drawN = (S.drawN || 0) + 1) % 3) return;   // the graph four times a second or so is plenty
+  const cv = S.hud.querySelector('canvas') as HTMLCanvasElement; if (!cv) return;
+  const x = cv.getContext('2d') as CanvasRenderingContext2D, W = cv.width, H = cv.height, top = 50, yOf = (ms: number) => H - 6 - Math.min(1, ms / top) * (H - 14);
+  x.clearRect(0, 0, W, H);
+  x.strokeStyle = 'rgba(255,255,255,.12)'; x.lineWidth = 1; x.font = '600 18px Inter, Arial, sans-serif'; x.fillStyle = 'rgba(255,255,255,.4)';
+  for (const [ms, lb] of [[16.7, '60'], [33.3, '30']] as [number, string][]) { const y = yOf(ms); x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); x.fillText(lb + ' fps', W - 74, y - 4); }
+  const line = (k: number, col: string, w: number) => { x.strokeStyle = col; x.lineWidth = w; x.beginPath(); S.hist.forEach((h: number[], i: number) => { const px = i / 139 * W, py = yOf(h[k]); if (i) x.lineTo(px, py); else x.moveTo(px, py); }); x.stroke(); };
+  line(2, '#F4A742', 2.5); line(1, '#5AA9FF', 2.5); line(0, '#4FD18B', 3.5);
+  const last = S.hist.slice(-20), avg = (k: number) => last.reduce((a: number, h: number[]) => a + h[k], 0) / Math.max(1, last.length);
+  const set = (c: string, t: string) => { const e = S.hud.querySelector(c) as HTMLElement; if (e) e.textContent = t; };
+  set('.gs-fps', String(Math.round(1000 / Math.max(1, avg(0))))); set('.gs-cpu', Math.round(avg(1)) + ' ms'); set('.gs-gpu', (est ? 'about ' : '') + Math.round(avg(2)) + ' ms');
+  void R;
+}
+/** Around the drawing of a stress-test frame: the processor's time, and the graphics chip's timer if there is one. */
+function gfxStressDraw(draw: () => void) {
+  const R = TestRooms, S = R.stress, t0 = performance.now(); let q: any = null;
+  const G = S && S.gq; if (G && G.pend.length < 4) { try { q = G.gl.createQuery(); G.gl.beginQuery(G.ext.TIME_ELAPSED_EXT, q); } catch (e) { q = null; } }
+  draw();
+  if (q) { try { G.gl.endQuery(G.ext.TIME_ELAPSED_EXT); G.pend.push(q); } catch (e) { /* no timer */ } }
+  if (S) S.lastCpu = (S.frameCpu || 0) + (performance.now() - t0);
 }
