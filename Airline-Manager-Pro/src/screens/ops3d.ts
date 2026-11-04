@@ -371,7 +371,7 @@ function opsWalk(dt: number, now?: number) {
 function opsSit() { const R = OpsRoom; aimUnlock(); R.seat = true; R.look = { yaw: 0, pitch: -0.16 }; const d = R.root.querySelector('.op-dot') as HTMLElement; if (d) d.hidden = true; Sound.tick(); opsUi(); }
 function opsStand() { const R = OpsRoom; phoneReset(R); R.seat = false; R.free = { x: 0.3, z: 1.3, v: 0, bob: 0 }; R.look = { yaw: 0, pitch: -0.05 }; Sound.tick(); opsUi(); }
 /** Through the door: it opens, and you are back in the Overview. */
-function opsDoor() { const R = OpsRoom; if (R.host) { R.doorT = R.doorT ? 0 : 1; Sound.tick(); return; } Sound.tick(); aimUnlock(); roomExitMenu(R.root, 'ops', to => { R.doorT = 1; setTimeout(() => opsLeave(to), 650); }); }
+function opsDoor() { const R = OpsRoom; if (R.host) { R.doorT = R.doorT ? 0 : 1; sfxDoor('wood', R.doorT === 1); return; } Sound.tick(); aimUnlock(); roomExitMenu(R.root, 'ops', to => { R.doorT = 1; setTimeout(() => opsLeave(to), 650); }); }
 function opsHover(e: PointerEvent) {
   const R = OpsRoom; if (R.loading || R.overlay || !R.seat) return;
   const T = THREE, rc = new T.Raycaster(), r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect();

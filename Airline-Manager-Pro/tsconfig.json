@@ -15,6 +15,7 @@
     "src/core/util.ts",
     "src/core/icons.ts",
     "src/core/sound.ts",
+    "src/core/sfx.ts",
     "src/data/airports.ts",
     "src/data/airports-major.ts",
     "src/data/real-airlines.ts",

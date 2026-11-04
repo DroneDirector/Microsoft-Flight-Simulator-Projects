@@ -120,7 +120,7 @@ function trOffice(scene: any, q: number) {
   A.cam = trRoomCam(A.group, 58, 0.03);
   R.of = A; R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'office'; return h; }));
   // its door: hinged, swinging into the room
-  R.doors.push({ k: 'office', name: 'your office', k0: 0, to: 0, n: 'x', mid: [-3.2, -2.6], half: 0.5, set: (e: number) => { if (A.doorLeaf) A.doorLeaf.rotation.y = -1.5 * e; },
+  R.doors.push({ k: 'office', name: 'your office', mat: 'wood', k0: 0, to: 0, n: 'x', mid: [-3.2, -2.6], half: 0.5, set: (e: number) => { if (A.doorLeaf) A.doorLeaf.rotation.y = -1.5 * e; },
     pass: [-3.55, -3.0, -2.75, -2.2] });   // where you walk through when it is open [x0, z0, x1, z1]
   // the visitor's chair and the route in, as in the office
   R.ofWalk = (x: number, z: number) => x > -3.2 && x < 3.2 && z > -3.4 && z < 3.0 && !ofBlocked(x, z);
@@ -133,7 +133,7 @@ function trOps(scene: any, q: number, ren: any) {
   A.cam = trRoomCam(A.group, 56, 0.03);
   R.ops = A; R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'ops'; return h; }));
   try { opsMonitorDraw(A); } catch (e) { /* the screen stays dark */ }
-  R.doors.push({ k: 'ops', name: 'the Operations office', k0: 0, to: 0, n: 'x', mid: [-3.2, (TR_L.opsDoor[0] + TR_L.opsDoor[1]) / 2], half: (TR_L.opsDoor[1] - TR_L.opsDoor[0]) / 2, set: (e: number) => { if (A.door) A.door.rotation.y = e * 1.35; },
+  R.doors.push({ k: 'ops', name: 'the Operations office', mat: 'wood', k0: 0, to: 0, n: 'x', mid: [-3.2, (TR_L.opsDoor[0] + TR_L.opsDoor[1]) / 2], half: (TR_L.opsDoor[1] - TR_L.opsDoor[0]) / 2, set: (e: number) => { if (A.door) A.door.rotation.y = e * 1.35; },
     pass: [-3.55, TR_L.opsDoor[0] + 0.22, -2.75, TR_L.opsDoor[1] - 0.22] });
   // walking inside it: its own floor plan, turned into the building's
   const g = A.group, inv = new THREE.Matrix4();
@@ -159,7 +159,7 @@ function trLounge(scene: any, q: number) {
   A.cam = trRoomCam(A.group, 62, 0.06);
   R.lg = A; R.lgSpec = sp; R.lgLv = lv;
   R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'lounge'; return h; }));
-  R.doors.push({ k: 'lounge', name: 'the lounge', k0: 0, to: 0, slide: true, n: 'x', mid: [TR_L.con[2], TR_L.lgDoorZ], half: LG_DOOR_W / 2, locked: R.lgShut, set: (e: number) => { for (const Lf of A.doorLeaves || []) Lf.position.x = Lf.userData.x0 + (Lf.userData.x1 - Lf.userData.x0) * e; },
+  R.doors.push({ k: 'lounge', name: 'the lounge', mat: 'sliding', k0: 0, to: 0, slide: true, n: 'x', mid: [TR_L.con[2], TR_L.lgDoorZ], half: LG_DOOR_W / 2, locked: R.lgShut, set: (e: number) => { for (const Lf of A.doorLeaves || []) Lf.position.x = Lf.userData.x0 + (Lf.userData.x1 - Lf.userData.x0) * e; },
     pass: [TR_L.con[2] - 0.6, TR_L.lgDoorZ - 0.7, TR_L.con[2] + 0.6, TR_L.lgDoorZ + 0.7] });
   const g = A.group, inv = new THREE.Matrix4();
   R.lgLocal = (x: number, z: number) => { inv.copy(g.matrixWorld).invert(); const v = new THREE.Vector3(x, 0, z).applyMatrix4(inv); return [v.x, v.z]; };
@@ -218,7 +218,7 @@ function trHalls(scene: any, q: number) {
   // the door at the end of the corridor, onto the concourse (opens outwards, into the concourse)
   { const pv = new T.Group(); pv.position.set(TR_L.staffDoor[0], 0, C[3]); g.add(pv); Props.place(pv, 'door-1', 0, 0, 0, q, { w: TR_L.staffDoor[1] - TR_L.staffDoor[0], h: 2.13, color: 0x5B636C });
     const hit = new T.Mesh(new T.BoxGeometry(TR_L.staffDoor[1] - TR_L.staffDoor[0], 2.1, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set((TR_L.staffDoor[1] - TR_L.staffDoor[0]) / 2, 1.05, 0); hit.userData.act = 'door'; hit.userData.room = 'staff'; pv.add(hit); R.hits.push(hit);
-    R.doors.push({ k: 'staff', name: 'the concourse', k0: 0, to: 0, n: 'z', mid: [(TR_L.staffDoor[0] + TR_L.staffDoor[1]) / 2, C[3]], half: (TR_L.staffDoor[1] - TR_L.staffDoor[0]) / 2, set: (e: number) => { pv.rotation.y = -e * Math.PI * 0.55; }, pass: [TR_L.staffDoor[0] + 0.22, C[3] - 0.6, TR_L.staffDoor[1] - 0.22, C[3] + 0.6] });
+    R.doors.push({ k: 'staff', name: 'the concourse', mat: 'metal', k0: 0, to: 0, n: 'z', mid: [(TR_L.staffDoor[0] + TR_L.staffDoor[1]) / 2, C[3]], half: (TR_L.staffDoor[1] - TR_L.staffDoor[0]) / 2, set: (e: number) => { pv.rotation.y = -e * Math.PI * 0.55; }, pass: [TR_L.staffDoor[0] + 0.22, C[3] - 0.6, TR_L.staffDoor[1] - 0.22, C[3] + 0.6] });
     Props.place(g, 'room-sign', TR_L.staffDoor[1] + 0.4, C[3] + 0.02, 0, q, { name: 'Offices', sub: 'Operations · Director', num: 'L2', pict: 'office', staff: true }, 1.25);
     // a frame round it on both sides
     for (const z of [C[3] - 0.03, C[3] + 0.03]) { box(0.06, 2.2, 0.06, dark, TR_L.staffDoor[0] - 0.03, 1.1, z); box(0.06, 2.2, 0.06, dark, TR_L.staffDoor[1] + 0.03, 1.1, z); box(TR_L.staffDoor[1] - TR_L.staffDoor[0] + 0.12, 0.06, 0.06, dark, (TR_L.staffDoor[0] + TR_L.staffDoor[1]) / 2, 2.2, z); } }
@@ -391,7 +391,7 @@ function trClickAt(e?: PointerEvent) {
   if (a === 'door') { const D = R.doors.filter((d: any) => d.k === room)[0]; if (!D) return;
     if (D.to) { const F = R.free, p = D.pass; if (F.x > p[0] - 0.4 && F.x < p[2] + 0.4 && F.z > p[1] - 0.4 && F.z < p[3] + 0.4) { toast('Step out of the doorway first', 'info'); return; } }
     if (D.locked) { toast('Your lounge opens here once you own your first one (Lounges)', 'info'); return; }
-    D.to = D.to ? 0 : 1; try { Sound.tick(); } catch (x) { /* quiet */ } return; }
+    D.to = D.to ? 0 : 1; try { sfxDoor(D.mat || 'wood', D.to === 1); } catch (x) { /* quiet */ } return; }
   if (a === 'future') { toast(`${o.userData.name}: this room comes later`, 'info'); return; }
   if (a === 'monitor' || a === 'laptop') { trComputer(room === 'ops' ? 'schedule' : ''); return; }
   toast('Test rooms: this is only to look at here', 'info');

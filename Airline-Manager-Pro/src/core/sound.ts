@@ -89,6 +89,41 @@ const Sound = {
     o.connect(g); g.connect(bus); o.start(end); o.stop(end + 0.45);
   },
   /** Soft tick for toggles and taps. */
+  /** A door, by what it is made of (made here unless www/sounds has the door's file): wood knocks and creaks with a
+   *  soft thud as it shuts, metal clanks and rings, glass clicks and chimes, sliding doors whir and hiss. */
+  door(kind: string, open: boolean) {
+    const ctx = audio(); if (!ctx) return;
+    const t = ctx.currentTime + 0.01, out = ctx.createGain(); out.gain.value = 0.7; out.connect(ctx.destination);
+    const burst = (at: number, dur: number, type: BiquadFilterType, f: number, q: number, gain: number) => {
+      const len = Math.max(8, Math.floor(ctx.sampleRate * dur)), b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+      for (let i = 0; i < len; i++) { const x = i / len; d[i] = (Math.random() * 2 - 1) * Math.min(1, x * 30) * Math.pow(1 - x, 2); }
+      const s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = b; fl.type = type; fl.frequency.value = f; fl.Q.value = q; g.gain.value = gain; s.connect(fl); fl.connect(g); g.connect(out); s.start(at);
+    };
+    if (kind === 'wood') {
+      tone(ctx, 1900, t, 0.03, 0.05, 'triangle', out); burst(t, 0.05, 'bandpass', 2600, 2, 0.5);   // the latch
+      if (open) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(420, t + 0.12); o.frequency.linearRampToValueAtTime(330, t + 0.6); g.gain.setValueAtTime(0.0001, t + 0.12); g.gain.exponentialRampToValueAtTime(0.012, t + 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62); const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 3; o.connect(f); f.connect(g); g.connect(out); o.start(t + 0.12); o.stop(t + 0.65); }   // a little creak
+      else { tone(ctx, 110, t + 0.08, 0.18, 0.35, 'sine', out); burst(t + 0.08, 0.14, 'lowpass', 700, 1, 0.6); }   // the thud
+    } else if (kind === 'metal') {
+      burst(t, 0.06, 'bandpass', 3200, 3, 0.6); tone(ctx, 620, t + 0.01, 0.45, 0.05, 'triangle', out); tone(ctx, 1480, t + 0.01, 0.3, 0.03, 'sine', out);   // the latch and the ring
+      if (!open) { burst(t + 0.09, 0.2, 'lowpass', 900, 1, 0.7); tone(ctx, 180, t + 0.09, 0.5, 0.12, 'triangle', out); }
+    } else if (kind === 'glass') {
+      burst(t, 0.04, 'highpass', 4000, 1, 0.35); tone(ctx, 2300, t + 0.01, 0.6, 0.025, 'sine', out); tone(ctx, 3450, t + 0.01, 0.4, 0.012, 'sine', out);
+      if (!open) burst(t + 0.08, 0.1, 'bandpass', 1800, 2, 0.3);
+    } else {   // sliding: a motor's whir and the air
+      const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter(); o.type = 'sawtooth'; o.frequency.setValueAtTime(open ? 80 : 95, t); o.frequency.linearRampToValueAtTime(open ? 110 : 70, t + 0.9);
+      f.type = 'lowpass'; f.frequency.value = 500; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.1); g.gain.setValueAtTime(0.05, t + 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.0); o.connect(f); f.connect(g); g.connect(out); o.start(t); o.stop(t + 1.05);
+      burst(t, 0.95, 'bandpass', 1800, 0.6, 0.08); if (!open) burst(t + 0.9, 0.08, 'lowpass', 800, 1, 0.3);
+    }
+  },
+  /** A drink running into a cup for a while (made here unless there is a file). */
+  pour(secs: number, milk?: boolean) {
+    const ctx = audio(); if (!ctx) return;
+    const t = ctx.currentTime + 0.02, len = Math.floor(ctx.sampleRate * secs), b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (0.7 + 0.3 * Math.sin(i / ctx.sampleRate * 37));
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = b; f.type = 'bandpass'; f.frequency.setValueAtTime(milk ? 3200 : 1500, t); f.frequency.linearRampToValueAtTime(milk ? 2600 : 900, t + secs); f.Q.value = milk ? 1.2 : 2.2;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.15); g.gain.setValueAtTime(0.09, t + secs - 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + secs);
+    s.connect(f); f.connect(g); g.connect(ctx.destination); s.start(t);
+  },
   tick() {
     if (!State.settings.uiSounds) return;
     const ctx = audio(); if (!ctx) return;
@@ -105,6 +140,7 @@ const Sound = {
   /** A footstep, by what you walk on: parquet and other wood knocks (heel, then toe), carpet is a soft, dull thud,
    *  vinyl and tiles click, metal stairs ring, concrete is crisp and gritty. Louder the faster you walk. */
   step(surface: 'wood' | 'carpet' | 'tile' | 'metal' | 'concrete', v?: number) {
+    if (typeof Sfx !== 'undefined' && Sfx.play('footsteps-' + surface, Math.max(0.35, Math.min(1.25, (v || 1.2) / 1.3)))) return;   // a file in www/sounds
     const ctx = audio(); if (!ctx) return;
     const t = ctx.currentTime + 0.005, k = Math.max(0.35, Math.min(1.25, (v || 1.2) / 1.3)), j = (a: number) => a * (0.88 + Math.random() * 0.24);
     const out = ctx.createGain(); out.gain.value = 0.9 * k; out.connect(ctx.destination);

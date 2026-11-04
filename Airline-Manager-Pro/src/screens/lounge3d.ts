@@ -581,7 +581,7 @@ function lgFrame() {
 }
 /** Everything that goes on in the room each frame, standing or sitting: the guests, the fire, steam, what you look at. */
 /** The sliding doors: towards open (1) or shut (0); they move in lgFrameRest. */
-function lgDoorsTo(k: number) { const A = LoungeRoom.A; if (!A || !A.doorLeaves) return; A.doorTo = k; try { if (k) hgSnd('motor'); } catch (e) { /* quiet */ } }
+function lgDoorsTo(k: number) { const A = LoungeRoom.A; if (!A || !A.doorLeaves) return; if (A.doorTo !== k) { try { sfxDoor('sliding', k > 0); } catch (e) { /* quiet */ } } A.doorTo = k; }
 function lgFrameRest(now: number, dt: number) {
   const R = LoungeRoom;
   if (R.A && R.A.doorLeaves && R.A.doorK !== R.A.doorTo) { const A = R.A; A.doorK += Math.sign(A.doorTo - A.doorK) * Math.min(Math.abs(A.doorTo - A.doorK), dt * 1.6); const e = A.doorK * A.doorK * (3 - 2 * A.doorK); for (const L of A.doorLeaves) L.position.x = L.userData.x0 + (L.userData.x1 - L.userData.x0) * e; }
@@ -677,7 +677,7 @@ function lgPour() {
 function lgPressStep(dt: number) {
   const R = LoungeRoom, P = R.press; if (!P) return; P.t += dt;
   const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
-  if (P.st === 'reach') { P.k = E(P.t / 0.5); if (P.t >= 0.5) { P.st = 'hold'; P.t = 0; try { hgSnd('beep'); } catch (e) { /* quiet */ } lgCoffeeMenu(); } }
+  if (P.st === 'reach') { P.k = E(P.t / 0.5); if (P.t >= 0.5) { P.st = 'hold'; P.t = 0; try { if (!Sfx.play('coffee-touch')) Sound.tick(); } catch (e) { /* quiet */ } lgCoffeeMenu(); } }
   else if (P.st === 'hold') P.k = 1;
   else if (P.st === 'back') { P.k = 1 - E(P.t / 0.5); if (P.t >= 0.5) { R.press = null; if (P.pick) lgCoffeePour(P.pick); } }
 }
@@ -706,7 +706,7 @@ function lgPressArms(m: any, now: number): any {
 /** The cup under the spout, the drink running into it and the cup filling; hot drinks steam. */
 function lgCoffeePour(k: string) {
   const R = LoungeRoom, A = R.A, T = THREE, d = LG_DRINKS[k]; if (!A || !d) return;
-  try { hgSnd('motor'); } catch (e) { /* quiet */ }
+  try { if (!Sfx.play('coffee-grind')) hgSnd('motor'); } catch (e) { /* quiet */ }
   const p = A.coffeeAt, c: any = { st: 'pour', kind: k, tea: !!d.tea, sips: 0, lvl: 0, full: 0.8, hotUntil: Date.now() + 5 * 60e3 };
   c.g = lgCupGroup(k); c.g.position.set(p.x, p.y, p.z); A.root.add(c.g); lgLiquid(c);
   R.cups = R.cups || []; R.cups.push(c);
@@ -715,6 +715,8 @@ function lgCoffeePour(k: string) {
   const st = new T.Mesh(new T.CylinderGeometry(0.0032, 0.0026, 1, 8, 1, true), new T.MeshStandardMaterial({ color: d.col, roughness: 0.15, transparent: true, opacity: 0.92 }));
   st.position.set(p.x, (top + bot) / 2, p.z); st.scale.y = top - bot; A.root.add(st);
   c.stream = { m: st, t: 0, dur: d.pour, top, bot };
+  const milk = !!d.top && k !== 'espresso' && k !== 'chocolate', water = k === 'tea' || k === 'americano';
+  setTimeout(() => { if (!LoungeRoom.on) return; try { if (!Sfx.play(milk ? 'coffee-milk' : water ? 'coffee-water' : 'coffee-pour')) Sound.pour(d.pour * 0.92, milk); } catch (e) { /* quiet */ } }, d.pour * 80);
 }
 /** A cup on its saucer as one group (to carry and put down), with its hit box, the heat shimmer above it, and the
  *  drink in it: a surface that rises as it fills, falls as you drink, and tilts as it sloshes. */
@@ -798,7 +800,7 @@ function lgPickCup(o: any) {
 /** Put the cup down where you are aiming, on a table or a counter. */
 function lgPutCup(hit: any, point: any) {
   const R = LoungeRoom, c = lgHeldCup(); if (!c) return;
-  Sound.tick(); c.st = 'placed'; c.g.position.set(point.x, hit.userData.top, point.z); c.g.rotation.set(0, Math.random() * 6.28, 0); c.use = null;
+  try { if (!Sfx.play(c.snack ? 'put-down' : 'cup-down')) hgSnd('put'); } catch (e) { Sound.tick(); } c.st = 'placed'; c.g.position.set(point.x, hit.userData.top, point.z); c.g.rotation.set(0, Math.random() * 6.28, 0); c.use = null;
   R.A.hits.push(c.g.userData.hit);
 }
 /** A sip: the cup comes up to your mouth and back down. Three sips and it is finished (a snack: its own bites). */

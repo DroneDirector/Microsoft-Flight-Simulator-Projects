@@ -70,6 +70,21 @@ if (existsSync(three)) {
 // three.js's model loader (MIT), made into a plain script by tools/vendor/make-gltf.py
 mkdirSync(join(root, 'www/vendor'), { recursive: true });
 copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/three-gltf.js'));
+// replaceable sounds: the files in www/sounds and the guide with every name the game looks for (src/core/sfx.ts)
+{
+  const dir = join(root, 'www/sounds'); mkdirSync(dir, { recursive: true });
+  const files = readdirSync(dir).filter(f => /\.(ogg|mp3|wav|m4a)$/i.test(f)).sort();
+  writeFileSync(join(dir, 'index.json'), JSON.stringify({ files }, null, 1));
+  const src = readFileSync(join(root, 'src/core/sfx.ts'), 'utf8'), names = [...src.slice(src.indexOf('const SFX_NAMES')).split('];')[0].matchAll(/\['([^']+)', '((?:[^'\\]|\\.)*)'\]/g)].map(m => [m[1], m[2].replace(/\\'/g, "'")]);
+  const have = n => files.some(f => f.replace(/\.[a-z0-9]+$/i, '') === n) ? ' (in use)' : '';
+  writeFileSync(join(dir, 'README.md'), ['# Replaceable sounds', '',
+    'Put a sound file with one of these names in this folder (`.ogg`, `.mp3`, `.wav` or `.m4a`) and build the app: the game',
+    'plays it instead of making that sound itself. Remove it and the game\'s own sound comes back. This list is written by',
+    'the build. Short, clean recordings work best; the game sets their volume (footsteps by how fast you walk).',
+    'Licences of sounds you use must allow commercial sale (CC0 is simplest).', '', '| File | Sound |', '|---|---|',
+    ...names.map(([n, d]) => `| \`${n}.ogg\`${have(n)} | ${d} |`), ''].join('\n'));
+  if (files.length) console.log(`Sounds from files: ${files.length} (${files.join(', ')})`);
+}
 // replaceable models: the list of the .glb files in www/models (see www/models/README.md)
 {
   const dir = join(root, 'www/models'), files = [];

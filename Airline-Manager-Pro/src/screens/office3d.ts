@@ -586,20 +586,24 @@ function ofAttitude(p: any): string {
   return 'honest';
 }
 function ofKnock() {
+  if (Sfx.play('door-knock')) { ofKnockAsk(); return; }
   try {
     const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext, ac = OfficeRoom.ac || (OfficeRoom.ac = new AC());
     [0, 0.22, 0.44].forEach(dl => { const t = ac.currentTime + 0.05 + dl, n = ac.createBuffer(1, 4410, 44100), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 380); const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'lowpass'; f.frequency.value = 420; g.gain.value = 0.9; s.buffer = n; s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t); });
   } catch (e) { /* no sound */ }
+  ofKnockAsk();
+}
+function ofKnockAsk() {
   ofSay('', 'Someone is knocking on your door.', 'A knock at the door');
   const R = OfficeRoom, o = R.root.querySelector('.ct-opts') as HTMLElement;
   if (o) o.innerHTML = `<button class="btn primary" data-of="comein">Come in</button>`;
   // nobody answering: they knock once more after a while
   clearTimeout(R.knockT); R.knockT = setTimeout(() => { if (R.on && R.vis && R.vis.state === 'outside' && !R.started && R.root.querySelector('[data-of=comein]')) ofKnockAgain(); }, 12000);
 }
-function ofKnockAgain() { const R = OfficeRoom; try { const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext, ac = R.ac || (R.ac = new AC()); [0, 0.22].forEach(dl => { const t = ac.currentTime + 0.05 + dl, n = ac.createBuffer(1, 4410, 44100), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 380); const s2 = ac.createBufferSource(), f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; s2.buffer = n; s2.connect(f); f.connect(ac.destination); s2.start(t); }); } catch (e) { /* no sound */ } }
+function ofKnockAgain() { const R = OfficeRoom; if (Sfx.play('door-knock')) return; try { const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext, ac = R.ac || (R.ac = new AC()); [0, 0.22].forEach(dl => { const t = ac.currentTime + 0.05 + dl, n = ac.createBuffer(1, 4410, 44100), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 380); const s2 = ac.createBufferSource(), f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; s2.buffer = n; s2.connect(f); f.connect(ac.destination); s2.start(t); }); } catch (e) { /* no sound */ } }
 /** You answer the knock: "Come in." in your own voice, then the door opens and they come in. */
 function ofComeIn() {
-  const R = OfficeRoom; clearTimeout(R.knockT); const o = R.root.querySelector('.ct-opts') as HTMLElement; if (o) o.innerHTML = '';
+  const R = OfficeRoom; clearTimeout(R.knockT); sfxDoor('wood', true); const o = R.root.querySelector('.ct-opts') as HTMLElement; if (o) o.innerHTML = '';
   const mine = 'Come in.', meWho = myWho('neutral'), you = R.root.querySelector('.of-you') as HTMLElement;
   if (you) you.innerHTML = `<span><b>You</b>${esc(mine)}</span>${voiceButton(mine, meWho, 'Play what you said')}`;
   if (ofAutoVoice()) { try { Voice.speak(mine, () => { /* said */ }, meWho); } catch (e) { /* no voice */ } }
@@ -837,7 +841,7 @@ function ofClickAt(e?: PointerEvent) {
   if (a === 'bowl-water') { if (!petRefill(R.A, 'water')) toast('The water bowl is full', 'info'); return; }
   if (a === 'bowl-food') { ofBowlPick(); return; }
   if (R.seat) return;
-  if (a === 'door' && R.host) { R.doorT = R.doorT ? 0 : 1; Sound.tick(); return; }   // in the building: the door opens and shuts
+  if (a === 'door' && R.host) { R.doorT = R.doorT ? 0 : 1; sfxDoor('wood', R.doorT === 1); return; }   // in the building: the door opens and shuts
   if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); roomExitMenu(R.root, 'office', to => { R.doorT = 1; setTimeout(() => ofExitToMain('', to), 650); }); }
 }
 function ofSit() { aimUnlock(); const R = OfficeRoom; R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = true; ofVisitUi(); Sound.tick(); }
