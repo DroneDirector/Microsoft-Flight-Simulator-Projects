@@ -16,14 +16,17 @@ function sceneGearTucked(): boolean { return (State.settings as any).sceneGearTu
 /** Keeps the gear there while a 3D place is open, and away when none is. */
 function sceneGearSync() {
   let el = document.querySelector('.scn-gear') as HTMLElement;
-  const on = sceneOpen() && !(typeof ExitSplash !== 'undefined' && ExitSplash.on);
-  if (!on) { if (el) el.remove(); const h0 = document.querySelector('body > .pad-hints'); if (h0) h0.remove(); document.body.classList.remove('scn-set-on'); return; }
-  if (!el) {
+  // the 3D view has its gear in its own bar at the top (before Behind); the other places get this one
+  const on = sceneOpen() && !(typeof V3d !== 'undefined' && V3d.open && V3d.root && !V3d.root.classList.contains('v3d-aptonly')) && !(typeof ExitSplash !== 'undefined' && ExitSplash.on);
+  const pads = sceneOpen() && !(typeof ExitSplash !== 'undefined' && ExitSplash.on);
+  if (!on && el) el.remove();
+  if (!pads) { const h0 = document.querySelector('body > .pad-hints'); if (h0) h0.remove(); document.body.classList.remove('scn-set-on'); return; }
+  if (!el && on) {
     el = document.createElement('div'); el.className = 'scn-gear';
     el.innerHTML = `<button class="scn-gear-btn" data-act="scene-settings" aria-label="Settings">${icon('gear')}<span>Settings</span></button><button class="scn-gear-tuck" data-act="scene-gear-tuck" aria-label="Tuck the settings button away">${icon('chevron')}</button><button class="scn-gear-tab" data-act="scene-gear-tuck" aria-label="Show the settings button">${icon('gear')}</button>`;
     document.body.appendChild(el);
   }
-  el.classList.toggle('tucked', sceneGearTucked());
+  if (el && on) el.classList.toggle('tucked', sceneGearTucked());
   // the controller's buttons for this place, only while a controller is connected (they follow Settings → Devices)
   const v3 = typeof V3d !== 'undefined' && V3d.open;
   const want = typeof Pad !== 'undefined' && Pad.gp ? padHintsHtml(v3 ? [['nextCam', 'Camera'], ['prev', 'Previous aircraft'], ['next', 'Next aircraft'], ['pointer', 'Pointer'], ['back', 'Back'], ['settings', 'Settings']]
