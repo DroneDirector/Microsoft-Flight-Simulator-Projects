@@ -314,7 +314,8 @@ function ofLaptop3d(T: any, lt: any, slab: any, bx: any, screenTex: any) {
 /** A photo of you with your family on the desk: taken once, with the figures, and kept. */
 function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   const T = THREE, R = OfficeRoom, me: any = myPilot();
-  const key = JSON.stringify([me && me.look || {}, (State as any).family || null]);
+  const fam = familyInfo(), pet: any = petData(), kind = fam.married ? 'family' : pet && pet.kind !== 'none' ? 'pet' : 'firstday';
+  const key = JSON.stringify([me && me.look || {}, (State as any).family || null, kind, kind === 'pet' ? pet : 0]);
   if (R.photo && R.photo.key === key) { done(ctTex(R.photo.cv)); return; }
   const scene = new T.Scene(), cam = new T.PerspectiveCamera(30, 4 / 3, 0.1, 30);
   const [bg] = ctCanvas(512, 384); { const x = bg.getContext('2d') as CanvasRenderingContext2D, g = x.createLinearGradient(0, 0, 0, 384); g.addColorStop(0, '#8DB7D9'); g.addColorStop(0.55, '#DCE7E8'); g.addColorStop(0.56, '#4E7F9A'); g.addColorStop(0.7, '#5D8C5A'); g.addColorStop(1, '#3E6A3A'); x.fillStyle = g; x.fillRect(0, 0, 512, 384); }
@@ -326,15 +327,16 @@ function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   const hOf = (L: any) => (L.height || FAM_H[L.sex === 'f' ? 'f' : 'm']) / H0;
   // the man on the left, the woman on the right, the children in front between them
   const meX = meL.sex === 'f' ? 0.38 : -0.38;
-  const fam = [{ L: meL, x: meX, s: hOf(meL) }, { L: ptL, x: -meX, s: hOf(ptL) },
-    { L: ctLook('kid1-' + base, 'f', 'public'), x: -0.16, s: 0.62, z: 0.55 }, { L: ctLook('kid2-' + base, 'm', 'public'), x: 0.2, s: 0.54, z: 0.6 }];
+  const kids = [{ L: ctLook('kid1-' + base, 'f', 'public'), x: -0.16, s: 0.62, z: 0.55 }, { L: ctLook('kid2-' + base, 'm', 'public'), x: 0.2, s: 0.54, z: 0.6 }, { L: ctLook('kid3-' + base, 'm', 'public'), x: 0.02, s: 0.46, z: 0.9 }];
+  const famAll: any[] = [{ L: meL, x: meX, s: hOf(meL) }, { L: ptL, x: -meX, s: hOf(ptL) }].concat(fam.kids === 1 ? [Object.assign({}, kids[0], { x: 0.02 })] : kids.slice(0, fam.kids));
+  if (kind !== 'family') { ofOtherPhoto(ren, kind, me, pet, key, done); return; }
   // the children's hair and features stay the same from one photo to the next
   let rs = 7; const rnd = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
   // the children: no beards or grey hair, and their skin between their parents'
-  for (const f of fam.slice(2)) { const L: any = f.L, a = fam[0].L.skin || 2, b = fam[1].L.skin || 2; L.facial = 'none'; L.glasses = 'none'; L.skin = Math.round((a + b) / 2 + (rnd() - 0.5)); if (L.hairColor >= 8) L.hairColor = fam[rnd() < 0.5 ? 0 : 1].L.hairColor < 8 ? fam[0].L.hairColor : 1; }
+  for (const f of famAll.slice(2)) { const L: any = f.L, a = famAll[0].L.skin || 2, b = famAll[1].L.skin || 2; L.facial = 'none'; L.glasses = 'none'; L.skin = Math.round((a + b) / 2 + (rnd() - 0.5)); if (L.hairColor >= 8) L.hairColor = famAll[rnd() < 0.5 ? 0 : 1].L.hairColor < 8 ? famAll[0].L.hairColor : 1; }
   const built: any[] = [];   // each figure is scaled from outside: it sets its own scale as it breathes
   try {
-    for (const f of fam) { const m = Human.build(f.L, 'exec', '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); g.position.set(f.x, 0, f.z || 0); g.scale.setScalar(f.s); scene.add(g); m.pose({ t: 1, yaw: 0, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) }); built.push(m); }
+    for (const f of famAll) { const m = Human.build(f.L, 'exec', '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); g.position.set(f.x, 0, f.z || 0); g.scale.setScalar(f.s); scene.add(g); m.pose({ t: 1, yaw: 0, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) }); built.push(m); }
   } catch (e) { /* the photo without people */ }
   cam.position.set(0, 1.05, 3.9); cam.lookAt(0, 0.95, 0);
   const rt = new T.WebGLRenderTarget(512, 384, { samples: 4 }); rt.texture.colorSpace = T.SRGBColorSpace;
@@ -346,6 +348,49 @@ function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   x.putImageData(id, 0, 0);
   R.photo = { key, cv }; rt.dispose();
   scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); });
+  done(ctTex(cv));
+}
+
+/** The photo on your desk without a partner: your pet if you have one (lying on a rug in the sun), or you on your
+ *  first day in the job (in uniform, an aircraft on the apron behind you, the day written in the corner). */
+function ofOtherPhoto(ren: any, kind: string, me: any, pet: any, key: string, done: (tex: any) => void) {
+  const T = THREE, R = OfficeRoom, scene = new T.Scene(), W = 512, H = 384;
+  const [bg, bx] = ctCanvas(W, H);
+  if (kind === 'pet') { const g = bx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#E9D9BF'); g.addColorStop(1, '#C9A97E'); bx.fillStyle = g; bx.fillRect(0, 0, W, H); bx.fillStyle = 'rgba(255,240,200,0.35)'; bx.beginPath(); bx.moveTo(60, 0); bx.lineTo(220, 0); bx.lineTo(420, H); bx.lineTo(180, H); bx.fill(); }
+  else {   // the apron: sky, the terminal far off, an aircraft's nose and wing
+    const g = bx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#7FAEDB'); g.addColorStop(0.58, '#D8E6EE'); g.addColorStop(0.6, '#8C949B'); g.addColorStop(1, '#5E666D'); bx.fillStyle = g; bx.fillRect(0, 0, W, H);
+    bx.fillStyle = '#B9C3CB'; bx.fillRect(0, 196, W, 34); for (let i = 0; i < 26; i++) { bx.fillStyle = '#6E8496'; bx.fillRect(8 + i * 20, 204, 12, 14); }
+    bx.fillStyle = '#F4F6F8'; bx.beginPath(); bx.ellipse(380, 190, 150, 34, 0, 0, Math.PI * 2); bx.fill(); bx.beginPath(); bx.moveTo(250, 200); bx.lineTo(120, 236); bx.lineTo(150, 240); bx.lineTo(300, 210); bx.fill();
+    bx.fillStyle = '#26323D'; for (let i = 0; i < 7; i++) bx.fillRect(300 + i * 26, 182, 12, 9); bx.beginPath(); bx.ellipse(500, 186, 22, 14, 0, 0, Math.PI * 2); bx.fill();
+    bx.fillStyle = (company() && company().color) || '#2C8CFF'; bx.fillRect(240, 204, 280, 6);
+  }
+  const bp = new T.Mesh(new T.PlaneGeometry(9, 6.75), new T.MeshBasicMaterial({ map: ctTex(bg) })); bp.position.set(0, 1.4, -3); scene.add(bp);
+  scene.add(new T.HemisphereLight(0xFFF6E8, 0x6A7A5A, 1.4)); const sl = new T.DirectionalLight(0xFFF0DC, 2.2); sl.position.set(2, 4, 5); scene.add(sl);
+  const cam = new T.PerspectiveCamera(30, 4 / 3, 0.05, 30);
+  try {
+    if (kind === 'pet') {
+      const A: any = {}, rug = new T.Mesh(new T.CircleGeometry(1.4, 48), new T.MeshStandardMaterial({ color: 0x8A4E3A, roughness: 0.9 })); rug.rotation.x = -Math.PI / 2; scene.add(rug);
+      petPlace(T, scene, A, [0, 0], 0.4); if (A.pet && A.pet.body && A.pet.body.U) A.pet.body.U.uBreath.value = 0;
+      cam.position.set(0.55, 0.6, 1.1); cam.lookAt(0.15, 0.08, 0.02);
+    } else {
+      const L = me && me.look ? Object.assign({}, me.look, { hat: 'cap' }) : ctLook('me', 'm', 'public');
+      const m = Human.build(dressed(L, 'captain'), 'captain', (company() && company().color) || '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); scene.add(g);
+      m.pose({ t: 1, yaw: 0.15, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) });
+      cam.position.set(0, 1.25, 3.4); cam.lookAt(0, 1.05, 0);
+    }
+  } catch (e) { cam.position.set(0, 1.2, 3.6); cam.lookAt(0, 1, 0); }
+  const rt = new T.WebGLRenderTarget(W, H, { samples: 4 }); rt.texture.colorSpace = T.SRGBColorSpace;
+  ren.setRenderTarget(rt); ren.render(scene, cam); ren.setRenderTarget(null);
+  const px = new Uint8Array(W * H * 4); try { ren.readRenderTargetPixels(rt, 0, 0, W, H, px); } catch (e) { /* as it is */ }
+  const [cv, x] = ctCanvas(W, H), id = x.createImageData(W, H);
+  for (let y = 0; y < H; y++) id.data.set(px.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+  x.putImageData(id, 0, 0);
+  if (kind === 'firstday') {   // the day it was, written in the corner as people do
+    const d = (() => { try { const S: any = State; const t = S.startedAt || S.created || (S.company && S.company.founded); return t ? new Date(t) : new Date(); } catch (e) { return new Date(); } })();
+    x.fillStyle = 'rgba(255,250,235,0.92)'; x.font = 'italic 600 26px Georgia, serif'; x.textAlign = 'right'; x.fillText('Day one · ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }), W - 18, H - 18);
+  }
+  R.photo = { key, cv }; rt.dispose();
+  scene.traverse((o: any) => { if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); });
   done(ctTex(cv));
 }
 
