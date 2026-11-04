@@ -482,7 +482,7 @@ function ofReady() {
     ctProgress(100, 'Ready', R);
     const wait = Math.max(300, 2400 - (performance.now() - R.loadT0));
     setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); }
-      if (R.mode === 'interview') { ofKnock(); setTimeout(() => ofEnter(), 900); } else ofVisitUi(); }, wait);
+      if (R.mode === 'interview') ofKnock(); else ofVisitUi(); }, wait);
   }, 40);
 }
 OfficeRoom.close = function (quiet?: boolean) {
@@ -545,7 +545,20 @@ function ofKnock() {
     const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext, ac = OfficeRoom.ac || (OfficeRoom.ac = new AC());
     [0, 0.22, 0.44].forEach(dl => { const t = ac.currentTime + 0.05 + dl, n = ac.createBuffer(1, 4410, 44100), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 380); const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'lowpass'; f.frequency.value = 420; g.gain.value = 0.9; s.buffer = n; s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t); });
   } catch (e) { /* no sound */ }
-  ofSay('', 'Come in.', 'A knock at the door');
+  ofSay('', 'Someone is knocking on your door.', 'A knock at the door');
+  const R = OfficeRoom, o = R.root.querySelector('.ct-opts') as HTMLElement;
+  if (o) o.innerHTML = `<button class="btn primary" data-of="comein">Come in</button>`;
+  // nobody answering: they knock once more after a while
+  clearTimeout(R.knockT); R.knockT = setTimeout(() => { if (R.on && R.vis && R.vis.state === 'outside' && !R.started && R.root.querySelector('[data-of=comein]')) ofKnockAgain(); }, 12000);
+}
+function ofKnockAgain() { const R = OfficeRoom; try { const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext, ac = R.ac || (R.ac = new AC()); [0, 0.22].forEach(dl => { const t = ac.currentTime + 0.05 + dl, n = ac.createBuffer(1, 4410, 44100), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 380); const s2 = ac.createBufferSource(), f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; s2.buffer = n; s2.connect(f); f.connect(ac.destination); s2.start(t); }); } catch (e) { /* no sound */ } }
+/** You answer the knock: "Come in." in your own voice, then the door opens and they come in. */
+function ofComeIn() {
+  const R = OfficeRoom; clearTimeout(R.knockT); const o = R.root.querySelector('.ct-opts') as HTMLElement; if (o) o.innerHTML = '';
+  const mine = 'Come in.', meWho = myWho('neutral'), you = R.root.querySelector('.of-you') as HTMLElement;
+  if (you) you.innerHTML = `<span><b>You</b>${esc(mine)}</span>${voiceButton(mine, meWho, 'Play what you said')}`;
+  if (ofAutoVoice()) { try { Voice.speak(mine, () => { /* said */ }, meWho); } catch (e) { /* no voice */ } }
+  Sound.tick(); setTimeout(() => { if (R.on) ofEnter(); }, 500);
 }
 /** In they come: the door swings open, a moment later they step in, walk round the furniture to the chair, turn
  *  and sit down facing you. */
@@ -564,7 +577,7 @@ function ofEnter() {
       const now = `${V.state}|${V.x.toFixed(2)}|${V.z.toFixed(2)}|${V.yaw.toFixed(2)}|${V.sitK.toFixed(2)}`;
       if (now !== mark) { mark = now; since = performance.now(); } else if (performance.now() - since > 4000) { clearInterval(watch); ofSeatNow(); }
     }, 500);
-  }, 3000);
+  }, 2000);
 }
 /* ---------- finding the way: round the door, the walls and the furniture ---------- */
 // what stands on the floor, as rectangles [x0, z0, x1, z1] (the room is 6.4 m by 6.4 m; the door is on the left wall
@@ -906,7 +919,7 @@ function ofInviteNow(id: string) {
   for (const sel of ['.of-spots', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
   const top = R.root.querySelector('.ct-top b') as HTMLElement; if (top) top.textContent = `Your office: ${p.name}, ${String(inc.title).toLowerCase()}`;
   ofSay('', `${p.name} is on the way up…`, 'Conduct report');
-  const go = () => { if (!R.on || R.p !== p) return; try { ofVisitor(); } catch (e) { R.vis = null; } ofKnock(); setTimeout(() => ofEnter(), 900); };
+  const go = () => { if (!R.on || R.p !== p) return; try { ofVisitor(); } catch (e) { R.vis = null; } ofKnock(); };
   setTimeout(() => { if (Human.ready) go(); else Human.load().then(go, go); }, 1800);
 }
 function ofSpot(k: string) {
@@ -1407,6 +1420,7 @@ function ofClick(b: HTMLElement) {
   else if (k === 'end') ofEnd();
   else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else if (s === 'hangars') { Sound.tick(); ofExitToMain('', 'hangars'); } else ofSpot(s); }
   else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
+  else if (k === 'comein') ofComeIn();
   else if (k === 'back') { Sound.tick(); ofVisitUi(); }
   else if (k === 'boxclose') ofBoxClose();
   else if (k === 'boxmin') ofBoxMin();
