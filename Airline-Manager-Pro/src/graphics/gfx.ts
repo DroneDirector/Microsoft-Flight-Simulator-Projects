@@ -35,6 +35,15 @@ const Gfx = {
   aniso(): number { const v = this.S().gfxAniso; return this.pc() && v != null ? +v : 0; },
   /** The detail of the rooms (offices, operations room, courtroom): Automatic follows the cabin quality. */
   roomQ(): number { const v = this.S().gfxRoomQ; const auto = typeof cabinQ === 'function' ? cabinQ() : 2; return v != null ? clamp(Math.round(+v), 0, 3) : auto; },
+  /** Each 3D place's own settings (Settings → Graphics → Lounges, Hangars, Offices and rooms); Automatic follows Rooms. */
+  placeQ(pl: 'lounge' | 'hangar' | 'room'): number { const v = pl === 'room' ? null : this.S()[pl + 'Q']; return v != null && v !== 'auto' ? clamp(Math.round(+v), 0, 3) : this.roomQ(); },
+  /** The pixel ratio a place is drawn at: Automatic by its quality, or a chosen sharpness (75% to 300% of the screen's). */
+  placeSharp(pl: string, q: number): number { const v = this.S()[pl + 'Sharp'], dpr = window.devicePixelRatio || 1;
+    return v != null && v !== 'auto' ? Math.min(4, dpr * [0.75, 1, 1.5, 2, 3][clamp(+v, 0, 4)]) : Math.min(dpr, q >= 3 ? 2 : q >= 2 ? 1.5 : 1); },
+  placeShadow(pl: string, auto: boolean): boolean { const v = this.S()[pl + 'Shadow']; return v === 'on' ? true : v === 'off' ? false : auto; },
+  placePeople(pl: string): boolean { return this.S()[pl + 'People'] !== false; },
+  /** How finely each person in a place is made (0.4 light, 0.6 normal, 0.85 high, 1 highest), or its automatic. */
+  placePeopleQ(pl: string, auto: number): number { const v = this.S()[pl + 'PplQ']; return v != null && v !== 'auto' ? [0.4, 0.6, 0.85, 1][clamp(+v, 0, 3)] : auto; },
   /** Pictures: 0 standard (phones), 1 high (the PC's automatic), 2 highest. */
   pics(): number { const v = this.S().gfxPics; return !this.pc() ? 0 : v != null ? clamp(Math.round(+v), 0, 2) : 1; },
   /** A picture size by quality: [standard, high, highest]. */

@@ -232,8 +232,8 @@ function opsMonitorDraw(AA?: any) {
 function opsOpen2(root: HTMLElement, q: number) {
   const R = OpsRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement;
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
-  ren.setPixelRatio(Gfx.pr(Math.min(window.devicePixelRatio || 1, q >= 3 ? 2 : q >= 2 ? 1.5 : 1))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
-  ren.shadowMap.enabled = q >= 2; ren.shadowMap.type = T.PCFSoftShadowMap;
+  ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('room', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
+  ren.shadowMap.enabled = Gfx.placeShadow('room', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
   const cam = new T.PerspectiveCamera(56, 1, 0.03, 30); R.cam = cam;
   scene.add(new T.HemisphereLight(0xEAF2FF, 0x1A222C, 0.75));
