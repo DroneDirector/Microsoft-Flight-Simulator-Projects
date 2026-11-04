@@ -189,7 +189,38 @@ public class AppToolsPlugin extends Plugin {
             r.put("installer", inst == null ? "" : inst);
         } catch (Exception ignored) { }
         r.put("canInstall", canInstall());
+        // for the recommended graphics settings: memory, processor cores, the chip, the screen's refresh rate
+        try {
+            android.app.ActivityManager am = (android.app.ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+            android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo(); am.getMemoryInfo(mi);
+            r.put("ramMb", (long) (mi.totalMem / 1048576L)); r.put("lowRam", am.isLowRamDevice());
+        } catch (Exception ignored) { }
+        r.put("cores", Runtime.getRuntime().availableProcessors());
+        try { r.put("soc", Build.VERSION.SDK_INT >= 31 ? (Build.SOC_MANUFACTURER + " " + Build.SOC_MODEL) : Build.HARDWARE); } catch (Exception ignored) { }
+        try { r.put("hz", getActivity().getWindowManager().getDefaultDisplay().getRefreshRate()); } catch (Exception ignored) { }
         call.resolve(r);
+    }
+
+    /** A photo from the game into the phone's gallery (Pictures/Airline Manager Pro), where the Photos app finds it. */
+    @PluginMethod
+    public void savePhoto(PluginCall call) {
+        String data = call.getString("data", ""), name = call.getString("name", "photo.jpg");
+        int comma = data.indexOf(',');
+        if (comma >= 0) data = data.substring(comma + 1);
+        try {
+            byte[] bytes = android.util.Base64.decode(data, android.util.Base64.DEFAULT);
+            ContentResolver cr = getContext().getContentResolver();
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name);
+            v.put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            if (Build.VERSION.SDK_INT >= 29) { v.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Airline Manager Pro"); v.put(android.provider.MediaStore.Images.Media.IS_PENDING, 1); }
+            Uri uri = cr.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            if (uri == null) { call.reject("The gallery would not take the photo"); return; }
+            OutputStream os = cr.openOutputStream(uri); if (os == null) { call.reject("The gallery would not take the photo"); return; }
+            os.write(bytes); os.close();
+            if (Build.VERSION.SDK_INT >= 29) { android.content.ContentValues d = new android.content.ContentValues(); d.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0); cr.update(uri, d, null, null); }
+            JSObject r = new JSObject(); r.put("uri", uri.toString()); call.resolve(r);
+        } catch (Exception e) { call.reject("The photo could not be saved: " + e.getMessage()); }
     }
 
     @PluginMethod

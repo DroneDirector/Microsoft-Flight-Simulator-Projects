@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.133 (2026-11-04)
+
+- Recommended graphics (gfx-advice.ts): gfxSpec (WebGL renderer, AppTools.deviceInfo ramMb/cores/soc/hz, PC /api/sysinfo), gfxRecommend, apply/undo
+- Stress test in the joined rooms (TestRooms.open({ stress })): stages of pixel ratio, shadows and instanced extras; stops near the limit; report; gfxStress kept
+- Photos to the device: AppTools.savePhoto (MediaStore, Pictures/Airline Manager Pro), PC /api/photo (Pictures\Airline Manager Pro)
+- Cinema button in the UI's colours; Testing removed from the title screen
+
 ## 0.9.132 (2026-11-04)
 
 - Clouds 3D/2D (cloud2d, cloudFlat): flat sheets from the same reports; v3dReloadAll after leaving the settings (cloudReload)

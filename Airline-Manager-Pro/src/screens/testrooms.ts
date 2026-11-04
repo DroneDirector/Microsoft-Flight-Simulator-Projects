@@ -25,15 +25,15 @@ const TR_L = {
   corH: 3.0, conH: 5.2,
 };
 
-TestRooms.open = function () {
-  const R = TestRooms; if (R.on) return;
+TestRooms.open = function (opts?: any) {
+  const R = TestRooms; if (R.on) return; R.stressMode = !!(opts && opts.stress);
   if (typeof company !== 'function' || !company()) { toast('Start or load a game first: the rooms are your own', 'info'); return; }
   const q = Gfx.roomQ();
   R.on = true; R.q = q; R.pct = 0; R.keys = {}; R.stick = [0, 0]; R.loading = true; R.loadT0 = performance.now(); R.overlay = null;
   const root = document.createElement('div'); root.className = 'court3d office3d tr3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
-    <div class="ct-top"><div class="ct-title"><small>Testing</small><b>Office · Operations · Lounge</b></div>
-      <button class="btn ghost sm ct-leave" data-tr="exit">${icon('close')}Exit testing</button></div>
+    <div class="ct-top"><div><small>${opts && opts.stress ? 'Graphics' : 'Testing'}</small><b>${opts && opts.stress ? 'Stress test' : 'Office · Operations · Lounge'}</b></div></div>
+    <button class="ct-leave" data-tr="exit">${icon('close')}<span>${opts && opts.stress ? 'Stop the test' : 'Exit testing'}</span><kbd>Esc</kbd></button>
     <div class="ct-spots tr-go"><button data-tr="go" data-k="office">Your office</button><button data-tr="go" data-k="corridor">Corridor</button><button data-tr="go" data-k="ops">Operations</button><button data-tr="go" data-k="concourse">Concourse</button><button data-tr="go" data-k="lounge">Lounge</button><button data-tr="visitor">A visitor</button></div>
     <div class="walk-pad ct-pad op-pad"><i></i></div><div class="of-aim op-dot" hidden>+</div><div class="tr-hint" hidden></div>
     ${ctLoaderHtml('Test rooms', 'Joining the rooms…', '')}`;
@@ -274,13 +274,15 @@ function trReady() {
   ctProgress(100, 'Ready', R);
   setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); } }, 500);
   R.perf = Perf.state();
-  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !R.overlay && !Perf.skip(R.perf)) trFrame(); };
+  const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !R.overlay && (R.stress || !Perf.skip(R.perf))) trFrame(); };   // the stress test measures every frame, uncapped
   R.raf = requestAnimationFrame(loop);
   R.iv = setInterval(() => { if (R.on && !document.hidden && R.ops) { try { opsMonitorDraw(R.ops); } catch (e) { /* next time */ } } }, 5000);
-  setTimeout(() => { if (R.on) trVisitor(); }, 6000);
+  if (R.stressMode) setTimeout(() => { if (R.on) gfxStressStart(); }, 900);
+  else setTimeout(() => { if (R.on) trVisitor(); }, 6000);
 }
 function trFrame() {
-  const R = TestRooms, T = THREE, now = (performance.now() - R.t0) / 1000, dt = Math.min(0.05, now - (R.last || now)); R.last = now;
+  const R = TestRooms, T = THREE, now = (performance.now() - R.t0) / 1000, raw = Math.max(0, now - (R.last || now)), dt = Math.min(0.05, raw); R.last = now;
+  if (R.stress) { try { petStep(R.of, now, dt); } catch (e) { /* no pet */ } for (const D of R.doors) D.set(D.k0); gfxStressFrame(raw); if (R.stress) R.ren.render(R.scene, R.cam); return; }
   try { if (R.of) petStep(R.of, now, dt); } catch (e) { /* no pet */ }
   for (const D of R.doors) if (D.k0 !== D.to) { D.k0 += Math.sign(D.to - D.k0) * Math.min(Math.abs(D.to - D.k0), dt * (D.slide ? 1.6 : 1.4)); const e = D.k0 * D.k0 * (3 - 2 * D.k0); D.set(e); }
   try { trVisStep(dt, now); } catch (e) { R.vis = null; }
@@ -434,14 +436,14 @@ function trInput(root: HTMLElement, cv: HTMLCanvasElement) {
   cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else trClickAt(); return; } justLocked = false; if (drag && moved < 6) trClickAt(e); drag = null; });
   root.addEventListener('click', ev => {
     const b = (ev.target as HTMLElement).closest('[data-tr]') as HTMLElement; if (!b) return; const k = b.getAttribute('data-tr');
-    if (k === 'exit') { TestRooms.close(); return; }
+    if (k === 'exit') { if (R.stress) { gfxStressEnd(true); return; } TestRooms.close(); return; }
     if (k === 'lookclose') { trComputerClose(); return; }
     if (k === 'visitor') { trVisitor(); return; }
     if (k === 'go') { const s = TR_SPOTS[b.getAttribute('data-k') || '']; if (s && R.free) { Sound.tick(); R.free.x = s.x; R.free.z = s.z; R.free.v = 0; R.look = { yaw: s.yaw, pitch: -0.05 }; } }
   });
   R.key$ = (e: KeyboardEvent) => {
     if (!R.on) return; const k = e.key.toLowerCase();
-    if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay) { trComputerClose(); return; } if (aimLocked()) { aimUnlock(); return; } TestRooms.close(); return; }
+    if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay) { trComputerClose(); return; } if (aimLocked()) { aimUnlock(); return; } if (R.stress) { gfxStressEnd(true); return; } TestRooms.close(); return; }
     if (R.overlay) return;
     if (/^(w|a|s|d|q|e|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
   };
@@ -458,7 +460,7 @@ function trInput(root: HTMLElement, cv: HTMLCanvasElement) {
   }
 }
 
-TestRooms.close = function () {
+TestRooms.close = function (quiet?: boolean) {
   const R = TestRooms; if (!R.on) return; R.on = false;
   trComputerClose();
   cancelAnimationFrame(R.raf); clearInterval(R.iv);
@@ -468,5 +470,6 @@ TestRooms.close = function () {
   try { exitFreeRenderer(R.ren, R.scene); } catch (e) { /* gone */ }
   R.ren = null; R.scene = null; R.of = null; R.ops = null; R.lg = null; R.vis = null; R.hits = []; R.doors = []; R.walk = [];
   if (R.root) R.root.remove(); R.root = null;
-  try { titleOpen(); } catch (e) { /* the game */ }
+  if (R.stress) { R.stress = null; }
+  if (!quiet && !R.stressMode) { try { titleOpen(); } catch (e) { /* the game */ } }
 };

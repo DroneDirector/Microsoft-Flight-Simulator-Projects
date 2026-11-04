@@ -93,7 +93,6 @@ function titleHtml(): string {
         ${item('ts-new', 'plus', 'New game', 'Create your pilot and airline')}
         ${Store.nogame() ? '' : item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
         ${item('ts-load', 'download', 'Load game', 'Pick up any save')}
-        ${Store.nogame() ? '' : item('ts-test', 'layers', 'Testing', 'Walk the joined rooms: office, operations, lounge')}
         ${item('ts-options', 'gear', 'Options', 'Every setting')}
         ${item('ts-quit', 'power', 'Quit', 'Asks first, offers to save')}
       </nav>

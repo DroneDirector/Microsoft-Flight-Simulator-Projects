@@ -31,6 +31,7 @@ const SETTINGS: SetSection[] = [
     { type: 'toggle', key: 'aiNotify', label: 'Notify me when my pilots land', hint: 'A phone notification when a hired pilot reaches the gate, even when the app is closed.' },
   ] },
   { id: 'view3d', title: 'Graphics', icon: 'map', items: [
+    { type: 'group', title: 'Recommended' }, { type: 'html', html: () => gfxAdviceHtml() },
     ...(DESKTOP ? [{ type: 'group', title: 'PC graphics' } as SetItem, { type: 'html', html: () => gfxSettingsHtml() } as SetItem] : []),
     { type: 'group', title: 'Distance and clouds' },
     { type: 'html', html: () => {

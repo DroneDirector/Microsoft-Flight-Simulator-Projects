@@ -49,10 +49,21 @@ ACTIONS['photo-shoot'] = () => {
     try { Sound.tick(); } catch (e) { /* quiet */ }
     const small = document.createElement('canvas'), s2 = Gfx.pic([960, 1400, 2000]) / Math.max(W, H); small.width = Math.round(W * s2); small.height = Math.round(H * s2); (small.getContext('2d') as CanvasRenderingContext2D).drawImage(big, 0, 0, small.width, small.height);
     Photo.last = { data: small.toDataURL('image/jpeg', 0.8), cap, reg: f ? f.reg : '', from: f ? f.from : '', to: f ? f.to : '' };
-    PhotoDb.put({ id: uid(), log: '3d', at: Date.now(), data: big.toDataURL('image/jpeg', Gfx.pics() >= 1 ? 0.96 : 0.92), thumb: th.toDataURL('image/jpeg', 0.75), w: W, h: H, cap, mode: Mode.coop() ? 'coop' : 'solo' })
-      .then(() => toast('Photo saved with your screenshots', 'ok', { label: 'To the papers', act: 'photo-news' })).catch(() => toast('The photo could not be saved', 'warn'));
+    const full = big.toDataURL('image/jpeg', Gfx.pics() >= 1 ? 0.96 : 0.92);
+    Promise.all([PhotoDb.put({ id: uid(), log: '3d', at: Date.now(), data: full, thumb: th.toDataURL('image/jpeg', 0.75), w: W, h: H, cap, mode: Mode.coop() ? 'coop' : 'solo' }).then(() => true, () => false), photoToDevice(full, cap)])
+      .then(([inGame, where]) => { if (!inGame && !where) { toast('The photo could not be saved', 'warn'); return; } toast(`Photo saved ${inGame ? 'with your screenshots' : ''}${inGame && where ? ' and ' : ''}${where}`, 'ok', { label: 'To the papers', act: 'photo-news' }); });
   } catch (e) { toast('The photo could not be taken', 'warn'); }
 };
+/** A photo also onto the device: the phone's gallery (Pictures/Airline Manager Pro, where the Photos app shows it)
+ *  or, on the PC, the Pictures folder (Pictures\\Airline Manager Pro). Says where it went. */
+function photoToDevice(data: string, cap: string) {
+  const d = new Date(), stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}.${String(d.getSeconds()).padStart(2, '0')}`;
+  const name = `Airline Manager Pro ${stamp}`;
+  const c: any = (window as any).Capacitor, T = c && c.isNativePlatform && c.isNativePlatform() && c.Plugins && c.Plugins.AppTools;
+  if (T && T.savePhoto) return T.savePhoto({ data, name: name + '.jpg' }).then(() => 'in your phone\'s gallery (Pictures, Airline Manager Pro)', () => '');
+  if (DESKTOP) return fetch('/api/photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data, name, cap }) }).then(r => r.json()).then(r => r && r.ok ? 'in your Pictures folder (Airline Manager Pro)' : '', () => '');
+  return Promise.resolve('');   // in a browser: kept in the game only
+}
 /** The last photo as the papers' photo of the day (one a day). */
 ACTIONS['photo-news'] = () => {
   const L = Photo.last, S: any = State; if (!L) return;

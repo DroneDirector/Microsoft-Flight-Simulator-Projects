@@ -190,6 +190,7 @@
     "src/screens/hangar3d.ts",
     "src/screens/lounge3d.ts",
     "src/screens/testrooms.ts",
+    "src/screens/gfx-advice.ts",
     "src/main.ts"
   ]
 }
