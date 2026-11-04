@@ -289,6 +289,11 @@ function trHalls(scene: any, q: number) {
     quad(5.6, 1.4, M({ color: 0x2A2C30, roughness: 0.6 }), K[2] - 0.04, LG_DOOR_H + 0.75, TR_L.lgDoorZ, -Math.PI / 2);
     const n = new T.Mesh(new T.PlaneGeometry(4.4, 0.82), new T.MeshBasicMaterial({ map: ctTex(c), transparent: true, toneMapped: false })); n.position.set(K[2] - 0.06, LG_DOOR_H + 0.75, TR_L.lgDoorZ); n.rotation.y = -Math.PI / 2; g.add(n);
     Props.place(g, 'room-sign', K[2] - 0.04, TR_L.lgDoorZ + LG_DOOR_W / 2 + 0.45, -Math.PI / 2, q, { name: 'Lounge', sub: R.lgSpec ? R.lgSpec.name : 'Members', num: 'L', pict: 'lounge', staff: false }, 1.25); }
+  // a security officer by the staff door (on the concourse side), when you have one at this airport
+  try { const hub = R.lgKey || (company() && company().hub) || '', o = typeof secPick === 'function' ? secPick(hub) : null;
+    if (o && Human.ready) { const m = Human.build(dressed(Object.assign({}, o.look, { sec: true }), 'ground' as any), 'ground', '#1C1F26', av3Style(), q >= 2 ? 0.6 : 0.45);
+      const pv = new T.Group(); pv.add(m.root); pv.position.set(TR_L.staffDoor[1] + 0.9, 0, C[3] + 0.6); pv.rotation.y = -0.3; g.add(pv);
+      m.pose({ t: 1, yaw: 0, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) }); R.guard = { m, pv }; } } catch (e) { /* no guard */ }
   // the flight boards hanging over the concourse before the lounge: Departures and Arrivals, 30 cm apart, facing you as
   // you walk towards the lounge
   { const fx = K[2] - 3.2, fy = 4.35, fz = TR_L.lgDoorZ;
@@ -333,6 +338,7 @@ function trFrame() {
   try { trVisStep(dt, now); } catch (e) { R.vis = null; }
   try { trnStep(dt, now); } catch (e) { /* no clock */ }
   try { fidsStep(R.fids); } catch (e) { /* the boards wait */ }
+  try { if (R.guard) R.guard.m.pose({ t: now, yaw: 0, gaze: [Math.sin(now * 0.2) * 0.4, 0], blink: (now % 4.1) < 0.12 ? 1 : 0, g: humanGesture(null, now) }); } catch (e) { R.guard = null; }   // the officer stands and looks round
   trWalk(dt);
   trAim();
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);

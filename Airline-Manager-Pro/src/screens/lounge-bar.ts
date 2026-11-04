@@ -429,3 +429,43 @@ function lgGuestGlass(G: any, arms: number[] | null) {
   const want = h.add(new THREE.Vector3(0, -0.06, 0)); c.g.position.copy(c.from.clone().lerp(want, c.w * c.w * (3 - 2 * c.w)));
   c.g.rotation.set(G.sip ? -0.7 * Math.sin(Math.PI * clamp(G.sip.t / 2.0, 0, 1)) : 0, G.yaw, 0, 'YXZ');
 }
+
+/* ---------- Security collecting a drunk guest ---------- */
+// An officer comes in through the lounge's doors, walks to the guest, and leads them out the way out (secExit: the
+// doors now; another way out if there ever is one). A weak officer makes a scene: raised voices, the guest pulling away.
+function lgSecurityEscort(name: string, o: any, scene: boolean) {
+  const R = LoungeRoom, A = R.A, T = THREE; if (!A || R.sec) return;
+  const G = (R.guests || []).filter((g: any) => g.P && g.P.name === name)[0]; if (!G) return;
+  let m: any = null; try { m = Human.build(dressed(Object.assign({}, o.look, { sec: true }), 'ground' as any), 'ground', '#1C1F26', av3Style(), R.q >= 2 ? 0.7 : 0.5); try { modelsPeople(m, o.look); } catch (e) { /* the app's own */ } } catch (e) { m = null; }
+  if (!m) return;
+  const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); A.root.add(pivot);
+  const door = A.door || { x: 0, z: 0 };
+  R.sec = { m, pivot, holder, G, st: 'in', x: door.x, z: door.z, yaw: 0, dist: 0, scene, t: 0, exit: secExit('lounge') };
+  if (G.seat) { G.st = 'stand'; G.timer = 0; G.side = lgSeatSide(G.seat); }   // the guest gets up
+  toast(`Security is collecting ${name}`, 'info');
+}
+function lgSecStep(dt: number, now: number) {
+  const R = LoungeRoom, S = R.sec, A = R.A; if (!S || !A) return;
+  const G = S.G, door = A.door || { x: 0, z: 0 }, T = THREE; S.t += dt;
+  const walk = (x: number, z: number, v: number) => { const dx = x - S.x, dz = z - S.z, d = Math.hypot(dx, dz); if (d < 0.15) return true;
+    const h = Math.atan2(dx, dz); S.x += Math.sin(h) * Math.min(d, v * dt); S.z += Math.cos(h) * Math.min(d, v * dt); S.yaw += angDiffRad(S.yaw, h) * Math.min(1, dt * 6); S.dist += v * dt; S.moving = true; return false; };
+  S.moving = false;
+  if (S.st === 'in') { if (G.gone) { S.st = 'out'; } else if (walk(G.x - Math.sin(G.yaw) * 0.0 + 0.55, G.z + 0.1, 1.1)) { S.st = 'talk'; S.t = 0; } }
+  else if (S.st === 'talk') { S.yaw += angDiffRad(S.yaw, Math.atan2(G.x - S.x, G.z - S.z)) * Math.min(1, dt * 5); if (S.t > (S.scene ? 4.5 : 2.5)) { S.st = 'lead'; S.t = 0; G.st = 'led'; G.v = 0; } }
+  else if (S.st === 'lead') {
+    // to the way out, the guest a step behind (unsteady)
+    const done = walk(door.x, door.z, 0.75);
+    const bx = S.x - Math.sin(S.yaw) * 0.6 + 0.25 * Math.sin(S.t * 2), bz = S.z - Math.cos(S.yaw) * 0.6;
+    const dx = bx - G.x, dz = bz - G.z, d = Math.hypot(dx, dz); if (d > 0.02) { G.x += dx * Math.min(1, dt * 3); G.z += dz * Math.min(1, dt * 3); G.yaw += angDiffRad(G.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 5); G.v = 0.7; G.dist += 0.7 * dt; }
+    if (done) { S.st = 'out'; try { A.root.remove(G.pivot); } catch (e) { /* gone */ } G.gone = true; if (G.seat) lgFreeSeat(G); }
+  }
+  else if (S.st === 'out') { try { A.root.remove(S.pivot); } catch (e) { /* gone */ } R.sec = null; return; }
+  S.pivot.position.set(S.x, 0, S.z); S.pivot.rotation.y = S.yaw;
+  let g = humanGesture(null, now);
+  if (S.moving) g = cabinLerpG(g, humanGesture({ kind: 'walk', v: 0.9, seed: 'security' } as any, S.dist / 1.25), 0.9);
+  if (S.st === 'talk' || S.st === 'lead') { g.R = [0.55, 0.15, 0.1, 0.7]; }   // a hand out to the guest's arm
+  if (S.st === 'talk' && S.scene) { g.shake = (g.shake || 0) + 0.15 * Math.sin(now * 3); }
+  try { S.m.pose({ t: now, yaw: 0, gaze: [0, 0], blink: (now % 3.9) < 0.12 ? 1 : 0, g, talk: 0 }); } catch (e) { /* still */ }
+  // the guest: arguing a little in a scene, then led away
+  if (S.st === 'talk' && S.scene && G.m) { G.yaw += 0.6 * dt * Math.sin(now * 2.2); }
+}

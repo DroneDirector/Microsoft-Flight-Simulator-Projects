@@ -275,7 +275,7 @@ const GROUND_JOBS: [string, string][] = [
   ['baggage', 'Baggage handler'], ['pushback', 'Push-back tug driver'], ['fuel', 'Fuel truck driver'], ['catering', 'Catering truck driver'],
   ['deice', 'De-icing operator'], ['bus', 'Apron bus driver'], ['ramp', 'Ramp agent'], ['stairs', 'Stairs and power unit operator'],
 ];
-function groundJobName(p: any): string { const j = GROUND_JOBS.filter(x => x[0] === p.job)[0]; return j ? j[1] : 'Ground staff'; }
+function groundJobName(p: any): string { if (p && p.job === 'security') return 'Security officer'; const j = GROUND_JOBS.filter(x => x[0] === p.job)[0]; return j ? j[1] : 'Ground staff'; }
 const ROLE_NAMES: { [r: string]: string } = { captain: 'Captain', fo: 'First officer', fa: 'Flight attendant', mech: 'Mechanic', ground: 'Ground staff' };
 
 /** Weekly payroll history: one salary payment per person, shown in Finance. */

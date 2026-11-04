@@ -4449,3 +4449,4 @@ body.scn-set-on .fg-mon { z-index: 1201; }
 .lg-bar-list button[disabled] { opacity: .45; cursor: default; }
 .lg-bar-out { display: flex; gap: 8px; align-items: center; color: #FFB4A8; margin: 0 0 8px; }
 .st-sub { margin: 14px 0 6px; }
+.sec-cover { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
