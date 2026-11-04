@@ -321,7 +321,7 @@ function lgBuild(scene: any, q: number): any {
   // brass surround in five stepped frames like a sunburst, a fan of brass rays above, warm light washing up the breast.
   // The fire is the lounge's own (its flames and their light). File: lounge-props/fireplace.glb.
   if (lv >= 1) {
-    const fx = x0, fz = z0 + D * 0.72, brassF = M({ color: 0xC9A25E, metalness: 0.95, roughness: 0.28 });
+    const fx = x0, fz = z0 + D * 0.72, brassF = M({ color: 0xC9A25E, metalness: 0.95, roughness: 0.28, emissive: 0x5A3E14, emissiveIntensity: 0.55 });   // the brass catches the fire's glow
     // w along the wall (z), d out from it (x), at a distance x from the wall
     const at = (w: number, h: number, d: number, m: any, x: number, y: number, z: number) => bx(d, h, w, m, fx + x, y, fz + z);
     prop('fireplace', fx + 0.3, fz, Math.PI / 2, () => {
