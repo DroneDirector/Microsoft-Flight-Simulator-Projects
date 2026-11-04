@@ -243,7 +243,7 @@ function ofBuild(scene: any, q: number) {
   try { petPlace(T, root, A, [1.2, -2.8], -0.5, { free: (x: number, z: number) => ofFree(x, z) && !ofPetBlocked(x, z), door: [1.05, -1.85], box: [-2.9, -3.1, 2.9, 2.7] }); } catch (e) { /* no pet */ }
   // ceiling lights
   const dm = new T.MeshBasicMaterial({ color: 0xFFF1D8, toneMapped: false });
-  for (const [x, z] of [[-1.6, -1.8], [1.6, -1.8], [-1.6, 1.4], [1.6, 1.4], [0, -0.2]]) { const d = new T.Mesh(new T.CircleGeometry(0.08, 20), dm); d.rotation.x = Math.PI / 2; d.position.set(x, HH - 0.005, z); root.add(d); const L = new T.SpotLight(0xFFE4C0, 5, 7, 0.9, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); if (DESKTOP && Gfx.lights() >= 2 && Gfx.shadow() !== 0 && (x === 0 || z < 0)) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); L.shadow.bias = -0.0005; L.shadow.radius = 4; } root.add(L); root.add(L.target); }   // on the PC the ceiling lights cast soft shadows of their own
+  for (const [x, z] of (q >= 1 ? [[-1.6, -1.8], [1.6, -1.8], [-1.6, 1.4], [1.6, 1.4], [0, -0.2]] : [[0, -1.5], [0, 1.1]])) { const d = new T.Mesh(new T.CircleGeometry(0.08, 20), dm); d.rotation.x = Math.PI / 2; d.position.set(x, HH - 0.005, z); root.add(d); const L = new T.SpotLight(0xFFE4C0, q >= 1 ? 5 : 11, q >= 1 ? 7 : 9, q >= 1 ? 0.9 : 1.15, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); if (DESKTOP && Gfx.lights() >= 2 && Gfx.shadow() !== 0 && (x === 0 || z < 0)) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); L.shadow.bias = -0.0005; L.shadow.radius = 4; } root.add(L); root.add(L.target); }   // on the PC the ceiling lights cast soft shadows of their own
   return A;
 }
 

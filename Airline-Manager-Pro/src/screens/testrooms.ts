@@ -186,7 +186,11 @@ function trHalls(scene: any, q: number) {
   wallX(C[0], C[2], C[3] - 0.02, -1, H, [[TR_L.staffDoor[0], TR_L.staffDoor[1], 2.2]]);
   for (const [x, f] of [[C[0] + 0.03, 1], [C[2] - 0.05, -1]] as number[][]) { box(0.04, 0.15, C[3] - C[1], rail, x, 0.95, (C[1] + C[3]) / 2); box(0.012, 0.12, C[3] - C[1], dark, x - f * 0.01, 0.06, (C[1] + C[3]) / 2); }
   for (let z = C[1] + 1.5; z < C[3]; z += 3) { const p = quad(1.2, 0.6, lamp, (C[0] + C[2]) / 2, H - 0.01, z, 0, Math.PI / 2); void p; }
-  for (let z = C[1] + 3; z < C[3]; z += 6) { const L = new T.PointLight(0xFFF4E2, 9, 9, 2); L.position.set((C[0] + C[2]) / 2, H - 0.3, z); g.add(L); }
+  // real lamps cost every surface a little more to draw, so fewer on lighter settings (the panels still glow, and
+  // a soft fill light stands in for them); phones and tablets keep their speed
+  const lampStep = q >= 2 ? 6 : q >= 1 ? 12 : 0;
+  if (lampStep) for (let z = C[1] + 3; z < C[3]; z += lampStep) { const L = new T.PointLight(0xFFF4E2, q >= 2 ? 9 : 14, q >= 2 ? 9 : 14, 2); L.position.set((C[0] + C[2]) / 2, H - 0.3, z); g.add(L); }
+  else g.add(new T.HemisphereLight(0xFFF6E8, 0x6A6458, 0.45));
   // the rooms still to come: shut doors with their signs (west side)
   for (const [i, [a, b]] of future.entries()) {
     const pv = new T.Group(); pv.position.set(C[0] + 0.03, 0, a); pv.rotation.y = -Math.PI / 2; g.add(pv); Props.place(pv, 'door-1', 0, 0, 0, q, { w: b - a, h: 2.12, color: 0x7D8790 });
@@ -226,10 +230,14 @@ function trHalls(scene: any, q: number) {
   // moving walkways (to look at; you walk beside them), seats along the glass
   for (const z of [10.2, 12.9]) { box(22, 0.22, 2.0, M({ color: 0x5D646C, metalness: 0.5, roughness: 0.4 }), 12, 0.11, z); box(21.8, 0.02, 1.7, M({ color: 0x2B2F34, roughness: 0.6 }), 12, 0.23, z);
     for (const s of [-1, 1]) { box(22, 0.9, 0.04, new T.MeshPhysicalMaterial({ color: 0xDDEBF4, transparent: true, opacity: 0.25, roughness: 0.05 }), 12, 0.67, z + s * 0.96); box(22, 0.1, 0.12, M({ color: 0x1C1F23 }), 12, 1.15, z + s * 0.96); } }
-  for (let x = -6; x < 26; x += 0.62) { box(0.54, 0.05, 0.5, M({ color: 0x2F3D52 }), x, 0.45, 16.6); box(0.54, 0.5, 0.06, M({ color: 0x2F3D52 }), x, 0.72, 16.88); }
+  { // the seats along the glass: one shape each for the seat, the back and the legs, drawn as copies (a single draw call each)
+    const xs: number[] = []; for (let x = -6; x < 26; x += 0.62) xs.push(x);
+    const seatM = M({ color: 0x2F3D52, roughness: 0.55 }), legM = M({ color: 0x9AA0A6, metalness: 0.6, roughness: 0.35 }), m4 = new T.Matrix4();
+    for (const [geo, mat, y, z] of [[new T.BoxGeometry(0.54, 0.05, 0.5), seatM, 0.45, 16.6], [new T.BoxGeometry(0.54, 0.5, 0.06), seatM, 0.72, 16.88], [new T.BoxGeometry(0.04, 0.43, 0.42), legM, 0.215, 16.65]] as any[]) {
+      const im = new T.InstancedMesh(geo, mat, xs.length); xs.forEach((x, i) => im.setMatrixAt(i, m4.makeTranslation(x, y, z))); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.castShadow = shadow; im.receiveShadow = true; g.add(im); } }
   for (const x of [-7.5, 7, 27]) Props.place(g, 'plant-2', x, 16.9, 0.3, q, { seed: Math.round(x) });
   // lights: a row of pendants and the ceiling's glow
-  for (let x = K[0] + 3; x < K[2]; x += 6) { const L = new T.PointLight(0xFFF6E8, 22, 18, 2); L.position.set(x, HC - 0.6, (K[1] + K[3]) / 2); g.add(L);
+  for (let x = K[0] + 3; x < K[2]; x += 6) { if (lampStep && Math.round((x - K[0] - 3) / 6) % (lampStep / 6) === 0) { const L = new T.PointLight(0xFFF6E8, q >= 2 ? 22 : 34, q >= 2 ? 18 : 26, 2); L.position.set(x, HC - 0.6, (K[1] + K[3]) / 2); g.add(L); }
     const d = new T.Mesh(new T.CylinderGeometry(0.35, 0.35, 0.05, 24), lamp); d.position.set(x, HC - 0.03, (K[1] + K[3]) / 2); g.add(d); }
   // overhead signs: yellow on dark grey (as in many airports)
   const way = (x: number, z: number, ry: number, w: number, text: string) => {

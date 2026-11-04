@@ -162,7 +162,7 @@ function opsBuild(scene: any, q: number) {
   Props.place(root, 'plant-2', X1 - 0.42, Z0 + 0.42, 0.3, q, { seed: 8 });
   // the lights: linear ceiling lights, cool white
   for (const z of [-1.6, 0.2, 1.6]) { const ln = new T.Mesh(new T.BoxGeometry(2.6, 0.02, 0.08), mat.glow); ln.position.set(0, HH - 0.012, z); root.add(ln); }
-  for (const [x, z] of [[-1.3, -1.6], [1.3, -1.6], [-1.3, 1.0], [1.3, 1.0], [0, -0.3]]) { const L = new T.SpotLight(0xF2F6FF, 4.5, 7, 0.95, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); if (q >= 2 && x === 0 && (!DESKTOP || Gfx.lights() >= 2)) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); } root.add(L); root.add(L.target); }
+  for (const [x, z] of (q >= 1 ? [[-1.3, -1.6], [1.3, -1.6], [-1.3, 1.0], [1.3, 1.0], [0, -0.3]] : [[0, -1.3], [0, 0.8]])) { const L = new T.SpotLight(0xF2F6FF, q >= 1 ? 4.5 : 10, q >= 1 ? 7 : 9, q >= 1 ? 0.95 : 1.15, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); if (q >= 2 && x === 0 && (!DESKTOP || Gfx.lights() >= 2)) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); } root.add(L); root.add(L.target); }
   return A;
 }
 

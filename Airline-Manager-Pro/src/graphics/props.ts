@@ -118,16 +118,41 @@ function prM(o: any): any { return new THREE.MeshStandardMaterial(Object.assign(
 function prP(o: any): any { return new THREE.MeshPhysicalMaterial(Object.assign({ roughness: 0.6 }, o)); }
 
 /* ---------- the props ---------- */
+/** Props already built, by name, detail and options: a second one of the same shares its shapes and materials
+ *  (nothing is built or held twice; a room full of the same chair costs the memory of one). */
+const PR_BUILT: { [k: string]: any } = {};
 const Props = {
-  /** Build one prop (front +Z, on the floor, centred). */
+  /** Build one prop (front +Z, on the floor, centred). The same one again is a copy sharing its shapes. */
   make(name: string, q: PropQ = 1, o: any = {}): any {
     const f = (PROP_BUILD as any)[name]; if (!f) return new THREE.Group();
-    const g = f(q, o); g.name = name; g.userData.prop = name; return g;
+    const key = name === 'room-sign' ? '' : name + '|' + q + '|' + JSON.stringify(o);
+    if (key && PR_BUILT[key]) { const c = PR_BUILT[key].clone(); c.userData = Object.assign({}, PR_BUILT[key].userData); return c; }
+    const g = f(q, o); g.name = name; g.userData.prop = name;
+    if (key) PR_BUILT[key] = g;
+    return key ? this.make(name, q, o) : g;
   },
   /** Build it, stand it in `parent` at x, z (y), turned ry, and use the file in its place if there is one. */
   place(parent: any, name: string, x: number, z: number, ry = 0, q: PropQ = 1, o: any = {}, y = 0): any {
     const g = this.make(name, q, o); g.position.set(x, y, z); g.rotation.y = ry; parent.add(g);
     try { Models.swap(g, PROP_DIR + name + '.glb', false); } catch (e) { /* the app's own */ }
+    return g;
+  },
+  /** Many of the same prop (a row of seats, a lounge full of armchairs) drawn together: each of its parts is drawn
+   *  once for all of them (one draw call per material, not one per chair), which phones and tablets feel most. With
+   *  a model file in its place, each is placed on its own so the file is used. at: [x, z, ry, y?] each. */
+  placeMany(parent: any, name: string, at: number[][], q: PropQ = 1, o: any = {}): any {
+    const T = THREE;
+    if (!at.length) return new T.Group();
+    if (Models.has(PROP_DIR + name + '.glb') || at.length < 2) { const g = new T.Group(); g.name = name + '-set'; parent.add(g); for (const p of at) this.place(g, name, p[0], p[1], p[2] || 0, q, o, p[3] || 0); return g; }
+    const tpl = this.make(name, q, o), g = new T.Group(); g.name = name + '-set'; g.userData.prop = name; g.userData.many = at.length; parent.add(g);
+    tpl.updateMatrixWorld(true);
+    const m4 = new T.Matrix4(), Q = new T.Quaternion(), P = new T.Vector3(), S = new T.Vector3(1, 1, 1), Y = new T.Vector3(0, 1, 0);
+    tpl.traverse((mesh: any) => {
+      if (!mesh.isMesh) return;
+      const im = new T.InstancedMesh(mesh.geometry, mesh.material, at.length); im.castShadow = mesh.castShadow; im.receiveShadow = mesh.receiveShadow;
+      at.forEach((p, i) => { m4.compose(P.set(p[0], p[3] || 0, p[1]), Q.setFromAxisAngle(Y, p[2] || 0), S); m4.multiply(mesh.matrixWorld); im.setMatrixAt(i, m4); });
+      im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); g.add(im);
+    });
     return g;
   },
 };

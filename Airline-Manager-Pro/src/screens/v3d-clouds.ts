@@ -291,8 +291,12 @@ function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): Clou
       }
       if (flat) {   // 2D: a heap is a soft patch of cloud at its base, fuller and greyer underneath where it is denser
         const W = cell * (0.75 + 0.6 * dens), ccx = c[0] + (rnd(1) - 0.5) * cell * 0.35, ccz = c[1] + (rnd(2) - 0.5) * cell * 0.35;
-        add({ x: ccx, y: base + 40, z: ccz, m: 0, s: W, h: 0.15, a: 0.6 + 0.3 * dens, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|f` });
-        if (dens > 0.5) add({ x: ccx + (rnd(3) - 0.5) * cell * 0.2, y: base + 220, z: ccz + (rnd(4) - 0.5) * cell * 0.2, m: 0, s: W * 0.7, h: 0.7, a: 0.55, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|f2` });
+        // a few overlapping, offset sheets, each fainter: their edges break up into an irregular, soft-edged patch
+        const nf = 3 + (dens > 0.6 ? 1 : 0) + (detail >= 3 ? 1 : 0);
+        for (let f = 0; f < nf; f++) {
+          const ang = rnd(f * 7 + 60) * Math.PI * 2, rr = (f ? 0.18 + 0.2 * rnd(f * 7 + 61) : 0) * W;
+          add({ x: ccx + Math.cos(ang) * rr, y: base + 30 + f * 45, z: ccz + Math.sin(ang) * rr, m: 0, s: W * (0.62 + 0.3 * rnd(f * 7 + 62)), h: 0.1 + f * 0.15, a: 0.3 + 0.28 * dens, sd: sd + f * 1.7, dx: 0, dy: 1, dz: 0, id: `${tag}|f${f}` });
+        }
         if (rains && dens > 0.45) add({ x: ccx, y: base + 50, z: ccz, m: 3, s: W * 0.6, h: 0, a: 0.25 + 0.35 * pr.k, sd, dx: pr.kind === 'sn' ? 1 : 0, dy: 0, dz: 0, w: base + 50 - (st.elev - curve), id: `${tag}|shaft` });
         return;
       }

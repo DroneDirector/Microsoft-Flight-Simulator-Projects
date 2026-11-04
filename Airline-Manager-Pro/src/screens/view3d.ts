@@ -256,7 +256,7 @@ function v3dWaterAt(icao: string, lat: number, lon: number): boolean {
 /** Drag to look around, pinch or scroll to zoom, tap an aircraft for its flight. */
 function v3dBind() {
   const cv = V3d.cv; cv.style.touchAction = 'none';
-  cv.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); if (!V3d.open) return;   // closing the view lets go of the graphics on purpose
+  cv.addEventListener('webglcontextlost', (e: Event) => { e.preventDefault(); if (!V3d.open || e.target !== V3d.cv) return;   // closing the view lets go of the graphics on purpose (also an old view's, arriving after a reload)
     try { ErrorLog.add('3d', 'The 3D view lost its graphics', `Satellite detail ${v3dSatQ()}`, 'WebGL context lost'); } catch (x) { /* ignore */ } const S: any = State.settings; if ((S.v3dSatQ || 0) > 0) { S.v3dSatQ--; Store.soon(); } v3dClose(); toast('The 3D view ran out of graphics memory and closed. Satellite detail was lowered one step.', 'warn'); });
   cv.addEventListener('pointerdown', (e: PointerEvent) => {
     cv.setPointerCapture(e.pointerId); V3d.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY };
