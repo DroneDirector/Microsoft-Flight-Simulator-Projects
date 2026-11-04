@@ -86,7 +86,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
     <div class="v3d-info"></div>
     <div class="v3d-line"></div>
     <div class="v3d-status"></div>
-    <button class="v3d-shot" data-act="v3d-shot" aria-label="Take a screenshot" title="Take a screenshot (P)">${icon('camera')}</button><button class="v3d-shot v3d-photo" data-act="photo-mode" aria-label="Photo mode" title="Photo mode (H)">${icon('star')}</button>
+    <button class="v3d-shot" data-act="v3d-shot" aria-label="Take a screenshot" title="Take a screenshot (P)">${icon('camera')}</button><button class="v3d-cine" data-act="photo-mode" aria-label="Cinema" title="Cinema: frame your shot, hide everything else (H)">${icon('cinema')}<span>Cinema</span></button>
     <button class="v3d-uitog" data-act="v3d-ui" aria-label="Hide or show the controls" title="Hide or show the controls (H)">${icon('focus')}<span>Hide controls</span></button>
     <button class="v3d-sat ${(State.settings as any).v3dSat ? 'on' : ''}" data-act="v3d-sat">${icon('map')}Satellite</button>
     <div class="v3d-free-ui">
@@ -155,7 +155,17 @@ function v3dClose() {
   V3d.root = null; V3d.terrain = null; V3d.airport = null; V3d.aptScene = null; V3d.planes = {};
 }
 // closing from the free camera: back to the normal Overview
+/** The X (and Esc, the back button, the controller): asks first; Yes leaves with the loading screen. */
 ACTIONS['v3d-close'] = () => {
+  if (!V3d.open || ExitSplash.on || document.querySelector('.v3d-ask')) return;
+  try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* not locked */ }
+  Sound.tick();
+  const wrap = openLayer('modal', `<div class="modal-head"><div><h2>Leave the 3D viewer?</h2><small>Are you sure you want to exit the 3D viewer?</small></div></div>
+    <div class="modal-actions center"><button class="btn ghost" data-act="close-layer">No, stay</button><button class="btn primary" data-v3d-yes>${icon('close')}Yes, leave</button></div>`, { cls: 'narrow v3d-ask' });
+  const yes = wrap && wrap.querySelector('[data-v3d-yes]') as HTMLElement;
+  if (yes) { yes.addEventListener('click', () => { closeTop(); ACTIONS['v3d-close-go'](null as any, null as any); }); setTimeout(() => yes.focus(), 50); }
+};
+ACTIONS['v3d-close-go'] = () => {
   if (!V3d.open || ExitSplash.on) return;
   const free = V3d.mode === 'free';
   exitSplash('v3d', 'Leaving the 3D viewer', [
@@ -335,6 +345,8 @@ function v3dCentre(f: LiveFlight, pos: number[]): { pos: number[]; icao: string 
   const A = apt(f.from), B = f.noDest ? null : apt(f.to);
   const dA = A ? gcDistanceNm(pos, A.pos) : 1e9, dB = B ? gcDistanceNm(pos, B.pos) : 1e9;
   if (Math.min(dA, dB) < 60) { const k = dB <= dA ? f.to : f.from; return { pos: apt(k).pos, icao: k }; }
+  // close to another airport (a diversion, a missed approach elsewhere, taxiing at a field not in the plan): drawn too
+  const near = v3dAirportNear(pos, 3); if (near) return { pos: apt(near).pos, icao: near };
   return { pos, icao: '' };
 }
 
@@ -1082,14 +1094,26 @@ function v3dFreeStep(dt: number) {
 /** Flown far from the centre: the scene (terrain, airport, aircraft) moves to where the camera is. */
 function v3dFreeRecentre() {
   const F = fc(); if (!F) return;
-  const ll = v3dLonLat(F.pos.x, F.pos.z); if (gcDistanceNm(V3d.origin, ll) < 10) return;
-  // the nearest airport within a few miles becomes the centre, so its layout is drawn
-  let icao = '', best = 4;
-  for (const k of Object.keys(AIRPORTS)) { const A = apt(k); if (!A || !A.pos) continue; const d = gcDistanceNm(ll, A.pos); if (d < best) { best = d; icao = k; } }
+  const ll = v3dLonLat(F.pos.x, F.pos.z);
+  // an airport within a few miles is always the centre, so its layout is drawn (also when you come back to it
+  // after flying the camera away: before, the view only moved again after another 10 miles, and the airport
+  // stayed away); every airport in the world, not only the main ones
+  const icao = v3dAirportNear(ll, 4);
+  if (icao && icao === V3d.icao) return;
+  if (!icao && gcDistanceNm(V3d.origin, ll) < 10) return;
   const centre = icao ? apt(icao).pos : ll, oldY = F.pos.y;
   v3dRecentre({ from: icao || '', to: icao || '', noDest: !icao } as any, { lon: centre[0], lat: centre[1] });
   if (!icao) { V3d.icao = ''; }
   const q = v3dXY(ll[0], ll[1]); F.pos.set(q[0], oldY, q[1]);
+}
+/** The nearest airport within `nm`, from the main ones and the world list (with runways, not seaplane bases), or ''. */
+function v3dAirportNear(ll: number[], nm: number): string {
+  let icao = '', best = nm;
+  const check = (k: string, pos: number[]) => { if (!pos) return; const d = gcDistanceNm(ll, pos); if (d < best) { best = d; icao = k; } };
+  for (const k of Object.keys(AIRPORTS)) { const A = AIRPORTS[k]; if (A && A.pos && !isHelipad(k)) check(k, A.pos); }
+  try { const W: any = World; if (W.ready) { const dLat = nm / 60; for (const a of W.list) if (a.size != null && a.size <= 2 && Math.abs(a.pos[1] - ll[1]) < dLat) check(a.icao, a.pos); } } catch (e) { /* the main ones */ }
+  if (icao) registerWorldAirport(icao);
+  return icao;
 }
 
 ACTIONS['fc-help'] = () => { const h = V3d.root && V3d.root.querySelector('.fc-help'); if (h) h.classList.toggle('on'); Sound.tick(); };
