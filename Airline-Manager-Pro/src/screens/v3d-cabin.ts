@@ -86,10 +86,10 @@ function cabWinParts(st: CabinStyle, kind: 'deep' | 'row'): any {
   const pane = new T.ShapeGeometry(new T.Shape(cabWinLoop(ww, wh, r, -0.002, nc, ns).map(p => new T.Vector2(p[0], p[1]))));
   pane.translate(0, 0, back - 0.003);
   // the shade: a panel 1 high from its bottom edge up (scaled to how far it is down), its lip and the grip
-  const shade = new T.PlaneGeometry(ww + 0.03, 1); shade.translate(0, 0.5, 0);
-  const lip = new T.BoxGeometry(ww + 0.02, 0.012, 0.014, 1, 1, 1); lip.translate(0, 0.006, 0.007);
+  const shade = new T.PlaneGeometry(ww + 0.012, 1); shade.translate(0, 0.5, 0);
+  const lip = new T.BoxGeometry(ww + 0.008, 0.012, 0.014, 1, 1, 1); lip.translate(0, 0.006, 0.007);
   const grip = new T.CylinderGeometry(0.034, 0.034, 0.01, [12, 16, 20, 28][q], 1, false, Math.PI / 2, Math.PI); grip.rotateX(Math.PI / 2); grip.scale(1, 0.4, 1); grip.translate(0, 0.0, 0.014);   // the half-oval tab under the lip
-  const shadeZ = Math.max(back + 0.03, -0.035);   // just behind the surround's lip, in the reveal
+  const shadeZ = back + 0.006;   // close in front of the pane, so its square corners stay hidden behind the rounded surround
   return (CabWin.geo[key] = { ring, seal, pane, shade, lip, grip, back, shadeZ, ww, wh, r });
 }
 /** Where the shade's bottom edge is for how far it is down (0 up, the lip just showing at the top; 1 shut). */
