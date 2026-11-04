@@ -84,6 +84,7 @@
     "src/core/bases.ts",
     "src/core/bank.ts",
     "src/core/ratings.ts",
+    "src/core/crew-training.ts",
     "src/core/jobs.ts",
     "src/core/online.ts",
     "src/core/g2p.ts",

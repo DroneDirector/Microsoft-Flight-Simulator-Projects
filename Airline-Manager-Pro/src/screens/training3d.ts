@@ -227,9 +227,215 @@ function trnPictures() {
   for (const [o, tex] of N.covers || []) put(o, tex, 'cover');
 }
 /** The clock on the wall keeps the time. */
-function trnStep() {
+function trnStep(dt = 0, now = 0) {
   const R = TestRooms, C = R.trn && R.trn.clock; if (!C) return;
+  try { trnClassStep(dt, now); } catch (e) { /* the class waits */ }
   if (!R.trn.picAt || performance.now() - R.trn.picAt > 2000) { R.trn.picAt = performance.now(); try { trnPictures(); } catch (e) { /* the file's own */ } }
   const d = new Date(), h = (d.getHours() % 12 + d.getMinutes() / 60) / 12 * Math.PI * 2, m = d.getMinutes() / 60 * Math.PI * 2;
   C[0].rotation.x = h; C[1].rotation.x = m;   // seen from the room (looking east), clockwise
+}
+
+/* ---------- the class: the people on a course, in their seats, and the teacher ---------- */
+// The students are the people you hired, as they are (their own names and looks): everyone on a course, up to 12,
+// the longest there first. They sit at their desks, swaying a little, and look at the teacher. The teacher talks all
+// through the lesson, about what this class is learning (pilots, cabin crew, mechanics or ground staff), and goes
+// round his routine: he looks at the class for a few seconds, then down at the book in his hand, back up, over to the
+// window to look out (still talking), back behind his desk to sit for three to four minutes, up again with the book
+// to read from it for 27 seconds, and from the start. Click him (or a student) to see what is said; his voice is
+// heard while you are in the room.
+const TRN_TEACHER = { name: 'Daniel Brandt', title: 'Instructor, the Academy', sex: 'm' as 'm' | 'f' };
+const TRN_LESSONS: { [who: string]: string[] } = {
+  pilot: [
+    'Good morning, everyone. Today we look at what keeps the aircraft safe when things stop going to plan.',
+    'Let us start with the take-off. V one is the speed at which you are committed. After it, you go, whatever happens.',
+    'Below V one, a serious failure means you stop. Above it, you fly the aircraft, you climb, and then you sort it out.',
+    'Rotate at V R, smoothly, to the attitude in your briefing. Not faster: you risk a tail strike.',
+    'If an engine fails after V one, keep it straight with the rudder. Dead foot, dead engine.',
+    'Climb at V two until you are clear of obstacles, then accelerate and clean up the flaps.',
+    'Now, crew resource management. The best captains ask the first officer what they think, and listen to the answer.',
+    'When something unusual happens, aviate first, then navigate, then communicate. In that order, every time.',
+    'An upset: the nose is high and the speed is falling. Push. Unload the wing first, then roll level, then recover.',
+    'Read the checklist out loud, and wait for the answer. Silence is not an answer.',
+    'Weather. A thunderstorm is never worth it. Twenty miles round it, and never underneath.',
+    'Fuel. Land with your final reserve still in the tanks. If you might not, declare it early.',
+    'Right. Open your books at the chapter on stabilised approaches. One thousand feet, stable, or we go around.',
+  ],
+  fa: [
+    'Good morning, everyone. Today is about safety, the reason you are on board.',
+    'Before every flight you check your emergency equipment: the oxygen, the extinguishers, the torch and the first aid kit.',
+    'Your door is armed before push-back. If it opens now, the slide inflates, so cross-check with your colleague.',
+    'In an evacuation you have ninety seconds. Shout your commands: release your seat belts, get out!',
+    'Look outside before you open the door. Fire, water or debris on that side, and that door stays shut.',
+    'A fire in the cabin: find it, fight it, and tell the flight deck at once. Never open a hot locker wide.',
+    'Smoke hood first, then the extinguisher. Aim at the base of the fire, not the smoke.',
+    'Lithium batteries can catch fire long after they are switched off. Cool it with water, then put it in the bag.',
+    'First aid. Someone collapses: check for breathing, call for the defibrillator, and start compressions.',
+    'Thirty compressions, two breaths. Hard and fast, about two a second. Swap every two minutes.',
+    'A difficult passenger. Stay calm, keep your voice low, and keep the purser and the captain informed.',
+    'Turbulence: when the seat belt sign comes on, you sit down too. Your safety comes first.',
+    'Open your books at the chapter on ditching. Life jackets on, but not inflated until you are outside.',
+  ],
+  mech: [
+    'Good morning. Today we talk about doing the job right, every time, and signing for it.',
+    'Every task follows the maintenance manual. Not memory, not the way we did it last time. The manual.',
+    'Human factors. Fatigue, pressure and distraction are behind most maintenance mistakes.',
+    'If you are interrupted during a task, go back one step and check it again before you carry on.',
+    'Torque. Use a calibrated wrench, and check the value in the manual for that bolt, every time.',
+    'Wiring. Look for chafing where the wires pass structure, and keep power and signal wires apart.',
+    'A borescope inspection: you look for nicks, cracks and burns on the blades, and you measure them against the limits.',
+    'An engine run-up. Chocks in, a fire guard outside, and the area in front and behind the engine clear.',
+    'Foreign object damage. One loose nut in an intake can destroy an engine. Count your tools in and out.',
+    'Hot work in the hangar needs a permit and a fire watch, until thirty minutes after the last spark.',
+    'When you release an aircraft to service, your signature says it is safe. Only sign what you have seen.',
+    'Open your books at the chapter on the minimum equipment list, and what you may defer.',
+  ],
+  ground: [
+    'Good morning, everyone. Today is about the ramp, the busiest and most dangerous place at the airport.',
+    'On the apron, aircraft always have right of way. Always.',
+    'Keep to the speed limits: walking pace near the aircraft, and never drive under a wing.',
+    'Before an aircraft moves, the anti-collision beacon comes on. When it flashes, stay clear of the engines.',
+    'Pushback. Connect the towbar, insert the bypass pin, and only then tell the flight deck you are ready.',
+    'Keep talking to the captain on the headset: brakes released, pushback approved, and when you stop, set the brakes.',
+    'Loading. The load plan tells you what goes where. Heavy items low, and everything secured.',
+    'Dangerous goods. Check the labels, and never load a damaged or leaking package. Tell your supervisor.',
+    'The loadsheet must match what is really on board. A last-minute change means a new figure for the captain.',
+    'De-icing. The critical surfaces must be clean before take-off, and the hold-over time starts when you begin.',
+    'A fuel spill: stop the fuelling, keep people away, and call the fire service. No engines, no sparks.',
+    'Open your books at the chapter on airside driving, and the markings you must know for your test.',
+  ],
+};
+/** The class now: who sits where (up to 12, the longest there first). */
+function trnClassList(): any[] { try { return inTrainingNow().slice(0, 12); } catch (e) { return []; } }
+/** What the class is learning: the kind most of them are. */
+function trnTopic(list: any[]): string {
+  const n: any = {}; for (const p of list) { const k = courseGroupOf(p); n[k] = (n[k] || 0) + 1; }
+  return Object.keys(n).sort((a, b) => n[b] - n[a])[0] || 'pilot';
+}
+function trnPersonQ(): number { const q = Gfx.roomQ(); return q >= 2 ? 0.75 : q >= 1 ? 0.5 : 0.35; }
+/** Seat the class, add or take away students as courses start and end, and the teacher with them. */
+function trnClassSync() {
+  const R = TestRooms, N = R.trn; if (!N || !R.scene) return;
+  const T = THREE, c = company(), list = trnClassList(), seats = N.seats, want: any = {};
+  list.forEach((p, i) => want[p.id] = i);
+  for (const id in N.people) if (!(id in want) || N.people[id].seat !== want[id]) { const s = N.people[id]; N.g.remove(s.pivot); R.hits = R.hits.filter((h: any) => h !== s.hit); delete N.people[id]; }
+  list.forEach((p, i) => {
+    if (N.people[p.id]) return;
+    try {
+      const m = Human.build(p.look, personRole(p), (c && c.color) || '#2C8CFF', av3Style(), trnPersonQ()); try { modelsPeople(m, p.look); } catch (e) { /* the app's own */ }
+      const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); pivot.rotation.order = 'YXZ'; N.g.add(pivot);
+      const top = m.top || 1.7; pivot.position.set(seats[i][0] - 0.02, 0.49, seats[i][1]); holder.position.y = -top * 0.52; pivot.rotation.y = -Math.PI / 2;
+      const hit = new T.Mesh(new T.BoxGeometry(0.5, 1.3, 0.5), new T.MeshBasicMaterial({ visible: false })); hit.position.set(seats[i][0], 0.75, seats[i][1]); hit.userData = { act: 'trn', id: p.id, keep: true }; N.g.add(hit); R.hits.push(hit);
+      N.people[p.id] = { p, m, pivot, holder, seat: i, hit, ph: i * 1.37 + Math.random() * 3, g: null };
+    } catch (e) { /* this one stays away */ }
+  });
+  N.topic = trnTopic(list);
+  // the teacher: there while there is a class
+  if (list.length && !N.teacher) {
+    try {
+      const L: any = randomLook('academy-teacher-1', TRN_TEACHER.sex, 'captain'); L.civil = true; L.top = 'jacket'; L.neck = 'tie'; L.uniform = 2; L.hat = 'none'; L.glasses = 'rect'; L.bottom = 'trousers'; L.shoes = 'oxford';
+      const m = Human.build(L, 'captain', (c && c.color) || '#2C8CFF', av3Style(), Math.max(0.5, trnPersonQ())); try { modelsPeople(m, L); } catch (e) { /* the app's own */ }
+      const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); pivot.rotation.order = 'YXZ'; N.g.add(pivot);
+      const book = new T.Mesh(new T.BoxGeometry(0.2, 0.27, 0.03), new T.MeshStandardMaterial({ map: ctTex(trnCoverCanvas('Principles of Flight', '#1F4E79')), roughness: 0.7 })); N.g.add(book);
+      const hit = new T.Mesh(new T.BoxGeometry(0.6, 1.8, 0.6), new T.MeshBasicMaterial({ visible: false })); hit.userData = { act: 'trn', id: 'teacher', keep: true }; N.g.add(hit); R.hits.push(hit);
+      N.teacher = { m, pivot, holder, book, hit, x: -12.2, z: -15.1, yaw: Math.PI / 2, step: 0, stepAt: 0, sit: 0, g: null, line: -1, say: '', sayAt: 0, next: 0 };
+    } catch (e) { N.teacher = null; }
+  } else if (!list.length && N.teacher) {
+    const t = N.teacher; N.g.remove(t.pivot); N.g.remove(t.book); N.g.remove(t.hit); R.hits = R.hits.filter((h: any) => h !== t.hit); N.teacher = null;
+    try { if (Voice.speaking && /Daniel Brandt/.test(Voice.who)) Voice.stop(); } catch (e) { /* no voice */ }
+  }
+}
+// the teacher's routine: [what, seconds, where he stands (x, z, facing)]
+const TRN_FRONT = [-12.2, -15.1, Math.PI / 2], TRN_WINDOW = [-12.95, -17.75, Math.PI], TRN_DESK = [-13.75, -15.1, Math.PI / 2];
+function trnRoutine(): [string, number, number[]][] {
+  return [['look', 4, TRN_FRONT], ['book', 5, TRN_FRONT], ['look', 4, TRN_FRONT], ['walk', 0, TRN_WINDOW], ['window', 6, TRN_WINDOW], ['walk', 0, TRN_DESK],
+    ['sit', 180 + Math.random() * 60, TRN_DESK], ['stand', 1.6, TRN_DESK], ['read', 27, TRN_DESK], ['walk', 0, TRN_FRONT]];
+}
+/** Are you in the Training room (to hear the lesson)? */
+function trnHere(): boolean { const R = TestRooms, F = R.free; return !!(F && R.in === 'halls' && F.x > TRN_L.x0 && F.x < TRN_L.x1 + 0.3 && F.z > TRN_L.z0 && F.z < TRN_L.z1); }
+function trnClassStep(dt: number, now: number) {
+  const R = TestRooms, N = R.trn; if (!N) return;
+  if (!N.syncAt || now - N.syncAt > 3) { N.syncAt = now; trnClassSync(); }
+  const t0 = N.teacher, tx = t0 ? t0.x : -12.2, tz = t0 ? t0.z : -15.1;
+  // the students: seated, swaying a little, looking at the teacher, now and then down at their notes
+  for (const id in N.people) {
+    const s = N.people[id], t = now + s.ph;
+    s.pivot.rotation.x = 0.012 * Math.sin(t * 0.37) + 0.006 * Math.sin(t * 0.91 + 1);
+    s.pivot.rotation.z = 0.014 * Math.sin(t * 0.29 + 2) + 0.005 * Math.sin(t * 0.77);
+    const gT = humanGesture({ kind: 'sit', v: 0 }, t);
+    gT.L = [0.42, 0.12, 0.1, 0.95]; gT.R = [0.42, 0.12, 0.1, 0.95];
+    const sx = s.pivot.position.x, sz = s.pivot.position.z, a = Math.atan2(tx - sx, tz - sz) - s.pivot.rotation.y, want = clamp(Math.atan2(Math.sin(a), Math.cos(a)), -1, 1);
+    const notes = (Math.sin(t * 0.21) > 0.75) ? 0.35 : 0.05;   // writing a note now and then
+    gT.shake += want * 0.7 * (1 - notes); gT.nod += notes;
+    s.g = s.g ? cabinLerpG(s.g, gT, Math.min(1, dt * 3)) : gT;
+    s.m.pose({ t, yaw: 0, gaze: [want * 0.3, 0], blink: (t % 4.7) < 0.12 ? 1 : 0, g: s.g });
+  }
+  const T = N.teacher; if (!T) return;
+  // the routine
+  const plan = N.plan || (N.plan = trnRoutine());
+  if (!T.stepAt) T.stepAt = now;
+  let [what, secs, at] = plan[T.step];
+  if (what === 'walk') {
+    const dx = at[0] - T.x, dz = at[1] - T.z, d = Math.hypot(dx, dz), sp = 0.9 * dt;
+    if (d < 0.05) { T.x = at[0]; T.z = at[1]; T.step = (T.step + 1) % plan.length; T.stepAt = now; if (!T.step) N.plan = trnRoutine(); }
+    else { T.x += dx / d * Math.min(d, sp); T.z += dz / d * Math.min(d, sp); const yw = Math.atan2(dx, dz); T.yaw += Math.atan2(Math.sin(yw - T.yaw), Math.cos(yw - T.yaw)) * Math.min(1, dt * 6); }
+  } else {
+    T.yaw += Math.atan2(Math.sin(at[2] - T.yaw), Math.cos(at[2] - T.yaw)) * Math.min(1, dt * 4);
+    if (now - T.stepAt >= secs) { T.step = (T.step + 1) % plan.length; T.stepAt = now; if (!T.step) N.plan = trnRoutine(); }
+  }
+  [what] = plan[T.step];
+  // sitting down behind the desk and getting up
+  const wantSit = what === 'sit' ? 1 : 0; T.sit += Math.sign(wantSit - T.sit) * Math.min(Math.abs(wantSit - T.sit), dt * 1.1);
+  const sk = T.sit * T.sit * (3 - 2 * T.sit), top = T.m.top || 1.75;
+  T.pivot.position.set(T.x, sk * 0.49, T.z); T.holder.position.y = -sk * top * 0.52; T.pivot.rotation.y = T.yaw;
+  T.hit.position.set(T.x, 0.9, T.z);
+  const tt = now;
+  let gT = what === 'walk' ? humanWalk(tt, { v: 0.9, seed: 'teacher' }) : humanGesture(null, tt);
+  const holding = what === 'book' || what === 'read' || what === 'look' || what === 'walk' && T.step !== 5 || what === 'window';
+  if (holding && what !== 'walk') { gT.L = [0.45, 0.12, 0.08, 1.2]; }
+  if (what === 'book' || what === 'read') { gT.R = [0.5, 0.05, 0, 1.25]; gT.nod += 0.38; }
+  else if (what === 'look') { gT.R = [0.25 + 0.15 * Math.sin(tt * 1.3), 0.15, 0, 0.6 + 0.3 * Math.sin(tt * 0.9)]; gT.shake += 0.35 * Math.sin(tt * 0.4); }   // talking with his hand, looking round the class
+  else if (what === 'window') { gT.nod -= 0.05; gT.shake += 0.15 * Math.sin(tt * 0.3); }
+  if (sk > 0.01) gT = humanSitMove(cabinLerpG(gT, humanGesture({ kind: 'sit', v: 0 }, tt), sk), sk);
+  T.g = T.g ? cabinLerpG(T.g, gT, Math.min(1, dt * 5)) : gT;
+  // talking all the time: the lesson, line after line (heard while you are in the room)
+  const lines = TRN_LESSONS[N.topic || 'pilot'] || TRN_LESSONS.pilot, here = trnHere();
+  const voiceName = `pax|${TRN_TEACHER.sex}|neutral|${TRN_TEACHER.name}`;
+  const busy = (() => { try { return Voice.speaking && Voice.who === voiceName; } catch (e) { return false; } })();
+  if (!busy && performance.now() > T.next) {
+    T.line = (T.line + 1) % lines.length; T.say = lines[T.line]; T.sayAt = Date.now(); T.next = performance.now() + Math.max(4500, T.say.length * 75);
+    trnBoxUpdate();
+    if (here && trnVoiceOn()) { try { if (!Voice.speaking) { Voice.speak(T.say, () => { T.next = performance.now() + 700; }, voiceName); T.next = performance.now() + 60000; } } catch (e) { /* no voice */ } }
+  }
+  T.m.pose({ t: tt, yaw: 0, gaze: [0, 0], blink: (tt % 3.9) < 0.12 ? 1 : 0, g: T.g, talk: humanTalk(voiceName, T.say, T.sayAt) });
+  // his book: in his hands, or on the desk while he sits
+  const B = T.book, fx = Math.sin(T.yaw), fz = Math.cos(T.yaw);
+  if (what === 'sit' || what === 'stand' && sk > 0.5) { B.position.set(-13.15, 0.785, -14.75); B.rotation.set(-Math.PI / 2, 0, 0.3); }
+  else { const lift = what === 'book' || what === 'read' ? 1.18 : 0.98; B.position.set(T.x + fx * 0.3, lift, T.z + fz * 0.3); B.rotation.set(what === 'book' || what === 'read' ? -0.9 : -0.2, T.yaw, 0, 'YXZ'); }
+}
+function trnVoiceOn(): boolean { const S: any = State.settings; return S.mechanicVoice !== false && S.trainingVoice !== false; }
+/* the speech box: what the teacher is saying (follows him line by line), or what a student is doing */
+function trnBoxEl(): HTMLElement {
+  const R = TestRooms; let b = R.root && R.root.querySelector('.trn-box') as HTMLElement;
+  if (!b && R.root) { b = document.createElement('div'); b.className = 'ct-box trn-box'; b.hidden = true;
+    b.innerHTML = `<button class="of-x" data-tr="trnclose" aria-label="Close">${icon('close')}</button><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><div class="ct-ctl"><button class="btn sm ghost" data-tr="trnvoice"></button></div>`;
+    R.root.appendChild(b); }
+  return b;
+}
+function trnBoxUpdate() {
+  const R = TestRooms, N = R.trn, b = trnBoxEl(); if (!b || b.hidden || !N) return;
+  if (N.boxWho === 'teacher' && N.teacher) {
+    (b.querySelector('.ct-who b') as HTMLElement).textContent = TRN_TEACHER.name; (b.querySelector('.ct-who small') as HTMLElement).textContent = TRN_TEACHER.title + ' · ' + ({ pilot: 'pilots', fa: 'cabin crew', mech: 'mechanics', ground: 'ground staff' } as any)[N.topic || 'pilot'];
+    (b.querySelector('.ct-text') as HTMLElement).textContent = N.teacher.say || '…';
+  }
+  (b.querySelector('[data-tr="trnvoice"]') as HTMLElement).textContent = trnVoiceOn() ? 'Voice: on' : 'Voice: off';
+}
+function trnShow(id: string) {
+  const R = TestRooms, N = R.trn, b = trnBoxEl(); if (!b || !N) return;
+  N.boxWho = id; b.hidden = false; Sound.tick();
+  if (id === 'teacher') { trnBoxUpdate(); return; }
+  const s = N.people[id]; if (!s) { b.hidden = true; return; }
+  const p = s.p, C = p.course ? CrewTraining.course(p.course.id) : null, ty = p.training ? acType(p.training.typeId) : null;
+  (b.querySelector('.ct-who b') as HTMLElement).textContent = p.name; (b.querySelector('.ct-who small') as HTMLElement).textContent = roleNameOf(p);
+  (b.querySelector('.ct-text') as HTMLElement).textContent = `${C ? C.name : ty ? `Type rating: ${ty.maker} ${ty.model}` : 'On a course'}. Listening and taking notes${p.course || p.training ? `, until ${dateStr(new Date((p.course || p.training).until)).slice(5, 16)}` : ''}.`;
+  (b.querySelector('[data-tr="trnvoice"]') as HTMLElement).textContent = trnVoiceOn() ? 'Voice: on' : 'Voice: off';
 }

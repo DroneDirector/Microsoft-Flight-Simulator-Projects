@@ -37,7 +37,7 @@ TestRooms.open = function (opts?: any) {
     <button class="ct-leave tr-leave" data-tr="exit">${icon('close')}<span>${R.game ? 'Leave' : opts && opts.stress ? 'Stop the test' : 'Exit testing'}</span><kbd>Esc</kbd></button>
     <div class="ct-spots tr-go"><button data-tr="go" data-k="office">Your office</button><button data-tr="go" data-k="corridor">Corridor</button><button data-tr="go" data-k="ops">Operations</button><button data-tr="go" data-k="training">Training</button><button data-tr="go" data-k="concourse">Concourse</button><button data-tr="go" data-k="lounge">Lounge</button><button data-tr="visitor">A visitor</button></div>
     <div class="walk-pad ct-pad op-pad"><i></i></div><div class="of-aim op-dot" hidden>+</div><div class="tr-hint" hidden></div></div>
-    ${R.game ? ctLoaderHtml(R.gameRoom === 'ops' ? 'Operations' : R.gameRoom === 'lounge' ? 'Your lounge' : 'Your office', 'Unlocking the doors…', R.gameRoom === 'ops' ? OPS_EMBLEM : R.gameRoom === 'lounge' ? LG_EMBLEM : OF_WINGS) : ctLoaderHtml('Test rooms', 'Joining the rooms…', '')}`;
+    ${R.game ? ctLoaderHtml(R.gameRoom === 'ops' ? 'Operations' : R.gameRoom === 'lounge' ? 'Your lounge' : R.gameRoom === 'training' ? 'Training room' : 'Your office', 'Unlocking the doors…', R.gameRoom === 'ops' ? OPS_EMBLEM : R.gameRoom === 'lounge' ? LG_EMBLEM : OF_WINGS) : ctLoaderHtml('Test rooms', 'Joining the rooms…', '')}`;
   if (R.game) root.classList.add('tr-game');
   document.body.appendChild(root);
   setTimeout(() => { if (R.on && R.root === root) trOpen2(root, q); }, 60);
@@ -314,6 +314,7 @@ function trReady() {
   R.iv = setInterval(() => { if (R.on && !document.hidden && R.ops) { try { opsMonitorDraw(R.ops); } catch (e) { /* next time */ } } }, 5000);
   try { R.fit(); } catch (e) { /* later */ }
   if (R.stressMode) setTimeout(() => { if (R.on) gfxStressStart(); }, 900);
+  else if (R.game && R.gameRoom === 'training') { const s = TR_SPOTS.training; R.free.x = s.x; R.free.z = s.z; R.look = { yaw: s.yaw, pitch: -0.05 }; }   // into the Training room, at its doors
   else if (R.game) trEnter(R.gameRoom, null, R.gameInc);   // straight into your chair (or the lounge)
   else setTimeout(() => { if (R.on) trVisitor(); }, 6000);
 }
@@ -324,7 +325,7 @@ function trFrame() {
   try { if (R.of) petStep(R.of, now, dt); } catch (e) { /* no pet */ }
   for (const D of R.doors) if (D.k0 !== D.to) { D.k0 += Math.sign(D.to - D.k0) * Math.min(Math.abs(D.to - D.k0), dt * (D.slide ? 1.6 : 1.4)); const e = D.k0 * D.k0 * (3 - 2 * D.k0); D.set(e); }
   try { trVisStep(dt, now); } catch (e) { R.vis = null; }
-  try { trnStep(); } catch (e) { /* no clock */ }
+  try { trnStep(dt, now); } catch (e) { /* no clock */ }
   trWalk(dt);
   trAim();
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
@@ -383,6 +384,7 @@ function trAimedObj(e?: PointerEvent): any {
 }
 function trHintOf(o: any): string {
   if (!o) return ''; const a = o.userData.act, room = o.userData.room;
+  if (a === 'trn') return o.userData.id === 'teacher' ? `${TRN_TEACHER.name}: click to see what he says` : 'Click to see who this is';
   if (TestRooms.game && a !== 'door' && a !== 'future') return '';
   if (a === 'door') { const D = TestRooms.doors.filter((d: any) => d.k === room)[0]; return D ? D.locked ? 'Lounge: coming soon. Buy your first lounge to open it' : (D.to ? `Click to shut the door` : `Click to open the door to ${D.name}`) : ''; }
   if (a === 'future') return `${o.userData.name}: coming later`;
@@ -398,6 +400,7 @@ function trClickAt(e?: PointerEvent) {
   const R = TestRooms; if (R.loading || R.overlay) return;
   const o = trAimedObj(e); if (!o) return;
   const a = o.userData.act, room = o.userData.room;
+  if (a === 'trn') { trnShow(o.userData.id); return; }
   if (R.game && a !== 'door' && a !== 'future') return;
   if (a === 'door') { const D = R.doors.filter((d: any) => d.k === room)[0]; if (!D) return;
     if (D.to) { const F = R.free, p = D.pass; if (F.x > p[0] - 0.4 && F.x < p[2] + 0.4 && F.z > p[1] - 0.4 && F.z < p[3] + 0.4) { toast('Step out of the doorway first', 'info'); return; } }
@@ -504,6 +507,8 @@ function trInput(root: HTMLElement, cv: HTMLCanvasElement) {
     if (k === 'exit') { if (R.stress) { gfxStressEnd(true); return; } if (R.game) { trLeaveBuilding(); return; } TestRooms.close(); return; }
     if (k === 'lookclose') { trComputerClose(); return; }
     if (k === 'visitor') { trVisitor(); return; }
+    if (k === 'trnclose') { const B = R.root.querySelector('.trn-box') as HTMLElement; if (B) B.hidden = true; if (R.trn) R.trn.boxWho = ''; Sound.tick(); return; }
+    if (k === 'trnvoice') { const S: any = State.settings; S.trainingVoice = !trnVoiceOn(); if (!S.trainingVoice) { try { if (/Daniel Brandt/.test(Voice.who)) Voice.stop(); } catch (e) { /* no voice */ } } Store.soon(); Sound.tick(); trnBoxUpdate(); return; }
     if (k === 'go') { const s = TR_SPOTS[b.getAttribute('data-k') || '']; if (s && R.free) { Sound.tick(); R.free.x = s.x; R.free.z = s.z; R.free.v = 0; R.look = { yaw: s.yaw, pitch: -0.05 }; } }
   });
   R.key$ = (e: KeyboardEvent) => {
