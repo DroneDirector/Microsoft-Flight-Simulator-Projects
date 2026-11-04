@@ -10,7 +10,7 @@
 // The log is kept on this device (the newest 8,000 lines) and saved as a text file from
 // Settings → Updates and errors, together with the error log.
 
-interface TraceLast { t: number; pos: number[]; ph: string; alt: number; logged: number; td?: boolean; tdRwy?: string }
+interface TraceLast { t: number; pos: number[]; ph: string; alt: number; logged: number; td?: boolean; tdRwy?: string; gapTd?: boolean }
 
 const TRACE_KEY = 'airline-manager-pro.flight-trace';
 const TRACE_MAX = 8000;
@@ -76,7 +76,7 @@ const FlightTrace = {
       // touchdown: on the runway it was cleared to?
       // (on the runway now, or it already landed between two looks: then it is taxiing in or at the gate)
       const onRwyNow = /touchdown|landing roll/i.test(ph) || (/^landing$/i.test(ph) && alt < 30);
-      const landedBetween = L && /taxi in|arrived|at the gate/i.test(ph) && /final|landing|touchdown|roll/i.test(L.ph);
+      const landedBetween = L && /taxi in|arrived|at the gate/i.test(ph) && /approach|descent|final|landing|touchdown|roll/i.test(L.ph);   // the landing was shorter than the time between two looks
       if (L && !L.td && (onRwyNow || landedBetween)) {
         L.td = true;
         if (onRwyNow) { const chk = this.onRunway(f, w.pos, plan); L.tdRwy = chk.rwy; this.add(now, f, `touchdown · ${chk.text}`, chk.ok ? '' : chk.problem); }
@@ -85,13 +85,15 @@ const FlightTrace = {
       const phaseChanged = !L || L.ph !== ph;
       if (problem || phaseChanged || !L || now - L.logged >= 30000) {
         this.add(now, f, text, problem);
-        this.last.set(f.id, { t: now, pos: w.pos, ph, alt, logged: now, td: L && L.td, tdRwy: L && L.tdRwy });
-      } else { L.t = now; L.pos = w.pos; L.ph = ph; L.alt = alt; }
+        this.last.set(f.id, { t: now, pos: w.pos, ph, alt, logged: now, td: L && L.td, tdRwy: L && L.tdRwy, gapTd: !!(L && (L.gapTd || this.gapOverTd(f, L.t, now))) });
+      } else { if (this.gapOverTd(f, L.t, now)) L.gapTd = true; L.t = now; L.pos = w.pos; L.ph = ph; L.alt = alt; }   // a gap: the app was away (screen off, in the background) since L.t
     }
     // flights that ended
     for (const id of Array.from(this.last.keys())) if (!State.live.some(f => f.id === id)) this.last.delete(id);
   },
 
+  /** Was the app away (no look for over 15 seconds) across the flight's planned touchdown, between a and b? */
+  gapOverTd(f: LiveFlight, a: number, b: number): boolean { const td = (f as any).planTdAt || 0; return !!td && b - a > 15000 && a <= td + 5000 && b >= td - 5000; },
   /** Is a position on the runway the flight was planned to land on? */
   onRunway(f: LiveFlight, pos: number[], plan: any): { ok: boolean; text: string; problem: string; rwy: string } {
     const re: RunwayEnd = plan && plan.arr; if (!re) return { ok: true, text: 'no runway data for ' + f.to, problem: '', rwy: '' };
@@ -106,7 +108,10 @@ const FlightTrace = {
   arrived(f: LiveFlight, at: number) {
     const L = this.last.get(f.id);
     // only a problem if the app was watching at the moment it should have touched down
-    const F: any = f, tdAt = F.planTdAt || 0, watched = L && tdAt && L.t >= tdAt && L.t > at - 15 * 60000 && !/hold|go-?around|delayed/i.test(L.ph);
+    // watched means looked at just before AND after the touchdown, with no gap across it (screen off, the app in the
+    // background): a first look after a gap finds it taxiing in, which isn't a missing touchdown
+    const F: any = f, tdAt = F.planTdAt || 0;
+    const watched = L && tdAt && L.t >= tdAt && L.t > at - 15 * 60000 && !L.gapTd && !this.gapOverTd(f, L.t, at) && !/hold|go-?around|delayed/i.test(L.ph);
     if (L && !L.td && watched) this.add(at, f, 'arrived at the gate without being seen to touch down', 'NO TOUCHDOWN');
     else if (L && !L.td) this.add(at, f, 'arrived at the gate (the app was not watching during the landing)');
     else this.add(at, f, `arrived at the gate${L && L.tdRwy ? ' after landing on runway ' + L.tdRwy : ' (the app was closed during the landing)'}`);
