@@ -916,6 +916,8 @@ function hgFrame() {
   R.walkPos = R.cam.position.clone(); R.walkQuat = R.cam.quaternion.clone();
   if (R.A && R.A.monScr) { const zk = hgZoomK(); R.A.monScr.material.color.setScalar(1 + 0.6 * Math.sin(Math.PI * Math.min(1, zk * 1.4)));
     if (zk > 0 && R.A.monEye) { const e = zk * zk * (3 - 2 * zk), q0 = R.cam.quaternion.clone(); R.cam.position.lerp(R.A.monEye, e); R.cam.lookAt(R.A.monAt); const q1 = R.cam.quaternion.clone(); R.cam.quaternion.copy(q0).slerp(q1, e); } }
+  // frame generation: what you hold moves with your view, not with the room
+  if (R.perf) { const H = R.hold && R.hold.grip; R.perf.anchor = H ? R.cam : null; R.perf.anchorDraw = H ? [H] : null; }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function lerpAng(a: number, b: number, k: number): number { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; }

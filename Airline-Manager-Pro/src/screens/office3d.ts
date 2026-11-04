@@ -787,6 +787,8 @@ function ofFrame() {
     R.cam.lookAt(ahead);
   } else ofWalk(dt, now);
   if (R.glow) { if ((R.seat && !R.lapHover) || R.overlay || R.lapZ) R.glow.hide(); R.glow.step(dt); }
+  // frame generation: the photo in your hands moves with your view
+  if (R.perf) { const P = R.ph && R.ph.st !== 'idle' && R.A && R.A.photoAt; R.perf.anchor = P ? R.cam : null; R.perf.anchorDraw = P ? [R.A.photoAt] : null; }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function ofBlocked(x: number, z: number): boolean {

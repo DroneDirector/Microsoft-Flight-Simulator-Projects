@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.153
+- No more flicker of what you hold with frame generation on; spills fade away.
+
 ## 0.9.152
 - Security officers: hiring, gate checks, Send Security for drunk passengers (seen in the lounge), overnight guarding, reports, training, a pause switch.
 

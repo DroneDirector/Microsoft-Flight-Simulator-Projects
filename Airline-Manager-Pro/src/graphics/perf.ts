@@ -138,7 +138,7 @@ const FrameGen = {
       // the real frame: drawn into the picture, with the camera it was drawn from
       const q = this.gpuBegin(ren); ren.setRenderTarget(G.rt); ren.render(scene, cam); this.layer(G, st, ren, cam, scene); ren.setRenderTarget(null); this.gpuEnd(q);
       G.prevVP.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); G.fresh = true; st.realAt = t; st.real = (st.real || 0) + 1; st.madeRun = 0;
-      G.aOn = 0; const A = st.anchor; if (A && A.parent) { G.aPrev.copy(A.matrixWorld); G.aOn = st.anchorAll ? 2 : G.layOk ? 1 : 0; G.camA = (G.camA || new THREE.Matrix4()).copy(A.matrixWorld).invert().multiply(cam.matrixWorld); }
+      G.aOn = 0; const A = st.anchor; if (A && (A.parent || A.isCamera)) { G.aPrev.copy(A.matrixWorld); G.aOn = st.anchorAll ? 2 : G.layOk ? 1 : 0; G.camA = (G.camA || new THREE.Matrix4()).copy(A.matrixWorld).invert().multiply(cam.matrixWorld); }
     } else { st.made = (st.made || 0) + 1; st.madeRun = (st.madeRun || 0) + 1; }
     st.lastWasReal = real;
     // on the screen: the picture, shifted from the camera it was drawn from to the camera now
@@ -150,8 +150,8 @@ const FrameGen = {
     U.uMW.value.multiplyMatrices(G.prevVP, inv);
     // what moves with the aircraft you follow: from where it is now back to where it was in the drawn picture
     U.uUseA.value = 0;
-    if (G.aOn && st.anchor && st.anchor.parent) {
-      const A = st.anchor; A.updateMatrix(); G.aNow.multiplyMatrices(A.parent.matrixWorld, A.matrix);
+    if (G.aOn && st.anchor && (st.anchor.parent || st.anchor.isCamera)) {
+      const A = st.anchor; if (A.parent) { A.updateMatrix(); G.aNow.multiplyMatrices(A.parent.matrixWorld, A.matrix); } else { A.updateMatrixWorld(); G.aNow.copy(A.matrixWorld); }
       U.uMA.value.copy(G.aNow).invert().premultiply(G.aPrev).premultiply(G.prevVP).multiply(inv); U.uUseA.value = G.aOn;
     }
     U.uNear.value = cam.near; U.uFar.value = cam.far; U.uLog.value = ren.capabilities && ren.capabilities.logarithmicDepthBuffer ? 1 : 0; U.uP22.value = cam.projectionMatrix.elements[10]; U.uP32.value = cam.projectionMatrix.elements[14];
@@ -182,7 +182,9 @@ const FrameGen = {
    *  distance (st.depthOnly), so made frames move each by its own motion. Nothing to do inside the aircraft. */
   layer(G: any, st: any, ren: any, cam: any, scene?: any) {
     G.layOk = false;
-    const A = st.anchor && st.anchor.visible && st.anchor.parent ? st.anchor : null, extra: any[] = (st.depthOnly || []).concat(this.glows(G, scene, A)).filter((o: any) => o && o.visible && o.parent);
+    // what moves with the anchor: the anchor itself, or (anchored to the camera) the things held in your hands
+    const draw: any[] = (st.anchorDraw ? st.anchorDraw : st.anchor ? [st.anchor] : []).filter((o: any) => o && o.visible && o.parent && !o.isCamera);
+    const A = draw.length ? draw[0] : null, extra: any[] = (st.depthOnly || []).concat(this.glows(G, scene, A)).filter((o: any) => o && o.visible && o.parent);
     if (st.anchorAll) return;   // inside the aircraft: everything moves with it, no layer needed
     try {
       const T = THREE, sz = ren.getDrawingBufferSize(new T.Vector2()), w = sz.x, h = sz.y;
@@ -198,9 +200,9 @@ const FrameGen = {
         // sky round them as aircraft. See-through parts that belong to it stay: the cabin windows, their glass, blinds and
         // the view through them, the propeller discs, so they move with the aircraft
         const off: any[] = [], T0 = THREE, glowM = (x: any) => x && (x.blending === T0.AdditiveBlending || (x.userData && x.userData.fgGlow));
-        A.traverseVisible((o: any) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && (Array.isArray(m) ? m.some(glowM) : glowM(m)))) off.push(o); });
+        for (const D of draw) D.traverseVisible((o: any) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && (Array.isArray(m) ? m.some(glowM) : glowM(m)))) off.push(o); });
         for (const o of off) o.visible = false;
-        L.overrideMaterial = G.white; L.children = [A];
+        L.overrideMaterial = G.white; L.children = draw;
         try { ren.render(L, cam); } finally { for (const o of off) o.visible = true; }
       }
       // the clouds and every light's glow: only their distance (the clouds where they are thick enough to be seen), all
