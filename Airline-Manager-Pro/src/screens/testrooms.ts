@@ -289,6 +289,12 @@ function trHalls(scene: any, q: number) {
     quad(5.6, 1.4, M({ color: 0x2A2C30, roughness: 0.6 }), K[2] - 0.04, LG_DOOR_H + 0.75, TR_L.lgDoorZ, -Math.PI / 2);
     const n = new T.Mesh(new T.PlaneGeometry(4.4, 0.82), new T.MeshBasicMaterial({ map: ctTex(c), transparent: true, toneMapped: false })); n.position.set(K[2] - 0.06, LG_DOOR_H + 0.75, TR_L.lgDoorZ); n.rotation.y = -Math.PI / 2; g.add(n);
     Props.place(g, 'room-sign', K[2] - 0.04, TR_L.lgDoorZ + LG_DOOR_W / 2 + 0.45, -Math.PI / 2, q, { name: 'Lounge', sub: R.lgSpec ? R.lgSpec.name : 'Members', num: 'L', pict: 'lounge', staff: false }, 1.25); }
+  // the flight boards hanging over the concourse before the lounge: Departures and Arrivals, 30 cm apart, facing you as
+  // you walk towards the lounge
+  { const fx = K[2] - 3.2, fy = 4.35, fz = TR_L.lgDoorZ;
+    try { R.fids = fidsPair(g, R.lgKey || (company() && company().hub) || '', fx, fy, fz, -Math.PI / 2, 1.6); } catch (e) { R.fids = []; }
+    const rodM = M({ color: 0x2B3036, metalness: 0.6, roughness: 0.4 });
+    for (const s of [-1.7, -0.3, 0.3, 1.7]) { const rod = new T.Mesh(new T.CylinderGeometry(0.012, 0.012, HC - fy - 0.45, 6), rodM); rod.position.set(fx, fy + 0.45 + (HC - fy - 0.45) / 2, fz + s); g.add(rod); } }
   // walking: the corridor and the concourse (keeping off the walls, the walkways and the seats)
   const r = 0.28;
   R.walk.push((x: number, z: number) => x > C[0] + r && x < C[2] - r && z > C[1] + r && z < C[3] - r);
@@ -326,6 +332,7 @@ function trFrame() {
   for (const D of R.doors) if (D.k0 !== D.to) { D.k0 += Math.sign(D.to - D.k0) * Math.min(Math.abs(D.to - D.k0), dt * (D.slide ? 1.6 : 1.4)); const e = D.k0 * D.k0 * (3 - 2 * D.k0); D.set(e); }
   try { trVisStep(dt, now); } catch (e) { R.vis = null; }
   try { trnStep(dt, now); } catch (e) { /* no clock */ }
+  try { fidsStep(R.fids); } catch (e) { /* the boards wait */ }
   trWalk(dt);
   trAim();
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);

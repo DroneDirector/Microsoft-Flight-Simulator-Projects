@@ -193,6 +193,7 @@
     "src/core/career-rides.ts",
     "src/core/ops-decisions.ts",
     "src/screens/hangar3d.ts",
+    "src/screens/fids3d.ts",
     "src/screens/lounge3d.ts",
     "src/screens/lounge-bar.ts",
     "src/screens/training3d.ts",

@@ -200,7 +200,8 @@ towards +Z (where you sit or stand to use it), standing on the floor; fitted to 
 | `lounge-props/grand-piano.glb` | Grand piano (Flagship) |
 | `lounge-props/wall-art.glb` | Framed art (Flagship) |
 | `lounge-props/champagne-bucket.glb` | Champagne bucket (Flagship) |
-| `lounge-props/departures-screen.glb` | Departures screen frame (the list is drawn by the app) |
+| `lounge-props/departures-screen.glb` | Departures screen frame (the list is drawn by the app; also hanging in the concourse) |
+| `lounge-props/arrivals-screen.glb` | Arrivals screen frame (beside the departures screen) |
 | `lounge-props/glass-rack.glb` | Glass rack hanging from the ceiling over the bar (the glasses are their own files) |
 | `lounge-props/bottle-red.glb` | Bottle of red wine (the bartender takes it from the shelf and pours) |
 | `lounge-props/bottle-white.glb` | Bottle of white wine |

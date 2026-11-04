@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.150
+- Departures and Arrivals boards in the lounge and the concourse, with real traffic, expected times, delays and split-flap text.
+
 ## 0.9.149
 - The lounge bar: a bartender who waves and pours your drink in front of you, eleven drinks with their strength and alcohol, new bottles and a glass rack, and the effects of drinking.
 
