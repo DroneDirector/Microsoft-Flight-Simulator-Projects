@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.141 (2026-11-04)
+
+- FrameGen 'on' (default): adaptive made frames (FrameGen.between, up to 2), measured real/made intervals, GPU timer, FgStat; the cabin included
+- Performance monitor (fg-mon) with a quick switch synced with Settings; AppTools.cpuInfo, /api/cpu
+- Automatic performance and the cabin guard off unless chosen
+
 ## 0.9.140 (2026-11-04)
 
 - Computers/phone: lap-files.ts (FileDb, explorer, folders, drag, menus, documents, printing, recorder, start menu, search, per-device settings with Update); Mail folders, Spam, Deleted, drag, menus, guide

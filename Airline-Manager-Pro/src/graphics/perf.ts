@@ -10,7 +10,7 @@ const Perf = {
   /** Switched on? Automatic on phones and tablets, chosen on the PC. */
   on(): boolean {
     const v = (State.settings as any).perfAuto;
-    return v == null ? !DESKTOP : v !== false && v !== 'off';
+    return v == null ? false : v !== false && v !== 'off';   // off unless chosen: frame generation keeps it smooth instead
   },
   /** The device's temperature level (Android: 0 cool … 6 shutting down) and battery saver, every 20 s. */
   poll() {
@@ -43,7 +43,7 @@ const Perf = {
   frame(st: any, r: any, top?: number) {
     if (!st || !r) return;
     if (!st.base) st.base = r.getPixelRatio();
-    const now = performance.now(); if (st.gen && FrameGen.on() && Perf.fpsCap() && st.lastReal === st.real) return; st.lastReal = st.real; st.n++;   // with frame generation, only the real frames count
+    const now = performance.now(); if (st.gen && FrameGen.on() && (Perf.fpsCap() || FrameGen.mode() === 'on') && st.lastReal === st.real) return; st.lastReal = st.real; st.n++;   // with frame generation, only the real frames count
     if (!st.t0) { st.t0 = now; st.n = 0; return; }
     if (now - st.t0 < 1500) return;
     const lim = Math.min(this.fpsCap() || 999, top || 999), full = lim < 999 ? lim : 0;
@@ -74,30 +74,63 @@ const Perf = {
 // its depth; on the screen's other frames that picture is shifted to where the camera is now (each point moved by
 // its own distance), so looking around and walking stay as smooth as the screen. Things that move by themselves
 // still move 30 times a second; edges uncovered by the shift take the nearest colour.
+/** What frame generation did in the last second, for the performance monitor. */
+const FgStat: any = { real: 0, made: 0, shown: 0, t0: 0, fps: 0, realFps: 0, madeFps: 0, cpu: 0, gpu: 0, gq: null as any, cpuAcc: 0, cpuN: 0 };
 const FrameGen = {
-  /** Switched on? Off by default; Automatic follows automatic performance. */
-  on(): boolean { const v = (State.settings as any).frameGen; return v === 'on' || (v === 'auto' && Perf.on()); },
+  /** Switched on? On unless switched off ('on', the default: always, as many frames in between as help; 'auto': only
+   *  while the frame rate is held at 30). */
+  mode(): string { const v = (State.settings as any).frameGen; return v == null ? 'on' : String(v); },
+  on(): boolean { const v = this.mode(); return v === 'on' || (v === 'auto' && Perf.on()); },
+  /** How many made frames to put after each real one (always on): as many as fit while a real frame takes its time,
+   *  none when real frames come as fast as the screen anyway. */
+  between(st: any): number {
+    const r = st.realDt || 16, g = Math.max(4, st.genDt || 8);
+    if (r < 21 || r < g * 1.35) return 0;
+    return Math.max(1, Math.min(2, Math.round(r / Math.max(g, 1000 / 75)) - 1));   // at most two: real motion (other aircraft, people) stays at a good pace
+  },
+  /** One second of counts and times for the monitor. */
+  tick(t: number, real: boolean, cpu: number) {
+    const S = FgStat; S.shown++; if (real) S.real++; else S.made++; S.cpuAcc += cpu; S.cpuN++;
+    if (!S.t0) S.t0 = t;
+    if (t - S.t0 >= 1000) { const k = 1000 / (t - S.t0); S.fps = Math.round(S.shown * k); S.realFps = Math.round(S.real * k); S.madeFps = Math.round(S.made * k); S.cpu = S.cpuN ? S.cpuAcc / S.cpuN : 0; S.shown = S.real = S.made = 0; S.cpuAcc = 0; S.cpuN = 0; S.t0 = t; }
+  },
+  /** The graphics chip's time for a real frame (where the browser can measure it). */
+  gpuBegin(ren: any): any {
+    try {
+      const S = FgStat; if (!S.gq || S.gq.gl !== ren.getContext()) { const gl = ren.getContext(), ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); S.gq = ext ? { gl, ext, pend: [] as any[] } : { gl, ext: null, pend: [] }; }
+      const G = S.gq; if (!G.ext || G.pend.length > 3) return null;
+      for (let i = G.pend.length - 1; i >= 0; i--) { const q = G.pend[i]; if (G.gl.getQueryParameter(q, G.gl.QUERY_RESULT_AVAILABLE)) { if (!G.gl.getParameter(G.ext.GPU_DISJOINT_EXT)) { const ns = G.gl.getQueryParameter(q, G.gl.QUERY_RESULT); S.gpu = S.gpu ? S.gpu * 0.8 + ns / 1e6 * 0.2 : ns / 1e6; } G.gl.deleteQuery(q); G.pend.splice(i, 1); } }
+      const q = G.gl.createQuery(); G.gl.beginQuery(G.ext.TIME_ELAPSED_EXT, q); return q;
+    } catch (e) { return null; }
+  },
+  gpuEnd(q: any) { if (!q) return; try { const G = FgStat.gq; G.gl.endQuery(G.ext.TIME_ELAPSED_EXT); G.pend.push(q); } catch (e) { /* no timer */ } },
   /** Draw this frame: the real scene when its turn has come, otherwise an in-between frame. */
   draw(st: any, ren: any, scene: any, cam: any, now?: number): boolean {
-    const t = now == null ? performance.now() : now, cap = Perf.fpsCap() || (st && st.genCap) || 0;
-    if (!st || !this.on() || !cap) { ren.render(scene, cam); return true; }
+    const t = now == null ? performance.now() : now, c0 = performance.now(), always = this.mode() === 'on', cap = Perf.fpsCap() || (st && st.genCap) || 0;
+    // how long the screen waited after a real frame and after a made one (always on: decides how many to make)
+    if (st) { const dt = st.prevT ? t - st.prevT : 0; st.prevT = t; if (dt > 0 && dt < 250) { if (st.lastWasReal) st.realDt = st.realDt ? st.realDt * 0.85 + dt * 0.15 : dt; else st.genDt = st.genDt ? st.genDt * 0.85 + dt * 0.15 : dt; } }
+    if (!st || !this.on() || (!cap && !always)) { const q = this.gpuBegin(ren); ren.render(scene, cam); this.gpuEnd(q); if (st) st.lastWasReal = true; this.tick(t, true, performance.now() - c0); return true; }
     const G = st.gen || (st.gen = this.make());
     if (!G) { ren.render(scene, cam); return true; }
     const T = THREE, sz = ren.getDrawingBufferSize(new T.Vector2());
     if (G.rt.width !== sz.x || G.rt.height !== sz.y) { G.rt.setSize(sz.x, sz.y); G.fresh = false; }
     cam.updateMatrixWorld();
-    const real = !G.fresh || !st.realAt || t - st.realAt >= 1000 / cap - 3;
+    let real: boolean;
+    if (always) { const n = this.between(st); real = !G.fresh || n === 0 || (st.madeRun || 0) >= n; }
+    else real = !G.fresh || !st.realAt || t - st.realAt >= 1000 / cap - 3;
     if (real) {
       // the real frame: drawn into the picture, with the camera it was drawn from
-      ren.setRenderTarget(G.rt); ren.render(scene, cam); ren.setRenderTarget(null);
-      G.prevVP.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); G.fresh = true; st.realAt = t; st.real = (st.real || 0) + 1;
-    } else st.made = (st.made || 0) + 1;
+      const q = this.gpuBegin(ren); ren.setRenderTarget(G.rt); ren.render(scene, cam); ren.setRenderTarget(null); this.gpuEnd(q);
+      G.prevVP.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); G.fresh = true; st.realAt = t; st.real = (st.real || 0) + 1; st.madeRun = 0;
+    } else { st.made = (st.made || 0) + 1; st.madeRun = (st.madeRun || 0) + 1; }
+    st.lastWasReal = real;
     // on the screen: the picture, shifted from the camera it was drawn from to the camera now
     const U = G.mat.uniforms;
     U.uPrevVP.value.copy(G.prevVP);
     U.uInvVP.value.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).invert();
     U.uNear.value = cam.near; U.uFar.value = cam.far; U.uLog.value = ren.capabilities && ren.capabilities.logarithmicDepthBuffer ? 1 : 0; U.uP22.value = cam.projectionMatrix.elements[10]; U.uP32.value = cam.projectionMatrix.elements[14];
     ren.render(G.scene, G.cam);
+    this.tick(t, real, performance.now() - c0);
     return real;
   },
   make(): any {

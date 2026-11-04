@@ -112,6 +112,11 @@ export class Desktop {
       } catch (e: any) { json(res, { ok: false, error: String(e && e.message || e) }); }
     }), true;
     // the machine, for the recommended graphics settings: memory, processor, graphics cards
+    if (url === '/api/cpu') {   // the performance monitor: how busy each core has been since the last look
+      const now = os.cpus(), prev: any[] = (this as any)._cpuPrev || now; (this as any)._cpuPrev = now;
+      const use = now.map((c, i) => { const p = prev[i] || c, t = (k: string) => (c.times as any)[k] - (p.times as any)[k], idle = t('idle'), all = ['user', 'nice', 'sys', 'idle', 'irq'].reduce((a, k) => a + t(k), 0); return all > 0 ? Math.max(0, Math.min(100, 100 * (1 - idle / all))) : 0; });
+      json(res, { use, ghz: ((now[0] || { speed: 0 }).speed || 0) / 1000 }); return true;
+    }
     if (url === '/api/sysinfo') { listGpus().then(g => json(res, { ramMb: Math.round(os.totalmem() / 1048576), cores: os.cpus().length, cpu: (os.cpus()[0] || { model: '' }).model, gpus: g })); return true; }
     if (url === '/api/flightplan') return readBody(req, b => { try { const p = JSON.parse(b); json(res, { ok: true, path: saveFlightPlan(p.name, p.text) }); } catch (e: any) { json(res, { ok: false, error: String(e && e.message || e) }); } }), true;
     const dir = this.appDir(); if (!dir) return false;

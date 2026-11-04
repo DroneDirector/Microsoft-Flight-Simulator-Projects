@@ -451,7 +451,7 @@ function cabinRatio(base: number): number {
 }
 function cabinMoodOn(): boolean { return (State.settings as any).cabMood !== false; }
 /** Keep the frame rate smooth: the cabin is drawn less sharply while the frame rate is low (auto: on, except Ultra). */
-function cabinGuardOn(): boolean { const v = cabinOpt('cabGuard'); return v === 'auto' ? cabinQ() < 3 : v === 'on'; }
+function cabinGuardOn(): boolean { const v = cabinOpt('cabGuard'); return v === 'on'; }   // off unless chosen: frame generation keeps the cabin smooth
 function cabinQv(v: number[]): number { return v[cabinQ()]; }
 /** A smooth closed outline through the points (or the plain outline at low quality). */
 function cabinSmooth(pts: number[][], n: number): any {

@@ -926,7 +926,7 @@ function v3dLoop(now: number) {
   if (V3d.loaded || !VL.drawnAt || now - VL.drawnAt > 450) {
     VL.drawnAt = now;
     if (VL.cabinFwdFor) { try { cabinOutsidePass(V3d.planes[VL.cabinFwdFor]); } catch (e) { /* the windows keep the last view */ } }
-    if (V3d.loaded && !(V3d as any).dprWas) FrameGen.draw((V3d as any).perf, V3d.r, V3d.scene, V3d.cam, now); else V3d.r.render(V3d.scene, V3d.cam);
+    if (V3d.loaded && (!(V3d as any).dprWas || FrameGen.mode() === 'on')) FrameGen.draw((V3d as any).perf, V3d.r, V3d.scene, V3d.cam, now); else V3d.r.render(V3d.scene, V3d.cam);
     if (V3d.loaded && !(V3d as any).dprWas) Perf.frame((V3d as any).perf, V3d.r, gameBoost() ? 60 : V3D_FPS);   // the cabin keeps its own sharpness
   }
 
