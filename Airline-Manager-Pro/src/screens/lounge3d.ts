@@ -16,6 +16,7 @@ const LG_SPECS: LgSpec[] = [
   { W: 22, D: 14, H: 3.9, guests: 7, name: 'Business lounge' },
   { W: 28, D: 17, H: 4.6, guests: 10, name: 'Flagship lounge' },
 ];
+const LG_DOOR_W = 1.9, LG_DOOR_H = 2.4;
 function lgPropSwap(g: any, name: string) { try { Models.swap(g, 'lounge-props/' + name + '.glb', false); } catch (e) { /* the app's own */ } }
 
 /** Your lounges: where you have one, at what level. */
@@ -152,8 +153,13 @@ function lgBuild(scene: any, q: number): any {
     const f = new T.Mesh(new T.PlaneGeometry(W, D), floorM); f.rotation.x = -Math.PI / 2; f.receiveShadow = true; root.add(f);
     const ce = new T.Mesh(new T.PlaneGeometry(W, D), M({ color: lv === 2 ? 0xF4EFE6 : 0xEDEEF0, roughness: 0.9 })); ce.rotation.x = Math.PI / 2; ce.position.y = H; root.add(ce);
     const wallM = lv === 0 ? M({ color: 0xE3E6EA, roughness: 0.9 }) : lv === 1 ? walnut : M({ color: 0xEDE6DA, roughness: 0.8 });
-    for (const [w, x, z, ry] of [[W, 0, z1, Math.PI], [D, x0, 0, Math.PI / 2], [D, x1, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, H), wallM); p.position.set(x, H / 2, z); p.rotation.y = ry; p.receiveShadow = true; root.add(p); }
-    if (lv === 2) for (const [w, x, z, ry] of [[W, 0, z1 - 0.02, Math.PI], [D, x0 + 0.02, 0, Math.PI / 2], [D, x1 - 0.02, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, 1.1), marble); p.position.set(x, 0.55, z); p.rotation.y = ry; root.add(p); const t = new T.Mesh(new T.BoxGeometry(w, 0.04, 0.03), gold); t.position.set(x, 1.12, z); t.rotation.y = ry; root.add(t); }
+    // the back wall has the way in: an opening for the sliding doors (dx ± LG_DOOR_W/2, LG_DOOR_H high)
+    const dxo = W / 2 - 6.3, oa = dxo - LG_DOOR_W / 2, ob = dxo + LG_DOOR_W / 2;
+    const backSeg = (xa: number, xb: number, ya: number, yb: number, m: any, dz: number) => { if (xb - xa < 0.01 || yb - ya < 0.01) return; const p = new T.Mesh(new T.PlaneGeometry(xb - xa, yb - ya), m); p.position.set((xa + xb) / 2, (ya + yb) / 2, z1 - dz); p.rotation.y = Math.PI; p.receiveShadow = true; root.add(p); };
+    backSeg(x0, oa, 0, H, wallM, 0); backSeg(ob, x1, 0, H, wallM, 0); backSeg(oa, ob, LG_DOOR_H, H, wallM, 0);
+    for (const [w, x, z, ry] of [[D, x0, 0, Math.PI / 2], [D, x1, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, H), wallM); p.position.set(x, H / 2, z); p.rotation.y = ry; p.receiveShadow = true; root.add(p); }
+    if (lv === 2) { for (const [w, x, z, ry] of [[D, x0 + 0.02, 0, Math.PI / 2], [D, x1 - 0.02, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, 1.1), marble); p.position.set(x, 0.55, z); p.rotation.y = ry; root.add(p); const t = new T.Mesh(new T.BoxGeometry(w, 0.04, 0.03), gold); t.position.set(x, 1.12, z); t.rotation.y = ry; root.add(t); }
+      for (const [xa, xb] of [[x0, oa - 0.12], [ob + 0.12, x1]]) { backSeg(xa, xb, 0, 1.1, marble, 0.02); const t = new T.Mesh(new T.BoxGeometry(xb - xa, 0.04, 0.03), gold); t.position.set((xa + xb) / 2, 1.12, z1 - 0.02); root.add(t); } }
     // the carpet (its own model file per level)
     // under the seating (the groups of armchairs start 2.6 m from the windows, one or two rows of them)
     const rows = lv === 0 ? 1 : 2, cw = W * 0.7, cd = rows * 3.3 + 1.4, cz = z0 + 2.6 + (rows - 1) * 1.65;
@@ -167,9 +173,30 @@ function lgBuild(scene: any, q: number): any {
     block(x0, z0 - 1, x1, z0 + 0.4); }
   block(x0 - 1, z0, x0 + 0.35, z1); block(x1 - 0.35, z0, x1 + 1, z1); block(x0, z1 - 0.35, x1, z1 + 1);
   // the way in: a glass door on the front wall, the reception desk beside it
-  { const dx = W * 0.3; const fr = bx(1.9, 2.3, 0.08, lv === 2 ? brass : black, dx, 1.15, z1 - 0.04); void fr;
-    const dg = new T.Mesh(new T.PlaneGeometry(1.7, 2.2), new T.MeshPhysicalMaterial({ color: 0xBFD6E8, transparent: true, opacity: 0.35, roughness: 0.05 })); dg.position.set(dx, 1.12, z1 - 0.09); dg.rotation.y = Math.PI; root.add(dg);
-    const hit = new T.Mesh(new T.BoxGeometry(1.8, 2.3, 0.4), new T.MeshBasicMaterial({ visible: false })); hit.position.set(dx, 1.15, z1 - 0.2); hit.userData.act = 'door'; root.add(hit); A.hits.push(hit); A.door = new T.Vector3(dx, 0, z1 - 1.4);
+  { const dx = W / 2 - 6.3, fm = lv === 2 ? brass : black, dw = LG_DOOR_W, dh = LG_DOOR_H;
+    // the frame: two posts, a header with the door operator above it
+    bx(0.09, dh, 0.16, fm, dx - dw / 2 - 0.045, dh / 2, z1 - 0.06); bx(0.09, dh, 0.16, fm, dx + dw / 2 + 0.045, dh / 2, z1 - 0.06);
+    bx(dw + 0.18, 0.22, 0.2, fm, dx, dh + 0.11, z1 - 0.08); bx(dw * 2 + 0.4, 0.16, 0.12, M({ color: 0x3C3F44, metalness: 0.6, roughness: 0.4 }), dx, dh - 0.02, z1 - 0.2);
+    // two sliding glass leaves (props/door-2), each sliding to its own side
+    const leaves: any[] = [];
+    for (const s of [-1, 1]) { const g = Props.place(root, 'door-2', dx + s * dw / 4, z1 - 0.16, Math.PI, q, { w: dw / 2 + 0.02, h: dh - 0.06, rail: lv === 2 ? 0xB08D57 : 0x2A2C30 });
+      g.userData.x0 = dx + s * dw / 4; g.userData.x1 = dx + s * (dw * 3 / 4 - 0.02); leaves.push(g);
+      // a frosted band with the airline's name, at eye height, on each leaf
+      const [bc, bxx] = ctCanvas(256, 32); bxx.fillStyle = 'rgba(255,255,255,0.78)'; bxx.fillRect(0, 0, 256, 32); bxx.fillStyle = 'rgba(60,60,60,0.85)'; bxx.font = '600 15px Inter, Arial, sans-serif'; bxx.textAlign = 'center'; bxx.fillText(String(co.name || '').toUpperCase(), 128, 21);
+      const band = new T.Mesh(new T.PlaneGeometry(dw / 2 - 0.06, 0.1), new T.MeshBasicMaterial({ map: ctTex(bc), transparent: true })); band.position.set(0, 1.2, -0.012); band.rotation.y = Math.PI; band.userData.keep = true; g.add(band); }
+    A.doorLeaves = leaves; A.doorK = 0; A.doorTo = 0;
+    // beyond the doors: the concourse (a short hall with its floor, walls and lights, and the view along it)
+    { const fl = new T.Mesh(new T.PlaneGeometry(dw + 3, 3.2), M({ color: 0xB8B2A6, roughness: 0.45 })); fl.rotation.x = -Math.PI / 2; fl.position.set(dx, 0.002, z1 + 1.6); root.add(fl);
+      for (const s of [-1, 1]) { const w2 = new T.Mesh(new T.PlaneGeometry(3.2, 3.2), M({ color: 0xE9E7E1, roughness: 0.8 })); w2.position.set(dx + s * (dw / 2 + 1.5), 1.6, z1 + 1.6); w2.rotation.y = -s * Math.PI / 2; root.add(w2); }
+      const ce = new T.Mesh(new T.PlaneGeometry(dw + 3, 3.2), new T.MeshBasicMaterial({ color: 0xF4F1EA })); ce.rotation.x = Math.PI / 2; ce.position.set(dx, 3.2, z1 + 1.6); root.add(ce);
+      const [vc, vx] = ctCanvas(512, 320); const gr = vx.createLinearGradient(0, 0, 0, 320); gr.addColorStop(0, '#EDEAE2'); gr.addColorStop(0.55, '#D9D3C6'); gr.addColorStop(0.56, '#B9B2A4'); gr.addColorStop(1, '#A39C8E'); vx.fillStyle = gr; vx.fillRect(0, 0, 512, 320);
+      vx.fillStyle = '#2B3036'; vx.fillRect(150, 70, 212, 40); vx.fillStyle = '#F4C542'; vx.font = '700 22px Inter, Arial, sans-serif'; vx.fillText('\u2190  Gates   Exit  \u2192', 168, 98);
+      for (let i = 0; i < 7; i++) { vx.fillStyle = 'rgba(255,248,230,0.9)'; vx.fillRect(40 + i * 66, 20, 36, 6); }
+      for (let i = 0; i < 5; i++) { vx.fillStyle = 'rgba(40,40,46,0.55)'; const px = 60 + i * 95 + (i % 2) * 20, ph = 46 + (i % 3) * 6; vx.fillRect(px, 176 - ph, 12, ph); vx.beginPath(); vx.arc(px + 6, 176 - ph - 7, 7, 0, 6.3); vx.fill(); }
+      const view = new T.Mesh(new T.PlaneGeometry(dw + 3, 3.2), new T.MeshBasicMaterial({ map: ctTex(vc) })); view.position.set(dx, 1.6, z1 + 3.2); view.rotation.y = Math.PI; root.add(view); }
+    // the green exit sign over the doors, inside
+    { const ex = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), new T.MeshBasicMaterial({ map: ctTex(ctExit()), toneMapped: false })); ex.position.set(dx, dh + 0.42, z1 - 0.02); ex.rotation.y = Math.PI; root.add(ex); }
+    const hit = new T.Mesh(new T.BoxGeometry(dw, dh, 0.4), new T.MeshBasicMaterial({ visible: false })); hit.position.set(dx, dh / 2, z1 - 0.2); hit.userData.act = 'door'; root.add(hit); A.hits.push(hit); A.door = new T.Vector3(dx, 0, z1 - 1.4);
     prop('reception-desk', dx - 2.6, z1 - 1.6, Math.PI, () => {
       const top = lv === 2 ? marble : lv === 1 ? walnut : M({ color: 0xE9E4DA, roughness: 0.35 });
       bx(2.2, 1.05, 0.6, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, dx - 2.6, 0.525, z1 - 1.6); bx(2.3, 0.05, 0.75, top, dx - 2.6, 1.07, z1 - 1.6);
@@ -179,12 +206,8 @@ function lgBuild(scene: any, q: number): any {
     A.desk = new T.Vector3(dx - 2.6, 0, z1 - 1.0); }
   // seating: groups of armchairs (and a sofa) round coffee tables on the carpet
   const seats: any[] = [];
-  const armchair = (x: number, z: number, ry: number) => prop(['armchair-fabric', 'armchair-leather', 'armchair-velvet'][lv], x, z, ry, () => {
-    const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = ry; root.add(g);
-    const o = (w: number, h: number, d: number, m: any, X: number, Y: number, Z: number) => { const k = new T.Mesh(new T.BoxGeometry(w, h, d), m); k.position.set(X, Y, Z); k.castShadow = shadow; k.receiveShadow = true; g.add(k); return k; };
-    o(0.8, 0.16, 0.72, fabric, 0, 0.38, 0.02); o(0.8, 0.62, 0.16, fabric, 0, 0.72, -0.3).rotation.x = -0.08; for (const s of [-1, 1]) o(0.14, 0.32, 0.72, fabric, s * 0.4, 0.55, 0);
-    o(0.66, 0.12, 0.6, fabric, 0, 0.5, 0.04);
-    for (const [X, Z] of [[-0.34, -0.3], [0.34, -0.3], [-0.34, 0.3], [0.34, 0.3]]) { const l = new T.Mesh(new T.CylinderGeometry(0.025, 0.018, 0.3, 10), legM); l.position.set(X, 0.15, Z); g.add(l); } });
+  const upCol = [0x3E6A8A, 0x7A3F22, 0x1F5C4A][lv];
+  const armchair = (x: number, z: number, ry: number) => Props.place(root, 'armchair-' + (lv + 1), x, z, ry, q, { color: upCol });
   const table = (x: number, z: number) => prop(['coffee-table-oak', 'coffee-table-walnut', 'coffee-table-marble'][lv], x, z, 0, () => {
     const top = [oak, walnut, marble][lv]; add(new T.CylinderGeometry(0.5, 0.5, 0.05, 40), top, x, 0.42, z);
     if (lv === 2) { for (let i = 0; i < 3; i++) { const a = i / 3 * 6.283; const l = add(new T.CylinderGeometry(0.02, 0.02, 0.4, 8), gold, x + Math.cos(a) * 0.3, 0.2, z + Math.sin(a) * 0.3); l.rotation.z = Math.cos(a) * 0.2; l.rotation.x = -Math.sin(a) * 0.2; } }
@@ -196,7 +219,7 @@ function lgBuild(scene: any, q: number): any {
     for (const [dx, dz, ry] of [[0, -1.0, 0], [0, 1.0, Math.PI], [-1.0, 0, Math.PI / 2], [1.0, 0, -Math.PI / 2]] as number[][]) {
       if (ci % 2 && dx === 0 && dz < 0) continue;
       armchair(c[0] + dx, c[1] + dz, ry); block(c[0] + dx - 0.45, c[1] + dz - 0.45, c[0] + dx + 0.45, c[1] + dz + 0.45);
-      seats.push({ x: c[0] + dx, z: c[1] + dz, ry, hip: 0.55, kind: 'armchair' });
+      seats.push({ x: c[0] + dx, z: c[1] + dz, ry, hip: 0.5, kind: 'armchair' });
     }
     // cups and napkins on the tables
     prop(ci % 2 ? 'teacup-and-saucer' : 'coffee-cup-and-saucer', c[0] + 0.18, c[1] + 0.1, 0, () => lgCup(add, porcelain, lv === 2 ? gold : null, c[0] + 0.18, 0.445, c[1] + 0.1, ci % 2 === 1, ci % 2 ? 0x7A3E14 : 0x3A1F0E));
@@ -205,27 +228,25 @@ function lgBuild(scene: any, q: number): any {
   A.seats = seats;
   // a sofa against each side wall
   for (const s of [-1, 1]) { const x = s * (W / 2 - 0.65), z = z0 + D * 0.42;
-    prop(['sofa-fabric', 'sofa-leather', 'sofa-velvet'][lv], x, z, -s * Math.PI / 2, () => { const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = -s * Math.PI / 2; root.add(g);
-      const o = (w: number, h: number, d: number, m: any, X: number, Y: number, Z: number) => { const k = new T.Mesh(new T.BoxGeometry(w, h, d), m); k.position.set(X, Y, Z); k.castShadow = shadow; k.receiveShadow = true; g.add(k); return k; };
-      o(2.2, 0.18, 0.8, fabric, 0, 0.36, 0.02); o(2.2, 0.6, 0.18, fabric, 0, 0.72, -0.32); for (const t of [-1, 1]) o(0.16, 0.34, 0.8, fabric, t * 1.1, 0.55, 0); for (let k = -1; k <= 1; k++) o(0.68, 0.12, 0.64, fabric, k * 0.7, 0.5, 0.05); });
+    Props.place(root, 'sofa-' + (lv + 1), x, z, -s * Math.PI / 2, q, { seats: 3, color: upCol });
     block(x - 0.5, z - 1.2, x + 0.5, z + 1.2);
-    for (let k = -1; k <= 1; k++) seats.push({ x: x - s * 0.05, z: z + s * k * 0.7, ry: -s * Math.PI / 2, hip: 0.52, kind: 'sofa' });   // three places on the sofa
+    for (let k = -1; k <= 1; k++) seats.push({ x: x - s * 0.05, z: z + s * k * 0.64, ry: -s * Math.PI / 2, hip: 0.5, kind: 'sofa' });   // three places on the sofa
     // a floor lamp and a plant beside it
     prop('floor-lamp', x, z + 1.6, 0, () => { add(new T.CylinderGeometry(0.16, 0.18, 0.03, 20), lv === 2 ? brass : black, x, 0.015, z + 1.6); add(new T.CylinderGeometry(0.015, 0.015, 1.5, 8), lv === 2 ? brass : black, x, 0.76, z + 1.6); const sh = add(new T.CylinderGeometry(0.18, 0.25, 0.3, 24, 1, true), new T.MeshStandardMaterial({ color: 0xF4ECD8, emissive: 0xFFE2A8, emissiveIntensity: 0.6, side: T.DoubleSide }), x, 1.55, z + 1.6); void sh; });
-    prop('potted-plant', x, z - 1.7, 0, () => lgPlant(add, x, z - 1.7, lv));
+    Props.place(root, (lv === 0 ? ['plant-3', 'plant-1'] : lv === 1 ? ['plant-1', 'plant-2'] : ['plant-2', 'plant-1'])[s < 0 ? 0 : 1], x, z - 1.7, s * 0.7, q, { seed: 3 + s });
     block(x - 0.35, z + 1.3, x + 0.35, z - 2.05);
   }
   // the refreshment corner (back right): counter, espresso machine, tea urn, teapot, cups, napkins, fruit, the fridge
   { const cx = x1 - 3.0, cz = z1 - 1.0, top = lv === 2 ? marble : lv === 1 ? M({ color: 0x2B2F36, roughness: 0.25 }) : M({ color: 0xE9E4DA, roughness: 0.35 });
     prop('buffet-counter', cx, cz, Math.PI, () => { bx(3.2, 0.88, 0.7, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, cx, 0.44, cz); bx(3.3, 0.05, 0.78, top, cx, 0.905, cz); });
     block(cx - 1.7, cz - 0.45, cx + 1.7, z1); A.surf.push({ x: cx, z: cz - 0.05, top: 0.93, w: 3.2, d: 0.66 });
-    prop('espresso-machine', cx - 1.1, cz, Math.PI, () => { bx(0.5, 0.42, 0.42, chrome, cx - 1.1, 1.14, cz); bx(0.46, 0.08, 0.38, black, cx - 1.1, 1.39, cz); for (const s of [-1, 1]) { add(new T.CylinderGeometry(0.03, 0.03, 0.12, 12), black, cx - 1.1 + s * 0.12, 1.05, cz - 0.24); } bx(0.4, 0.02, 0.16, chrome, cx - 1.1, 0.94, cz - 0.24); });
+    const cm = Props.place(root, 'coffee-machine-1', cx - 1.1, cz + 0.05, Math.PI, q, {}, 0.93);
     prop('tea-urn', cx - 0.35, cz, 0, () => lgUrn(add, lv === 0 ? chrome : brass, black, cx - 0.35, 0.93, cz, lv));
     prop('teapot', cx + 0.2, cz - 0.1, 0.6, () => lgTeapot(add, lv === 2 ? porcelain : lv === 1 ? M({ color: 0x1E2F4F, roughness: 0.25 }) : porcelain, lv === 2 ? gold : null, cx + 0.2, 0.93, cz - 0.1));
     for (let i = 0; i < 4; i++) prop(i % 2 ? 'teacup-and-saucer' : 'coffee-cup-and-saucer', cx + 0.55 + (i % 2) * 0.2, cz - 0.15 + Math.floor(i / 2) * 0.22, 0, () => lgCup(add, porcelain, lv === 2 ? gold : null, cx + 0.55 + (i % 2) * 0.2, 0.93, cz - 0.15 + Math.floor(i / 2) * 0.22, i % 2 === 1, 0));
     prop('napkin-stack', cx + 1.0, cz, 0, () => lgNapkins(add, cx + 1.0, 0.93, cz, 10, lv));
     prop('fruit-bowl', cx + 1.38, cz - 0.05, 0, () => lgFruit(add, lv === 2 ? gold : porcelain, cx + 1.38, 0.93, cz - 0.05));
-    const hit = new T.Mesh(new T.BoxGeometry(2.0, 0.7, 0.8), new T.MeshBasicMaterial({ visible: false })); hit.position.set(cx - 0.7, 1.2, cz); hit.userData.act = 'coffee'; root.add(hit); A.hits.push(hit); A.coffeeAt = new T.Vector3(cx - 1.1, 0.93, cz - 0.24);
+    const hit = new T.Mesh(new T.BoxGeometry(2.0, 0.7, 0.8), new T.MeshBasicMaterial({ visible: false })); hit.position.set(cx - 0.7, 1.2, cz); hit.userData.act = 'coffee'; root.add(hit); A.hits.push(hit); A.coffeeAt = new T.Vector3(cx - 1.1, 0.93 + 0.058, cz + 0.05 - (cm.userData.cupAt ? cm.userData.cupAt.z : 0.34));
     // the fridge: glass front, lit shelves of drinks and snack bars (the same products as the hangars' machine)
     const fx = x1 - 0.55, fz = cz - 1.6;
     prop('drinks-fridge', fx, fz, -Math.PI / 2, () => { const g = new T.Group(); g.position.set(fx, 0, fz); g.rotation.y = -Math.PI / 2; root.add(g);
@@ -326,12 +347,6 @@ function lgTeapot(add: any, por: any, rim: any, x: number, y: number, z: number)
   add(new T.TorusGeometry(0.045, 0.01, 6, 14, Math.PI), por, x - 0.1, y + 0.08, z).rotation.z = Math.PI / 2;
   if (rim) add(new T.TorusGeometry(0.08, 0.003, 6, 28), rim, x, y + 0.13, z).rotation.x = Math.PI / 2;
 }
-function lgPlant(add: any, x: number, z: number, lv: number) {
-  const T = THREE, pot = add(new T.CylinderGeometry(0.24, 0.19, 0.5, 24), new T.MeshStandardMaterial({ color: lv === 2 ? 0xD4AF37 : lv === 1 ? 0x2B2F36 : 0xE8E4DC, metalness: lv === 2 ? 0.9 : 0, roughness: lv === 2 ? 0.3 : 0.6 }), x, 0.25, z); void pot;
-  const r = ctRng(Math.round(x * 13 + z * 7)), leaf = new T.MeshStandardMaterial({ color: 0x2F6B34, roughness: 0.7, side: T.DoubleSide });
-  for (let i = 0; i < 26; i++) { const lf = add(new T.PlaneGeometry(0.12, 0.6), leaf, x, 0.5 + 0.3 + r() * 0.6, z); const a = r() * 6.3, t = 0.4 + r() * 0.7; lf.position.x += Math.cos(a) * 0.1; lf.position.z += Math.sin(a) * 0.1; lf.rotation.set(-t * Math.cos(a) * 0.8, a, t * 0.8 * Math.sin(a)); lf.castShadow = false; }
-}
-
 /* ---------- guests ---------- */
 /** Who is in the lounge: the business and first class passengers of your next departures from here (the next four
  *  hours), the same people (names, faces, clothes) as on those flights' passenger lists. The flight is given their
@@ -471,7 +486,7 @@ function lgOpen2(root: HTMLElement, q: number) {
   ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('lounge', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
   ren.shadowMap.enabled = Gfx.placeShadow('lounge', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
-  const cam = new T.PerspectiveCamera(62, 1, 0.03, 200); R.cam = cam;
+  const cam = new T.PerspectiveCamera(62, 1, 0.06, 200); R.cam = cam;
   const S = hgSun(R.k); R.hemi = new T.HemisphereLight(0xFFF4E6, 0x40362E, 0.55 + 0.35 * S.k); scene.add(R.hemi);
   ctProgress(15, 'Laying the carpet…', R);
   setTimeout(() => {
@@ -546,8 +561,11 @@ function lgFrame() {
   lgFrameRest(now, dt);
 }
 /** Everything that goes on in the room each frame, standing or sitting: the guests, the fire, steam, what you look at. */
+/** The sliding doors: towards open (1) or shut (0); they move in lgFrameRest. */
+function lgDoorsTo(k: number) { const A = LoungeRoom.A; if (!A || !A.doorLeaves) return; A.doorTo = k; try { if (k) hgSnd('motor'); } catch (e) { /* quiet */ } }
 function lgFrameRest(now: number, dt: number) {
   const R = LoungeRoom;
+  if (R.A && R.A.doorLeaves && R.A.doorK !== R.A.doorTo) { const A = R.A; A.doorK += Math.sign(A.doorTo - A.doorK) * Math.min(Math.abs(A.doorTo - A.doorK), dt * 1.6); const e = A.doorK * A.doorK * (3 - 2 * A.doorK); for (const L of A.doorLeaves) L.position.x = L.userData.x0 + (L.userData.x1 - L.userData.x0) * e; }
   // guests: sitting back, talking now and then, sipping; the fire flickers; steam rises from fresh cups
   for (const G of R.guests || []) if (!G.gone) lgGuestStep(G, now, dt);
   if (R.guests && R.guests.some((G: any) => G.gone)) R.guests = R.guests.filter((G: any) => !G.gone);
@@ -581,7 +599,7 @@ function lgAimedObj(e?: PointerEvent): any {
 }
 function lgClickAt(e?: PointerEvent) {
   const R = LoungeRoom; if (R.loading) return; const o = lgAimedObj(e), a = o ? o.userData.act : '';
-  if (a === 'door') { roomExitMenu(R.root, 'lounges', to => lgLeave(to)); return; }
+  if (a === 'door') { if (R.sit) lgStand(); lgDoorsTo(1); setTimeout(() => { if (R.on) roomExitMenu(R.root, 'lounges', to => lgLeave(to), () => lgDoorsTo(0)); }, 450); return; }
   if (a === 'coffee') { if (R.sit) lgStand(); lgPour(); return; }
   if (a === 'cup') { lgPickCup(o); return; }
   if (a === 'surface' && lgHeldCup()) { lgPutCup(o, R.aimPoint || o.position); return; }

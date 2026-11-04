@@ -115,6 +115,30 @@ a heavier, higher-quality building can go to the PC while phones keep the lighte
 | `hangars/hangar-very-large.glb` | Very large hangar: 96 × 100 m, 30 m high, doors 26.5 m (747, 777-9, A380) |
 | `hangars/hangar-very-large-pc.glb` | The same, PC only |
 
+## Furniture and fittings used in several rooms (`props/`)
+
+Plants, sofas, armchairs, the coffee machine, the doors and the room signs, in the lounges, your office, the Operations
+office and the hangars. Where there are several kinds they are numbered (`plant-1`, `plant-2`…); one file stands for
+every one of that kind. Metres, front towards +Z (where you sit or the side you face it from), standing on the floor,
+centred; fitted to the size of the app's own. Doors: `door-1` is one leaf with its hinge on the left edge; `door-2` one
+sliding glass leaf (two are used). The room sign's name and pictogram stay the app's own, drawn in front of the file's frame.
+
+| File | What |
+|---|---|
+| `props/plant-1.glb` | Potted plant 1: fiddle-leaf fig in a glazed ceramic pot (about 1.6 m) |
+| `props/plant-2.glb` | Potted plant 2: kentia palm in a tall square planter (about 1.9 m) |
+| `props/plant-3.glb` | Potted plant 3: snake plant in a low concrete bowl (about 0.9 m) |
+| `props/sofa-1.glb` | Sofa 1: fabric, soft rounded cushions, tapered oak legs (Lounge) |
+| `props/sofa-2.glb` | Sofa 2: leather, buttoned back, chrome sled legs (Business lounge, your office) |
+| `props/sofa-3.glb` | Sofa 3: velvet Chesterfield, rolled arms, gold legs (Flagship lounge) |
+| `props/armchair-1.glb` | Armchair 1: fabric, to match sofa 1 |
+| `props/armchair-2.glb` | Armchair 2: leather, to match sofa 2 |
+| `props/armchair-3.glb` | Armchair 3: velvet, to match sofa 3 |
+| `props/coffee-machine-1.glb` | Coffee machine 1: bean-to-cup with a touchscreen, two bean hoppers, a drip tray (lounges, the hangar break room) |
+| `props/door-1.glb` | Door 1: painted steel door leaf with a narrow glass panel, lever handles and kick plates (hangar rooms). Hinge on its left edge (x = 0), the leaf along +X; it turns about the hinge |
+| `props/door-2.glb` | Door 2: one leaf of the automatic sliding glass doors (lounge entrance); two are used, one sliding each way |
+| `props/room-sign.glb` | Room sign by a door: the frame only (the name, number and pictogram are drawn by the app on a panel in front) |
+
 ## Hangar equipment and furniture (`hangar-props/`)
 
 One file for each kind: every one of that kind in the hangars uses it. Metres, front towards +Z (the side you face it
@@ -137,7 +161,6 @@ own (`vehicles/pushback-tug.glb`).
 | `hangar-props/bookshelf.glb` | Shelf of manuals |
 | `hangar-props/kitchen-counter.glb` | Break room counter with cupboards |
 | `hangar-props/sink.glb` | Sink and tap |
-| `hangar-props/coffee-machine.glb` | Coffee machine |
 | `hangar-props/coffee-mug.glb` | Coffee mug |
 | `hangar-props/drinking-glass.glb` | Drinking glass |
 | `hangar-props/break-room-table.glb` | Break room table |
@@ -154,21 +177,13 @@ towards +Z (where you sit or stand to use it), standing on the floor; fitted to 
 | `lounge-props/carpet-lounge.glb` | Carpet, Lounge |
 | `lounge-props/carpet-business.glb` | Carpet, Business lounge |
 | `lounge-props/carpet-flagship.glb` | Carpet, Flagship lounge (the finest) |
-| `lounge-props/armchair-fabric.glb` | Armchair, fabric (Lounge) |
-| `lounge-props/armchair-leather.glb` | Armchair, leather (Business lounge) |
-| `lounge-props/armchair-velvet.glb` | Armchair, velvet on gold legs (Flagship lounge) |
-| `lounge-props/sofa-fabric.glb` | Sofa, fabric |
-| `lounge-props/sofa-leather.glb` | Sofa, leather |
-| `lounge-props/sofa-velvet.glb` | Sofa, velvet |
 | `lounge-props/coffee-table-oak.glb` | Coffee table, oak |
 | `lounge-props/coffee-table-walnut.glb` | Coffee table, walnut |
 | `lounge-props/coffee-table-marble.glb` | Coffee table, marble and gold |
 | `lounge-props/floor-lamp.glb` | Floor lamp |
-| `lounge-props/potted-plant.glb` | Potted plant |
 | `lounge-props/magazine-rack.glb` | Magazine rack |
 | `lounge-props/reception-desk.glb` | Reception desk |
 | `lounge-props/buffet-counter.glb` | Refreshment counter |
-| `lounge-props/espresso-machine.glb` | Espresso machine |
 | `lounge-props/tea-urn.glb` | Tea urn (samovar) |
 | `lounge-props/teapot.glb` | Teapot |
 | `lounge-props/coffee-cup-and-saucer.glb` | Coffee cup and saucer |

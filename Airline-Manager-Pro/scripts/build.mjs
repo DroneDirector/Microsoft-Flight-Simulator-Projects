@@ -90,7 +90,7 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   }
   const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
   const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
-  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES'), crm = pairs('CRASH_FILES'), crx = pairs('CRASH_FX_FILES');
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES'), shp = pairs('PROP_FILES'), crm = pairs('CRASH_FILES'), crx = pairs('CRASH_FX_FILES');
   const have = f => files.includes(f) ? ' (in use)' : '';
   const md = [
     '# Replaceable models', '',
@@ -121,6 +121,14 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     'a heavier, higher-quality building can go to the PC while phones keep the lighter one.', '',
     '| File | Size |', '|---|---|',
     ...hgr.flatMap(([f, n]) => [`| \`hangars/${f}.glb\`${have('hangars/' + f + '.glb')} | ${n} |`, `| \`hangars/${f}-pc.glb\`${have('hangars/' + f + '-pc.glb')} | The same, PC only |`]), '',
+    '## Furniture and fittings used in several rooms (`props/`)', '',
+    'Plants, sofas, armchairs, the coffee machine, the doors and the room signs, in the lounges, your office, the Operations',
+    'office and the hangars. Where there are several kinds they are numbered (`plant-1`, `plant-2`…); one file stands for',
+    'every one of that kind. Metres, front towards +Z (where you sit or the side you face it from), standing on the floor,',
+    'centred; fitted to the size of the app\'s own. Doors: `door-1` is one leaf with its hinge on the left edge; `door-2` one',
+    'sliding glass leaf (two are used). The room sign\'s name and pictogram stay the app\'s own, drawn in front of the file\'s frame.', '',
+    '| File | What |', '|---|---|',
+    ...shp.map(([f, n]) => `| \`props/${f}.glb\`${have('props/' + f + '.glb')} | ${n} |`), '',
     '## Hangar equipment and furniture (`hangar-props/`)', '',
     'One file for each kind: every one of that kind in the hangars uses it. Metres, front towards +Z (the side you face it',
     'from: a chair\'s front is where you sit, a desk\'s where you work), standing on the floor. It is fitted to the size of the',

@@ -236,10 +236,9 @@ function ofBuild(scene: any, q: number) {
     add(new T.SphereGeometry(0.15, 32, 20), M({ map: ctTex(c), roughness: 0.4, clearcoat: 0.6 }), 0, 0.3, 0, 0, gl); add(new T.TorusGeometry(0.17, 0.008, 8, 40, Math.PI * 1.4), mat.brass, 0, 0.3, 0, 0, gl).rotation.y = Math.PI / 2; }
   for (const [x, h] of [[0.3, 0.26], [0.55, 0.2], [0.8, 0.3]]) { add(new T.CylinderGeometry(0.04, 0.05, 0.04, 16), mat.walnut, x, 0.83, Z1 - 0.3); const cup = add(new T.LatheGeometry([[0, 0], [0.02, 0], [0.012, 0.06], [0.012, h * 0.5], [0.06, h * 0.75], [0.07, h]].map(p => new T.Vector2(p[0], p[1])), 20), mat.brass, x, 0.85, Z1 - 0.3); void cup; }
   // a leather sofa and a low table (left), a plant in the corner
-  { const sx = X0 + 0.55, sz = 1.2; bx(0.8, 0.4, 1.9, mat.leather, sx, 0.25, sz); bx(0.25, 0.75, 1.9, mat.leather, X0 + 0.25, 0.5, sz); for (const s of [-1, 1]) bx(0.8, 0.6, 0.2, mat.leather, sx, 0.4, sz + s * 1.0);
+  { const sx = X0 + 0.55, sz = 1.2; Props.place(root, 'sofa-2', X0 + 0.48, sz, Math.PI / 2, q, { seats: 3, color: 0x4A2414 });
     slab(0.6, 1.0, 0.04, 0.03, mat.walnut, X0 + 1.45, 0.42, sz); for (const s of [-1, 1]) bx(0.5, 0.38, 0.04, mat.walnutM, X0 + 1.45, 0.2, sz + s * 0.42); }
-  { const px = X1 - 0.45, pz = Z0 + 0.45; add(new T.CylinderGeometry(0.22, 0.17, 0.45, 24), mat.pot, px, 0.225, pz); const r = ctRng(5);
-    for (let i = 0; i < 26; i++) { const lf = new T.Mesh(new T.PlaneGeometry(0.12, 0.55), mat.plant); const a = r() * 6.3, t = 0.4 + r() * 0.7; lf.position.set(px + Math.cos(a) * 0.12, 0.45 + 0.25 + r() * 0.6, pz + Math.sin(a) * 0.12); lf.rotation.set(-t * Math.cos(a) * 0.8, a, t * 0.8 * Math.sin(a)); lf.castShadow = true; root.add(lf); } }
+  Props.place(root, 'plant-1', X1 - 0.45, Z0 + 0.45, 0.4, q, { seed: 5 });
   // your pet, asleep in its bed by the right-hand bookshelf
   try { petPlace(T, root, A, [1.2, -2.8], -0.5, { free: (x: number, z: number) => ofFree(x, z) && !ofPetBlocked(x, z), door: [1.05, -1.85], box: [-2.9, -3.1, 2.9, 2.7] }); } catch (e) { /* no pet */ }
   // ceiling lights
