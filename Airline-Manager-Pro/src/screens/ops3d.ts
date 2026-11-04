@@ -384,7 +384,7 @@ function opsClickAt(e?: PointerEvent) {
   // the monitor's screen is up: a click beside it puts it away (and on the phone, picks the phone up after)
   if (R.overlay) { if (R.overlay.classList.contains('op-screen') && !R.zoomAnim) { const a = opsAimed(e); opsScreenClose(); if (a === 'phone') setTimeout(() => { if (!R.overlay) phonePick(R); }, 800); } return; }
   // the phone in your hand: a tap brings its screen up; a click on the monitor puts the phone down first, then opens it
-  if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') { if (opsAimed(e) === 'monitor') phoneThen(R, () => opsScreenOpen(R.tab || 'schedule')); else phoneOpen(R); } return; }
+  if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') { const a0 = opsAimed(e); if (a0 === 'monitor') phoneThen(R, () => opsScreenOpen(R.tab || 'schedule')); else if (a0 === 'phone') phoneOpen(R); else phonePut(R); } return; }   // a click on the phone uses it; anywhere else puts it back on the desk
   const a = opsAimed(e);
   if (a === 'phone') { if (!R.seat) opsSit(); setTimeout(() => phonePick(R), R.seat ? 0 : 300); return; }
   if (a === 'door') { opsDoor(); return; }

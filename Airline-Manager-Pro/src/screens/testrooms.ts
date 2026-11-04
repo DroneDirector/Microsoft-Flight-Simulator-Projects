@@ -27,7 +27,7 @@ const TR_L = {
 
 TestRooms.open = function (opts?: any) {
   const R = TestRooms; if (R.on) return; R.stressMode = !!(opts && opts.stress);
-  R.game = !!(opts && opts.game); R.gameRoom = opts && opts.room || 'office'; R.gameInc = opts && opts.inc || null; R.in = 'halls';
+  R.game = !!(opts && opts.game); R.gameRoom = opts && opts.room || 'office'; R.gameInc = opts && opts.inc || null; R.lgWant = opts && opts.lk || ''; R.in = 'halls';
   if (typeof company !== 'function' || !company()) { toast('Start or load a game first: the rooms are your own', 'info'); return; }
   const q = Gfx.roomQ();
   R.on = true; R.q = q; R.pct = 0; R.keys = {}; R.stick = [0, 0]; R.loading = true; R.loadT0 = performance.now(); R.overlay = null;
@@ -141,19 +141,18 @@ function trOps(scene: any, q: number, ren: any) {
   R.walk.push(R.walkOf.ops = (x: number, z: number) => { const [lx, lz] = R.opsLocal(x, z); return lx > -2.8 && lx < 2.8 && lz > -2.9 && lz < 2.5 && !opsBlocked(lx, lz); });
 }
 function trLounge(scene: any, q: number) {
-  const R = TestRooms, LR = LoungeRoom, k = company().hub, L = loyalty(), have = L && L.lounges && L.lounges[k];
-  if (R.game && !have) { R.lg = null; return; }   // no lounge at your hub yet: the concourse ends in a wall
-  const lv = have ? clamp(have.lvl || 0, 0, 2) : 1, sp = LG_SPECS[lv];
+  const R = TestRooms, LR = LoungeRoom, k = R.game ? trLgPick(R.lgWant) : company().hub, L = loyalty(), have = L && L.lounges && L.lounges[k];
+  const lv = have ? clamp(have.lvl || 0, 0, 2) : R.game ? 0 : 1, sp = LG_SPECS[lv];
   const keep = { spec: LR.spec, lvl: LR.lvl, k: LR.k, linked: LR.linked };
   LR.spec = sp; LR.lvl = lv; LR.k = k; LR.linked = true;
   const ox = TR_L.con[2] + sp.D / 2, oz = TR_L.lgDoorZ - (sp.W / 2 - 6.3);
   let A: any;
   try { A = trCopy(scene, s => { const A2 = lgBuild(s, q); try { lgLights(s, q); } catch (e) { /* the building's light */ } return A2; }, ox, oz, -Math.PI / 2); } finally { Object.assign(LR, keep); }
-  R.lgKey = k;
+  R.lgKey = k; R.lgShut = !!(R.game && !have);   // none of your own yet: there, built and lit, but shut behind a hoarding
   A.cam = new THREE.PerspectiveCamera(62, 1, 0.06, 300); A.group.add(A.cam);
   R.lg = A; R.lgSpec = sp; R.lgLv = lv;
   R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'lounge'; return h; }));
-  R.doors.push({ k: 'lounge', name: 'the lounge', k0: 0, to: 0, slide: true, set: (e: number) => { for (const Lf of A.doorLeaves || []) Lf.position.x = Lf.userData.x0 + (Lf.userData.x1 - Lf.userData.x0) * e; },
+  R.doors.push({ k: 'lounge', name: 'the lounge', k0: 0, to: 0, slide: true, locked: R.lgShut, set: (e: number) => { for (const Lf of A.doorLeaves || []) Lf.position.x = Lf.userData.x0 + (Lf.userData.x1 - Lf.userData.x0) * e; },
     pass: [TR_L.con[2] - 0.6, TR_L.lgDoorZ - 0.7, TR_L.con[2] + 0.6, TR_L.lgDoorZ + 0.7] });
   const g = A.group, inv = new THREE.Matrix4();
   R.lgLocal = (x: number, z: number) => { inv.copy(g.matrixWorld).invert(); const v = new THREE.Vector3(x, 0, z).applyMatrix4(inv); return [v.x, v.z]; };
@@ -258,7 +257,18 @@ function trHalls(scene: any, q: number) {
   way(4, 12, Math.PI / 2, 7, 'Lounge  →   Gates 21–23');
   way(22, 12, -Math.PI / 2, 5.5, '←  Offices · Staff');
   // the lounge's entrance seen from the concourse: its name over the doors, its sign beside them
-  if (R.lg) { const [c, cx] = ctCanvas(1400, 260); cx.fillStyle = '#E6C98E'; cx.font = '600 120px Georgia, serif'; cx.textAlign = 'center'; cx.fillText(String(company().name || 'Lounge'), 700, 120); cx.font = '500 64px Inter, Arial, sans-serif'; cx.fillStyle = '#F2EADB'; cx.fillText(R.lgSpec ? R.lgSpec.name.toUpperCase().split('').join(' ') : 'L O U N G E', 700, 215);
+  if (R.lg) { const [c, cx] = ctCanvas(1400, 260); cx.fillStyle = '#E6C98E'; cx.font = '600 120px Georgia, serif'; cx.textAlign = 'center'; cx.fillText(String(company().name || 'Lounge'), 700, 120); cx.font = '500 64px Inter, Arial, sans-serif'; cx.fillStyle = '#F2EADB'; cx.fillText(R.lgShut ? 'C O M I N G   S O O N' : R.lgSpec ? R.lgSpec.name.toUpperCase().split('').join(' ') : 'L O U N G E', 700, 215);
+    if (R.lgShut) {   // a hoarding over the shut doors until you own a lounge
+      const [hc, hx] = ctCanvas(640, 760), W = 640, Hh = 760;
+      hx.fillStyle = '#1D2026'; hx.fillRect(0, 0, W, Hh);
+      for (const y0 of [0, Hh - 70]) { hx.save(); hx.beginPath(); hx.rect(0, y0, W, 70); hx.clip(); for (let i = -2; i < 14; i++) { hx.fillStyle = i % 2 ? '#F2C230' : '#22252B'; hx.beginPath(); hx.moveTo(i * 60, y0 + 70); hx.lineTo(i * 60 + 60, y0 + 70); hx.lineTo(i * 60 + 130, y0); hx.lineTo(i * 60 + 70, y0); hx.fill(); } hx.restore(); }
+      hx.textAlign = 'center'; hx.fillStyle = '#E6C98E'; hx.font = '600 92px Georgia, serif'; hx.fillText('Lounge', W / 2, 260);
+      hx.fillStyle = '#F2EADB'; hx.font = '600 50px Inter, Arial, sans-serif'; hx.fillText('COMING SOON', W / 2, 350);
+      hx.fillStyle = '#9AA3AE'; hx.font = '500 32px Inter, Arial, sans-serif'; hx.fillText('Under construction', W / 2, 430);
+      hx.fillText('We are sorry for the', W / 2, 520); hx.fillText('inconvenience', W / 2, 562);
+      const hw = LG_DOOR_W + 0.7, hh = LG_DOOR_H + 0.12, dk = M({ color: 0x1D2026, roughness: 0.7 });
+      const hb = new T.Mesh(new T.BoxGeometry(0.06, hh, hw), [dk, new T.MeshStandardMaterial({ map: ctTex(hc), roughness: 0.65 }), dk, dk, dk, dk]);
+      hb.position.set(K[2] - 0.09, hh / 2, TR_L.lgDoorZ); hb.userData = { act: 'door', room: 'lounge' }; g.add(hb); R.hits.push(hb); }
     quad(5.6, 1.4, M({ color: 0x2A2C30, roughness: 0.6 }), K[2] - 0.04, LG_DOOR_H + 0.75, TR_L.lgDoorZ, -Math.PI / 2);
     const n = new T.Mesh(new T.PlaneGeometry(4.4, 0.82), new T.MeshBasicMaterial({ map: ctTex(c), transparent: true, toneMapped: false })); n.position.set(K[2] - 0.06, LG_DOOR_H + 0.75, TR_L.lgDoorZ); n.rotation.y = -Math.PI / 2; g.add(n);
     Props.place(g, 'room-sign', K[2] - 0.04, TR_L.lgDoorZ + LG_DOOR_W / 2 + 0.45, -Math.PI / 2, q, { name: 'Lounge', sub: R.lgSpec ? R.lgSpec.name : 'Members', num: 'L', pict: 'lounge', staff: false }, 1.25); }
@@ -337,7 +347,7 @@ function trAimedObj(e?: PointerEvent): any {
 function trHintOf(o: any): string {
   if (!o) return ''; const a = o.userData.act, room = o.userData.room;
   if (TestRooms.game && a !== 'door' && a !== 'future') return '';
-  if (a === 'door') { const D = TestRooms.doors.filter((d: any) => d.k === room)[0]; return D ? (D.to ? `Click to shut the door` : `Click to open the door to ${D.name}`) : ''; }
+  if (a === 'door') { const D = TestRooms.doors.filter((d: any) => d.k === room)[0]; return D ? D.locked ? 'Lounge: coming soon. Buy your first lounge to open it' : (D.to ? `Click to shut the door` : `Click to open the door to ${D.name}`) : ''; }
   if (a === 'future') return `${o.userData.name}: coming later`;
   if (a === 'monitor' || a === 'laptop') return 'Click to look at the computer (looking only)';
   if (a === 'pet') return 'Your pet';
@@ -354,6 +364,7 @@ function trClickAt(e?: PointerEvent) {
   if (R.game && a !== 'door' && a !== 'future') return;
   if (a === 'door') { const D = R.doors.filter((d: any) => d.k === room)[0]; if (!D) return;
     if (D.to) { const F = R.free, p = D.pass; if (F.x > p[0] - 0.4 && F.x < p[2] + 0.4 && F.z > p[1] - 0.4 && F.z < p[3] + 0.4) { toast('Step out of the doorway first', 'info'); return; } }
+    if (D.locked) { toast('Your lounge opens here once you own your first one (Lounges)', 'info'); return; }
     D.to = D.to ? 0 : 1; try { Sound.tick(); } catch (x) { /* quiet */ } return; }
   if (a === 'future') { toast(`${o.userData.name}: this room comes later`, 'info'); return; }
   if (a === 'monitor' || a === 'laptop') { trComputer(room === 'ops' ? 'schedule' : ''); return; }
@@ -598,4 +609,10 @@ function trLeaveBuilding(to?: string) {
   ]);
 }
 /** Should the game's Office, Operations and Lounge buttons open the joined building? (Settings → Graphics.) */
+/** Which lounge the building ends in: the one asked for, else your hub's, else any of yours, else a plain lounge at your hub. */
+function trLgPick(want?: string): string {
+  const ks = lgList().map(l => l.k), hub = company().hub;
+  if (want && ks.indexOf(want) >= 0) return want;
+  return ks.indexOf(hub) >= 0 ? hub : ks[0] || hub;
+}
 function trJoined(): boolean { return (State.settings as any).joinedRooms !== false && typeof company === 'function' && !!company(); }
