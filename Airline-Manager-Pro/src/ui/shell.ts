@@ -78,7 +78,7 @@ function renderTopbar() {
 }
 
 /* ---------- the digital clock by the battery: your device's time, and the game's date ---------- */
-function dclockHtml(): string { const d = dclockParts(); return `<span class="dclock" data-dclock role="timer" aria-label="Time ${d.t}, ${d.d}"><b><i data-dc-h>${d.h}</i><em>:</em><i data-dc-m>${d.m}</i><small data-dc-s>${d.s}</small></b><span data-dc-d>${d.d}</span></span>`; }
+function dclockHtml(): string { const d = dclockParts(); return `<span class="dclock" data-dclock role="timer" aria-label="Time ${d.t}, ${d.d}"><b><i data-dc-h>${d.h}</i><em>:</em><i data-dc-m>${d.m}</i></b><span data-dc-d>${d.d}</span></span>`; }
 function dclockParts(): { h: string; m: string; s: string; t: string; d: string } {
   const now = new Date(), p = (n: number) => String(n).padStart(2, '0');
   let g = now; try { g = companyDate(); } catch (e) { /* the device's date */ }

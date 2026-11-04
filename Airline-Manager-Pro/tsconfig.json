@@ -172,6 +172,8 @@
     "src/screens/v3d-lod.ts",
     "src/screens/view3d.ts",
     "src/ui/gamepad.ts",
+    "src/ui/devices.ts",
+    "src/ui/scene-gear.ts",
     "src/ui/exit-splash.ts",
     "src/core/career-start.ts",
     "src/ui/room-notes.ts",

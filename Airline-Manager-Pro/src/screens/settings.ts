@@ -19,7 +19,7 @@ const SETTINGS: SetSection[] = [
     { type: 'html', html: () => { if (typeof DESKTOP !== 'undefined' && DESKTOP) return ''; const on = (State.settings as any).gameLock === true; return `<label class="tg-row"><span><b>Lock to the game</b><small>Stops the notification panel and the system buttons from opening by accident while you play: swipes from the edges do nothing (Android's app pinning). Android asks once to confirm. To leave the app while it is on, hold Back and Recents together, or with gesture navigation swipe up and hold; switching this off lets go at once.</small></span><button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="gamelock-toggle"><i></i></button></label>`; } },
     { type: 'choice', key: 'crewStyle', label: 'Crew figures', hint: 'How your pilots, cabin crew and mechanics are drawn. Natural has real human proportions; stylised has a slightly larger head and eyes, like an animated film.', options: [['natural', 'Natural'], ['balanced', 'In-between'], ['stylised', 'Stylised']] },
   ] },
-  { id: 'pad', title: 'Controller', icon: 'play', items: [{ type: 'html', html: () => padSettingsHtml() }] },
+  { id: 'devices', title: 'Devices', icon: 'play', items: [{ type: 'html', html: () => devicesHtml() }] },
   { id: 'booster', title: 'Game Booster', icon: 'power', items: [
     { type: 'html', html: () => { setTimeout(() => { try { boostAnim(); boostDraw(); boostSample(); } catch (e) { /* no animation */ } }, 0); return boosterHtml(); } },
   ] },
