@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.138 (2026-11-04)
+
+- Joined building: room cameras look in the room's own (turned) coordinates (trRoomCam): Operations and the lounge walk and face correctly
+- Long cabin: openings in the shell behind every window (shader discard), frames turned to the wall's slope and set flush
+- Shades: live from the front to just aft of the wing (cabShadeToggle/cabShadeStep/cabShadeTap), shut further back; the window seat's own shade; neighbours see through; shade clipped at the window top, just in front of the pane
+
 ## 0.9.137 (2026-11-04)
 
 - Joined building: the lounge is always there (hub's, else another of yours: trLgPick); every lounge visit opens in the building

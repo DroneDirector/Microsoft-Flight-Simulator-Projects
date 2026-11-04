@@ -117,7 +117,7 @@ function trCut(root: any, a: number[], b: number[], top: number, keep: any[] = [
 function trOffice(scene: any, q: number) {
   const R = TestRooms;
   const A = trCopy(scene, s => { const A2 = ofBuild(s, q); trCut(A2.root, [-3.2, -3.1], [-3.2, -2.1], 2.2); return A2; }, 0, 0, 0);
-  A.cam = new THREE.PerspectiveCamera(58, 1, 0.03, 300); A.group.add(A.cam);
+  A.cam = trRoomCam(A.group, 58, 0.03);
   R.of = A; R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'office'; return h; }));
   // its door: hinged, swinging into the room
   R.doors.push({ k: 'office', name: 'your office', k0: 0, to: 0, set: (e: number) => { if (A.doorLeaf) A.doorLeaf.rotation.y = -1.5 * e; },
@@ -130,7 +130,7 @@ function trOps(scene: any, q: number, ren: any) {
   const R = TestRooms, L = TR_L.ops, ren0 = OpsRoom.ren; OpsRoom.ren = ren;
   let A: any;
   try { A = trCopy(scene, s => { const A2 = opsBuild(s, q); trCut(A2.root, [1.75 - 0.5, 2.5], [1.75 + 0.5, 2.5], 2.15); return A2; }, L.x, L.z, L.ry); } finally { OpsRoom.ren = ren0; }
-  A.cam = new THREE.PerspectiveCamera(56, 1, 0.03, 300); A.group.add(A.cam);
+  A.cam = trRoomCam(A.group, 56, 0.03);
   R.ops = A; R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'ops'; return h; }));
   try { opsMonitorDraw(A); } catch (e) { /* the screen stays dark */ }
   R.doors.push({ k: 'ops', name: 'the Operations office', k0: 0, to: 0, set: (e: number) => { if (A.door) A.door.rotation.y = e * 1.35; },
@@ -139,6 +139,13 @@ function trOps(scene: any, q: number, ren: any) {
   const g = A.group, inv = new THREE.Matrix4();
   R.opsLocal = (x: number, z: number) => { inv.copy(g.matrixWorld).invert(); const v = new THREE.Vector3(x, 0, z).applyMatrix4(inv); return [v.x, v.z]; };
   R.walk.push(R.walkOf.ops = (x: number, z: number) => { const [lx, lz] = R.opsLocal(x, z); return lx > -2.8 && lx < 2.8 && lz > -2.9 && lz < 2.5 && !opsBlocked(lx, lz); });
+}
+/** A room's camera inside the building: it lives in the room's own coordinates (the room may be turned), so where it
+ *  is told to look is in those coordinates too, as when the room stands on its own. */
+function trRoomCam(group: any, fov: number, near: number): any {
+  const T = THREE, cam = new T.PerspectiveCamera(fov, 1, near, 300), v = new T.Vector3(); group.add(cam);
+  cam.lookAt = function (x: any, y?: number, z?: number) { if (x && x.isVector3) v.copy(x); else v.set(x, y, z); group.updateWorldMatrix(true, false); group.localToWorld(v); T.Object3D.prototype.lookAt.call(cam, v); };
+  return cam;
 }
 function trLounge(scene: any, q: number) {
   const R = TestRooms, LR = LoungeRoom, k = R.game ? trLgPick(R.lgWant) : company().hub, L = loyalty(), have = L && L.lounges && L.lounges[k];
@@ -149,7 +156,7 @@ function trLounge(scene: any, q: number) {
   let A: any;
   try { A = trCopy(scene, s => { const A2 = lgBuild(s, q); try { lgLights(s, q); } catch (e) { /* the building's light */ } return A2; }, ox, oz, -Math.PI / 2); } finally { Object.assign(LR, keep); }
   R.lgKey = k; R.lgShut = !!(R.game && !have);   // none of your own yet: there, built and lit, but shut behind a hoarding
-  A.cam = new THREE.PerspectiveCamera(62, 1, 0.06, 300); A.group.add(A.cam);
+  A.cam = trRoomCam(A.group, 62, 0.06);
   R.lg = A; R.lgSpec = sp; R.lgLv = lv;
   R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'lounge'; return h; }));
   R.doors.push({ k: 'lounge', name: 'the lounge', k0: 0, to: 0, slide: true, locked: R.lgShut, set: (e: number) => { for (const Lf of A.doorLeaves || []) Lf.position.x = Lf.userData.x0 + (Lf.userData.x1 - Lf.userData.x0) * e; },

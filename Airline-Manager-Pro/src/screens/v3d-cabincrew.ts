@@ -348,10 +348,10 @@ function cabinTap(x: number, y: number): boolean {
   let best: any = null, bd = 0.45;
   for (const m of C.members as CrewMember[]) { if (m.hidden) continue; const c = m.holder.localToWorld(new T.Vector3(0, (m.m.top || 1.7) * (m.sitK > 0.5 ? 0.45 : 0.6), 0)); const d = ray.ray.distanceToPoint(c); if (d < bd) { bd = d; best = m; } }
   if (best) { cabinTalkOpen('crew:' + best.person.name, best); return true; }
-  const pg = G.userData.people; if (!pg) return false;
-  const ms = pg.userData.meshes, hit = ray.intersectObjects([ms.head, ms.torso].filter(Boolean), false)[0];
-  if (hit && hit.instanceId != null) { const w = pg.userData.who[hit.instanceId]; if (w) { cabinTalkOpen('pax:' + w.p.key, null, w.p); return true; } }
-  return false;
+  const pg = G.userData.people;
+  if (pg) { const ms = pg.userData.meshes, hit = ray.intersectObjects([ms.head, ms.torso].filter(Boolean), false)[0];
+    if (hit && hit.instanceId != null) { const w = pg.userData.who[hit.instanceId]; if (w) { cabinTalkOpen('pax:' + w.p.key, null, w.p); return true; } } }
+  return cabShadeTap(ray, G);   // a window: its shade up or down
 }
 ACTIONS['cab-talk'] = el => { const k = el.getAttribute('data-k'); const m = (CabinCrew.members as CrewMember[]).filter(x => 'crew:' + x.person.name === k)[0]; cabinTalkOpen(k, m || null, null); };
 /** The card: who it is and what they said, each line with a play button. */
