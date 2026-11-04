@@ -37,6 +37,8 @@ import java.util.List;
  * - When Android shuts down the app's web view in the background to free memory, the app is
  *   brought back instead of closing; everything is saved, so it opens where it was.
  * - Full screen can be switched off in the app's settings; the choice is kept on the phone.
+ * - Lock to the game (off unless switched on): Android's app pinning, so swipes from the edges can't open the
+ *   notification panel or the system buttons while playing.
  * - Game Booster (off unless switched on, kept on the phone): the screen stays on, and on phones that
  *   offer it the processor is held at a steady, sustained speed instead of slowing down when warm.
  *   Up to Android 13 it also closes other apps running in the background, and keeps doing so every
@@ -63,13 +65,14 @@ public class MainActivity extends BridgeActivity {
         enterImmersive();
         protectEdges();
         applyBoost();
+        applyLock();
         fastScreen();
         // after a swipe from the edge the system bars show over the app for a moment: hide them again
         // soon after (the notification shade can still be pulled down while they show)
         ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (v, insets) -> {
             if (fullScreen() && insets.isVisible(WindowInsetsCompat.Type.systemBars())) {
                 hideLater.removeCallbacksAndMessages(null);
-                hideLater.postDelayed(() -> { if (hasWindowFocus()) enterImmersive(); }, 2500);
+                hideLater.postDelayed(() -> { if (hasWindowFocus()) enterImmersive(); }, 700);
             }
             return ViewCompat.onApplyWindowInsets(v, insets);
         });
@@ -79,6 +82,20 @@ public class MainActivity extends BridgeActivity {
     SharedPreferences prefs() { return getSharedPreferences("amp_display", MODE_PRIVATE); }
     boolean fullScreen() { return prefs().getBoolean("fullscreen", true); }
     boolean boost() { return prefs().getBoolean("boost", false); }
+    boolean gameLock() { return prefs().getBoolean("gamelock", false); }
+    void setGameLock(boolean on) { prefs().edit().putBoolean("gamelock", on).apply(); runOnUiThread(this::applyLock); }
+
+    /** Lock to the game (Android's app pinning): while it is on, the notification panel and the system buttons can't
+     *  be opened by a stray swipe. Android asks once to confirm; to leave, hold Back and Recents (or, with gesture
+     *  navigation, swipe up and hold). Switching it off in the settings lets go at once. */
+    void applyLock() {
+        try {
+            android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+            boolean locked = am != null && Build.VERSION.SDK_INT >= 23 && am.getLockTaskModeState() != android.app.ActivityManager.LOCK_TASK_MODE_NONE;
+            if (gameLock() && !locked) startLockTask();
+            else if (!gameLock() && locked) stopLockTask();
+        } catch (Exception ignored) { }
+    }
 
     /** Called by the app's settings (AppTools). */
     void setFullScreen(boolean on) { prefs().edit().putBoolean("fullscreen", on).apply(); runOnUiThread(this::enterImmersive); }

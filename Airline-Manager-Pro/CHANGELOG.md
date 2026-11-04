@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.139 (2026-11-04)
+
+- Joined building: doorway guidance (trDoorAssist, host.assist), open from 55%, locked doors never pass
+- Lounge: the hangars' vending machine (hgVR shared), lgTakeSnack; coffee: arm to the touchscreen (lgPressArms), drink menu, visible stream, liquid level, slosh and spill (lgSlosh), steam
+- Office: Come in button (ofComeIn), second knock; visitor walks in two seconds after the door opens
+- Family: married, partner's name, children 0-3; desk photo: family, pet or first day (ofOtherPhoto)
+- Android: Lock to the game (startLockTask), system bars back after 0.7 s
+
 ## 0.9.138 (2026-11-04)
 
 - Joined building: room cameras look in the room's own (turned) coordinates (trRoomCam): Operations and the lounge walk and face correctly

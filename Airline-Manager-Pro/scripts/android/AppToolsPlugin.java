@@ -59,7 +59,8 @@ public class AppToolsPlugin extends Plugin {
             MainActivity a = (MainActivity) getActivity();
             if (call.getData().has("fullScreen")) a.setFullScreen(call.getBoolean("fullScreen", true));
             if (call.getData().has("boost")) a.setBoost(call.getBoolean("boost", false));
-            r.put("fullScreen", a.fullScreen()); r.put("boost", a.boost());
+            if (call.getData().has("gameLock")) a.setGameLock(call.getBoolean("gameLock", false));
+            r.put("fullScreen", a.fullScreen()); r.put("boost", a.boost()); r.put("gameLock", a.gameLock());
             boolean sustained = false;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) { android.os.PowerManager pm = (android.os.PowerManager) getContext().getSystemService(Context.POWER_SERVICE); sustained = pm != null && pm.isSustainedPerformanceModeSupported(); }
             r.put("sustained", sustained);

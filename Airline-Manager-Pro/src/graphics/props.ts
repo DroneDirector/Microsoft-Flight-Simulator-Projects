@@ -303,7 +303,7 @@ function prCoffee(q: PropQ): any {
   const beans = prMat('beans', () => prM({ color: 0xFFFFFF, roughness: 0.55, map: prTex('beans', (x, w, h) => { x.fillStyle = '#3A2214'; x.fillRect(0, 0, w, h); const r = prRng(19); for (let i = 0; i < 400; i++) { const a = r() * w, b = r() * h; x.fillStyle = ['#5A3420', '#6E4128', '#2A170C'][i % 3]; x.beginPath(); x.ellipse(a, b, 5, 3.4, r() * 3, 0, 6.3); x.fill(); x.strokeStyle = 'rgba(0,0,0,0.6)'; x.beginPath(); x.moveTo(a - 3, b); x.lineTo(a + 3, b); x.stroke(); } }, 128, 128, 1) }));
   const screen = prMat('coffee-screen', () => { const t = prTex('coffee-ui', (x, w, h) => {
       x.fillStyle = '#101317'; x.fillRect(0, 0, w, h); x.fillStyle = '#E8EDF2'; x.font = '600 22px Inter, Arial, sans-serif'; x.fillText('Choose your drink', 18, 34);
-      const names = ['Espresso', 'Cappuccino', 'Latte', 'Americano', 'Tea', 'Hot water'], cols = ['#6E4128', '#B98A5E', '#D9B48A', '#4A2A18', '#7A8E3A', '#5C8EB8'];
+      const names = ['Espresso', 'Cappuccino', 'Latte', 'Americano', 'Hot chocolate', 'Tea'], cols = ['#6E4128', '#B98A5E', '#D9B48A', '#4A2A18', '#5A3020', '#8A4A16'];
       names.forEach((n, i) => { const cx = 18 + (i % 3) * 120, cy = 54 + Math.floor(i / 3) * 96; x.fillStyle = '#1E242B'; x.fillRect(cx, cy, 108, 84);
         x.fillStyle = cols[i]; x.beginPath(); x.ellipse(cx + 54, cy + 30, 18, 6, 0, 0, 6.3); x.fill(); x.fillStyle = '#F2F2F0'; x.fillRect(cx + 37, cy + 30, 34, 4); x.beginPath(); x.moveTo(cx + 36, cy + 30); x.lineTo(cx + 40, cy + 50); x.lineTo(cx + 68, cy + 50); x.lineTo(cx + 72, cy + 30); x.fill();
         x.fillStyle = '#C9D2DB'; x.font = '500 14px Inter, Arial, sans-serif'; x.textAlign = 'center'; x.fillText(n, cx + 54, cy + 72); x.textAlign = 'left'; });

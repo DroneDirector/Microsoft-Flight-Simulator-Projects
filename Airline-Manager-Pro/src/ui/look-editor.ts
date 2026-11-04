@@ -6,7 +6,7 @@ interface LookEditOpts {
   sexOnly?: boolean; confirmName?: string; difficulty?: boolean; onAccept: (look: Look, identity?: { name: string; dob: string; nat: string }) => void;
 }
 
-let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string; pet?: Pet; who?: 'me' | 'partner'; me?: Look; partner?: any } = null;
+let _le: { o: LookEditOpts; look: Look; id: { name: string; dob: string; nat: string }; tab: string; cam: string; pet?: Pet; who?: 'me' | 'partner'; me?: Look; partner?: any; fam?: { married: boolean; name: string; kids: number } } = null;
 
 /* ---------- your family: your partner (your wife, or your husband if you are a woman), on the photo in your office ---------- */
 const FAM_H: { [s: string]: number } = { m: 178, f: 166 };
@@ -22,6 +22,11 @@ function familyPartner(mySex: string, base?: string): any {
   if (!L.height) L.height = FAM_H[want];
   return L;
 }
+/** Your family as you chose it: married or not (married unless you said otherwise), your partner's name, children. */
+function familyInfo(): { married: boolean; name: string; kids: number } {
+  const F: any = (State as any).family || {};
+  return { married: F.married !== false, name: String(F.partnerName || ''), kids: F.kids == null ? 2 : clamp(Math.round(+F.kids), 0, 3) };
+}
 function famHeightHtml(L: any): string {
   const h = Math.round(L.height || FAM_H[L.sex === 'f' ? 'f' : 'm']), ft = h / 30.48, fi = Math.floor(ft), inch = Math.round((ft - fi) * 12);
   return `<div class="le-group"><b>Height</b><div class="le-height"><input type="range" min="145" max="205" step="1" value="${h}" data-le-height aria-label="Height in centimetres"><span data-le-hv>${h} cm · ${fi}′${inch}″</span></div></div>`;
@@ -31,7 +36,7 @@ const LE_TABS = [['person', 'Person'], ['face', 'Face'], ['hair', 'Hair'], ['out
 
 function openLookEditor(o: LookEditOpts) {
   _le = { o, look: JSON.parse(JSON.stringify(dressed(o.look, o.role))), id: o.identity ? Object.assign({}, o.identity) : null, tab: o.identity ? 'person' : 'face', cam: 'full' };
-  if (o.identity) { _le.pet = JSON.parse(JSON.stringify(petData())); _le.who = 'me'; _le.partner = familyPartner(_le.look.sex, (myPilot() || {} as any).id); if (!(_le.look as any).height) (_le.look as any).height = FAM_H[_le.look.sex === 'f' ? 'f' : 'm']; }   // your own pilot: your partner and your pet too
+  if (o.identity) { _le.fam = familyInfo(); _le.pet = JSON.parse(JSON.stringify(petData())); _le.who = 'me'; _le.partner = familyPartner(_le.look.sex, (myPilot() || {} as any).id); if (!(_le.look as any).height) (_le.look as any).height = FAM_H[_le.look.sex === 'f' ? 'f' : 'm']; }   // your own pilot: your partner and your pet too
   if (o.sexOnly) _le.tab = 'person';
   _le.cam = leCamForTab(_le.tab);
   openLayer('modal', lookEditorHtml(), { cls: 'full look-pop' });
@@ -46,6 +51,15 @@ function leCamForKey(k: string): string {
   if (k === 'neck') return 'bust';
   return 'full';
 }
+/** Married or not, and children: what the photo on your office desk shows follows it. */
+function leFamilyHtml(): string {
+  const F = _le.fam, w = lePartnerWord(), pet = _le.pet && _le.pet.kind !== 'none';
+  const shows = F.married ? `You, your ${w}${F.kids ? ' and your ' + (F.kids === 1 ? 'child' : F.kids === 2 ? 'two children' : 'three children') : ''}` : pet ? `Your ${_le.pet.kind === 'cat' ? 'cat' : 'dog'}${_le.pet.name ? ', ' + _le.pet.name : ''}` : 'You, on your first day in the job';
+  return `<div class="le-group"><b>Family</b>${leChoiceAct('le-fam', 'married', [['yes', 'Married'], ['no', 'Not married']], F.married ? 'yes' : 'no')}</div>
+    ${F.married ? `<div class="le-group"><b>Children</b>${leChoiceAct('le-fam', 'kids', [['0', 'None'], ['1', 'One'], ['2', 'Two'], ['3', 'Three']], String(F.kids))}</div>` : ''}
+    <p class="muted le-fam-note">The photo on your office desk: ${esc(shows)}. Edit your ${w} with the switch at the top.</p>`;
+}
+function leChoiceAct(act: string, k: string, opts: string[][], cur: string): string { return `<div class="le-opts">${opts.map(o => `<button class="le-opt ${o[0] === cur ? 'on' : ''}" data-act="${act}" data-k="${k}" data-v="${o[0]}">${o[1]}</button>`).join('')}</div>`; }
 function leFigHtml(): string { return avatarSvg(_le.look, _le.who === 'partner' ? 'fa' : _le.o.role, { accent: company().color, cls: 'hero' }).replace('<canvas ', `<canvas data-cam="${_le.cam}" `); }
 function lePartnerWord(): string { return _le.partner && _le.partner.sex === 'm' ? 'husband' : 'wife'; }
 
@@ -65,7 +79,8 @@ function lookEditorBody(): string {
   }
   if (_le.who === 'partner') {
     if (t === 'face' || t === 'hair') { /* the same as yours, below */ }
-    else return `<div class="le-group"><b>Your ${lePartnerWord()}</b><p class="muted">With you and your two children on the family photo on your desk. ${_le.partner.sex === 'm' ? 'He' : 'She'} is always the other sex to you: change yours and your ${lePartnerWord()} changes with it.</p></div>
+    else return `<div class="le-group"><b>Your ${lePartnerWord()}</b><p class="muted">With you${_le.fam && _le.fam.kids ? ` and your ${_le.fam.kids === 1 ? 'child' : _le.fam.kids === 2 ? 'two children' : 'three children'}` : ''} on the family photo on your desk. ${_le.partner.sex === 'm' ? 'He' : 'She'} is always the other sex to you: change yours and your ${lePartnerWord()} changes with it.</p></div>
+      <div class="le-group"><b>${_le.partner.sex === 'm' ? 'His' : 'Her'} name</b><input class="le-in" data-le-pname value="${esc(_le.fam ? _le.fam.name : '')}" maxlength="40" autocomplete="off" placeholder="${_le.partner.sex === 'm' ? 'Daniel' : 'Anna'}"></div>
       <div class="le-group"><b>Skin tone</b>${leSwatches('skin', SKIN_TONES, L.skin)}</div>
       ${famHeightHtml(L)}
       <div class="le-group"><button class="btn ghost" data-act="le-shuffle">${icon('sync')}Another look</button></div>`;
@@ -80,7 +95,8 @@ function lookEditorBody(): string {
     <div class="le-group"><b>Male or female</b>${leChoice('sex', [['m', 'Male'], ['f', 'Female']], L.sex)}</div>
     <div class="le-group"><b>Skin tone</b>${leSwatches('skin', SKIN_TONES, L.skin)}</div>
     ${id ? famHeightHtml(L) : ''}
-    ${id ? leVoiceHtml(L) : ''}`;
+    ${id ? leVoiceHtml(L) : ''}
+    ${id && _le.fam ? leFamilyHtml() : ''}`;
   if (t === 'pet' && _le.pet) return petEditorHtml(_le.pet);
   if (t === 'face') return `
     <div class="le-group"><b>Face shape</b>${leChoice('face', [['oval', 'Oval'], ['round', 'Round'], ['square', 'Square'], ['long', 'Long']], L.face)}</div>
@@ -116,7 +132,7 @@ function lookEditorHtml(): string {
     <div class="le-side">
       <div class="modal-head"><div><h2>${esc(_le.o.title)}</h2><small>${_le.o.sexOnly ? '' : 'Everyone is always in uniform: you can swap any garment, never remove it.'}</small></div>
         <button class="icon-btn" data-act="close-layer" aria-label="Close without saving">${icon('close')}</button></div>
-      ${_le.partner ? `<div class="seg le-who" role="tablist"><button class="${_le.who !== 'partner' ? 'on' : ''}" data-act="le-who" data-w="me">${icon('user')}You</button><button class="${_le.who === 'partner' ? 'on' : ''}" data-act="le-who" data-w="partner">${icon('user')}Your <span data-le-pw>${lePartnerWord()}</span></button></div>` : ''}
+      ${_le.partner && (!_le.fam || _le.fam.married) ? `<div class="seg le-who" role="tablist"><button class="${_le.who !== 'partner' ? 'on' : ''}" data-act="le-who" data-w="me">${icon('user')}You</button><button class="${_le.who === 'partner' ? 'on' : ''}" data-act="le-who" data-w="partner">${icon('user')}Your <span data-le-pw>${lePartnerWord()}</span></button></div>` : ''}
       ${_le.o.sexOnly ? '' : `<div class="tabs">${LE_TABS.filter(x => _le.who !== 'partner' || x[0] !== 'outfit').concat(_le.pet && _le.who !== 'partner' ? [['pet', 'Pet']] : []).map(x => `<button class="tab ${_le.tab === x[0] ? 'on' : ''}" data-act="le-tab" data-t="${x[0]}">${x[1]}</button>`).join('')}</div>`}
       <div class="le-body" data-le-body>${lookEditorBody()}</div>
       <div class="modal-actions"><button class="btn ghost" data-act="close-layer">Cancel</button><button class="btn primary" data-act="le-accept">${icon('check')}Accept</button></div>
@@ -138,6 +154,7 @@ function leRefresh(body?: boolean) {
 }
 function leReadIdentity() {
   if (_le && _le.pet) { const pn = $('[data-pet-name]') as HTMLInputElement; if (pn) _le.pet.name = pn.value.trim().slice(0, 24); }
+  if (_le && _le.fam) { const pn2 = $('[data-le-pname]') as HTMLInputElement; if (pn2) _le.fam.name = pn2.value.trim().slice(0, 40); }
   if (!_le.id) return;
   const n = $('[data-le-name]') as HTMLInputElement, d = $('[data-le-dob]') as HTMLInputElement, nt = $('[data-le-nat]') as HTMLSelectElement;
   if (n) _le.id.name = n.value.trim() || _le.id.name;
@@ -206,7 +223,7 @@ ACTIONS['le-accept'] = () => {
   const o = _le.o, look = dressed(_le.look, o.role), id = _le.id;
   const partner = _le.partner ? familyPartnerFor(look.sex, _le.partner) : null;
   const before = JSON.stringify(dressed(o.look, o.role)), changed = JSON.stringify(look) !== before || (o.identity && JSON.stringify(id) !== JSON.stringify(o.identity));
-  const apply = () => { Haptics.success(); if (_le.pet) { (State as any).pet = _le.pet; Store.soon(); } if (partner) { (State as any).family = Object.assign({}, (State as any).family, { partner }); Store.soon(); } o.onAccept(look, id); };
+  const apply = () => { Haptics.success(); if (_le.pet) { (State as any).pet = _le.pet; Store.soon(); } if (partner || _le.fam) { const fam = _le.fam || familyInfo(); (State as any).family = Object.assign({}, (State as any).family, partner ? { partner } : {}, { married: fam.married, partnerName: fam.name, kids: fam.kids }); Store.soon(); } o.onAccept(look, id); };
   // someone who already exists: ask first; "No" keeps the look they have now
   if (o.confirmName && changed) {
     confirmChange(`Change ${o.confirmName}'s appearance?`, 'The new look is used everywhere in the app from now on.', 'Yes, change it', 'No, keep the current look',
@@ -238,4 +255,13 @@ ACTIONS['pet-set'] = el => {
   if (k === 'coat' || k === 'bed') { P[k] = +v; if (k === 'coat') delete P.coatHex; } else if (k === 'white') P.white = v === '1'; else if (k === 'lightHex') P.lightHex = v;
   else { P[k] = v; if (k === 'kind' && v !== 'none' && (!P.name || P.name === 'Buddy' || P.name === 'Mittens')) P.name = v === 'cat' ? 'Mittens' : 'Buddy'; if (k === 'kind' && v === 'cat') P.coat = Math.min(P.coat, PET_COATS.cat.length - 1); }
   Sound.tick(); leRefresh(true);
+};
+
+ACTIONS['le-fam'] = el => {
+  if (!_le || !_le.fam) return; leReadIdentity(); const k = el.getAttribute('data-k'), v = el.getAttribute('data-v');
+  if (k === 'married') { _le.fam.married = v === 'yes'; if (!_le.fam.married && _le.who === 'partner') { _le.partner = _le.look; _le.look = _le.me; _le.who = 'me'; } }
+  else if (k === 'kids') _le.fam.kids = clamp(+v || 0, 0, 3);
+  Sound.tick(); _le.cam = leCamForTab(_le.tab);
+  const side = $('.look-pop .le-side'); if (side) { const tmp = document.createElement('div'); tmp.innerHTML = lookEditorHtml(); const ns = tmp.querySelector('.le-side'); if (ns) side.innerHTML = ns.innerHTML; }
+  leRefresh(true);
 };

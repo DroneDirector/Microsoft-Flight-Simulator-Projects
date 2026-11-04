@@ -224,7 +224,7 @@ const HG_SCENE = `<svg class="ctl-house hg-scene" viewBox="0 0 560 260" aria-hid
   <path d="M120 236 V120 Q280 50 440 120 V236 Z"/><rect x="40" y="170" width="70" height="66"/><rect x="450" y="186" width="80" height="50"/></svg>`;
 
 HangarRoom.open = function (reg: string, base?: string, sizeK?: string, show?: HgShow) {
-  const R = HangarRoom; if (R.on) return;
+  const R = HangarRoom; if (R.on) return; HG_VR = null;
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   R.show = show || null;   // a showroom: an aircraft you are thinking of buying or leasing, on its own in a hangar of its size
   // an aircraft stands in a hangar only while it is in for work; otherwise it is an empty hangar of that size
@@ -627,14 +627,17 @@ function hgKeys(): HTMLCanvasElement {
 }
 
 /* ---------- the vending machine ---------- */
-function hgVendBuild(A: any, x: number, z: number) {
-  const T = THREE, R = HangarRoom, q = R.q, g = new T.Group(); g.position.set(x, 0, z); A.root.add(g);
+/** The room whose vending machine is in use: the hangar's break room, or the lounge (the same machine). */
+let HG_VR: any = null;
+function hgVR(): any { return HG_VR || HangarRoom; }
+function hgVendBuild(A: any, x: number, z: number, ry?: number) {
+  const T = THREE, R = hgVR(), q = R.q == null ? 1 : R.q, g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = ry || 0; A.root.add(g);
   const Wm = 0.95, Hm = 1.85, Dm = 0.8;
   const body = new T.MeshStandardMaterial({ color: 0x1F2A36, roughness: 0.45, metalness: 0.3 }), trim = new T.MeshStandardMaterial({ color: 0xB9C2CC, roughness: 0.3, metalness: 0.8 });
   const o = (w: number, h: number, d: number, m: any, X: number, Y: number, Z: number, par?: any) => { const k = new T.Mesh(new T.BoxGeometry(w, h, d), m); k.position.set(X, Y, Z); k.castShadow = q >= 1; k.receiveShadow = true; (par || g).add(k); return k; };
   // the cabinet (open at the front behind the glass), the inside lit
   o(Wm, Hm, 0.04, body, 0, Hm / 2, -Dm / 2 + 0.02); for (const s of [-1, 1]) o(0.04, Hm, Dm, body, s * (Wm / 2 - 0.02), Hm / 2, 0);
-  const tp = o(Wm, 0.04, Dm, body, 0, Hm - 0.02, 0); A.surfs.push(tp); o(Wm, 0.1, Dm, body, 0, 0.05, 0);
+  const tp = o(Wm, 0.04, Dm, body, 0, Hm - 0.02, 0); if (A.surfs) A.surfs.push(tp); o(Wm, 0.1, Dm, body, 0, 0.05, 0);
   const gx0 = -Wm / 2 + 0.05, gx1 = 0.2, inner = new T.MeshStandardMaterial({ color: 0xDDE4EA, roughness: 0.6, emissive: 0x404850, emissiveIntensity: 0.6 });
   o(gx1 - gx0, Hm - 0.62, 0.01, inner, (gx0 + gx1) / 2, 0.52 + (Hm - 0.62) / 2, -Dm / 2 + 0.05);
   // the right panel: the display, the keypad and the coin slot
@@ -685,9 +688,10 @@ function hgVendBuild(A: any, x: number, z: number) {
   g.updateMatrixWorld(true);
   A.vend = { g, slots, flapH, flap, tray: new T.Vector3((gx0 + gx1) / 2, 0.14, Dm / 2 - 0.2), Dm };
   hgVendFile(A);
-  hgVendDisplay('Choose a product');
-  HangarRoom.blockVend = [x - Wm / 2 - 0.2, z - Dm / 2 - 0.2, x + Wm / 2 + 0.2, z + Dm / 2 + 0.25];
-  A.blocks.push(HangarRoom.blockVend);
+  hgVendDisplay('Choose a product', A);
+  const side = Math.abs(Math.sin(ry || 0)) > 0.5, hw = (side ? Dm : Wm) / 2 + 0.2, hd = (side ? Wm : Dm) / 2 + 0.22;
+  R.blockVend = [x - hw, z - hd, x + hw, z + hd];
+  A.blocks.push(R.blockVend);
 }
 /** The vending machine from a model file (items/vending-machine.glb), with its working parts found by name:
  *   slot-A1 … slot-C3   where each product stands at the front of its shelf (empty nodes; A is the top row, 1 the left)
@@ -700,7 +704,7 @@ function hgVendBuild(A: any, x: number, z: number) {
 function hgVendFile(A: any) {
   const path = 'items/vending-machine.glb'; if (!Models.has(path)) return;
   const go = () => {
-    const R = HangarRoom, T = THREE, V = A.vend; if (!R.on || R.A !== A && R.Abuild !== A && R.A) return;
+    const R = hgVR(), T = THREE, V = A.vend; if (R === HangarRoom && (!R.on || R.A !== A && R.Abuild !== A && R.A)) return;
     const g = V.g, o = Models.copy(path); if (!o || g.userData.__swapped) return;
     const isProduct = (m: any) => { let x = m; while (x && x !== g) { if (x.userData.kind) return true; x = x.parent; } return false; };
     const own: any[] = []; g.traverse((m: any) => { if (m.isMesh && !m.userData.act && !isProduct(m)) own.push(m); });
@@ -727,8 +731,8 @@ function hgVendFile(A: any) {
   };
   if (Models.ready[path]) go(); else Models.load(path).then((x: any) => { if (x) go(); });
 }
-function hgVendDisplay(text: string) {
-  const A = HangarRoom.A || HangarRoom.Abuild, c = A && A.vendCv; if (!c) return;
+function hgVendDisplay(text: string, A0?: any) {
+  const R = hgVR(), A = A0 || (R.A && R.A.vend ? R.A : R.Abuild), c = A && A.vendCv; if (!c) return;
   const x = c.getContext('2d') as CanvasRenderingContext2D; x.fillStyle = '#06210F'; x.fillRect(0, 0, 256, 96); x.fillStyle = '#3CFF7A'; x.font = '700 26px "Courier New", monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
   const words = text.toUpperCase().split(' '), lines: string[] = []; let l = '';
   for (const w of words) { if ((l + ' ' + w).trim().length > 15) { lines.push(l.trim()); l = w; } else l += ' ' + w; } lines.push(l.trim());
@@ -1074,16 +1078,16 @@ function hgGoto(where: string) {
 
 /* ---------- the vending machine: choosing, the coil turns, it drops, the flap ---------- */
 function hgVendOpen() {
-  const R = HangarRoom; if (R.vend && R.vend.st && R.vend.st !== 'idle') return;
-  if (R.hold) { hgVendDisplay('Hands full'); toast('Your hands are full: put it down first', 'info'); return; }
+  const R = hgVR(); if (R.vend && R.vend.st && R.vend.st !== 'idle') return;
+  if (R.hold || (R === LoungeRoom && lgHeldCup())) { hgVendDisplay('Hands full'); toast('Your hands are full: put it down first', 'info'); return; }
   aimUnlock(); R.panelOpen = true; Sound.tick(); hgVendDisplay('Make a choice');
   const el = R.root.querySelector('.hg-panel') as HTMLElement; el.hidden = false;
-  el.innerHTML = `<div class="hg-vend"><div class="hg-vend-h"><b>Snacks &amp; drinks</b><small>Free for the crew. Choose one.</small><button data-op="panel-close" aria-label="Close">${icon('close')}</button></div>
+  el.innerHTML = `<div class="hg-vend"><div class="hg-vend-h"><b>Snacks &amp; drinks</b><small>${R === LoungeRoom ? 'Complimentary for our guests. Choose one.' : 'Free for the crew. Choose one.'}</small><button data-op="panel-close" aria-label="Close">${icon('close')}</button></div>
     <div class="hg-vend-g">${R.A.vend.slots.map((s: any) => { const p = hgProd(s.k); return `<button data-op="vend-pick" data-k="${s.k}"><i style="--c1:${p.c1};--c2:${p.c2}" class="hg-ic ${p.type}"></i><span><em>${s.code}</em>${esc(p.name)}</span></button>`; }).join('')}</div></div>`;
 }
-function hgPanelClose() { const R = HangarRoom; R.panelOpen = false; const el = R.root.querySelector('.hg-panel') as HTMLElement; if (el) { el.hidden = true; el.innerHTML = ''; } if (!R.vend || !R.vend.st || R.vend.st === 'idle') hgVendDisplay('Choose a product'); }
+function hgPanelClose() { const R = hgVR(); R.panelOpen = false; const el = R.root.querySelector('.hg-panel') as HTMLElement; if (el) { el.hidden = true; el.innerHTML = ''; } if (!R.vend || !R.vend.st || R.vend.st === 'idle') hgVendDisplay('Choose a product'); }
 function hgVendPick(k: string) {
-  const R = HangarRoom, V = R.A.vend, s = V.slots.filter((x: any) => x.k === k)[0]; if (!s) return;
+  const R = hgVR(), V = R.A.vend, s = V.slots.filter((x: any) => x.k === k)[0]; if (!s) return;
   hgPanelClose(); hgVendDisplay(`${s.code} ${hgProd(k).name}`);
   hgSnd('beep');
   // the one in front comes out of the coil; the others move up, and one more goes in at the back
@@ -1092,7 +1096,7 @@ function hgVendPick(k: string) {
   setTimeout(() => hgSnd('motor'), 120);
 }
 function hgVendStep(dt: number) {
-  const R = HangarRoom, V = R.vend; if (!V || !V.st || V.st === 'idle' || V.st === 'ready') { hgFlapStep(dt); return; }
+  const R = hgVR(), V = R.vend; if (!V || !V.st || V.st === 'idle' || V.st === 'ready') { hgFlapStep(dt); return; }
   const A = R.A, M = A.vend; V.t += dt;
   if (V.st === 'turn') {
     const k = Math.min(1, V.t / 1.6);
@@ -1109,15 +1113,16 @@ function hgVendStep(dt: number) {
   }
   hgFlapStep(dt);
 }
-function hgFlapStep(dt: number) { const R = HangarRoom, M = R.A && R.A.vend; if (!M) return; R.flapK = (R.flapK || 0) + ((R.flapT || 0) - (R.flapK || 0)) * Math.min(1, dt * 7); M.flapH.rotation.x = (M.flapH.userData.rx0 || 0) - R.flapK * 1.2; }
+function hgFlapStep(dt: number) { const R = hgVR(), M = R.A && R.A.vend; if (!M) return; R.flapK = (R.flapK || 0) + ((R.flapT || 0) - (R.flapK || 0)) * Math.min(1, dt * 7); M.flapH.rotation.x = (M.flapH.userData.rx0 || 0) - R.flapK * 1.2; }
 /** Open the flap, take it: it comes up into your hand. */
 function hgTake() {
-  const R = HangarRoom, V = R.vend; if (!V || V.st !== 'ready') return;
+  const R = hgVR(), V = R.vend; if (!V || V.st !== 'ready') return;
   R.flapT = 1; hgSnd('flap');
   const it: HgItem = { id: uid(), kind: V.s.k, x: 0, y: 0, z: 0, ry: 0, used: 0, n: hgProd(V.s.k).type === 'can' ? 4 + (Math.random() < 0.5 ? 1 : 0) : 3 + (Math.random() < 0.5 ? 1 : 0), at: Date.now() };
   const w = V.it.getWorldPosition(new THREE.Vector3()); V.it.parent.remove(V.it);
   R.vend = { st: 'idle' }; hgVendDisplay('Enjoy');
   setTimeout(() => { R.flapT = 0; hgVendDisplay('Choose a product'); }, 1400);
+  if (R === LoungeRoom) { lgTakeSnack(it, w); return; }   // in the lounge: in your hand like a cup
   hgHoldStart(it, false, w);
 }
 

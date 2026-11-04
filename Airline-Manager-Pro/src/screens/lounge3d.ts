@@ -118,13 +118,13 @@ LoungeRoom.open = function (k: string, host?: any) {
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   const it = lgList().filter(l => l.k === k)[0] || (host ? { k, lvl: clamp(TestRooms.lgLv || 0, 0, 2), name: '' } : lgList()[0]); if (!it) { toast('Build a lounge first (Lounges)', 'info'); return; }
   if (!host) for (const X of [typeof OfficeRoom !== 'undefined' ? OfficeRoom : null, typeof OpsRoom !== 'undefined' ? OpsRoom : null, typeof HangarRoom !== 'undefined' ? HangarRoom : null]) { try { if (X && X.on) X.close(true); } catch (e) { /* none */ } }
-  R.on = true; R.loading = true; R.k = it.k; R.lvl = it.lvl; R.spec = LG_SPECS[it.lvl]; R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now(); R.overlay = null;
+  R.on = true; R.loading = true; R.k = it.k; R.lvl = it.lvl; R.spec = LG_SPECS[it.lvl]; R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now(); R.overlay = null; R.vend = null; R.flapT = 0; R.flapK = 0; R.panelOpen = false; HG_VR = LoungeRoom; R.press = null; R.drops = []; R.spots = [];
   const q = Gfx.placeQ('lounge'), co: any = company(), A: any = apt(it.k);
   const root = host ? host.root : document.createElement('div'); if (!host) root.className = 'court3d office3d ops3d hg3d lg3d'; R.root = root;
   const ui = `${host ? '' : '<canvas></canvas>'}
     <div class="ct-top"><div><small>${esc(co.name)} · ${esc(it.k)}${A ? ' · ' + esc(A.city || A.name) : ''}</small><b>${esc(R.spec.name)}</b></div></div>
     <button class="ct-leave" data-op="leave">${icon('close')}<span>Leave the lounge</span><kbd>Esc</kbd></button>
-    <div class="ct-spots of-spots op-spots hg-spots" hidden></div><div class="of-aim op-aim" hidden></div><div class="walk-pad ct-pad op-pad" hidden><i></i></div><div class="of-aim op-dot" hidden>+</div><div class="hg-fade"></div>
+    <div class="ct-spots of-spots op-spots hg-spots" hidden></div><div class="of-aim op-aim" hidden></div><div class="walk-pad ct-pad op-pad" hidden><i></i></div><div class="of-aim op-dot" hidden>+</div><div class="hg-panel" hidden></div><div class="hg-fade"></div>
     ${host ? '' : ctLoaderHtml(R.spec.name, 'Opening the doors…', LG_EMBLEM)}`;
   if (host) { host.mount('lounge', ui); lgOpen2(root, q); return; }   // in the building: built already, straight in
   root.innerHTML = ui;
@@ -251,25 +251,17 @@ function lgBuild(scene: any, q: number): any {
     prop('buffet-counter', cx, cz, Math.PI, () => { bx(3.2, 0.88, 0.7, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, cx, 0.44, cz); bx(3.3, 0.05, 0.78, top, cx, 0.905, cz); });
     block(cx - 1.7, cz - 0.45, cx + 1.7, z1); A.surf.push({ x: cx, z: cz - 0.05, top: 0.93, w: 3.2, d: 0.66 });
     const cm = Props.place(root, 'coffee-machine-1', cx - 1.1, cz + 0.05, Math.PI, q, {}, 0.93);
+    { root.updateMatrixWorld(true); cm.updateMatrixWorld(true); const at = (x: number, y: number, z: number) => root.worldToLocal(cm.localToWorld(new T.Vector3(x, y, z)));
+      A.coffeeScreen = at(0, 0.5, 0.3); A.coffeeSpout = at(0, 0.25, 0.35); }   // the touchscreen on its front; the spouts over the cup
     prop('tea-urn', cx - 0.35, cz, 0, () => lgUrn(add, lv === 0 ? chrome : brass, black, cx - 0.35, 0.93, cz, lv));
     prop('teapot', cx + 0.2, cz - 0.1, 0.6, () => lgTeapot(add, lv === 2 ? porcelain : lv === 1 ? M({ color: 0x1E2F4F, roughness: 0.25 }) : porcelain, lv === 2 ? gold : null, cx + 0.2, 0.93, cz - 0.1));
     for (let i = 0; i < 4; i++) prop(i % 2 ? 'teacup-and-saucer' : 'coffee-cup-and-saucer', cx + 0.55 + (i % 2) * 0.2, cz - 0.15 + Math.floor(i / 2) * 0.22, 0, () => lgCup(add, porcelain, lv === 2 ? gold : null, cx + 0.55 + (i % 2) * 0.2, 0.93, cz - 0.15 + Math.floor(i / 2) * 0.22, i % 2 === 1, 0));
     prop('napkin-stack', cx + 1.0, cz, 0, () => lgNapkins(add, cx + 1.0, 0.93, cz, 10, lv));
     prop('fruit-bowl', cx + 1.38, cz - 0.05, 0, () => lgFruit(add, lv === 2 ? gold : porcelain, cx + 1.38, 0.93, cz - 0.05));
     const hit = new T.Mesh(new T.BoxGeometry(2.0, 0.7, 0.8), new T.MeshBasicMaterial({ visible: false })); hit.position.set(cx - 0.7, 1.2, cz); hit.userData.act = 'coffee'; root.add(hit); A.hits.push(hit); A.coffeeAt = new T.Vector3(cx - 1.1, 0.93 + 0.058, cz + 0.05 - (cm.userData.cupAt ? cm.userData.cupAt.z : 0.34));
-    // the fridge: glass front, lit shelves of drinks and snack bars (the same products as the hangars' machine)
-    const fx = x1 - 0.55, fz = cz - 1.6;
-    prop('drinks-fridge', fx, fz, -Math.PI / 2, () => { const g = new T.Group(); g.position.set(fx, 0, fz); g.rotation.y = -Math.PI / 2; root.add(g);
-      const o = (w: number, h: number, d: number, m: any, X: number, Y: number, Z: number) => { const k = new T.Mesh(new T.BoxGeometry(w, h, d), m); k.position.set(X, Y, Z); k.castShadow = shadow; g.add(k); return k; };
-      const body = M({ color: lv === 0 ? 0xD8DCE0 : 0x1E2126, metalness: 0.4, roughness: 0.4 });
-      o(0.8, 1.9, 0.04, body, 0, 0.95, -0.33); for (const s of [-1, 1]) o(0.04, 1.9, 0.7, body, s * 0.38, 0.95, 0); o(0.8, 0.04, 0.7, body, 0, 1.88, 0); o(0.8, 0.12, 0.7, body, 0, 0.06, 0);
-      o(0.72, 1.7, 0.01, new T.MeshStandardMaterial({ color: 0xEAF4FF, emissive: 0xBFD8F0, emissiveIntensity: 0.7 }), 0, 0.98, -0.3);
-      const kinds = ['cola', 'lemon', 'orange', 'water', 'icedtea', 'choco', 'peanut', 'oat', 'caramel'];
-      [0.3, 0.72, 1.14, 1.56].forEach((y, si) => { o(0.72, 0.015, 0.6, chrome, 0, y, 0); for (let i = 0; i < 6; i++) { const k = kinds[(si * 3 + i) % kinds.length], it = hgItemMesh(k, 0, 1), p = hgProd(k); it.position.set(-0.29 + i * 0.116, y + (p.type === 'can' ? HG_CAN.h / 2 : HG_BAR.l / 2) + 0.01, 0.12); g.add(it); const it2 = hgItemMesh(k, 0, 1); it2.position.copy(it.position); it2.position.z -= 0.15; g.add(it2); } });
-      const door = new T.Mesh(new T.PlaneGeometry(0.76, 1.78), new T.MeshPhysicalMaterial({ color: 0xDDEEFF, transparent: true, opacity: 0.18, roughness: 0.04, depthWrite: false })); door.position.set(0, 0.97, 0.351); door.renderOrder = 4; g.add(door);
-      o(0.02, 0.6, 0.03, chrome, 0.33, 1.0, 0.37);
-      const L = new T.PointLight(0xEAF4FF, 0.8, 1.6, 2); L.position.set(0, 1.4, 0.1); g.add(L); });
-    block(fx - 0.45, fz - 0.45, x1, fz + 0.45); }
+    // the vending machine (the same as the hangars'): choose, the coil turns, it drops; open the flap and take it
+    const fx = x1 - 0.62, fz = cz - 1.6;
+    HG_VR = LoungeRoom; hgVendBuild(A, fx, fz, -Math.PI / 2); }
   // a magazine rack by the door, the departures screen on the front wall
   { const mx = x0 + 1.2, mz = z1 - 0.5;
     prop('magazine-rack', mx, mz, Math.PI, () => { bx(0.7, 1.0, 0.3, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, mx, 0.5, mz); const cols = [0xC0392B, 0x2E5C8A, 0xF2B544, 0x2F6B4A, 0x8E44AD, 0xE67E22]; for (let r = 0; r < 3; r++) for (let i = 0; i < 2; i++) { const m = new T.Mesh(new T.PlaneGeometry(0.26, 0.3), M({ color: cols[(r * 2 + i) % cols.length] })); m.position.set(mx - 0.16 + i * 0.32, 0.3 + r * 0.3, mz - 0.17); m.rotation.set(0.15, Math.PI, 0); root.add(m); } });
@@ -555,7 +547,9 @@ function lgInput(root: HTMLElement, cv: HTMLCanvasElement) {
       pad.addEventListener('pointerdown', e => { e.stopPropagation(); id = e.pointerId; pad.setPointerCapture(id); mv(e); }); pad.addEventListener('pointermove', e => { if (e.pointerId === id) mv(e); });
       const up = (e: PointerEvent) => { if (e.pointerId !== id) return; id = -1; R.stick = [0, 0]; knob.style.transform = ''; }; pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up); } }
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-op]') as HTMLElement; if (!b) return; ev.stopPropagation(); const k = b.getAttribute('data-op');
-    if (k === 'leave') lgLeave(); else if (k === 'goto') lgGoto(b.getAttribute('data-k')); }, { signal: R.sig });
+    if (k === 'leave') lgLeave(); else if (k === 'goto') lgGoto(b.getAttribute('data-k'));
+    else if (k === 'coffee-pick') lgCoffeePick(b.getAttribute('data-k') || 'espresso'); else if (k === 'coffee-cancel') lgCoffeePick('');
+    else if (k === 'vend-pick') { HG_VR = LoungeRoom; hgVendPick(b.getAttribute('data-k')); } else if (k === 'panel-close') { HG_VR = LoungeRoom; hgPanelClose(); } }, { signal: R.sig });
   R.key$ = (e: KeyboardEvent) => { if (!R.on) return; const k = e.key.toLowerCase();
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; lgLeave(); return; }
     if (/^arrow\w+$/.test(k) || /^(w|a|s|d|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); } };
@@ -571,15 +565,17 @@ function lgFrame() {
   const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], rr = (K.d ? 1 : 0) - (K.a ? 1 : 0) + R.stick[0];
   if (R.sit && Math.hypot(f, rr) > 0.3) lgStand();   // walking gets you up
   if (R.sit) { lgSeated(now, dt); return; }
-  const mag = Math.min(1, Math.hypot(f, rr)), vmax = K.shift ? 2.4 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
+  const mag = R.press ? 0 : Math.min(1, Math.hypot(f, rr)), vmax = K.shift ? 2.4 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
+  try { lgPressStep(dt); } catch (e) { R.press = null; }
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-  let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
+  let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; if (R.host && R.host.assist && ml > 0.05) { const g2 = R.host.assist('lounge', F.x, F.z, mx, mz); mx = g2[0]; mz = g2[1]; }   // eased through an open doorway
+  const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!lgBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!lgBlocked(nx, F.z)) F.x = nx; else if (!lgBlocked(F.x, nz)) F.z = nz; F.bob += step; }
   if (R.host && R.host.out('lounge', F.x, F.z, R.look, F.v)) return;   // out through the doors: the concourse takes over
   try { Sound.steps(F, F.bob, 'carpet', F.v); } catch (e) { /* quiet */ }
   const bobY = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
   R.cam.position.set(F.x, 1.64 + bobY, F.z);
-  if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); S.pitch = R.look.pitch; const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now, dt); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
+  if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); S.pitch = R.look.pitch; const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now, dt, R.press ? (m: any) => lgPressArms(m, now) : undefined); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
   const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p))));
   lgFrameRest(now, dt);
 }
@@ -594,14 +590,17 @@ function lgFrameRest(now: number, dt: number) {
   if (R.guests && R.guests.some((G: any) => G.gone)) R.guests = R.guests.filter((G: any) => !G.gone);
   for (const fl of R.A.flames) { fl.scale.y = 0.85 + 0.25 * Math.abs(Math.sin(now * 7.3) * Math.sin(now * 3.1)); fl.material.opacity = 0.8 + 0.2 * Math.sin(now * 11); }
   if (R.A.fireL) R.A.fireL.intensity = 1.4 + 0.5 * Math.sin(now * 9) * Math.sin(now * 4.7);
-  for (let i = R.A.steam.length - 1; i >= 0; i--) { const s = R.A.steam[i]; s.t += dt; s.m.position.y += dt * 0.08; s.m.material.opacity = Math.max(0, 0.35 * (1 - s.t / 4)); s.m.scale.setScalar(1 + s.t * 0.6); if (s.t > 4) { R.A.root.remove(s.m); R.A.steam.splice(i, 1); } }
+  for (let i = R.A.steam.length - 1; i >= 0; i--) { const s = R.A.steam[i]; s.t += dt; s.m.position.y += dt * 0.07; s.m.position.x += Math.sin(now * 1.7 + i) * dt * 0.01; s.m.material.opacity = Math.max(0, 0.32 * Math.min(1, s.t * 4) * (1 - s.t / 2.2)); s.m.scale.setScalar(0.03 + s.t * 0.05); if (s.t > 2.2) { R.A.root.remove(s.m); s.m.material.dispose(); R.A.steam.splice(i, 1); } }
+  for (let i = (R.drops || []).length - 1; i >= 0; i--) { const D = R.drops[i]; D.v.y -= 9.81 * dt; D.m.position.addScaledVector(D.v, dt); if (D.m.position.y <= D.floor) { D.m.position.y = D.floor + 0.002; D.m.scale.set(2.2, 0.15, 2.2); R.drops.splice(i, 1); D.land = now; R.spots = R.spots || []; R.spots.push(D); } }
+  for (let i = (R.spots || []).length - 1; i >= 0; i--) { const D = R.spots[i]; if (now - D.land > 20) { R.A.root.remove(D.m); R.spots.splice(i, 1); } }
   try { lgCupsStep(dt, now); } catch (e) { /* no cups */ }
+  if (R.A.vend) { try { HG_VR = LoungeRoom; hgVendStep(dt); } catch (e) { /* the machine rests */ } }
   // what you look at glows
   const obj = lgAimedObj(), hint = obj ? obj.userData.act : '', dot = R.root.querySelector('.op-dot') as HTMLElement;
   const mine = obj && obj.userData.seat != null && R.A.seats[obj.userData.seat] === R.sit;   // the seat you're in doesn't glow
   if (R.glow) { if (obj && !mine) R.glow.showObj(obj); else R.glow.hide(); R.glow.step(dt); }
   if (dot) { const seat = obj && obj.userData.seat != null ? R.A.seats[obj.userData.seat] : null;
-    const tx = hint === 'cup' ? (lgHeldCup() ? 'You already have a cup in your hand' : 'Your cup: click to pick it up') : hint === 'surface' ? 'Click to put your cup down here' : lgHeldCup() && !hint ? 'Click to sip · aim at a table or a counter to put it down' : hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
+    const held0 = lgHeldCup(), tx = hint === 'cup' ? (held0 ? 'You already have something in your hand' : 'Click to pick it up') : hint === 'surface' ? 'Click to put it down here' : held0 && !hint ? (held0.snack && hgProd(held0.snack).type === 'bar' ? 'Click to take a bite · aim at a table or a counter to put it down' : 'Click to sip · aim at a table or a counter to put it down') : hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'vend' ? (R.vend && R.vend.st === 'ready' ? 'Open the flap at the bottom to take it' : 'Click to choose a snack or a drink') : hint === 'flap' ? (R.vend && R.vend.st === 'ready' ? 'Click to take it' : 'The tray') : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 /** A frame while you are sitting: your body in the seat, the view from your eyes, the room carrying on around you. */
@@ -625,6 +624,7 @@ function lgClickAt(e?: PointerEvent) {
   if (a === 'door' && R.host) { if (R.sit) lgStand(); lgDoorsTo(R.A.doorTo ? 0 : 1); Sound.tick(); return; }   // in the building: the doors open and shut
   if (a === 'door') { if (R.sit) lgStand(); lgDoorsTo(1); setTimeout(() => { if (R.on) roomExitMenu(R.root, 'lounges', to => lgLeave(to), () => lgDoorsTo(0)); }, 450); return; }
   if (a === 'coffee') { if (R.sit) lgStand(); lgPour(); return; }
+  if (a === 'vend' || a === 'flap') { HG_VR = LoungeRoom; if (R.sit) lgStand(); if (R.vend && R.vend.st === 'ready') hgTake(); else if (a === 'vend') hgVendOpen(); return; }
   if (a === 'cup') { lgPickCup(o); return; }
   if (a === 'surface' && lgHeldCup()) { lgPutCup(o, R.aimPoint || o.position); return; }
   if (lgHeldCup()) { lgSip(); return; }   // holding a cup: a click anywhere else is a sip
@@ -655,31 +655,127 @@ function lgStand() {
     const x = st.x + fx * a + fz * b, z = st.z + fz * a - fx * b; if (!lgBlocked(x, z)) { R.free.x = x; R.free.z = z; return; }
   }
 }
-/** Order a coffee or a tea: one at a time. The cup has to be picked up, drunk or put down somewhere before the next. */
+/** The drinks the machine makes: name, colour, the cup it goes in, how long it pours, a foam top. */
+const LG_DRINKS: { [k: string]: { name: string; col: number; top?: number; tea?: boolean; small?: boolean; pour: number } } = {
+  espresso: { name: 'Espresso', col: 0x2E170A, top: 0x8A5A32, small: true, pour: 3.2 },
+  cappuccino: { name: 'Cappuccino', col: 0x6E4128, top: 0xEADBC2, pour: 5.2 },
+  latte: { name: 'Latte', col: 0xB98A5E, top: 0xF1E6D3, tea: true, pour: 5.6 },
+  americano: { name: 'Americano', col: 0x24130A, pour: 4.8 },
+  chocolate: { name: 'Hot chocolate', col: 0x4E2A18, top: 0x6A3A22, tea: true, pour: 5.4 },
+  tea: { name: 'Tea', col: 0x8A4A16, tea: true, pour: 4.4 },
+};
+/** Order a drink: your hand goes to the machine's touchscreen and stays there while you choose; one cup at a time. */
 function lgPour() {
-  const R = LoungeRoom, A = R.A; if (!A || !A.coffeeAt) return;
+  const R = LoungeRoom, A = R.A; if (!A || !A.coffeeAt || R.press) return;
   R.cups = R.cups || [];
-  const waiting = R.cups.filter((c: any) => c.st === 'ready' || c.st === 'pour')[0], held = R.cups.filter((c: any) => c.st === 'held')[0];
-  if (waiting) { toast('Your cup is waiting on the counter: pick it up first', 'info'); return; }
-  if (held) { toast('Drink your cup or put it down first', 'info'); return; }
-  Sound.tick(); try { hgSnd('motor'); } catch (e) { /* quiet */ }
-  const tea = Math.random() < 0.4, c: any = { st: 'pour', tea, sips: 0, hotUntil: Date.now() + 4 * 60e3 }; R.cups.push(c);
-  setTimeout(() => {
-    if (!R.on) return; const p = A.coffeeAt;
-    c.g = lgCupGroup(tea); c.g.position.set(p.x + (Math.random() - 0.5) * 0.08, p.y, p.z); A.root.add(c.g); c.st = 'ready';
-    toast(tea ? 'A cup of tea, fresh from the urn: click it to pick it up' : 'A fresh espresso: click it to pick it up', 'ok');
-  }, 1500);
+  const waiting = R.cups.filter((c: any) => c.st === 'ready' || c.st === 'pour')[0], held = lgHeldCup();
+  if (waiting) { toast('Your cup is waiting at the machine: pick it up first', 'info'); return; }
+  if (held) { toast('Finish what you have or put it down first', 'info'); return; }
+  aimUnlock(); Sound.tick(); R.press = { st: 'reach', t: 0, a: null, k: 0 };
 }
-/** A cup on its saucer as one group (to carry and put down), with its hit box and the heat shimmer above it. */
-function lgCupGroup(tea: boolean): any {
-  const R = LoungeRoom, T = THREE, g = new T.Group();
+/** The press: reaching (about half a second), holding while the menu is open, then back to how your arms were. */
+function lgPressStep(dt: number) {
+  const R = LoungeRoom, P = R.press; if (!P) return; P.t += dt;
+  const E = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  if (P.st === 'reach') { P.k = E(P.t / 0.5); if (P.t >= 0.5) { P.st = 'hold'; P.t = 0; try { hgSnd('beep'); } catch (e) { /* quiet */ } lgCoffeeMenu(); } }
+  else if (P.st === 'hold') P.k = 1;
+  else if (P.st === 'back') { P.k = 1 - E(P.t / 0.5); if (P.t >= 0.5) { R.press = null; if (P.pick) lgCoffeePour(P.pick); } }
+}
+/** The menu on screen while your finger is on the machine's touchscreen. */
+function lgCoffeeMenu() {
+  const R = LoungeRoom, el = R.root.querySelector('.hg-panel') as HTMLElement; if (!el) return;
+  el.hidden = false;
+  el.innerHTML = `<div class="hg-vend"><div class="hg-vend-h"><b>Choose your drink</b><small>Freshly made, served hot.</small><button data-op="coffee-cancel" aria-label="Close">${icon('close')}</button></div>
+    <div class="hg-vend-g">${Object.keys(LG_DRINKS).map(k => { const d = LG_DRINKS[k], c = '#' + d.col.toString(16).padStart(6, '0'), t = '#' + (d.top || d.col).toString(16).padStart(6, '0'); return `<button data-op="coffee-pick" data-k="${k}"><i style="--c1:${t};--c2:${c}" class="hg-ic can"></i><span>${esc(d.name)}</span></button>`; }).join('')}</div></div>`;
+}
+/** A drink chosen (or none): the finger comes off the screen and your arm goes back; then it pours. */
+function lgCoffeePick(k: string) {
+  const R = LoungeRoom, el = R.root.querySelector('.hg-panel') as HTMLElement; if (el) { el.hidden = true; el.innerHTML = ''; }
+  const P = R.press; if (!P) return; Sound.tick();
+  P.pick = k && LG_DRINKS[k] ? k : ''; P.st = 'back'; P.t = 0;
+}
+/** Your right arm while ordering: from where it was, out to the touchscreen, a fingertip on it, and back. */
+function lgPressArms(m: any, now: number): any {
+  const R = LoungeRoom, T = THREE, P = R.press, A = R.A; if (!P || !A || !A.coffeeScreen || P.k < 0.002) { if (P) P.a = null; return null; }
+  const rest = humanGesture(null, now), J = m.joints.R; m.root.updateMatrixWorld(true);
+  const scr = A.root.localToWorld(A.coffeeScreen.clone()), from = m.root.localToWorld(humanHandAt(m, 'R', rest.R, undefined, J.palm));
+  const to = from.lerp(scr, P.k);
+  P.a = humanReach(m, 'R', m.root.worldToLocal(to), P.a || rest.R, J.palm);
+  return { R: P.a };
+}
+/** The cup under the spout, the drink running into it and the cup filling; hot drinks steam. */
+function lgCoffeePour(k: string) {
+  const R = LoungeRoom, A = R.A, T = THREE, d = LG_DRINKS[k]; if (!A || !d) return;
+  try { hgSnd('motor'); } catch (e) { /* quiet */ }
+  const p = A.coffeeAt, c: any = { st: 'pour', kind: k, tea: !!d.tea, sips: 0, lvl: 0, full: 0.8, hotUntil: Date.now() + 5 * 60e3 };
+  c.g = lgCupGroup(k); c.g.position.set(p.x, p.y, p.z); A.root.add(c.g); lgLiquid(c);
+  R.cups = R.cups || []; R.cups.push(c);
+  // the stream: from the spouts down into the cup, the drink's colour, wavering a little
+  const sp = A.coffeeSpout || new T.Vector3(p.x, p.y + 0.2, p.z), top = sp.y, bot = p.y + 0.02;
+  const st = new T.Mesh(new T.CylinderGeometry(0.0032, 0.0026, 1, 8, 1, true), new T.MeshStandardMaterial({ color: d.col, roughness: 0.15, transparent: true, opacity: 0.92 }));
+  st.position.set(p.x, (top + bot) / 2, p.z); st.scale.y = top - bot; A.root.add(st);
+  c.stream = { m: st, t: 0, dur: d.pour, top, bot };
+}
+/** A cup on its saucer as one group (to carry and put down), with its hit box, the heat shimmer above it, and the
+ *  drink in it: a surface that rises as it fills, falls as you drink, and tilts as it sloshes. */
+function lgCupGroup(k: any): any {
+  const R = LoungeRoom, T = THREE, g = new T.Group(), d = LG_DRINKS[typeof k === 'string' ? k : k ? 'tea' : 'espresso'] || LG_DRINKS.espresso;
   const add = (geo: any, m: any, x: number, y: number, z: number) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
-  lgCup(add, new T.MeshStandardMaterial({ color: 0xF7F5F0, roughness: 0.2 }), R.lvl === 2 ? new T.MeshStandardMaterial({ color: 0xD4AF37, metalness: 1, roughness: 0.25 }) : null, 0, 0, 0, tea, tea ? 0x7A3E14 : 0x3A1F0E);
+  lgCup(add, new T.MeshStandardMaterial({ color: 0xF7F5F0, roughness: 0.2 }), R.lvl === 2 ? new T.MeshStandardMaterial({ color: 0xD4AF37, metalness: 1, roughness: 0.25 }) : null, 0, 0, 0, !!d.tea, 0);
+  // the inside of the cup, as lgCup makes it: radius at a height above the saucer
+  const prof = d.tea ? [[0.03, 0], [0.04, 0.005], [0.05, 0.03], [0.055, 0.055]] : [[0.025, 0], [0.035, 0.006], [0.04, 0.04], [0.04, 0.075]];
+  const liq = new T.Mesh(new T.CircleGeometry(1, 28), new T.MeshStandardMaterial({ color: d.col, roughness: 0.12 })); liq.rotation.x = -Math.PI / 2; liq.visible = false;
+  const lg = new T.Group(); lg.add(liq); g.add(lg);
+  let foam: any = null; if (d.top) { foam = new T.Mesh(new T.RingGeometry(0.0, 1, 28), new T.MeshStandardMaterial({ color: d.top, roughness: 0.8, transparent: true, opacity: 0.9 })); foam.rotation.x = -Math.PI / 2; foam.position.y = 0.0008; foam.scale.setScalar(0.82); lg.add(foam); }
+  g.userData.liq = { lg, liq, foam, prof, h: prof[prof.length - 1][1], base: 0.012 };
   const hit = new T.Mesh(new T.BoxGeometry(0.2, 0.16, 0.2), new T.MeshBasicMaterial({ visible: false })); hit.position.y = 0.07; hit.userData.act = 'cup'; g.add(hit); R.A.hits.push(hit); g.userData.hit = hit;
   // the heat rising from a hot drink: a little of the shimmer behind the engines, bending what is behind it
   const hz = new T.Group(); for (const r of [0, Math.PI / 2]) { const q = new T.Mesh(new T.PlaneGeometry(0.075, 0.17), lgHeatMat()); q.rotation.y = r; q.position.y = 0.17; hz.add(q); }
   g.add(hz); g.userData.heat = hz;
   return g;
+}
+/** The drink's surface for how full the cup is (and the slosh: c.sl, a tilt in the room's x and z). */
+function lgLiquid(c: any) {
+  const L = c.g && c.g.userData.liq; if (!L) return;
+  const T = THREE, y = c.lvl * L.h, P = L.prof; let r = P[0][0];
+  for (let i = 1; i < P.length; i++) if (y <= P[i][1]) { const a = P[i - 1], b = P[i], t = (y - a[1]) / Math.max(1e-4, b[1] - a[1]); r = a[0] + (b[0] - a[0]) * t; break; } else r = P[i][0];
+  L.liq.visible = c.lvl > 0.012; if (L.foam) L.foam.visible = c.lvl > 0.25;
+  L.lg.position.set(0, L.base + y, 0); L.liq.scale.setScalar(Math.max(0.001, r - 0.0015)); if (L.foam) L.foam.scale.setScalar(Math.max(0.001, r - 0.0015) * 0.86);
+  // level in the room whatever the cup does, tilted by the slosh
+  c.g.updateMatrixWorld(true);
+  const qc = c.g.getWorldQuaternion(new T.Quaternion()).invert(), sl = c.sl || [0, 0];
+  const qs = new T.Quaternion().setFromEuler(new T.Euler(sl[1], 0, -sl[0]));
+  const qp = (LoungeRoom.A && LoungeRoom.A.root) ? LoungeRoom.A.root.getWorldQuaternion(new T.Quaternion()) : new T.Quaternion();
+  L.lg.quaternion.copy(qc).multiply(qp).multiply(qs);
+}
+/** The drink moving in the cup as you carry it: the surface swings against how the cup is moved, settles again, and
+ *  if you swing it hard enough it goes over the rim: a little less in the cup, and drops on the floor. */
+function lgSlosh(c: any, dt: number) {
+  const R = LoungeRoom, T = THREE, w = c.g.getWorldPosition(new T.Vector3());
+  if (!c.pv) { c.pv = w.clone(); c.vv = new T.Vector3(); c.sl = [0, 0]; c.sv = [0, 0]; return; }
+  const v = w.clone().sub(c.pv).divideScalar(dt), a0 = v.clone().sub(c.vv).divideScalar(dt); c.pv.copy(w); c.vv.copy(v);
+  c.as = c.as || new T.Vector3(); c.as.lerp(a0, Math.min(1, dt * 10)); const a = c.as;   // smoothed: a hand, not single jolts
+  const K = 150, C = 5.5, ax = clamp(a.x, -60, 60), az = clamp(a.z, -60, 60);   // a steady push tilts the surface by about a / g (half that: the cup's own walls)
+  for (const [i, ai] of [[0, ax], [1, az]] as number[][]) { c.sv[i] += (-K * c.sl[i] - C * c.sv[i] - ai * K / 9.81 * 0.28) * dt; c.sl[i] = clamp(c.sl[i] + c.sv[i] * dt, -0.7, 0.7); }
+  // over the rim?
+  const L = c.g.userData.liq, rim = L.h, y = c.lvl * L.h, r = L.prof[L.prof.length - 1][0], lift = Math.hypot(c.sl[0], c.sl[1]) * r;
+  if (c.lvl > 0.02 && y + lift > rim) {
+    const out = Math.min(c.lvl, (y + lift - rim) / L.h * dt * 5); c.lvl -= out;
+    if (!c.spilt) { c.spilt = true; toast('Careful, you spilt some', 'info'); }
+    c.dropT = (c.dropT || 0) - dt;
+    if (c.dropT <= 0) { c.dropT = 0.05; R.drops = R.drops || [];
+      const m = new T.Mesh(new T.SphereGeometry(0.006, 6, 4), new T.MeshStandardMaterial({ color: (LG_DRINKS[c.kind] || LG_DRINKS.espresso).col, roughness: 0.1 }));
+      const at = R.A.root.worldToLocal(w.clone().add(new T.Vector3(0, L.h, 0))); m.position.copy(at); R.A.root.add(m);
+      const dir = new T.Vector3(c.sl[0], 0, c.sl[1]).normalize();
+      R.drops.push({ m, v: R.A.root.worldToLocal(w.clone().add(dir.multiplyScalar(0.4).add(new T.Vector3(0, 0.3, 0)))).sub(R.A.root.worldToLocal(w.clone())), floor: 0.003 }); }
+  }
+}
+/** A wisp of steam: a soft round sprite, made once. */
+let _lgSteamTex: any = null;
+function lgSteamPuff(): any {
+  const T = THREE;
+  if (!_lgSteamTex) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d') as CanvasRenderingContext2D, gr = x.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); _lgSteamTex = new T.CanvasTexture(cv); }
+  const s = new T.Sprite(new T.SpriteMaterial({ map: _lgSteamTex, transparent: true, opacity: 0, depthWrite: false })); s.scale.setScalar(0.03); return s;
 }
 let _lgHeat: any = null;
 function lgHeatMat(): any {
@@ -705,10 +801,19 @@ function lgPutCup(hit: any, point: any) {
   Sound.tick(); c.st = 'placed'; c.g.position.set(point.x, hit.userData.top, point.z); c.g.rotation.set(0, Math.random() * 6.28, 0); c.use = null;
   R.A.hits.push(c.g.userData.hit);
 }
-/** A sip: the cup comes up to your mouth and back down. Three sips and it is finished. */
+/** A sip: the cup comes up to your mouth and back down. Three sips and it is finished (a snack: its own bites). */
 function lgSip() {
   const R = LoungeRoom, c = lgHeldCup(); if (!c || c.use) return;
-  c.use = { t: 0 }; setTimeout(() => { if (R.on) try { hgSnd('sip'); } catch (e) { /* quiet */ } }, 450);
+  const bite = c.snack && hgProd(c.snack).type === 'bar';
+  c.use = { t: 0 }; setTimeout(() => { if (R.on) try { hgSnd(bite ? 'bite' : 'sip'); } catch (e) { /* quiet */ } }, 450);
+}
+/** What you took from the vending machine: in your hand, used like a cup (a bite or a sip each click). */
+function lgTakeSnack(it: any, from: any) {
+  const R = LoungeRoom, T = THREE, g = new T.Group(), mesh = hgItemMesh(it.kind, 0, it.n); g.add(mesh);
+  const hit = new T.Mesh(new T.BoxGeometry(0.14, 0.18, 0.14), new T.MeshBasicMaterial({ visible: false })); hit.position.y = 0.07; hit.userData.act = 'cup'; hit.visible = false; g.add(hit); g.userData.hit = hit;
+  g.userData.heat = new T.Group(); g.position.copy(from); R.A.root.add(g);
+  R.cups = R.cups || []; R.cups.push({ st: 'held', g, snack: it.kind, n: it.n, sips: 0, hotUntil: 0, w: 0, from: from.clone(), mesh });
+  Sound.tick();
 }
 /** Each frame: cups in your hand follow your view; hot cups shimmer, less as they cool. */
 function lgCupsStep(dt: number, now: number) {
@@ -716,8 +821,21 @@ function lgCupsStep(dt: number, now: number) {
   if (_lgHeat && _lgHeat.normalMap) _lgHeat.normalMap.offset.set(Math.sin(now * 0.9) * 0.05, -now * 0.45);   // rising
   for (const c of R.cups || []) {
     if (!c.g) continue;
-    const hot = clamp((c.hotUntil - Date.now()) / (4 * 60e3), 0, 1) * (1 - c.sips / 3);
+    const hot = c.snack ? 0 : clamp((c.hotUntil - Date.now()) / (5 * 60e3), 0, 1) * (c.lvl == null ? 1 - c.sips / 3 : c.lvl > 0.02 ? 1 : 0);
     c.g.userData.heat.visible = heatOn && hot > 0.05; c.g.userData.heat.scale.set(1, 0.5 + 0.5 * hot, 1);
+    if (c.stream) {   // pouring: the stream runs and the cup fills
+      const S = c.stream; S.t += dt; const k = clamp(S.t / S.dur, 0, 1);
+      c.lvl = c.full * (k < 0.08 ? 0 : (k - 0.08) / 0.92);
+      const surf = c.g.position.y + 0.012 + c.lvl * c.g.userData.liq.h; S.m.scale.y = Math.max(0.01, S.top - surf); S.m.position.y = (S.top + surf) / 2;
+      const wv = 1 + 0.18 * Math.sin(now * 37) * Math.sin(now * 13); S.m.scale.x = S.m.scale.z = (k > 0.9 ? 1 - (k - 0.9) * 8 : 1) * wv;
+      S.m.visible = k > 0.02 && k < 1;
+      if (k >= 1) { R.A.root.remove(S.m); S.m.geometry.dispose(); c.stream = null; c.st = 'ready'; toast(`${(LG_DRINKS[c.kind] || LG_DRINKS.espresso).name}, freshly made: click the cup to pick it up`, 'ok'); }
+    }
+    if (hot > 0.05 && heatOn && c.lvl > 0.02) {   // steam: soft wisps rising and fading
+      c.stT = (c.stT || 0) - dt;
+      if (c.stT <= 0) { c.stT = 0.28 + Math.random() * 0.25; const w = lgSteamPuff(); const at = c.g.localToWorld(new THREE.Vector3((Math.random() - 0.5) * 0.02, 0.02 + c.lvl * c.g.userData.liq.h, (Math.random() - 0.5) * 0.02)); R.A.root.worldToLocal(at); w.position.copy(at); R.A.root.add(w); R.A.steam.push({ m: w, t: 0 }); }
+    }
+    if (c.lvl != null) lgLiquid(c);
     if (c.st !== 'held') continue;
     const yaw = R.look.yaw, rot = (x: number, y: number, z: number) => new T.Vector3(x, y, z).applyAxisAngle(new T.Vector3(0, 1, 0), yaw), eye = R.cam.position;
     c.w = Math.min(1, (c.w || 0) + dt * 2.5);
@@ -725,10 +843,15 @@ function lgCupsStep(dt: number, now: number) {
     if (c.use) {   // up to the mouth, a sip, back down
       c.use.t += dt; const t = c.use.t, e = (x: number) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }, k = t < 0.5 ? e(t / 0.5) : t < 1.6 ? 1 : 1 - e((t - 1.6) / 0.5);
       pos = pos.lerp(eye.clone().add(rot(0.0, -0.09, -0.13)), k); tilt = 0.75 * k;
-      if (t >= 2.1) { c.use = null; c.sips++; if (c.sips >= 3) { R.A.root.remove(c.g); c.g = null; c.st = 'done'; toast(c.tea ? 'Tea finished' : 'Coffee finished', 'ok'); continue; } }
+      if (c.lvl != null && t > 0.55 && t < 1.6) { if (c.sip0 == null) c.sip0 = c.lvl; c.lvl = Math.max(0, c.sip0 - (c.full / 3) * clamp((t - 0.55) / 1.0, 0, 1)); }
+      if (t >= 2.1) { c.use = null; c.sips++; c.sip0 = null;
+        if (c.lvl != null && c.lvl < 0.03) c.sips = 99;
+        if (c.snack && c.sips < c.n) { try { c.g.remove(c.mesh); c.mesh = hgItemMesh(c.snack, c.sips, c.n); c.g.add(c.mesh); } catch (e) { /* as it was */ } }
+        if (c.sips >= (c.snack ? c.n : 3)) { R.A.root.remove(c.g); c.g = null; c.st = 'done'; toast(c.snack ? `${hgProd(c.snack).name} finished` : c.tea ? 'Tea finished' : 'Coffee finished', 'ok'); continue; } }
     }
     if (c.w < 1) pos = c.from.clone().lerp(pos, c.w * c.w * (3 - 2 * c.w));
     c.g.position.copy(pos); c.g.rotation.set(0, yaw, 0); c.g.rotateX(tilt);
+    if (c.lvl != null && dt > 0) { if (c.w >= 1) lgSlosh(c, dt); else { c.pv = null; c.sl = [0, 0]; } }   // picked up gently: it settles in your hand first
   }
   R.cups = (R.cups || []).filter((c: any) => c.st !== 'done');
 }

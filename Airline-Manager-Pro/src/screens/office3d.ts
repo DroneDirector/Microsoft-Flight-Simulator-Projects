@@ -314,7 +314,8 @@ function ofLaptop3d(T: any, lt: any, slab: any, bx: any, screenTex: any) {
 /** A photo of you with your family on the desk: taken once, with the figures, and kept. */
 function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   const T = THREE, R = OfficeRoom, me: any = myPilot();
-  const key = JSON.stringify([me && me.look || {}, (State as any).family || null]);
+  const fam = familyInfo(), pet: any = petData(), kind = fam.married ? 'family' : pet && pet.kind !== 'none' ? 'pet' : 'firstday';
+  const key = JSON.stringify([me && me.look || {}, (State as any).family || null, kind, kind === 'pet' ? pet : 0]);
   if (R.photo && R.photo.key === key) { done(ctTex(R.photo.cv)); return; }
   const scene = new T.Scene(), cam = new T.PerspectiveCamera(30, 4 / 3, 0.1, 30);
   const [bg] = ctCanvas(512, 384); { const x = bg.getContext('2d') as CanvasRenderingContext2D, g = x.createLinearGradient(0, 0, 0, 384); g.addColorStop(0, '#8DB7D9'); g.addColorStop(0.55, '#DCE7E8'); g.addColorStop(0.56, '#4E7F9A'); g.addColorStop(0.7, '#5D8C5A'); g.addColorStop(1, '#3E6A3A'); x.fillStyle = g; x.fillRect(0, 0, 512, 384); }
@@ -326,15 +327,16 @@ function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   const hOf = (L: any) => (L.height || FAM_H[L.sex === 'f' ? 'f' : 'm']) / H0;
   // the man on the left, the woman on the right, the children in front between them
   const meX = meL.sex === 'f' ? 0.38 : -0.38;
-  const fam = [{ L: meL, x: meX, s: hOf(meL) }, { L: ptL, x: -meX, s: hOf(ptL) },
-    { L: ctLook('kid1-' + base, 'f', 'public'), x: -0.16, s: 0.62, z: 0.55 }, { L: ctLook('kid2-' + base, 'm', 'public'), x: 0.2, s: 0.54, z: 0.6 }];
+  const kids = [{ L: ctLook('kid1-' + base, 'f', 'public'), x: -0.16, s: 0.62, z: 0.55 }, { L: ctLook('kid2-' + base, 'm', 'public'), x: 0.2, s: 0.54, z: 0.6 }, { L: ctLook('kid3-' + base, 'm', 'public'), x: 0.02, s: 0.46, z: 0.9 }];
+  const famAll: any[] = [{ L: meL, x: meX, s: hOf(meL) }, { L: ptL, x: -meX, s: hOf(ptL) }].concat(fam.kids === 1 ? [Object.assign({}, kids[0], { x: 0.02 })] : fam.kids === 3 ? [Object.assign({}, kids[0], { x: -0.3 }), Object.assign({}, kids[2], { x: 0.06, z: 0.7 }), Object.assign({}, kids[1], { x: 0.38 })] : kids.slice(0, fam.kids));
+  if (kind !== 'family') { ofOtherPhoto(ren, kind, me, pet, key, done); return; }
   // the children's hair and features stay the same from one photo to the next
   let rs = 7; const rnd = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
   // the children: no beards or grey hair, and their skin between their parents'
-  for (const f of fam.slice(2)) { const L: any = f.L, a = fam[0].L.skin || 2, b = fam[1].L.skin || 2; L.facial = 'none'; L.glasses = 'none'; L.skin = Math.round((a + b) / 2 + (rnd() - 0.5)); if (L.hairColor >= 8) L.hairColor = fam[rnd() < 0.5 ? 0 : 1].L.hairColor < 8 ? fam[0].L.hairColor : 1; }
+  for (const f of famAll.slice(2)) { const L: any = f.L, a = famAll[0].L.skin || 2, b = famAll[1].L.skin || 2; L.facial = 'none'; L.glasses = 'none'; L.skin = Math.round((a + b) / 2 + (rnd() - 0.5)); if (L.hairColor >= 8) L.hairColor = famAll[rnd() < 0.5 ? 0 : 1].L.hairColor < 8 ? famAll[0].L.hairColor : 1; }
   const built: any[] = [];   // each figure is scaled from outside: it sets its own scale as it breathes
   try {
-    for (const f of fam) { const m = Human.build(f.L, 'exec', '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); g.position.set(f.x, 0, f.z || 0); g.scale.setScalar(f.s); scene.add(g); m.pose({ t: 1, yaw: 0, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) }); built.push(m); }
+    for (const f of famAll) { const m = Human.build(f.L, 'exec', '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); g.position.set(f.x, 0, f.z || 0); g.scale.setScalar(f.s); scene.add(g); m.pose({ t: 1, yaw: 0, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) }); built.push(m); }
   } catch (e) { /* the photo without people */ }
   cam.position.set(0, 1.05, 3.9); cam.lookAt(0, 0.95, 0);
   const rt = new T.WebGLRenderTarget(512, 384, { samples: 4 }); rt.texture.colorSpace = T.SRGBColorSpace;
@@ -346,6 +348,49 @@ function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   x.putImageData(id, 0, 0);
   R.photo = { key, cv }; rt.dispose();
   scene.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); });
+  done(ctTex(cv));
+}
+
+/** The photo on your desk without a partner: your pet if you have one (lying on a rug in the sun), or you on your
+ *  first day in the job (in uniform, an aircraft on the apron behind you, the day written in the corner). */
+function ofOtherPhoto(ren: any, kind: string, me: any, pet: any, key: string, done: (tex: any) => void) {
+  const T = THREE, R = OfficeRoom, scene = new T.Scene(), W = 512, H = 384;
+  const [bg, bx] = ctCanvas(W, H);
+  if (kind === 'pet') { const g = bx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#E9D9BF'); g.addColorStop(1, '#C9A97E'); bx.fillStyle = g; bx.fillRect(0, 0, W, H); bx.fillStyle = 'rgba(255,240,200,0.35)'; bx.beginPath(); bx.moveTo(60, 0); bx.lineTo(220, 0); bx.lineTo(420, H); bx.lineTo(180, H); bx.fill(); }
+  else {   // the apron: sky, the terminal far off, an aircraft's nose and wing
+    const g = bx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#7FAEDB'); g.addColorStop(0.58, '#D8E6EE'); g.addColorStop(0.6, '#8C949B'); g.addColorStop(1, '#5E666D'); bx.fillStyle = g; bx.fillRect(0, 0, W, H);
+    bx.fillStyle = '#B9C3CB'; bx.fillRect(0, 196, W, 34); for (let i = 0; i < 26; i++) { bx.fillStyle = '#6E8496'; bx.fillRect(8 + i * 20, 204, 12, 14); }
+    bx.fillStyle = '#F4F6F8'; bx.beginPath(); bx.ellipse(380, 190, 150, 34, 0, 0, Math.PI * 2); bx.fill(); bx.beginPath(); bx.moveTo(250, 200); bx.lineTo(120, 236); bx.lineTo(150, 240); bx.lineTo(300, 210); bx.fill();
+    bx.fillStyle = '#26323D'; for (let i = 0; i < 7; i++) bx.fillRect(300 + i * 26, 182, 12, 9); bx.beginPath(); bx.ellipse(500, 186, 22, 14, 0, 0, Math.PI * 2); bx.fill();
+    bx.fillStyle = (company() && company().color) || '#2C8CFF'; bx.fillRect(240, 204, 280, 6);
+  }
+  const bp = new T.Mesh(new T.PlaneGeometry(9, 6.75), new T.MeshBasicMaterial({ map: ctTex(bg) })); bp.position.set(0, 1.4, -3); scene.add(bp);
+  scene.add(new T.HemisphereLight(0xFFF6E8, 0x6A7A5A, 1.4)); const sl = new T.DirectionalLight(0xFFF0DC, 2.2); sl.position.set(2, 4, 5); scene.add(sl);
+  const cam = new T.PerspectiveCamera(30, 4 / 3, 0.05, 30);
+  try {
+    if (kind === 'pet') {
+      const A: any = {}, rug = new T.Mesh(new T.CircleGeometry(1.4, 48), new T.MeshStandardMaterial({ color: 0x8A4E3A, roughness: 0.9 })); rug.rotation.x = -Math.PI / 2; scene.add(rug);
+      petPlace(T, scene, A, [0, 0], 0.4); if (A.pet && A.pet.body && A.pet.body.U) A.pet.body.U.uBreath.value = 0;
+      cam.position.set(0.95, 0.95, 1.75); cam.lookAt(0.05, 0.12, 0);
+    } else {
+      const L = me && me.look ? Object.assign({}, me.look, { hat: 'cap' }) : ctLook('me', 'm', 'public');
+      const m = Human.build(dressed(L, 'captain'), 'captain', (company() && company().color) || '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); scene.add(g);
+      m.pose({ t: 1, yaw: 0.15, gaze: [0, 0], blink: 0, g: humanGesture(null, 1) });
+      cam.position.set(0, 1.25, 3.4); cam.lookAt(0, 1.05, 0);
+    }
+  } catch (e) { cam.position.set(0, 1.2, 3.6); cam.lookAt(0, 1, 0); }
+  const rt = new T.WebGLRenderTarget(W, H, { samples: 4 }); rt.texture.colorSpace = T.SRGBColorSpace;
+  ren.setRenderTarget(rt); ren.render(scene, cam); ren.setRenderTarget(null);
+  const px = new Uint8Array(W * H * 4); try { ren.readRenderTargetPixels(rt, 0, 0, W, H, px); } catch (e) { /* as it is */ }
+  const [cv, x] = ctCanvas(W, H), id = x.createImageData(W, H);
+  for (let y = 0; y < H; y++) id.data.set(px.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+  x.putImageData(id, 0, 0);
+  if (kind === 'firstday') {   // the day it was, written in the corner as people do
+    const d = (() => { try { const S: any = State; const t = S.startedAt || S.created || (S.company && S.company.founded); return t ? new Date(t) : new Date(); } catch (e) { return new Date(); } })();
+    x.fillStyle = 'rgba(255,250,235,0.92)'; x.font = 'italic 600 26px Georgia, serif'; x.textAlign = 'right'; x.fillText('Day one · ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }), W - 18, H - 18);
+  }
+  R.photo = { key, cv }; rt.dispose();
+  scene.traverse((o: any) => { if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); });
   done(ctTex(cv));
 }
 
@@ -482,7 +527,7 @@ function ofReady() {
     ctProgress(100, 'Ready', R);
     const wait = Math.max(300, 2400 - (performance.now() - R.loadT0));
     setTimeout(() => { const L = R.root && R.root.querySelector('.ct-loader') as HTMLElement; if (L) { L.classList.add('out'); setTimeout(() => L.remove(), 800); }
-      if (R.mode === 'interview') { ofKnock(); setTimeout(() => ofEnter(), 900); } else ofVisitUi(); }, wait);
+      if (R.mode === 'interview') ofKnock(); else ofVisitUi(); }, wait);
   }, 40);
 }
 OfficeRoom.close = function (quiet?: boolean) {
@@ -545,7 +590,20 @@ function ofKnock() {
     const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext, ac = OfficeRoom.ac || (OfficeRoom.ac = new AC());
     [0, 0.22, 0.44].forEach(dl => { const t = ac.currentTime + 0.05 + dl, n = ac.createBuffer(1, 4410, 44100), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 380); const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'lowpass'; f.frequency.value = 420; g.gain.value = 0.9; s.buffer = n; s.connect(f); f.connect(g); g.connect(ac.destination); s.start(t); });
   } catch (e) { /* no sound */ }
-  ofSay('', 'Come in.', 'A knock at the door');
+  ofSay('', 'Someone is knocking on your door.', 'A knock at the door');
+  const R = OfficeRoom, o = R.root.querySelector('.ct-opts') as HTMLElement;
+  if (o) o.innerHTML = `<button class="btn primary" data-of="comein">Come in</button>`;
+  // nobody answering: they knock once more after a while
+  clearTimeout(R.knockT); R.knockT = setTimeout(() => { if (R.on && R.vis && R.vis.state === 'outside' && !R.started && R.root.querySelector('[data-of=comein]')) ofKnockAgain(); }, 12000);
+}
+function ofKnockAgain() { const R = OfficeRoom; try { const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext, ac = R.ac || (R.ac = new AC()); [0, 0.22].forEach(dl => { const t = ac.currentTime + 0.05 + dl, n = ac.createBuffer(1, 4410, 44100), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / 380); const s2 = ac.createBufferSource(), f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 420; s2.buffer = n; s2.connect(f); f.connect(ac.destination); s2.start(t); }); } catch (e) { /* no sound */ } }
+/** You answer the knock: "Come in." in your own voice, then the door opens and they come in. */
+function ofComeIn() {
+  const R = OfficeRoom; clearTimeout(R.knockT); const o = R.root.querySelector('.ct-opts') as HTMLElement; if (o) o.innerHTML = '';
+  const mine = 'Come in.', meWho = myWho('neutral'), you = R.root.querySelector('.of-you') as HTMLElement;
+  if (you) you.innerHTML = `<span><b>You</b>${esc(mine)}</span>${voiceButton(mine, meWho, 'Play what you said')}`;
+  if (ofAutoVoice()) { try { Voice.speak(mine, () => { /* said */ }, meWho); } catch (e) { /* no voice */ } }
+  Sound.tick(); setTimeout(() => { if (R.on) ofEnter(); }, 500);
 }
 /** In they come: the door swings open, a moment later they step in, walk round the furniture to the chair, turn
  *  and sit down facing you. */
@@ -564,7 +622,7 @@ function ofEnter() {
       const now = `${V.state}|${V.x.toFixed(2)}|${V.z.toFixed(2)}|${V.yaw.toFixed(2)}|${V.sitK.toFixed(2)}`;
       if (now !== mark) { mark = now; since = performance.now(); } else if (performance.now() - since > 4000) { clearInterval(watch); ofSeatNow(); }
     }, 500);
-  }, 3000);
+  }, 2000);
 }
 /* ---------- finding the way: round the door, the walls and the furniture ---------- */
 // what stands on the floor, as rectangles [x0, z0, x1, z1] (the room is 6.4 m by 6.4 m; the door is on the left wall
@@ -739,7 +797,8 @@ function ofWalk(dt: number, now?: number) {
   const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], r = (K.d || K.arrowright ? 1 : 0) - (K.a || K.arrowleft ? 1 : 0) + R.stick[0];
   const mag = Math.min(1, Math.hypot(f, r)), vmax = K.shift ? 2.0 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-  let mx = fx * f + rx * r, mz = fz * f + rz * r; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
+  let mx = fx * f + rx * r, mz = fz * f + rz * r; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; if (R.host && R.host.assist && ml > 0.05) { const g2 = R.host.assist('office', F.x, F.z, mx, mz); mx = g2[0]; mz = g2[1]; }   // eased through an open doorway
+  const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!ofBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!ofBlocked(nx, F.z)) F.x = nx; else if (!ofBlocked(F.x, nz)) F.z = nz; F.bob += step; }
   if (R.host && R.host.out('office', F.x, F.z, R.look, F.v)) return;   // through the door: the corridor takes over
   Sound.steps(F, F.bob, Math.abs(F.x) < 1.8 && Math.abs(F.z) < 1.5 ? 'carpet' : 'wood', F.v);   // the rug, or the parquet around it
@@ -906,7 +965,7 @@ function ofInviteNow(id: string) {
   for (const sel of ['.of-spots', '.ct-pad', '.ct-hint', '.of-aim']) { const e = R.root.querySelector(sel) as HTMLElement; if (e) e.hidden = true; }
   const top = R.root.querySelector('.ct-top b') as HTMLElement; if (top) top.textContent = `Your office: ${p.name}, ${String(inc.title).toLowerCase()}`;
   ofSay('', `${p.name} is on the way up…`, 'Conduct report');
-  const go = () => { if (!R.on || R.p !== p) return; try { ofVisitor(); } catch (e) { R.vis = null; } ofKnock(); setTimeout(() => ofEnter(), 900); };
+  const go = () => { if (!R.on || R.p !== p) return; try { ofVisitor(); } catch (e) { R.vis = null; } ofKnock(); };
   setTimeout(() => { if (Human.ready) go(); else Human.load().then(go, go); }, 1800);
 }
 function ofSpot(k: string) {
@@ -1407,6 +1466,7 @@ function ofClick(b: HTMLElement) {
   else if (k === 'end') ofEnd();
   else if (k === 'spot') { const s = b.getAttribute('data-k'); if (s === 'sit') ofSit(); else if (s === 'hangars') { Sound.tick(); ofExitToMain('', 'hangars'); } else ofSpot(s); }
   else if (k === 'invite') ofInviteNow(b.getAttribute('data-id'));
+  else if (k === 'comein') ofComeIn();
   else if (k === 'back') { Sound.tick(); ofVisitUi(); }
   else if (k === 'boxclose') ofBoxClose();
   else if (k === 'boxmin') ofBoxMin();

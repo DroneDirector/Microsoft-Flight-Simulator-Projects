@@ -353,7 +353,8 @@ function opsWalk(dt: number, now?: number) {
   const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], rr = (K.d || K.arrowright ? 1 : 0) - (K.a || K.arrowleft ? 1 : 0) + R.stick[0];
   const mag = Math.min(1, Math.hypot(f, rr)), vmax = K.shift ? 2.0 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-  let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
+  let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; if (R.host && R.host.assist && ml > 0.05) { const g2 = R.host.assist('ops', F.x, F.z, mx, mz); mx = g2[0]; mz = g2[1]; }   // eased through an open doorway
+  const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!opsBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!opsBlocked(nx, F.z)) F.x = nx; else if (!opsBlocked(F.x, nz)) F.z = nz; F.bob += step; }
   if (R.host && R.host.out('ops', F.x, F.z, R.look, F.v)) return;   // through the door: the corridor takes over
   Sound.steps(F, F.bob, 'carpet', F.v);   // carpet tiles all over the operations room
