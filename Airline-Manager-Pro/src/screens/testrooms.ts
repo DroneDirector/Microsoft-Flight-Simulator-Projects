@@ -329,8 +329,8 @@ function trDoorAssist(x: number, z: number, mx: number, mz: number): [number, nu
     const nx = D.n === 'x', dN = nx ? D.mid[0] - x : D.mid[1] - z, dL = nx ? z - D.mid[1] : x - D.mid[0];   // to the doorway (across the wall), and off its middle (along it)
     if (Math.abs(dN) > 1.4 || Math.abs(dL) > D.half + 0.75) continue;
     const toward = (nx ? mx : mz) * Math.sign(dN || 1); if (toward < 0.25) continue;   // only when heading through
-    const room = Math.max(0, D.half - 0.24), off = Math.abs(dL) > room ? dL - Math.sign(dL) * room : 0;   // anywhere across its open width is fine
-    const pull = clamp(-off * 2.6, -0.9, 0.9) * (1 - Math.min(1, Math.abs(dN) / 1.4) * 0.5);
+    const room = Math.max(0, D.half - 0.33), off = Math.abs(dL) > room ? dL - Math.sign(dL) * room : 0;   // anywhere across the middle of its width is fine
+    const pull = clamp(-off * 6, -1, 1) * (1 - Math.min(1, Math.abs(dN) / 1.4) * 0.4);
     let ax = mx, az = mz; if (nx) az += pull; else ax += pull;
     // straight through once in the opening
     if (Math.abs(dN) < 0.45) { if (nx) az *= 0.35; else ax *= 0.35; }
