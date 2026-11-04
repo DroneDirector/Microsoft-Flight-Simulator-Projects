@@ -200,11 +200,14 @@ function patchNode(o: Element, n: Element) {
   if (o.tagName === 'CANVAS') return;   // drawn by code
   if (o.innerHTML !== n.innerHTML) patchChildren(o, n);
 }
+const FLAP_WHERE = '.sel-pop, .screen-ops, .screen-ranking, .v3d, .apv';
 /** Changed text turns over like a split-flap departure board: only the characters that changed flip, one
  *  after the other. Long text fades across instead; with reduced motion it simply changes. */
 function flapText(o: Text, txt: string) {
   const par = o.parentElement, old = o.nodeValue || '';
   if (!par || State.settings.reduceMotion || par.closest('svg, option, select, textarea, title') || !txt.trim()) { o.nodeValue = txt; return; }
+  // the flip only where it belongs: the opened flight card, Overview, Ranking, and the 3D and 2D views; elsewhere text simply changes
+  if (!par.closest(FLAP_WHERE)) { o.nodeValue = txt; return; }
   if (txt.length > 32) { o.nodeValue = txt; par.classList.remove('tick-fade'); void par.offsetWidth; par.classList.add('tick-fade'); return; }
   const w = document.createElement('span'); w.className = 'flap-w';
   // characters are lined up from the right for numbers (so 9→10 flips the right digits), from the left otherwise

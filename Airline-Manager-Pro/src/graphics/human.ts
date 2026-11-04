@@ -15,6 +15,10 @@ function animLevel(k: 'animWalk' | 'animSpeak' | 'animBody'): number {
   if (v != null && v !== 'auto' && !isNaN(+v)) return Math.max(0, Math.min(3, +v));
   return animAuto();
 }
+/** How people's hair is drawn (Settings → Graphics → Hair): strands, one by one (the finest, for PCs); hair cards,
+ *  fewer and wider locks of hair (nearly as good, far lighter: phones and tablets); or flat, painted on the head
+ *  only (the lightest). Automatic: strands on the PC, hair cards on phones and tablets. */
+function hairMode(): 'strands' | 'cards' | 'flat' { const v = (State.settings as any).hairMode; return v === 'strands' || v === 'cards' || v === 'flat' ? v : (typeof DESKTOP !== 'undefined' && DESKTOP ? 'strands' : 'cards'); }
 function animAuto(): number { let q = 2; try { q = typeof cabinQ === 'function' ? cabinQ() : 2; } catch (e) { /* default */ } return q >= 3 ? 3 : q === 0 ? 1 : 2; }
 /** The mouth while someone says a line in a conversation, from the words themselves (about 13 letters a second):
  *  open — wide on a, e and o, less on i and u, closed on m, b and p, closing between words and at the ends of
@@ -892,7 +896,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     return mesh;
   }
 
-  function buildHair(style, geo, b, I, c, q, hatY) {
+  function buildHair(style, geo, b, I, c, q, hatY, cards) {
     const rnd = rng(c.seed), A = b.A, B = b.B, C = v3(I.headC), S = v3(I.headS);
     const headCol = surfaceIndex(geo, i => A[i * 4 + 3] > 0.5 || (A[i * 4 + 1] < 0.5 && geo.attributes.position.getY(i) > I.neckY - 0.35));
     const line = c.hairline;
@@ -921,8 +925,10 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     }
     // lighter figures (the people further away, small devices) get fewer and shorter-jointed strands
     const lite = q < 0.6 ? q / 0.6 : 1;
-    const nG = Math.round((style === 'afro' ? 3000 : 1600) * Math.max(0.35, q)), nC = Math.round((style === 'afro' ? 40000 : (style === 'long' || style === 'wavy') ? 22000 : 18000) * q * lite);
+    let nG = Math.round((style === 'afro' ? 3000 : 1600) * Math.max(0.35, q)), nC = Math.round((style === 'afro' ? 40000 : (style === 'long' || style === 'wavy') ? 22000 : 18000) * q * lite);
     if (lite < 1 && spec.segs) spec.segs = Math.max(4, Math.round(spec.segs * (0.5 + 0.5 * lite)));
+    // hair cards: about a twelfth as many locks, each several times as wide, with fewer joints (the painted hair under them fills the gaps)
+    if (cards) { nC = Math.max(300, Math.round(nC / 12)); nG = Math.max(200, Math.round(nG / 3)); spec.width *= 6.5; if (spec.segs) spec.segs = Math.max(4, Math.round(spec.segs * 0.6)); }
     spec.shell = p => { const d = p.clone().sub(C), e = Math.sqrt((d.x / (S.x / 2)) ** 2 + (d.y / (S.y / 2)) ** 2 + (d.z / (S.z / 2)) ** 2); if (p.y > C.y - S.y * 0.35 && e < 0.86 && e > 0.01) p.copy(C).addScaledVector(d, 0.86 / e); };
     spec.guides = roots(nG); spec.roots = roots(nC);
     const edgeOf = R => { const i = R.tri; return Math.min(1, Math.max(0, (B[i * 4 + 1] - hairlineAtJS(Math.atan2(B[i * 4], B[i * 4 + 2]), line)) / 0.25)); };
@@ -1389,7 +1395,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     const hatKind = L.hat === 'none' ? null : (role === 'mech' || role === 'ground') ? 'mech' : L.hat === 'pillbox' ? 'pillbox' : role === 'captain' ? 'captain' : role === 'fa' ? 'fa' : 'fo';
     const strandHair = ['bald', 'buzz'].indexOf(L.hair) < 0;
     t0 = tick('material', t0);
-    if (strandHair) head.add(buildHair(L.hair, geo, b, I, c, q, hatKind && hatKind !== 'pillbox' ? I.headC[1] - 0.006 : 0));
+    const hm = hairMode(); if (strandHair && hm !== 'flat') head.add(buildHair(L.hair, geo, b, I, c, q, hatKind && hatKind !== 'pillbox' ? I.headC[1] - 0.006 : 0, hm === 'cards'));
     t0 = tick('hair', t0);
     const facial = L.facial === 'beard' ? 'short' : L.facial === 'moustache' ? 'chevron' : L.facial;
     if (BEARDS[facial]) head.add(buildBeard(facial, geo, b, I, c, c.mouth, q));
