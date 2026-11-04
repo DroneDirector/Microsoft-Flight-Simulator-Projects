@@ -109,7 +109,7 @@ const LG_EMBLEM = `<svg class="ctl-scales lg-emb" viewBox="0 0 200 200" aria-hid
 
 LoungeRoom.open = function (k: string, host?: any) {
   const R = LoungeRoom; if (R.on) return;
-  if (!host && trJoined()) {   // your lounges: in the joined building, at the end of the concourse
+  if (!host && trJoined() && lgList().length) {   // your lounges: in the joined building, at the end of the concourse
     const want = trLgPick(k);
     if (TestRooms.on && TestRooms.game && TestRooms.lgKey === want) trEnter('lounge', null);
     else { if (TestRooms.on) TestRooms.close(true); TestRooms.open({ game: true, room: 'lounge', lk: want }); }

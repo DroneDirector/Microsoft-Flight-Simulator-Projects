@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.137 (2026-11-04)
+
+- Joined building: the lounge is always there (hub's, else another of yours: trLgPick); every lounge visit opens in the building
+- No lounge yet: built and lit, doors locked behind a coming-soon hoarding (lgShut)
+
 ## 0.9.136 (2026-11-04)
 
 - Cabin windows (cabWinParts/cabWinSweep): swept surround with deep reveal, seal, pane, shade with lip and grip; window-seat view and the long cabin (instanced, shades at random heights, more down at night); detail by cabinQ
