@@ -20,18 +20,22 @@ const OPS_SCENE = `<svg class="ctl-house ops-scene" viewBox="0 0 560 260" aria-h
   <path d="M250 236 L256 120 L304 120 L310 236 Z"/><path d="M236 120 L324 120 L314 92 L246 92 Z"/><rect x="252" y="80" width="56" height="12"/><rect x="276" y="56" width="4" height="24"/>
   <rect x="40" y="200" width="160" height="36"/><rect x="360" y="190" width="180" height="46"/><path d="M60 230 l40 -6 l30 0 l10 -8 l6 0 l-4 8 l18 0 l0 4 z"/></svg>`;
 
-OpsRoom.open = function () {
+OpsRoom.open = function (host?: any) {
   const R = OpsRoom; if (R.on) return;
+  if (!host && trJoined()) { if (TestRooms.on && TestRooms.game) trEnter('ops', null); else TestRooms.open({ game: true, room: 'ops' }); return; }   // the joined building
+  R.host = host || null;
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   try { if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) OfficeRoom.close(true); } catch (e) { /* none */ }
   R.on = true; R.pct = 0; R.loading = true; R.overlay = null; R.keys = {}; R.last = 0; R.loadT0 = performance.now(); R.tab = 'schedule'; R.seat = true; R.free = { x: 0.3, z: 1.3, v: 0, bob: 0 }; R.stick = [0, 0]; R.doorT = 0; R.doorK = 0;
   const q = Gfx.roomQ(), co = company();
-  const root = document.createElement('div'); root.className = 'court3d office3d ops3d'; R.root = root;
-  root.innerHTML = `<canvas></canvas>
+  const root = host ? host.root : document.createElement('div'); if (!host) root.className = 'court3d office3d ops3d'; R.root = root;
+  const ui = `${host ? '' : '<canvas></canvas>'}
     <div class="ct-top"><div><small>${esc(co.name)}</small><b>Operations</b></div></div>
     <button class="ct-leave" data-op="leave">${icon('close')}<span>Leave Operations</span><kbd>Esc</kbd></button>
     <div class="ct-spots of-spots op-spots" hidden></div><div class="of-aim op-aim" hidden></div><div class="walk-pad ct-pad op-pad" hidden><i></i></div><div class="of-aim op-dot" hidden>+</div>
-    ${ctLoaderHtml('Operations', 'Switching on the screens…', OPS_EMBLEM, OPS_SCENE)}`;
+    ${host ? '' : ctLoaderHtml('Operations', 'Switching on the screens…', OPS_EMBLEM, OPS_SCENE)}`;
+  if (host) { host.mount('ops', ui); opsOpen2(root, q); return; }   // in the building: built already, straight in
+  root.innerHTML = ui;
   document.body.appendChild(root);
   setTimeout(() => { if (R.on && R.root === root) opsOpen2(root, q); }, 80);
 };
@@ -229,35 +233,37 @@ function opsMonitorDraw(AA?: any) {
 }
 
 function opsOpen2(root: HTMLElement, q: number) {
-  const R = OpsRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement;
-  const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
-  ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('room', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
-  ren.shadowMap.enabled = Gfx.placeShadow('room', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap;
-  const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
-  const cam = new T.PerspectiveCamera(56, 1, 0.03, 30); R.cam = cam;
-  scene.add(new T.HemisphereLight(0xEAF2FF, 0x1A222C, 0.75));
+  const R = OpsRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement, H = R.host;
+  R.ac = new AbortController(); R.sig = R.ac.signal;   // the room's own controls, all let go of together when it closes
+  const ren = H ? H.ren : new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
+  if (!H) { ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('room', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
+    ren.shadowMap.enabled = Gfx.placeShadow('room', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap; }
+  const scene = H ? H.scene : new T.Scene(); R.scene = scene; if (!H) scene.background = new T.Color(0x0B121B);
+  const cam = H ? H.cam('ops') : new T.PerspectiveCamera(56, 1, 0.03, 30); R.cam = cam;
+  if (!H) scene.add(new T.HemisphereLight(0xEAF2FF, 0x1A222C, 0.75));
   ctProgress(15, 'Setting up the desk…', R);
   setTimeout(() => {
     if (!R.on) return;
-    try {
+    if (!H) try {
       const pm = new T.PMREMGenerator(ren), env = new T.Scene(); env.add(new T.Mesh(new T.BoxGeometry(6, 3, 6), new T.MeshBasicMaterial({ color: 0x26303C, side: T.BackSide })));
       const l = new T.Mesh(new T.PlaneGeometry(3, 0.2), new T.MeshBasicMaterial({ color: 0xFFFFFF })); l.position.set(0, 1.4, 0); l.rotation.x = Math.PI / 2; env.add(l);
       scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
     } catch (e) { /* no reflections */ }
     ctProgress(35, 'Filling the archive…', R);
-    R.A = opsBuild(scene, q); R.glow = new AimGlow(scene);
+    R.A = H ? H.A('ops') : opsBuild(scene, q); R.glow = H ? H.glow('ops') : new AimGlow(scene);
     ctProgress(65, 'Loading the schedule…', R);
     opsMonitorDraw();
     const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
-    fit(); R.fit = fit; window.addEventListener('resize', fit);
+    if (!H) { fit(); R.fit = fit; window.addEventListener('resize', fit); } else R.fit = null;
     // looking around from the chair: drag, or the arrow keys
     R.look = { yaw: 0, pitch: -0.16 }; R.pk = null; R.phoneAfter = () => opsUi();
+    if (H && H.enterAt) { const e = H.enterAt; H.enterAt = null; R.seat = false; R.free = { x: e.x, z: e.z, v: e.v || 0, bob: 0 }; R.look = { yaw: e.yaw, pitch: e.pitch || 0 }; }
     let drag: any = null, moved = 0;
     let justLocked = false;
     cv.addEventListener('pointerdown', e => {
       // walking on the PC: the view takes the mouse (no pointer, turn as far as you like); a click then uses what glows
       if (!R.seat && DESKTOP && e.pointerType === 'mouse') { drag = null; if (!aimLocked(cv)) { justLocked = true; aimLock(cv); } return; }
-      drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* none */ } });
+      drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* none */ } }, { signal: R.sig });
     R.mm$ = (e: MouseEvent) => { if (R.on && !R.seat && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
     document.addEventListener('mousemove', R.mm$);
     // the walking stick on touch screens
@@ -269,9 +275,9 @@ function opsOpen2(root: HTMLElement, q: number) {
         const up = (e: PointerEvent) => { if (e.pointerId !== id) return; id = -1; R.stick = [0, 0]; knob.style.transform = ''; };
         pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
       } }
-    cv.addEventListener('pointermove', e => { if (drag) { moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.1, 0.8); } else opsHover(e); });
-    cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else opsClickAt(); return; } justLocked = false; if (drag && moved < 6) opsClickAt(e); drag = null; });
-    root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-op]') as HTMLElement; if (b) opsClick(b); });
+    cv.addEventListener('pointermove', e => { if (drag) { moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.1, 0.8); } else opsHover(e); }, { signal: R.sig });
+    cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else opsClickAt(); return; } justLocked = false; if (drag && moved < 6) opsClickAt(e); drag = null; }, { signal: R.sig });
+    root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-op]') as HTMLElement; if (b) opsClick(b); }, { signal: R.sig });
     R.key$ = (e: KeyboardEvent) => {
       if (!R.on) return; const k = e.key.toLowerCase();
       if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay.classList.contains('ph-screen')) phoneClose(R); else opsScreenClose(); } return; }
@@ -292,6 +298,7 @@ function opsOpen2(root: HTMLElement, q: number) {
     }, 40);
     R.iv = setInterval(() => { if (R.on && !document.hidden) opsMonitorDraw(); }, 5000);
     R.perf = Perf.state();
+    if (H) return;   // the building draws it
     const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && (!R.overlay || R.zoomAnim) && !Perf.skip(R.perf)) opsFrame(); };   // the room rests while a screen is open (not while it grows or shrinks)
     R.raf = requestAnimationFrame(loop);
   }, 30);
@@ -335,6 +342,7 @@ function opsAimedObj(e?: PointerEvent): any {
 }
 /* ---------- walking about the room ---------- */
 function opsBlocked(x: number, z: number): boolean {
+  const H = OpsRoom.host; if (H) { const d = H.pass('ops', x, z); if (d) return d < 0; }   // the doorway to the corridor: open or shut
   if (x < -2.55 || x > 2.55 || z < -2.65 || z > 2.25) return true;
   const B = [[-1.25, -0.8, 1.25, 0.32], [-0.42, 0.32, 0.42, 1.08], [-2.85, -2.45, -2.1, -0.35], [2.0, -2.9, 2.85, -2.05]];   // the desk, the chair, the archive rack, the plant
   for (const r of B) if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true;
@@ -347,6 +355,7 @@ function opsWalk(dt: number, now?: number) {
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
   let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!opsBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!opsBlocked(nx, F.z)) F.x = nx; else if (!opsBlocked(F.x, nz)) F.z = nz; F.bob += step; }
+  if (R.host && R.host.out('ops', F.x, F.z, R.look, F.v)) return;   // through the door: the corridor takes over
   Sound.steps(F, F.bob, 'carpet', F.v);   // carpet tiles all over the operations room
   const bobY = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
   R.cam.position.set(F.x, 1.64 + bobY, F.z);
@@ -356,12 +365,12 @@ function opsWalk(dt: number, now?: number) {
   // what's in front of you glows: the door (leave), the chair (sit), the monitor, the archives
   const obj = opsAimedObj(), hint = obj ? obj.userData.act : '', aim = R.root.querySelector('.op-dot') as HTMLElement;
   if (R.glow) { if (obj) R.glow.showObj(obj); else R.glow.hide(); }
-  if (aim) { aim.hidden = false; aim.textContent = hint === 'door' ? 'Click the door to leave Operations' : hint === 'sit' ? 'Click to sit in your chair' : hint === 'monitor' ? 'Click to work at the monitor' : hint === 'phone' ? 'Click to pick up your phone' : hint === 'archives' ? 'The archives' : '·'; aim.classList.toggle('on', !!hint); }
+  if (aim) { aim.hidden = false; aim.textContent = hint === 'door' ? (R.host ? (R.doorT ? 'Click to shut the door' : 'Click to open the door to the corridor') : 'Click the door to leave Operations') : hint === 'sit' ? 'Click to sit in your chair' : hint === 'monitor' ? 'Click to work at the monitor' : hint === 'phone' ? 'Click to pick up your phone' : hint === 'archives' ? 'The archives' : '·'; aim.classList.toggle('on', !!hint); }
 }
 function opsSit() { const R = OpsRoom; aimUnlock(); R.seat = true; R.look = { yaw: 0, pitch: -0.16 }; const d = R.root.querySelector('.op-dot') as HTMLElement; if (d) d.hidden = true; Sound.tick(); opsUi(); }
 function opsStand() { const R = OpsRoom; phoneReset(R); R.seat = false; R.free = { x: 0.3, z: 1.3, v: 0, bob: 0 }; R.look = { yaw: 0, pitch: -0.05 }; Sound.tick(); opsUi(); }
 /** Through the door: it opens, and you are back in the Overview. */
-function opsDoor() { const R = OpsRoom; Sound.tick(); aimUnlock(); roomExitMenu(R.root, 'ops', to => { R.doorT = 1; setTimeout(() => opsLeave(to), 650); }); }
+function opsDoor() { const R = OpsRoom; if (R.host) { R.doorT = R.doorT ? 0 : 1; Sound.tick(); return; } Sound.tick(); aimUnlock(); roomExitMenu(R.root, 'ops', to => { R.doorT = 1; setTimeout(() => opsLeave(to), 650); }); }
 function opsHover(e: PointerEvent) {
   const R = OpsRoom; if (R.loading || R.overlay || !R.seat) return;
   const T = THREE, rc = new T.Raycaster(), r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect();
@@ -481,6 +490,15 @@ function opsClick(b: HTMLElement) {
 /* ---------- leaving ---------- */
 OpsRoom.close = function (quiet?: boolean) {
   const R = OpsRoom; if (!R.on) return; R.on = false;
+  if (R.host) {   // in the building: only the room's own controls go; the building keeps the room
+    const H = R.host; R.host = null;
+    if (R.overlay) { try { if (R.overlay.classList.contains('lap-screen')) lapUnmount(); R.overlay.remove(); } catch (e) { /* gone */ } } R.overlay = null; document.body.classList.remove('of-over');
+    clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); document.removeEventListener('mousemove', R.mm$);
+    try { R.ac && R.ac.abort(); } catch (e) { /* none */ }
+    H.unmount('ops', R.doorT ? 1 : 0); R.ren = null; R.scene = null; R.A = null; R.glow = null; R.root = null;
+    if (!quiet) H.leaveAll();
+    return;
+  }
   R.overlay = null; document.body.classList.remove('of-over');
   cancelAnimationFrame(R.raf); clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   document.removeEventListener('mousemove', R.mm$); aimUnlock();
@@ -492,7 +510,7 @@ OpsRoom.close = function (quiet?: boolean) {
 function opsLeave(toOverview?: boolean | string) {
   if (!OpsRoom.on || ExitSplash.on) return;
   exitSplash('ops', 'Leaving Operations', [
-    { pct: 30, step: 'Switching off the screens…', run: () => OpsRoom.close(true) },
+    { pct: 30, step: 'Switching off the screens…', run: () => { const H = OpsRoom.host; OpsRoom.close(true); if (H) H.closeAll(); } },
     { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
     { pct: 85, step: toOverview ? 'On your way…' : 'Loading your airline…', run: () => { if (toOverview) { try { roomGoTo(typeof toOverview === 'string' ? toOverview : 'overview'); } catch (e) { refresh(); } } else refresh(); } },
   ]);

@@ -4250,3 +4250,4 @@ html.calm .dclock b em { animation: none; }
 .gs-t th, .gs-t td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); }
 .gs-t th { color: var(--ink-3, #8A96A3); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
 .gs-t tr.ok td:first-child { color: #4FD18B; } .gs-t tr.mid td:first-child { color: #F4C542; } .gs-t tr.bad td:first-child { color: #FF7A6B; }
+.tr3d .tr-halls-ui, .tr3d .tr-room-ui { display: contents; }

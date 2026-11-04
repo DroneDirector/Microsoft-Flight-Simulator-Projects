@@ -32,6 +32,7 @@ const SETTINGS: SetSection[] = [
   ] },
   { id: 'view3d', title: 'Graphics', icon: 'map', items: [
     { type: 'group', title: 'Recommended' }, { type: 'html', html: () => gfxAdviceHtml() },
+    { type: 'html', html: () => { const on = (State.settings as any).joinedRooms !== false; return `<label class="tg-row set-card"><span><b>Walk between your rooms</b><small>Your office, the Operations office and your hub's lounge in one building: a staff corridor and the concourse join them, and you walk from one to the other through their doors. The Office, Operations and Lounge buttons still take you straight to your chair. Off: each room on its own, with a loading screen in between.</small></span><button class="tg ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="joined-rooms"></button></label>`; } },
     ...(DESKTOP ? [{ type: 'group', title: 'PC graphics' } as SetItem, { type: 'html', html: () => gfxSettingsHtml() } as SetItem] : []),
     { type: 'group', title: 'Distance and clouds' },
     { type: 'html', html: () => {
@@ -598,6 +599,7 @@ document.addEventListener('input', e => {
   if (el.classList.contains('cl-km')) { const h = card && card.querySelector('.cl-km-h'); if (h) h.textContent = `Cloud distance: ${+el.value ? el.value + ' km' : 'Off'}`; }
   if (el.classList.contains('cl-d')) { const h = card && card.querySelector('.cl-d-h'); if (h) h.textContent = `Cloud detail: ${CLOUD_DETAIL_NAMES[+el.value - 1]}`; }
 });
+ACTIONS['joined-rooms'] = () => { const S: any = State.settings; S.joinedRooms = S.joinedRooms === false; Store.save(); Sound.tick(); rerenderSettingsBody(); };
 ACTIONS['cl-mode'] = (b: HTMLElement) => { const v = b && b.getAttribute('data-v') === '2d'; if (cloudFlat() === v) return; Sound.tick(); (State.settings as any).cloud2d = v; if (V3d.open) (V3d as any).cloudReload = !(V3d as any).cloudReload; Store.save(); rerenderSettingsBody(); };
 document.addEventListener('change', e => {
   const el = e.target as HTMLInputElement; if (!el || !el.classList) return;

@@ -356,24 +356,34 @@ const OF_WINGS = `<svg class="ctl-scales" viewBox="0 0 200 200" aria-hidden="tru
   <path d="M100 82 C120 80 150 76 182 64 C170 78 154 86 138 90 C152 92 164 92 176 90 C162 100 140 104 118 102 C130 106 140 108 152 108 C136 116 116 114 100 108 Z"/>
   <circle cx="100" cy="95" r="16"/><circle cx="100" cy="95" r="10" fill="#13213A"/></g><text x="100" y="150" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="url(#ofG)" letter-spacing="3">OFFICE</text></svg>`;
 
-OfficeRoom.open = function (inc?: any) {
-  const R = OfficeRoom; if (R.on) R.close(true);
+OfficeRoom.open = function (inc?: any, host?: any) {
+  const R = OfficeRoom;
+  if (!host && trJoined()) {   // the joined building: your office off the staff corridor
+    if (TestRooms.on && TestRooms.game) { if (R.on) R.close(true); trEnter('office', null, inc); } else { if (R.on) R.close(true); TestRooms.open({ game: true, room: 'office', inc }); }
+    return;
+  }
+  if (R.on) R.close(true);
+  R.host = host || null;
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   const p: any = inc ? staffById(inc.staffId) : null; if (inc && !p) { toast('This person no longer works for you', 'info'); return; }
   R.on = true; R.inc = inc || null; R.p = p; R.mode = inc ? 'interview' : 'visit'; R.keys = {}; R.stick = [0, 0]; R.pct = 0; R.asked = []; R.answers = 0; R.decided = false; R.ended = false; R.started = false; R.rescued = false; R.talkUntil = 0; R.flush = false; R.cond = null; R.doorT = 0; R.last = 0; R.view = ''; R.vis = null; R.loadT0 = performance.now();
   const q = Gfx.roomQ(), co = company();
-  const root = document.createElement('div'); root.className = 'court3d office3d'; R.root = root;
-  root.innerHTML = `<canvas></canvas>
+  const root = host ? host.root : document.createElement('div'); if (!host) root.className = 'court3d office3d'; R.root = root;
+  const ui = `${host ? '' : '<canvas></canvas>'}
     <div class="ct-top" data-of="boxopen" title="Show the conversation"><div><small>${esc(co.name)}</small><b>${inc ? `Your office: ${esc(p.name)}, ${esc(inc.title.toLowerCase())}` : 'Your office'}</b></div><i class="of-reopen">${icon('chevron')}</i></div>
     <button class="ct-leave" data-of="leave">${icon('close')}<span>Leave the office</span><kbd>Esc</kbd></button>
     <div class="ct-box" hidden><div class="box-grip" title="Drag to move the window (double-click to put it back)"><i></i></div><button class="of-x" data-of="boxclose" aria-label="Close" title="Close (bring it back from the name at the top left)">${icon('close')}</button><button class="of-x of-min" data-of="boxmin" aria-label="Minimise" title="Minimise">${icon('down')}</button><div class="of-you"></div><div class="ct-who"><b></b><small></small></div><p class="ct-text"></p><p class="of-tell"></p><div class="ct-say"></div><div class="ct-opts"></div><div class="ct-ctl"></div></div>
     <div class="ct-spots of-spots" hidden></div><div class="ct-hint" hidden></div><div class="walk-pad ct-pad" hidden><i></i></div><div class="of-aim" hidden>+</div>
-    ${ctLoaderHtml('Your office', inc ? `${p.name} is on the way up…` : 'Unlocking the door…', OF_WINGS)}`;
+    ${host ? '' : ctLoaderHtml('Your office', inc ? `${p.name} is on the way up…` : 'Unlocking the door…', OF_WINGS)}`;
+  if (host) { host.mount('office', ui); ofOpen2(root, q); return; }   // in the building: built already, straight in
+  root.innerHTML = ui;
   document.body.appendChild(root);
   setTimeout(() => { if (R.on && R.root === root) ofOpen2(root, q); }, 80);
 };
 function ofOpen2(root: HTMLElement, q: number) {
-  const R = OfficeRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement;
+  const R = OfficeRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement, H = R.host;
+  R.ac = new AbortController(); R.sig = R.ac.signal;   // the room's own controls, all let go of together when it closes
+  if (H) { ofHosted(root, q, cv); return; }
   const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
   ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('room', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
   ren.shadowMap.enabled = Gfx.placeShadow('room', q >= 1); ren.shadowMap.type = T.PCFSoftShadowMap;
@@ -390,23 +400,35 @@ function ofOpen2(root: HTMLElement, q: number) {
   ctProgress(40, 'Hanging the pictures…', R);
   const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
   fit(); R.fit = fit; window.addEventListener('resize', fit);
+  ofControls(root, cv, scene, ren, A);
+}
+/** In the building: its renderer, scene and this room's camera; the room itself built with the building. */
+function ofHosted(root: HTMLElement, q: number, cv: HTMLCanvasElement) {
+  const R = OfficeRoom, H = R.host;
+  R.ren = H.ren; R.scene = H.scene; R.cam = H.cam('office'); R.A = H.A('office'); R.glow = H.glow('office'); R.fit = null;
+  ofControls(root, cv, R.scene, R.ren, R.A);
+}
+/** Looking, clicking, the keys, the photo, you, the visitor; then the room comes alive. */
+function ofControls(root: HTMLElement, cv: HTMLCanvasElement, scene: any, ren: any, A: any) {
+  const R = OfficeRoom, H = R.host;
   // looking: drag (or the mouse once the view has it on the PC), the arrow keys in the chair
   R.look = { yaw: 0, pitch: -0.08 }; R.seat = true; R.free = { x: 0, z: 0.98, v: 0, bob: 0 };
+  if (H && H.enterAt) { const e = H.enterAt; H.enterAt = null; R.seat = false; R.free = { x: e.x, z: e.z, v: e.v || 0, bob: 0 }; R.look = { yaw: e.yaw, pitch: e.pitch || 0 }; }
   R.phoneAfter = () => ofVisitUi();
   let drag: any = null, moved = 0, justLocked = false;
   cv.addEventListener('pointerdown', e => {
     // walking on the PC: the view takes the mouse (no pointer, turn as far as you like); a click then uses what glows
     if (!R.seat && DESKTOP && e.pointerType === 'mouse') { drag = null; if (!aimLocked(cv)) { justLocked = true; aimLock(cv); } return; }
-    drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch, pw: R.ph && R.ph.st === 'hold' ? R.ph.want.slice() : null, bw: R.bw && R.bw.st === 'hold' ? R.bw.want.slice() : null }; moved = 0; cv.setPointerCapture(e.pointerId); });
+    drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch, pw: R.ph && R.ph.st === 'hold' ? R.ph.want.slice() : null, bw: R.bw && R.bw.st === 'hold' ? R.bw.want.slice() : null }; moved = 0; cv.setPointerCapture(e.pointerId); }, { signal: R.sig });
   R.mm$ = (e: MouseEvent) => { if (R.on && !R.seat && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
   document.addEventListener('mousemove', R.mm$);
   cv.addEventListener('pointermove', e => {
     if (!drag && R.seat && !R.overlay && !R.loading) { const o = ofAimedObj(e), on = !!(o && (o.userData.act === 'laptop' || o.userData.act === 'photo' || o.userData.act === 'phone') && !(R.ph && R.ph.st !== 'idle') && !(R.pk && R.pk.st !== 'idle')); R.lapHover = on; cv.style.cursor = on ? 'pointer' : ''; if (on && R.glow) R.glow.showObj(o); }
     if (!drag) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y));
     if (drag.bw && R.bw && R.bw.st === 'hold') { R.bw.want = [clamp(drag.bw[0] + (e.clientX - drag.x) * 0.006, -1.2, 1.2), clamp(drag.bw[1] + (e.clientY - drag.y) * 0.004, -0.5, 0.6)]; return; }   // the bowl: turn and tilt it
-    if (drag.pw && R.ph && R.ph.st === 'hold') { R.ph.want = [clamp(drag.pw[0] + (e.clientX - drag.x) * 0.004, -0.5, 0.5), clamp(drag.pw[1] + (e.clientY - drag.y) * 0.003, -0.4, 0.4)]; return; }   /* holding the photo: tilt it */ R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); });
-  cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else ofClickAt(); return; } justLocked = false; if (drag && moved < 6) ofClickAt(e); drag = null; });
-  root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); });
+    if (drag.pw && R.ph && R.ph.st === 'hold') { R.ph.want = [clamp(drag.pw[0] + (e.clientX - drag.x) * 0.004, -0.5, 0.5), clamp(drag.pw[1] + (e.clientY - drag.y) * 0.003, -0.4, 0.4)]; return; }   /* holding the photo: tilt it */ R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.25, 0.9); if (R.seat) R.look.yaw = clamp(R.look.yaw, -2.6, 2.6); }, { signal: R.sig });
+  cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else ofClickAt(); return; } justLocked = false; if (drag && moved < 6) ofClickAt(e); drag = null; }, { signal: R.sig });
+  root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-of]') as HTMLElement; if (b) ofClick(b); }, { signal: R.sig });
   R.key$ = (e: KeyboardEvent) => {
     if (!R.on) return; const k = e.key.toLowerCase();
     if (R.overlay) { if (k === 'escape' && !document.querySelector('.layer')) { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay.classList.contains('lap-screen')) ofLaptopClose(); else if (R.overlay.classList.contains('ph-screen')) ofPhoneClose(); else ofPlannerClose(); } return; }   // the planner has the keys (typing)
@@ -427,7 +449,8 @@ function ofOpen2(root: HTMLElement, q: number) {
       if (Human.ready) setTimeout(go, 30); else Human.load().then(() => setTimeout(go, 30), () => ofReady());
     } else ofReady();
   };
-  const photo = () => ofFamilyPhoto(ren, tex => {
+  const photo = () => (H && A.photoDone) ? (R.me = A.me || null, R.me && R.me.g && (R.me.g.visible = true), R.ph = null, next()) : ofFamilyPhoto(ren, tex => {
+    A.photoDone = true;
     const T2 = THREE, fr = new T2.Group(); A.photoAt.add(fr);
     const bk = new T2.Mesh(new T2.BoxGeometry(0.2, 0.155, 0.012), new T2.MeshPhysicalMaterial({ color: 0xC9A04E, metalness: 1, roughness: 0.25 })); bk.position.set(0, 0.09, 0); bk.rotation.x = -0.15; fr.add(bk);
     const ph = new T2.Mesh(new T2.PlaneGeometry(0.18, 0.135), new T2.MeshStandardMaterial({ map: tex, roughness: 0.35 })); ph.position.set(0, 0.09, 0.0065); ph.rotation.x = -0.15; fr.add(ph);
@@ -437,6 +460,7 @@ function ofOpen2(root: HTMLElement, q: number) {
     try {
       const me: any = myPilot(); R.me = selfBody(scene, me && me.look ? Object.assign({}, me.look, { hat: 'none' }) : ctLook('me', 'm', 'public'), company().color);
       if (R.me) { R.me.chair = new T2.Vector3(0, 0.64, 1.14); R.me.eye0 = R.me.chair.clone().add(selfEyeOff(R.me, Math.PI, 0)); }   // sitting on the cushion, back in the chair
+      A.me = R.me;
     } catch (e) { R.me = null; }
     R.ph = null;
     next();
@@ -444,6 +468,7 @@ function ofOpen2(root: HTMLElement, q: number) {
   if (Human.ready) setTimeout(photo, 30); else Human.load().then(() => setTimeout(photo, 30), () => next());
   R.loading = true;
   R.perf = Perf.state();
+  if (H) return;   // the building draws it
   const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && (!R.overlay || R.lapZ) && !Perf.skip(R.perf)) ofFrame(); };   // the room rests while the planner is open
   R.raf = requestAnimationFrame(loop);
 }
@@ -462,6 +487,17 @@ function ofReady() {
 }
 OfficeRoom.close = function (quiet?: boolean) {
   const R = OfficeRoom; if (!R.on) return; R.on = false;
+  if (R.host) {   // in the building: only the room's own controls go; the building keeps the room
+    const H = R.host; R.host = null;
+    if (R.overlay && R.overlay.classList.contains('lap-screen')) { try { lapUnmount(); } catch (e) { /* closed */ } }
+    if (R.overlay) { try { R.overlay.remove(); } catch (e) { /* gone */ } } R.overlay = null; R.lapZ = null; document.body.classList.remove('of-over');
+    window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); document.removeEventListener('mousemove', R.mm$);
+    try { R.ac && R.ac.abort(); } catch (e) { /* none */ } try { Voice.stop(); } catch (e) { /* ignore */ }
+    if (R.vis && R.vis.pivot && R.A) { try { R.A.root.remove(R.vis.pivot); } catch (e) { /* gone */ } }
+    H.unmount('office', R.doorT ? 1 : 0); R.ren = null; R.scene = null; R.A = null; R.vis = null; R.ph = null; R.pk = null; R.glow = null; R.root = null;
+    if (!quiet) H.leaveAll();
+    return;
+  }
   if (R.overlay && R.overlay.classList.contains('lap-screen')) { try { lapUnmount(); } catch (e) { /* closed */ } }
   R.overlay = null; R.lapZ = null; document.body.classList.remove('of-over');
   cancelAnimationFrame(R.raf); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
@@ -481,7 +517,7 @@ function ofLeave() {
 function ofExitToMain(msg?: string, to?: string) {
   if (!OfficeRoom.on) return;
   exitSplash('office', 'Leaving the office', [
-    { pct: 30, step: 'Closing the office…', run: () => OfficeRoom.close(true) },
+    { pct: 30, step: 'Closing the office…', run: () => { const H = OfficeRoom.host; OfficeRoom.close(true); if (H) H.closeAll(); } },
     { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
     { pct: 85, step: to === 'hangars' ? 'Loading your hangars…' : 'Loading your airline…', run: () => { if (to) { try { roomGoTo(to); } catch (e) { refresh(); } } else refresh(); } },
   ], () => { if (msg) toast(msg, 'info'); });
@@ -692,6 +728,7 @@ function ofFrame() {
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function ofBlocked(x: number, z: number): boolean {
+  const H = OfficeRoom.host; if (H) { const d = H.pass('office', x, z); if (d) return d < 0; }   // the doorway to the corridor: open or shut
   if (x < -2.9 || x > 2.9 || z < -3.1 || z > 2.7) return true;
   const B = [[-1.3, -0.7, 1.3, 0.7], [-0.45, 0.6, 0.45, 1.4], [-0.45, -1.4, 0.45, -0.6], [-3.2, 0.1, -1.6, 2.3], [-1.4, 2.25, 1.4, 3.0], [-3.1, -3.4, -1.5, -2.85], [1.5, -3.4, 3.1, -2.85], [2.5, -3.2, 3.2, -2.5]];
   for (const r of B) if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true;
@@ -704,6 +741,7 @@ function ofWalk(dt: number, now?: number) {
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
   let mx = fx * f + rx * r, mz = fz * f + rz * r; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!ofBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!ofBlocked(nx, F.z)) F.x = nx; else if (!ofBlocked(F.x, nz)) F.z = nz; F.bob += step; }
+  if (R.host && R.host.out('office', F.x, F.z, R.look, F.v)) return;   // through the door: the corridor takes over
   Sound.steps(F, F.bob, Math.abs(F.x) < 1.8 && Math.abs(F.z) < 1.5 ? 'carpet' : 'wood', F.v);   // the rug, or the parquet around it
   const bobY = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
   R.cam.position.set(F.x, 1.64 + bobY, F.z);
@@ -713,7 +751,7 @@ function ofWalk(dt: number, now?: number) {
   // what's in front of you: the chair (sit) or the door (leave)
   const aim = R.root.querySelector('.of-aim') as HTMLElement, obj = ofAimedObj(), hint = obj ? obj.userData.act : '';
   if (R.glow) { if (obj) R.glow.showObj(obj); else R.glow.hide(); }   // what you can use glows softly
-  if (aim) { aim.hidden = false; aim.textContent = hint === 'sit' ? 'Click to sit in your chair' : hint === 'door' ? 'Click the door to leave the office' : '·'; aim.classList.toggle('on', !!hint); }
+  if (aim) { aim.hidden = false; aim.textContent = hint === 'sit' ? 'Click to sit in your chair' : hint === 'door' ? (R.host ? (R.doorT ? 'Click to shut the door' : 'Click to open the door to the corridor') : 'Click the door to leave the office') : '·'; aim.classList.toggle('on', !!hint); }
 }
 function ofAimed(e?: PointerEvent): string { const o = ofAimedObj(e); return o ? o.userData.act : ''; }
 /** What you can use at the mouse (or, walking, at the dot in the middle), within reach. */
@@ -740,6 +778,7 @@ function ofClickAt(e?: PointerEvent) {
   if (a === 'bowl-water') { if (!petRefill(R.A, 'water')) toast('The water bowl is full', 'info'); return; }
   if (a === 'bowl-food') { ofBowlPick(); return; }
   if (R.seat) return;
+  if (a === 'door' && R.host) { R.doorT = R.doorT ? 0 : 1; Sound.tick(); return; }   // in the building: the door opens and shuts
   if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); roomExitMenu(R.root, 'office', to => { R.doorT = 1; setTimeout(() => ofExitToMain('', to), 650); }); }
 }
 function ofSit() { aimUnlock(); const R = OfficeRoom; R.seat = true; R.look = { yaw: 0, pitch: -0.08 }; const aim = R.root.querySelector('.of-aim') as HTMLElement; if (aim) aim.hidden = true; ofVisitUi(); Sound.tick(); }

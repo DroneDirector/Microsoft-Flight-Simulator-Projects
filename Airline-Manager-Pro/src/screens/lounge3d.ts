@@ -107,19 +107,23 @@ const LG_EMBLEM = `<svg class="ctl-scales lg-emb" viewBox="0 0 200 200" aria-hid
   <path d="M52 112 L52 136 L148 136 L148 112" fill="none" stroke="url(#lgG)" stroke-width="5"/><path class="lg-steam" d="M96 58 q-6 -8 0 -16 q6 -8 0 -16 M108 58 q-6 -8 0 -16 q6 -8 0 -16" stroke="url(#lgG)" stroke-width="3" fill="none" opacity=".8"/>
   <text x="100" y="168" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="15" fill="url(#lgG)" letter-spacing="5">LOUNGE</text></svg>`;
 
-LoungeRoom.open = function (k: string) {
+LoungeRoom.open = function (k: string, host?: any) {
   const R = LoungeRoom; if (R.on) return;
+  if (!host && trJoined() && k === company().hub && lgList().some(l => l.k === k)) { if (TestRooms.on && TestRooms.game) trEnter('lounge', null); else TestRooms.open({ game: true, room: 'lounge' }); return; }   // your hub's lounge: in the joined building
+  R.host = host || null;
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
   const it = lgList().filter(l => l.k === k)[0] || lgList()[0]; if (!it) { toast('Build a lounge first (Lounges)', 'info'); return; }
-  for (const X of [typeof OfficeRoom !== 'undefined' ? OfficeRoom : null, typeof OpsRoom !== 'undefined' ? OpsRoom : null, typeof HangarRoom !== 'undefined' ? HangarRoom : null]) { try { if (X && X.on) X.close(true); } catch (e) { /* none */ } }
+  if (!host) for (const X of [typeof OfficeRoom !== 'undefined' ? OfficeRoom : null, typeof OpsRoom !== 'undefined' ? OpsRoom : null, typeof HangarRoom !== 'undefined' ? HangarRoom : null]) { try { if (X && X.on) X.close(true); } catch (e) { /* none */ } }
   R.on = true; R.loading = true; R.k = it.k; R.lvl = it.lvl; R.spec = LG_SPECS[it.lvl]; R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now(); R.overlay = null;
   const q = Gfx.placeQ('lounge'), co: any = company(), A: any = apt(it.k);
-  const root = document.createElement('div'); root.className = 'court3d office3d ops3d hg3d lg3d'; R.root = root;
-  root.innerHTML = `<canvas></canvas>
+  const root = host ? host.root : document.createElement('div'); if (!host) root.className = 'court3d office3d ops3d hg3d lg3d'; R.root = root;
+  const ui = `${host ? '' : '<canvas></canvas>'}
     <div class="ct-top"><div><small>${esc(co.name)} · ${esc(it.k)}${A ? ' · ' + esc(A.city || A.name) : ''}</small><b>${esc(R.spec.name)}</b></div></div>
     <button class="ct-leave" data-op="leave">${icon('close')}<span>Leave the lounge</span><kbd>Esc</kbd></button>
     <div class="ct-spots of-spots op-spots hg-spots" hidden></div><div class="of-aim op-aim" hidden></div><div class="walk-pad ct-pad op-pad" hidden><i></i></div><div class="of-aim op-dot" hidden>+</div><div class="hg-fade"></div>
-    ${ctLoaderHtml(R.spec.name, 'Opening the doors…', LG_EMBLEM)}`;
+    ${host ? '' : ctLoaderHtml(R.spec.name, 'Opening the doors…', LG_EMBLEM)}`;
+  if (host) { host.mount('lounge', ui); lgOpen2(root, q); return; }   // in the building: built already, straight in
+  root.innerHTML = ui;
   document.body.appendChild(root);
   setTimeout(() => { if (R.on && R.root === root) lgOpen2(root, q); }, 80);
 };
@@ -483,33 +487,45 @@ function lgGuestAt(): any {
 
 /* ---------- the loop ---------- */
 function lgOpen2(root: HTMLElement, q: number) {
-  const R = LoungeRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement; R.q = q;
-  const ren = new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
-  ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('lounge', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
-  ren.shadowMap.enabled = Gfx.placeShadow('lounge', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap;
-  const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
-  const cam = new T.PerspectiveCamera(62, 1, 0.06, 200); R.cam = cam;
-  const S = hgSun(R.k); R.hemi = new T.HemisphereLight(0xFFF4E6, 0x40362E, 0.55 + 0.35 * S.k); scene.add(R.hemi);
+  const R = LoungeRoom, T = THREE, cv = root.querySelector('canvas') as HTMLCanvasElement, H = R.host; R.q = q;
+  R.ac = new AbortController(); R.sig = R.ac.signal;   // the room's own controls, all let go of together when it closes
+  const ren = H ? H.ren : new T.WebGLRenderer({ canvas: cv, antialias: q >= 1, powerPreference: 'high-performance' }); R.ren = ren;
+  if (!H) { ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('lounge', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
+    ren.shadowMap.enabled = Gfx.placeShadow('lounge', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap; }
+  const scene = H ? H.scene : new T.Scene(); R.scene = scene; if (!H) scene.background = new T.Color(0x0B121B);
+  const cam = H ? H.cam('lounge') : new T.PerspectiveCamera(62, 1, 0.06, 200); R.cam = cam;
+  const S = hgSun(R.k); if (!H) { R.hemi = new T.HemisphereLight(0xFFF4E6, 0x40362E, 0.55 + 0.35 * S.k); scene.add(R.hemi); }
   ctProgress(15, 'Laying the carpet…', R);
   setTimeout(() => {
     if (!R.on) return;
-    try { const pm = new T.PMREMGenerator(ren), env = new T.Scene(); env.add(new T.Mesh(new T.BoxGeometry(10, 5, 10), new T.MeshBasicMaterial({ color: 0x6A5E52, side: T.BackSide }))); const l = new T.Mesh(new T.PlaneGeometry(6, 1), new T.MeshBasicMaterial({ color: 0xFFFFFF })); l.position.set(0, 2.4, -4); env.add(l); scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose(); } catch (e) { /* no reflections */ }
+    if (!H) try { const pm = new T.PMREMGenerator(ren), env = new T.Scene(); env.add(new T.Mesh(new T.BoxGeometry(10, 5, 10), new T.MeshBasicMaterial({ color: 0x6A5E52, side: T.BackSide }))); const l = new T.Mesh(new T.PlaneGeometry(6, 1), new T.MeshBasicMaterial({ color: 0xFFFFFF })); l.position.set(0, 2.4, -4); env.add(l); scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose(); } catch (e) { /* no reflections */ }
     ctProgress(35, 'Setting out the cups…', R);
-    let A: any = null; try { A = lgBuild(scene, q); } catch (e) { console.error(e); }
+    let A: any = null; try { A = H ? H.A('lounge') : lgBuild(scene, q); } catch (e) { console.error(e); }
     if (!A) { toast('The lounge could not be built on this device', 'warn'); LoungeRoom.close(); return; }
-    R.A = A; R.glow = new AimGlow(scene);
-    // daylight through the windows, warm lamps inside
+    R.A = A; R.glow = H ? H.glow('lounge') : new AimGlow(scene);
+    if (!H) lgLights(scene, q);
+    ctProgress(60, 'The guests are arriving…', R);
+    if (!H || !A.guestsDone) { A.guestsDone = true; try { lgGuests(); } catch (e) { R.guests = []; } try { lgSeatHits(); lgSurfHits(); } catch (e) { /* no seats to click */ } A.guests = R.guests; }
+    else R.guests = A.guests || [];
+    const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
+    if (!H) { fit(); R.fit = fit; window.addEventListener('resize', fit); } else R.fit = null;
+    R.free = { x: A.door.x - 0.2, z: A.door.z - 0.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.04 }; R.sit = null; R.cups = A.cups || (A.cups = []);
+    if (H && H.enterAt) { const e = H.enterAt; H.enterAt = null; R.free = { x: e.x, z: e.z, v: e.v || 0, bob: 0 }; R.look = { yaw: e.yaw, pitch: e.pitch || 0 }; }
+    lgInput(root, cv);
+    lgStart(root, ren, scene, cam);
+  }, H ? 0 : 30);
+}
+/** Daylight through the windows and warm lamps inside (in the building, built with the lounge). */
+function lgLights(scene: any, q: number) {
+  const R = LoungeRoom, T = THREE, S = hgSun(R.k);
     const sp: LgSpec = R.spec, sunK = S.k;
     const win = new T.DirectionalLight(0xEAF2FF, 1.2 * sunK + 0.1); win.position.set(0, sp.H * 1.5, -sp.D * 1.5); win.target.position.set(0, 0, 0); if (q >= 2) { win.castShadow = true; win.shadow.mapSize.set(DESKTOP ? 2048 : 1024, DESKTOP ? 2048 : 1024); const c = win.shadow.camera; c.left = -sp.W / 2; c.right = sp.W / 2; c.top = sp.D; c.bottom = -sp.D; } scene.add(win); scene.add(win.target);
     const nL = DESKTOP ? 6 : q >= 2 ? 4 : 2;
     for (let i = 0; i < nL; i++) { const L = new T.PointLight(0xFFE6C4, (R.lvl === 2 ? 9 : 7) * (1.2 - 0.5 * sunK), 12, 1.6); L.position.set(-sp.W * 0.35 + (i % 3) * sp.W * 0.35, sp.H - 0.4, -sp.D * 0.2 + Math.floor(i / 3) * sp.D * 0.45); scene.add(L); }
-    ctProgress(60, 'The guests are arriving…', R);
-    try { lgGuests(); } catch (e) { R.guests = []; }
-    try { lgSeatHits(); lgSurfHits(); } catch (e) { /* no seats to click */ }
-    const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
-    fit(); R.fit = fit; window.addEventListener('resize', fit);
-    R.free = { x: A.door.x - 0.2, z: A.door.z - 0.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.04 }; R.sit = null; R.cups = [];
-    lgInput(root, cv);
+}
+/** The room comes alive: compiled, shown, drawn every frame (in the building, the building draws it). */
+function lgStart(root: HTMLElement, ren: any, scene: any, cam: any) {
+  const R = LoungeRoom, H = R.host;
     ctProgress(85, 'Opening the doors…', R);
     setTimeout(() => {
       if (!R.on) return;
@@ -520,29 +536,29 @@ function lgOpen2(root: HTMLElement, q: number) {
     }, 40);
     R.iv = setInterval(() => { if (R.on && !document.hidden && R.A) { lgDepartures(R.A.depCv, R.k); R.A.depTex.needsUpdate = true; } }, 30000);
     R.perf = Perf.state();
+    if (H) return;   // the building draws it
     const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !Perf.skip(R.perf)) lgFrame(); };
     R.raf = requestAnimationFrame(loop);
-  }, 30);
 }
 function lgInput(root: HTMLElement, cv: HTMLCanvasElement) {
   const R = LoungeRoom; let drag: any = null, moved = 0, justLocked = false;
-  cv.addEventListener('pointerdown', e => { if (DESKTOP && e.pointerType === 'mouse') { drag = null; if (!aimLocked(cv)) { justLocked = true; aimLock(cv); } return; } drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* none */ } });
+  cv.addEventListener('pointerdown', e => { if (DESKTOP && e.pointerType === 'mouse') { drag = null; if (!aimLocked(cv)) { justLocked = true; aimLock(cv); } return; } drag = { x: e.clientX, y: e.clientY, yaw: R.look.yaw, pitch: R.look.pitch }; moved = 0; try { cv.setPointerCapture(e.pointerId); } catch (x) { /* none */ } }, { signal: R.sig });
   R.mm$ = (e: MouseEvent) => { if (R.on && aimLocked(cv)) aimTurn(R.look, e, -1.2, 1.0); }; document.addEventListener('mousemove', R.mm$);
-  cv.addEventListener('pointermove', e => { if (drag) { moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.2, 1.0); } });
-  cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else lgClickAt(); return; } justLocked = false; if (drag && moved < 6) lgClickAt(e); drag = null; });
+  cv.addEventListener('pointermove', e => { if (drag) { moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.003, -1.2, 1.0); } }, { signal: R.sig });
+  cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else lgClickAt(); return; } justLocked = false; if (drag && moved < 6) lgClickAt(e); drag = null; }, { signal: R.sig });
   { const pad = root.querySelector('.op-pad') as HTMLElement, knob = pad && pad.firstElementChild as HTMLElement; let id = -1;
     if (pad) { const mv = (e: PointerEvent) => { const r = pad.getBoundingClientRect(), Rr = r.width / 2; let dx = (e.clientX - r.left - Rr) / Rr, dy = (e.clientY - r.top - Rr) / Rr; const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; } R.stick = [dx, -dy]; knob.style.transform = `translate(${dx * Rr * 0.55}px, ${dy * Rr * 0.55}px)`; };
       pad.addEventListener('pointerdown', e => { e.stopPropagation(); id = e.pointerId; pad.setPointerCapture(id); mv(e); }); pad.addEventListener('pointermove', e => { if (e.pointerId === id) mv(e); });
       const up = (e: PointerEvent) => { if (e.pointerId !== id) return; id = -1; R.stick = [0, 0]; knob.style.transform = ''; }; pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up); } }
   root.addEventListener('click', ev => { const b = (ev.target as HTMLElement).closest('[data-op]') as HTMLElement; if (!b) return; ev.stopPropagation(); const k = b.getAttribute('data-op');
-    if (k === 'leave') lgLeave(); else if (k === 'goto') lgGoto(b.getAttribute('data-k')); });
+    if (k === 'leave') lgLeave(); else if (k === 'goto') lgGoto(b.getAttribute('data-k')); }, { signal: R.sig });
   R.key$ = (e: KeyboardEvent) => { if (!R.on) return; const k = e.key.toLowerCase();
     if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (aimLocked()) { aimUnlock(); return; } if (aimEscUsed()) return; lgLeave(); return; }
     if (/^arrow\w+$/.test(k) || /^(w|a|s|d|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); } };
   R.ku$ = (e: KeyboardEvent) => { if (R.on) R.keys[e.key.toLowerCase()] = false; };
   window.addEventListener('keydown', R.key$, true); window.addEventListener('keyup', R.ku$, true);
 }
-function lgBlocked(x: number, z: number): boolean { const R = LoungeRoom, sp: LgSpec = R.spec, r = 0.25; if (x < -sp.W / 2 + 0.4 || x > sp.W / 2 - 0.4 || z < -sp.D / 2 + 0.45 || z > sp.D / 2 - 0.4) return true; for (const b of R.A.blocks) if (x > b[0] - r && x < b[2] + r && z > b[1] - r && z < b[3] + r) return true; return false; }
+function lgBlocked(x: number, z: number): boolean { const R = LoungeRoom, sp: LgSpec = R.spec, r = 0.25; if (R.host) { const d = R.host.pass('lounge', x, z); if (d) return d < 0; } if (x < -sp.W / 2 + 0.4 || x > sp.W / 2 - 0.4 || z < -sp.D / 2 + 0.45 || z > sp.D / 2 - 0.4) return true; for (const b of R.A.blocks) if (x > b[0] - r && x < b[2] + r && z > b[1] - r && z < b[3] + r) return true; return false; }
 function lgFrame() {
   const R = LoungeRoom, T = THREE, now = performance.now() / 1000, dt = Math.min(0.05, now - (R.last || now)); R.last = now;
   const K = R.keys || {}, F = R.free;
@@ -555,6 +571,7 @@ function lgFrame() {
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
   let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!lgBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!lgBlocked(nx, F.z)) F.x = nx; else if (!lgBlocked(F.x, nz)) F.z = nz; F.bob += step; }
+  if (R.host && R.host.out('lounge', F.x, F.z, R.look, F.v)) return;   // out through the doors: the concourse takes over
   try { Sound.steps(F, F.bob, 'carpet', F.v); } catch (e) { /* quiet */ }
   const bobY = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
   R.cam.position.set(F.x, 1.64 + bobY, F.z);
@@ -601,6 +618,7 @@ function lgAimedObj(e?: PointerEvent): any {
 }
 function lgClickAt(e?: PointerEvent) {
   const R = LoungeRoom; if (R.loading) return; const o = lgAimedObj(e), a = o ? o.userData.act : '';
+  if (a === 'door' && R.host) { if (R.sit) lgStand(); lgDoorsTo(R.A.doorTo ? 0 : 1); Sound.tick(); return; }   // in the building: the doors open and shut
   if (a === 'door') { if (R.sit) lgStand(); lgDoorsTo(1); setTimeout(() => { if (R.on) roomExitMenu(R.root, 'lounges', to => lgLeave(to), () => lgDoorsTo(0)); }, 450); return; }
   if (a === 'coffee') { if (R.sit) lgStand(); lgPour(); return; }
   if (a === 'cup') { lgPickCup(o); return; }
@@ -729,6 +747,15 @@ function lgGoto(where: string) {
 /* ---------- leaving ---------- */
 LoungeRoom.close = function (quiet?: boolean) {
   const R = LoungeRoom; if (!R.on) return; R.on = false;
+  if (R.host) {   // in the building: only the room's own controls go; the building keeps the room (and its guests)
+    const H = R.host; R.host = null;
+    clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); document.removeEventListener('mousemove', R.mm$);
+    try { R.ac && R.ac.abort(); } catch (e) { /* none */ }
+    if (R.sit) { try { lgStand(); } catch (e) { /* up */ } }
+    H.unmount('lounge', R.A && R.A.doorTo ? 1 : 0); R.ren = null; R.scene = null; R.A = null; R.glow = null; R.root = null;
+    if (!quiet) H.leaveAll();
+    return;
+  }
   cancelAnimationFrame(R.raf); clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
   document.removeEventListener('mousemove', R.mm$); aimUnlock();
   try { FrameGen.dispose(R.perf); } catch (e) { /* none */ }
@@ -739,7 +766,7 @@ LoungeRoom.close = function (quiet?: boolean) {
 function lgLeave(to?: string) {
   if (!LoungeRoom.on || ExitSplash.on) return;
   exitSplash('lounge', 'Leaving the ' + (LoungeRoom.spec ? LoungeRoom.spec.name.toLowerCase() : 'lounge'), [
-    { pct: 30, step: 'Closing the lounge…', run: () => LoungeRoom.close(true) },
+    { pct: 30, step: 'Closing the lounge…', run: () => { const H = LoungeRoom.host; LoungeRoom.close(true); if (H) H.closeAll(); } },
     { pct: 55, step: 'Clearing the room from memory…', run: exitFreeMemory },
     { pct: 85, step: to && to !== 'lounges' ? 'On your way…' : 'Loading your lounges…', run: () => { try { roomGoTo(to || 'lounges'); } catch (e) { refresh(); } } },
   ]);

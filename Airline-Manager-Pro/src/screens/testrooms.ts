@@ -27,16 +27,18 @@ const TR_L = {
 
 TestRooms.open = function (opts?: any) {
   const R = TestRooms; if (R.on) return; R.stressMode = !!(opts && opts.stress);
+  R.game = !!(opts && opts.game); R.gameRoom = opts && opts.room || 'office'; R.gameInc = opts && opts.inc || null; R.in = 'halls';
   if (typeof company !== 'function' || !company()) { toast('Start or load a game first: the rooms are your own', 'info'); return; }
   const q = Gfx.roomQ();
   R.on = true; R.q = q; R.pct = 0; R.keys = {}; R.stick = [0, 0]; R.loading = true; R.loadT0 = performance.now(); R.overlay = null;
   const root = document.createElement('div'); root.className = 'court3d office3d tr3d'; R.root = root;
-  root.innerHTML = `<canvas></canvas>
-    <div class="ct-top"><div><small>${opts && opts.stress ? 'Graphics' : 'Testing'}</small><b>${opts && opts.stress ? 'Stress test' : 'Office · Operations · Lounge'}</b></div></div>
-    <button class="ct-leave" data-tr="exit">${icon('close')}<span>${opts && opts.stress ? 'Stop the test' : 'Exit testing'}</span><kbd>Esc</kbd></button>
+  root.innerHTML = `<canvas></canvas><div class="tr-halls-ui">
+    <div class="ct-top tr-top"><div><small>${R.game ? esc(company().name) : opts && opts.stress ? 'Graphics' : 'Testing'}</small><b>${R.game ? 'Staff corridor and concourse' : opts && opts.stress ? 'Stress test' : 'Office · Operations · Lounge'}</b></div></div>
+    <button class="ct-leave tr-leave" data-tr="exit">${icon('close')}<span>${R.game ? 'Leave' : opts && opts.stress ? 'Stop the test' : 'Exit testing'}</span><kbd>Esc</kbd></button>
     <div class="ct-spots tr-go"><button data-tr="go" data-k="office">Your office</button><button data-tr="go" data-k="corridor">Corridor</button><button data-tr="go" data-k="ops">Operations</button><button data-tr="go" data-k="concourse">Concourse</button><button data-tr="go" data-k="lounge">Lounge</button><button data-tr="visitor">A visitor</button></div>
-    <div class="walk-pad ct-pad op-pad"><i></i></div><div class="of-aim op-dot" hidden>+</div><div class="tr-hint" hidden></div>
-    ${ctLoaderHtml('Test rooms', 'Joining the rooms…', '')}`;
+    <div class="walk-pad ct-pad op-pad"><i></i></div><div class="of-aim op-dot" hidden>+</div><div class="tr-hint" hidden></div></div>
+    ${R.game ? ctLoaderHtml(R.gameRoom === 'ops' ? 'Operations' : R.gameRoom === 'lounge' ? 'Your lounge' : 'Your office', 'Unlocking the doors…', R.gameRoom === 'ops' ? OPS_EMBLEM : R.gameRoom === 'lounge' ? LG_EMBLEM : OF_WINGS) : ctLoaderHtml('Test rooms', 'Joining the rooms…', '')}`;
+  if (R.game) root.classList.add('tr-game');
   document.body.appendChild(root);
   setTimeout(() => { if (R.on && R.root === root) trOpen2(root, q); }, 60);
 };
@@ -56,7 +58,7 @@ function trOpen2(root: HTMLElement, q: number) {
     [60, 'The lounge…', () => trLounge(scene, q)],
     [80, 'The corridor and the concourse…', () => trHalls(scene, q)],
   ];
-  R.hits = []; R.doors = []; R.walk = [];
+  R.hits = []; R.doors = []; R.walk = []; R.walkOf = {};
   let i = 0;
   const next = () => {
     if (!R.on) return;
@@ -64,8 +66,9 @@ function trOpen2(root: HTMLElement, q: number) {
     const [pct, txt, f] = steps[i++]; ctProgress(pct, txt, R);
     setTimeout(() => { try { f(); } catch (e) { console.error(e); try { ErrorLog.add('testing', 'Test rooms: a part could not be built', (e && (e as any).message) || String(e), txt); } catch (x) { /* no log */ } } next(); }, 30);
   };
-  const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
+  const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); for (const c of [cam, R.of && R.of.cam, R.ops && R.ops.cam, R.lg && R.lg.cam]) if (c) { c.aspect = w / Math.max(1, h); c.updateProjectionMatrix(); } };
   fit(); R.fit = fit; window.addEventListener('resize', fit);
+  if (R.game) R.host = trHost(root, cv);
   trInput(root, cv);
   next();
 }
@@ -114,18 +117,20 @@ function trCut(root: any, a: number[], b: number[], top: number, keep: any[] = [
 function trOffice(scene: any, q: number) {
   const R = TestRooms;
   const A = trCopy(scene, s => { const A2 = ofBuild(s, q); trCut(A2.root, [-3.2, -3.1], [-3.2, -2.1], 2.2); return A2; }, 0, 0, 0);
+  A.cam = new THREE.PerspectiveCamera(58, 1, 0.03, 300); A.group.add(A.cam);
   R.of = A; R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'office'; return h; }));
   // its door: hinged, swinging into the room
   R.doors.push({ k: 'office', name: 'your office', k0: 0, to: 0, set: (e: number) => { if (A.doorLeaf) A.doorLeaf.rotation.y = -1.5 * e; },
     pass: [-3.55, -3.0, -2.75, -2.2] });   // where you walk through when it is open [x0, z0, x1, z1]
   // the visitor's chair and the route in, as in the office
   R.ofWalk = (x: number, z: number) => x > -3.2 && x < 3.2 && z > -3.4 && z < 3.0 && !ofBlocked(x, z);
-  R.walk.push((x: number, z: number) => R.ofWalk(x, z));
+  R.walk.push(R.walkOf.office = (x: number, z: number) => R.ofWalk(x, z));
 }
 function trOps(scene: any, q: number, ren: any) {
   const R = TestRooms, L = TR_L.ops, ren0 = OpsRoom.ren; OpsRoom.ren = ren;
   let A: any;
   try { A = trCopy(scene, s => { const A2 = opsBuild(s, q); trCut(A2.root, [1.75 - 0.5, 2.5], [1.75 + 0.5, 2.5], 2.15); return A2; }, L.x, L.z, L.ry); } finally { OpsRoom.ren = ren0; }
+  A.cam = new THREE.PerspectiveCamera(56, 1, 0.03, 300); A.group.add(A.cam);
   R.ops = A; R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'ops'; return h; }));
   try { opsMonitorDraw(A); } catch (e) { /* the screen stays dark */ }
   R.doors.push({ k: 'ops', name: 'the Operations office', k0: 0, to: 0, set: (e: number) => { if (A.door) A.door.rotation.y = e * 1.35; },
@@ -133,23 +138,26 @@ function trOps(scene: any, q: number, ren: any) {
   // walking inside it: its own floor plan, turned into the building's
   const g = A.group, inv = new THREE.Matrix4();
   R.opsLocal = (x: number, z: number) => { inv.copy(g.matrixWorld).invert(); const v = new THREE.Vector3(x, 0, z).applyMatrix4(inv); return [v.x, v.z]; };
-  R.walk.push((x: number, z: number) => { const [lx, lz] = R.opsLocal(x, z); return lx > -2.8 && lx < 2.8 && lz > -2.9 && lz < 2.5 && !opsBlocked(lx, lz); });
+  R.walk.push(R.walkOf.ops = (x: number, z: number) => { const [lx, lz] = R.opsLocal(x, z); return lx > -2.8 && lx < 2.8 && lz > -2.9 && lz < 2.5 && !opsBlocked(lx, lz); });
 }
 function trLounge(scene: any, q: number) {
   const R = TestRooms, LR = LoungeRoom, k = company().hub, L = loyalty(), have = L && L.lounges && L.lounges[k];
+  if (R.game && !have) { R.lg = null; return; }   // no lounge at your hub yet: the concourse ends in a wall
   const lv = have ? clamp(have.lvl || 0, 0, 2) : 1, sp = LG_SPECS[lv];
   const keep = { spec: LR.spec, lvl: LR.lvl, k: LR.k, linked: LR.linked };
   LR.spec = sp; LR.lvl = lv; LR.k = k; LR.linked = true;
   const ox = TR_L.con[2] + sp.D / 2, oz = TR_L.lgDoorZ - (sp.W / 2 - 6.3);
   let A: any;
-  try { A = trCopy(scene, s => lgBuild(s, q), ox, oz, -Math.PI / 2); } finally { Object.assign(LR, keep); }
+  try { A = trCopy(scene, s => { const A2 = lgBuild(s, q); try { lgLights(s, q); } catch (e) { /* the building's light */ } return A2; }, ox, oz, -Math.PI / 2); } finally { Object.assign(LR, keep); }
+  R.lgKey = k;
+  A.cam = new THREE.PerspectiveCamera(62, 1, 0.06, 300); A.group.add(A.cam);
   R.lg = A; R.lgSpec = sp; R.lgLv = lv;
   R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'lounge'; return h; }));
   R.doors.push({ k: 'lounge', name: 'the lounge', k0: 0, to: 0, slide: true, set: (e: number) => { for (const Lf of A.doorLeaves || []) Lf.position.x = Lf.userData.x0 + (Lf.userData.x1 - Lf.userData.x0) * e; },
     pass: [TR_L.con[2] - 0.6, TR_L.lgDoorZ - 0.7, TR_L.con[2] + 0.6, TR_L.lgDoorZ + 0.7] });
   const g = A.group, inv = new THREE.Matrix4();
   R.lgLocal = (x: number, z: number) => { inv.copy(g.matrixWorld).invert(); const v = new THREE.Vector3(x, 0, z).applyMatrix4(inv); return [v.x, v.z]; };
-  R.walk.push((x: number, z: number) => {
+  R.walk.push(R.walkOf.lounge = (x: number, z: number) => {
     const [lx, lz] = R.lgLocal(x, z), r = 0.25; if (lx < -sp.W / 2 + 0.45 || lx > sp.W / 2 - 0.45 || lz < -sp.D / 2 + 0.5 || lz > sp.D / 2 - 0.4) return false;
     for (const b of A.blocks) if (lx > b[0] - r && lx < b[2] + r && lz > b[1] - r && lz < b[3] + r) return false;
     return true; });
@@ -214,7 +222,7 @@ function trHalls(scene: any, q: number) {
     quad(K[2] - K[0], K[3] - K[1], M({ map: slat, roughness: 0.8 }), (K[0] + K[2]) / 2, HC, (K[1] + K[3]) / 2, 0, Math.PI / 2); }
   wallX(K[0], K[2], K[1], 1, HC, [[TR_L.staffDoor[0], TR_L.staffDoor[1], 2.2]]);
   wallZ(K[1], K[3], K[0], 1, HC, []);
-  wallZ(K[1], K[3], K[2] - 0.02, -1, HC, [[TR_L.lgDoorZ - LG_DOOR_W / 2, TR_L.lgDoorZ + LG_DOOR_W / 2, LG_DOOR_H]]);
+  wallZ(K[1], K[3], K[2] - 0.02, -1, HC, R.lg ? [[TR_L.lgDoorZ - LG_DOOR_W / 2, TR_L.lgDoorZ + LG_DOOR_W / 2, LG_DOOR_H]] : []);
   // the glass wall: mullions, a sill, and the apron beyond it
   { const view = new T.Mesh(new T.PlaneGeometry(90, 26), new T.MeshBasicMaterial({ map: ctTex(ofView()), toneMapped: false })); view.position.set((K[0] + K[2]) / 2, 9, K[3] + 26); view.rotation.y = Math.PI; g.add(view);
     const gl = new T.Mesh(new T.PlaneGeometry(K[2] - K[0], HC), new T.MeshPhysicalMaterial({ color: 0xD6E8F5, roughness: 0.03, transparent: true, opacity: 0.12, depthWrite: false })); gl.position.set((K[0] + K[2]) / 2, HC / 2, K[3]); gl.renderOrder = 3; g.add(gl);
@@ -250,7 +258,7 @@ function trHalls(scene: any, q: number) {
   way(4, 12, Math.PI / 2, 7, 'Lounge  →   Gates 21–23');
   way(22, 12, -Math.PI / 2, 5.5, '←  Offices · Staff');
   // the lounge's entrance seen from the concourse: its name over the doors, its sign beside them
-  { const [c, cx] = ctCanvas(1400, 260); cx.fillStyle = '#E6C98E'; cx.font = '600 120px Georgia, serif'; cx.textAlign = 'center'; cx.fillText(String(company().name || 'Lounge'), 700, 120); cx.font = '500 64px Inter, Arial, sans-serif'; cx.fillStyle = '#F2EADB'; cx.fillText(R.lgSpec ? R.lgSpec.name.toUpperCase().split('').join(' ') : 'L O U N G E', 700, 215);
+  if (R.lg) { const [c, cx] = ctCanvas(1400, 260); cx.fillStyle = '#E6C98E'; cx.font = '600 120px Georgia, serif'; cx.textAlign = 'center'; cx.fillText(String(company().name || 'Lounge'), 700, 120); cx.font = '500 64px Inter, Arial, sans-serif'; cx.fillStyle = '#F2EADB'; cx.fillText(R.lgSpec ? R.lgSpec.name.toUpperCase().split('').join(' ') : 'L O U N G E', 700, 215);
     quad(5.6, 1.4, M({ color: 0x2A2C30, roughness: 0.6 }), K[2] - 0.04, LG_DOOR_H + 0.75, TR_L.lgDoorZ, -Math.PI / 2);
     const n = new T.Mesh(new T.PlaneGeometry(4.4, 0.82), new T.MeshBasicMaterial({ map: ctTex(c), transparent: true, toneMapped: false })); n.position.set(K[2] - 0.06, LG_DOOR_H + 0.75, TR_L.lgDoorZ); n.rotation.y = -Math.PI / 2; g.add(n);
     Props.place(g, 'room-sign', K[2] - 0.04, TR_L.lgDoorZ + LG_DOOR_W / 2 + 0.45, -Math.PI / 2, q, { name: 'Lounge', sub: R.lgSpec ? R.lgSpec.name : 'Members', num: 'L', pict: 'lounge', staff: false }, 1.25); }
@@ -277,12 +285,15 @@ function trReady() {
   const loop = () => { if (!R.on) return; R.raf = requestAnimationFrame(loop); if (!R.loading && !R.overlay && (R.stress || !Perf.skip(R.perf))) trFrame(); };   // the stress test measures every frame, uncapped
   R.raf = requestAnimationFrame(loop);
   R.iv = setInterval(() => { if (R.on && !document.hidden && R.ops) { try { opsMonitorDraw(R.ops); } catch (e) { /* next time */ } } }, 5000);
+  try { R.fit(); } catch (e) { /* later */ }
   if (R.stressMode) setTimeout(() => { if (R.on) gfxStressStart(); }, 900);
+  else if (R.game) trEnter(R.gameRoom, null, R.gameInc);   // straight into your chair (or the lounge)
   else setTimeout(() => { if (R.on) trVisitor(); }, 6000);
 }
 function trFrame() {
   const R = TestRooms, T = THREE, now = (performance.now() - R.t0) / 1000, raw = Math.max(0, now - (R.last || now)), dt = Math.min(0.05, raw); R.last = now;
   if (R.stress) { try { petStep(R.of, now, dt); } catch (e) { /* no pet */ } for (const D of R.doors) D.set(D.k0); gfxStressFrame(raw); if (R.stress) R.ren.render(R.scene, R.cam); return; }
+  if (R.in && R.in !== 'halls') { trRoomFrame(dt); return; }
   try { if (R.of) petStep(R.of, now, dt); } catch (e) { /* no pet */ }
   for (const D of R.doors) if (D.k0 !== D.to) { D.k0 += Math.sign(D.to - D.k0) * Math.min(Math.abs(D.to - D.k0), dt * (D.slide ? 1.6 : 1.4)); const e = D.k0 * D.k0 * (3 - 2 * D.k0); D.set(e); }
   try { trVisStep(dt, now); } catch (e) { R.vis = null; }
@@ -308,6 +319,8 @@ function trWalk(dt: number) {
     const step = F.v * dt, nx = F.x + fx * step, nz = F.z + fz * step;
     if (trFree(nx, nz)) { F.x = nx; F.z = nz; } else if (trFree(nx, F.z)) F.x = nx; else if (trFree(F.x, nz)) F.z = nz;
     F.bob += step;
+    if (R.game) { for (const k of ['office', 'ops', 'lounge']) { const fn = R.walkOf && R.walkOf[k]; if (fn && fn(F.x, F.z)) { trEnter(k, { x: F.x, z: F.z, yaw: R.look.yaw, pitch: R.look.pitch, v: F.v }); return; } } }
+    try { Sound.steps(F, F.bob, F.z > TR_L.con[1] ? 'tile' : 'carpet', F.v); } catch (e) { /* quiet */ }
   }
   const bob = Math.sin(F.bob / 0.65 * Math.PI) * 0.016 * Math.min(1, F.v / 1.1);
   R.cam.position.set(F.x, 1.64 + bob, F.z);
@@ -323,6 +336,7 @@ function trAimedObj(e?: PointerEvent): any {
 }
 function trHintOf(o: any): string {
   if (!o) return ''; const a = o.userData.act, room = o.userData.room;
+  if (TestRooms.game && a !== 'door' && a !== 'future') return '';
   if (a === 'door') { const D = TestRooms.doors.filter((d: any) => d.k === room)[0]; return D ? (D.to ? `Click to shut the door` : `Click to open the door to ${D.name}`) : ''; }
   if (a === 'future') return `${o.userData.name}: coming later`;
   if (a === 'monitor' || a === 'laptop') return 'Click to look at the computer (looking only)';
@@ -337,6 +351,7 @@ function trClickAt(e?: PointerEvent) {
   const R = TestRooms; if (R.loading || R.overlay) return;
   const o = trAimedObj(e); if (!o) return;
   const a = o.userData.act, room = o.userData.room;
+  if (R.game && a !== 'door' && a !== 'future') return;
   if (a === 'door') { const D = R.doors.filter((d: any) => d.k === room)[0]; if (!D) return;
     if (D.to) { const F = R.free, p = D.pass; if (F.x > p[0] - 0.4 && F.x < p[2] + 0.4 && F.z > p[1] - 0.4 && F.z < p[3] + 0.4) { toast('Step out of the doorway first', 'info'); return; } }
     D.to = D.to ? 0 : 1; try { Sound.tick(); } catch (x) { /* quiet */ } return; }
@@ -427,23 +442,25 @@ const TR_SPOTS: any = {
 function trInput(root: HTMLElement, cv: HTMLCanvasElement) {
   const R = TestRooms;
   let drag: any = null, moved = 0, justLocked = false;
+  const mine = () => !R.in || R.in === 'halls';   // in a room, the room's own controls have it
   cv.addEventListener('pointerdown', e => {
+    if (!mine()) { drag = null; return; }
     if (DESKTOP && e.pointerType === 'mouse') { drag = null; if (!aimLocked(cv)) { justLocked = true; aimLock(cv); } return; }
     drag = { x: e.clientX, y: e.clientY, yaw: R.look ? R.look.yaw : 0, pitch: R.look ? R.look.pitch : 0 }; moved = 0; cv.setPointerCapture(e.pointerId); });
-  R.mm$ = (e: MouseEvent) => { if (R.on && R.look && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
+  R.mm$ = (e: MouseEvent) => { if (R.on && mine() && R.look && aimLocked(cv)) aimTurn(R.look, e, -1.25, 0.9); };
   document.addEventListener('mousemove', R.mm$);
-  cv.addEventListener('pointermove', e => { if (!drag || !R.look) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.004, -1.2, 0.9); });
-  cv.addEventListener('pointerup', e => { if (aimLocked(cv)) { if (justLocked) justLocked = false; else trClickAt(); return; } justLocked = false; if (drag && moved < 6) trClickAt(e); drag = null; });
+  cv.addEventListener('pointermove', e => { if (!drag || !R.look || !mine()) return; moved = Math.max(moved, Math.hypot(e.clientX - drag.x, e.clientY - drag.y)); R.look.yaw = drag.yaw - (e.clientX - drag.x) * 0.004; R.look.pitch = clamp(drag.pitch - (e.clientY - drag.y) * 0.004, -1.2, 0.9); });
+  cv.addEventListener('pointerup', e => { if (!mine()) { drag = null; return; } if (aimLocked(cv)) { if (justLocked) justLocked = false; else trClickAt(); return; } justLocked = false; if (drag && moved < 6) trClickAt(e); drag = null; });
   root.addEventListener('click', ev => {
     const b = (ev.target as HTMLElement).closest('[data-tr]') as HTMLElement; if (!b) return; const k = b.getAttribute('data-tr');
-    if (k === 'exit') { if (R.stress) { gfxStressEnd(true); return; } TestRooms.close(); return; }
+    if (k === 'exit') { if (R.stress) { gfxStressEnd(true); return; } if (R.game) { trLeaveBuilding(); return; } TestRooms.close(); return; }
     if (k === 'lookclose') { trComputerClose(); return; }
     if (k === 'visitor') { trVisitor(); return; }
     if (k === 'go') { const s = TR_SPOTS[b.getAttribute('data-k') || '']; if (s && R.free) { Sound.tick(); R.free.x = s.x; R.free.z = s.z; R.free.v = 0; R.look = { yaw: s.yaw, pitch: -0.05 }; } }
   });
   R.key$ = (e: KeyboardEvent) => {
-    if (!R.on) return; const k = e.key.toLowerCase();
-    if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay) { trComputerClose(); return; } if (aimLocked()) { aimUnlock(); return; } if (R.stress) { gfxStressEnd(true); return; } TestRooms.close(); return; }
+    if (!R.on || !mine()) return; const k = e.key.toLowerCase();
+    if (k === 'escape') { e.preventDefault(); e.stopImmediatePropagation(); if (R.overlay) { trComputerClose(); return; } if (aimLocked()) { aimUnlock(); return; } if (R.stress) { gfxStressEnd(true); return; } if (R.game) { trLeaveBuilding(); return; } TestRooms.close(); return; }
     if (R.overlay) return;
     if (/^(w|a|s|d|q|e|arrow\w+|shift)$/.test(k)) { R.keys[k] = true; e.preventDefault(); e.stopImmediatePropagation(); }
   };
@@ -461,7 +478,10 @@ function trInput(root: HTMLElement, cv: HTMLCanvasElement) {
 }
 
 TestRooms.close = function (quiet?: boolean) {
-  const R = TestRooms; if (!R.on) return; R.on = false;
+  const R = TestRooms; if (!R.on) return;
+  if (R.in && R.in !== 'halls') { const RR = TR_ROOMS[R.in] && TR_ROOMS[R.in](); try { if (RR && RR.on && RR.host) RR.close(true); } catch (e) { /* closed */ } }
+  for (const RR of [OfficeRoom, OpsRoom, LoungeRoom]) { try { RR.me = null; RR.meTried = false; RR.guests = []; } catch (e) { /* none */ } }
+  R.on = false; R.in = 'halls'; R.host = null; R.hallsUi = null;
   trComputerClose();
   cancelAnimationFrame(R.raf); clearInterval(R.iv);
   window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); window.removeEventListener('resize', R.fit);
@@ -471,5 +491,111 @@ TestRooms.close = function (quiet?: boolean) {
   R.ren = null; R.scene = null; R.of = null; R.ops = null; R.lg = null; R.vis = null; R.hits = []; R.doors = []; R.walk = [];
   if (R.root) R.root.remove(); R.root = null;
   if (R.stress) { R.stress = null; }
-  if (!quiet && !R.stressMode) { try { titleOpen(); } catch (e) { /* the game */ } }
+  if (!quiet && !R.stressMode && !R.game) { try { titleOpen(); } catch (e) { /* the game */ } }
+  if (!quiet && R.game) { try { refresh(); } catch (e) { /* the game */ } }
 };
+
+/* ---------- in the game: the rooms run inside the building ---------- */
+// Each room (your office, Operations, your lounge) keeps all of its own code: sitting, the laptop, the phone, the
+// photo, visitors and interviews, the monitor and its screens, the guests and the coffee. In the building it draws
+// into the building's view with its own camera (a child of the room, so its own coordinates still work) and puts its
+// controls on the building's screen. Walking out of its open door hands you to the corridor; walking in through an
+// open door hands you to the room.
+const TR_ROOMS: any = { office: () => OfficeRoom, ops: () => OpsRoom, lounge: () => LoungeRoom };
+function trRoomA(k: string): any { const R = TestRooms; return k === 'office' ? R.of : k === 'ops' ? R.ops : k === 'lounge' ? R.lg : null; }
+/** The building's side of the rooms' hosted mode. */
+function trHost(root: HTMLElement, cv: HTMLCanvasElement): any {
+  const R = TestRooms, T = THREE, glows: any = {};
+  const toWorld = (k: string, x: number, z: number) => { const A = trRoomA(k); const v = new T.Vector3(x, 0, z).applyMatrix4(A.group.matrixWorld); return [v.x, v.z]; };
+  const ry = (k: string) => trRoomA(k).group.rotation.y;
+  return {
+    root, cv,
+    get ren() { return R.ren; }, get scene() { return R.scene; },
+    cam: (k: string) => trRoomA(k).cam,
+    A: (k: string) => trRoomA(k),
+    glow: (k: string) => glows[k] || (glows[k] = new AimGlow(R.scene)),
+    /** The room's controls onto the building's screen; the building's own go. */
+    mount(k: string, html: string) {
+      trUnmountUi(); trHallsUiOff();
+      const el = document.createElement('div'); el.className = 'tr-room-ui'; el.innerHTML = html; root.appendChild(el);
+      root.classList.add('tr-in-room', k === 'office' ? 'of-in' : k === 'ops' ? 'ops3d' : 'lg3d', ...(k === 'lounge' ? ['ops3d', 'hg3d'] : []));
+      R.in = k;
+      // the door as it is now; you in the room
+      const D = R.doors.filter((d: any) => d.k === k)[0], RR = TR_ROOMS[k]();
+      if (D) { if (k === 'office') RR.doorT = D.to; else if (k === 'ops') { RR.doorT = D.to; RR.doorK = D.k0; } else { const A = trRoomA(k); A.doorTo = D.to; A.doorK = D.k0; } }
+      trMeShow(k, true);
+    },
+    /** The room has let go: its controls off the screen, the door's state back to the building. */
+    unmount(k: string, door: number) {
+      trUnmountUi(); root.classList.remove('tr-in-room', 'of-in', 'ops3d', 'lg3d', 'hg3d');
+      const D = R.doors.filter((d: any) => d.k === k)[0], A = trRoomA(k);
+      if (D) { D.to = door; D.k0 = k === 'office' ? clamp(-(A.doorLeaf ? A.doorLeaf.rotation.y : 0) / 1.5, 0, 1) : k === 'ops' ? clamp((A.door ? A.door.rotation.y : 0) / 1.35, 0, 1) : clamp(A.doorK || 0, 0, 1); }
+      if (glows[k]) { try { glows[k].hide(); } catch (e) { /* none */ } }
+      trMeShow(k, false);
+      if (R.in === k) R.in = 'halls';
+    },
+    /** In the room's own coordinates: in its doorway? 1 open, −1 shut, 0 not in it. */
+    pass(k: string, x: number, z: number): number {
+      const D = R.doors.filter((d: any) => d.k === k)[0]; if (!D) return 0; const [wx, wz] = toWorld(k, x, z), p = D.pass;
+      if (wx > p[0] && wx < p[2] && wz > p[1] && wz < p[3]) { const RR = TR_ROOMS[k](), open = k === 'lounge' ? (trRoomA(k).doorK || 0) > 0.75 : k === 'ops' ? (RR.doorK || 0) > 0.75 : -(trRoomA(k).doorLeaf ? trRoomA(k).doorLeaf.rotation.y : 0) > 1.1; return open ? 1 : -1; }
+      return 0;
+    },
+    /** Out of the room into the corridor or the concourse? Then the building takes over. */
+    out(k: string, x: number, z: number, look: any, v: number): boolean {
+      const [wx, wz] = toWorld(k, x, z), inRoom = R.walkOf[k] && R.walkOf[k](wx, wz);
+      const halls = R.walk.slice(-2).some((f: any) => f(wx, wz));
+      if (inRoom || !halls) return false;
+      const yaw = look.yaw + ry(k) + Math.PI;   // the room's way of turning to the building's
+      R.free = { x: wx, z: wz, v: v || 0, bob: 0 }; R.look = { yaw, pitch: look.pitch || 0 };
+      TR_ROOMS[k]().close(true);
+      return true;
+    },
+    enterAt: null as any,
+    leaveAll() { /* a room closing by itself closes the building too */ trLeaveBuilding(); },
+    closeAll() { TestRooms.close(true); },
+  };
+}
+function trUnmountUi() {
+  const R = TestRooms; if (!R.root) return;
+  R.root.querySelectorAll('.tr-room-ui').forEach(e => e.remove());
+  if (R.hallsUi && !R.hallsUi.isConnected) { const cv = R.root.querySelector('canvas'); R.root.insertBefore(R.hallsUi, cv ? cv.nextSibling : R.root.firstChild); }
+}
+/** The corridor's own controls off the screen (a room's go on in their place). */
+function trHallsUiOff() { const R = TestRooms; if (!R.root) return; R.hallsUi = R.hallsUi || R.root.querySelector('.tr-halls-ui'); if (R.hallsUi && R.hallsUi.isConnected) R.hallsUi.remove(); }
+/** Your own figure: each room has its own, shown only in the room you are in (in its own coordinates). */
+function trMeShow(k: string, on: boolean) {
+  const RR = TR_ROOMS[k](), me = RR.me || (trRoomA(k) && trRoomA(k).me), A = trRoomA(k);
+  if (me && me.g) { if (A && A.group && me.g.parent !== A.group) A.group.add(me.g); me.g.visible = on; }
+}
+/** Into a room: at the door (walking in), or straight to your chair (from the game's buttons). */
+function trEnter(k: string, at: any, inc?: any) {
+  const R = TestRooms; if (!trRoomA(k) || !R.host) { if (k !== 'office') trEnter('office', null, inc); return; }
+  if (at) { const A = trRoomA(k), inv = new THREE.Matrix4().copy(A.group.matrixWorld).invert(), v = new THREE.Vector3(at.x, 0, at.z).applyMatrix4(inv);
+    R.host.enterAt = { x: v.x, z: v.z, yaw: at.yaw - A.group.rotation.y - Math.PI, pitch: at.pitch, v: at.v }; }
+  else R.host.enterAt = null;
+  try {
+    if (k === 'office') OfficeRoom.open(inc || null, R.host);
+    else if (k === 'ops') OpsRoom.open(R.host);
+    else LoungeRoom.open(R.lgKey, R.host);
+  } catch (e) { console.error(e); R.in = 'halls'; trUnmountUi(); toast('That room could not be opened', 'warn'); }
+}
+/** A frame while you are in a room: the room's own frame (it draws); the other doors keep moving. */
+function trRoomFrame(dt: number) {
+  const R = TestRooms, k = R.in, RR = TR_ROOMS[k] && TR_ROOMS[k]();
+  for (const D of R.doors) if (D.k !== k && D.k0 !== D.to) { D.k0 += Math.sign(D.to - D.k0) * Math.min(Math.abs(D.to - D.k0), dt * (D.slide ? 1.6 : 1.4)); const e = D.k0 * D.k0 * (3 - 2 * D.k0); D.set(e); }
+  if (!RR || !RR.on) { R.in = 'halls'; return; }
+  const me = RR.me; if (me && me.g && trRoomA(k) && me.g.parent !== trRoomA(k).group) trRoomA(k).group.add(me.g);   // made by the room itself: into the room's coordinates
+  if (RR.loading || (RR.overlay && !RR.lapZ && !RR.zoomAnim)) { if (!RR.overlay) R.ren.render(R.scene, trRoomA(k).cam); return; }
+  try { if (k === 'office') ofFrame(); else if (k === 'ops') opsFrame(); else lgFrame(); } catch (e) { console.error(e); }
+}
+/** Leaving the building (from the corridor, or a room asking): its loading screen, then back to the game. */
+function trLeaveBuilding(to?: string) {
+  const R = TestRooms; if (!R.on || ExitSplash.on) return;
+  exitSplash('office', 'Leaving the building', [
+    { pct: 30, step: 'Closing the doors…', run: () => TestRooms.close(true) },
+    { pct: 55, step: 'Clearing the rooms from memory…', run: exitFreeMemory },
+    { pct: 85, step: 'Loading your airline…', run: () => { if (to) { try { roomGoTo(to); } catch (e) { refresh(); } } else refresh(); } },
+  ]);
+}
+/** Should the game's Office, Operations and Lounge buttons open the joined building? (Settings → Graphics.) */
+function trJoined(): boolean { return (State.settings as any).joinedRooms !== false && typeof company === 'function' && !!company(); }
