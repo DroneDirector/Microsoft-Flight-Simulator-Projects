@@ -752,9 +752,10 @@ function lgLiquid(c: any) {
 function lgSlosh(c: any, dt: number) {
   const R = LoungeRoom, T = THREE, w = c.g.getWorldPosition(new T.Vector3());
   if (!c.pv) { c.pv = w.clone(); c.vv = new T.Vector3(); c.sl = [0, 0]; c.sv = [0, 0]; return; }
-  const v = w.clone().sub(c.pv).divideScalar(dt), a = v.clone().sub(c.vv).divideScalar(dt); c.pv.copy(w); c.vv.copy(v);
+  const v = w.clone().sub(c.pv).divideScalar(dt), a0 = v.clone().sub(c.vv).divideScalar(dt); c.pv.copy(w); c.vv.copy(v);
+  c.as = c.as || new T.Vector3(); c.as.lerp(a0, Math.min(1, dt * 10)); const a = c.as;   // smoothed: a hand, not single jolts
   const K = 150, C = 5.5, ax = clamp(a.x, -60, 60), az = clamp(a.z, -60, 60);   // a steady push tilts the surface by about a / g (half that: the cup's own walls)
-  for (const [i, ai] of [[0, ax], [1, az]] as number[][]) { c.sv[i] += (-K * c.sl[i] - C * c.sv[i] - ai * K / 9.81 * 0.5) * dt; c.sl[i] = clamp(c.sl[i] + c.sv[i] * dt, -0.7, 0.7); }
+  for (const [i, ai] of [[0, ax], [1, az]] as number[][]) { c.sv[i] += (-K * c.sl[i] - C * c.sv[i] - ai * K / 9.81 * 0.28) * dt; c.sl[i] = clamp(c.sl[i] + c.sv[i] * dt, -0.7, 0.7); }
   // over the rim?
   const L = c.g.userData.liq, rim = L.h, y = c.lvl * L.h, r = L.prof[L.prof.length - 1][0], lift = Math.hypot(c.sl[0], c.sl[1]) * r;
   if (c.lvl > 0.02 && y + lift > rim) {
