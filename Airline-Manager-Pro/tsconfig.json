@@ -199,6 +199,7 @@
     "src/screens/fids3d.ts",
     "src/screens/lounge3d.ts",
     "src/screens/lounge-bar.ts",
+    "src/screens/lounge-deco.ts",
     "src/screens/sec-incident.ts",
     "src/core/mods.ts",
     "src/core/ground-sim.ts",

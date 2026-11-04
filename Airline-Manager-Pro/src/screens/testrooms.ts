@@ -554,6 +554,7 @@ TestRooms.close = function (quiet?: boolean) {
   document.removeEventListener('mousemove', R.mm$); aimUnlock();
   try { FrameGen.dispose(R.perf); } catch (e) { /* none */ }
   try { exitFreeRenderer(R.ren, R.scene); } catch (e) { /* gone */ }
+  try { for (const m of (R.lg && R.lg.mirrors) || []) m.userData.dispose(); } catch (e) { /* gone */ }
   R.ren = null; R.scene = null; R.of = null; R.ops = null; R.lg = null; R.vis = null; R.hits = []; R.doors = []; R.walk = [];
   if (R.root) R.root.remove(); R.root = null;
   if (R.stress) { R.stress = null; }

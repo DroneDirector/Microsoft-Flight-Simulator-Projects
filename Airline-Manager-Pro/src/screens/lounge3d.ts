@@ -1,6 +1,8 @@
 // Your lounges, in 3D. Walk into the lounge you have built at a base and see it as it is at its level:
 //  - Lounge: a bright, comfortable room with fabric armchairs, a good carpet and a refreshment corner.
-//  - Business lounge: larger, walnut walls, leather armchairs, a bar with stools, pendant lights and a richer carpet.
+//  - Business lounge: larger, a herringbone oak floor, plaster walls over walnut, leather armchairs, the black and brass
+//    L-shaped bar, the art deco fireplace, pendant lights and a richer carpet.
+//  Every level: a copper-wave ceiling, tall walls, flight boards on the side walls too, a welcome mat where you arrive.
 //  - Flagship lounge: the largest, with marble, velvet chairs on gold legs, chandeliers, a fireplace, a grand piano,
 //    art on the walls and the finest carpet of all.
 // Every level has the refreshment corner (an espresso machine, a tea urn, cups and saucers, napkins, a fruit bowl
@@ -12,9 +14,9 @@
 const LoungeRoom: any = { on: false };
 interface LgSpec { W: number; D: number; H: number; guests: number; name: string }
 const LG_SPECS: LgSpec[] = [
-  { W: 16, D: 11, H: 3.4, guests: 4, name: 'Lounge' },
-  { W: 22, D: 14, H: 3.9, guests: 7, name: 'Business lounge' },
-  { W: 28, D: 17, H: 4.6, guests: 10, name: 'Flagship lounge' },
+  { W: 16, D: 11, H: 4.2, guests: 4, name: 'Lounge' },
+  { W: 22, D: 14, H: 4.8, guests: 7, name: 'Business lounge' },
+  { W: 28, D: 17, H: 5.5, guests: 10, name: 'Flagship lounge' },
 ];
 const LG_DOOR_W = 1.9, LG_DOOR_H = 2.4;
 function lgPropSwap(g: any, name: string) { try { Models.swap(g, 'lounge-props/' + name + '.glb', false); } catch (e) { /* the app's own */ } }
@@ -156,18 +158,20 @@ function lgBuild(scene: any, q: number): any {
   const fabric = [M({ color: 0x3E6A8A, roughness: 0.95 }), M({ map: ctTex(ctLeather('#7A3F22')), roughness: 0.45 }), M({ color: 0x1F5C4A, roughness: 0.85 })][lv];
   const legM = [M({ color: 0x2A2D33, metalness: 0.6, roughness: 0.4 }), black, gold][lv];
   // floor, walls, ceiling
-  { const floorM = lv === 2 ? marble : lv === 1 ? walnut : M({ map: ctTex(ctNoise('#8A8F96', 0.08, 3), 6, 4), roughness: 0.7 });
-    if (floorM.map) { floorM.map.repeat.set(W / 3, D / 3); }
+  { const floorM = lv === 2 ? marble : lv === 1 ? M({ map: ctTex(lgHerringbone()), roughness: 0.42 }) : M({ map: ctTex(ctNoise('#8A8F96', 0.08, 3), 6, 4), roughness: 0.7 });
+    if (floorM.map) { floorM.map.repeat.set(W / (lv === 1 ? 4 : 3), D / (lv === 1 ? 4 : 3)); }
     const f = new T.Mesh(new T.PlaneGeometry(W, D), floorM); f.rotation.x = -Math.PI / 2; f.receiveShadow = true; root.add(f);
-    const ce = new T.Mesh(new T.PlaneGeometry(W, D), M({ color: lv === 2 ? 0xF4EFE6 : 0xEDEEF0, roughness: 0.9 })); ce.rotation.x = Math.PI / 2; ce.position.y = H; root.add(ce);
-    const wallM = lv === 0 ? M({ color: 0xE3E6EA, roughness: 0.9 }) : lv === 1 ? walnut : M({ color: 0xEDE6DA, roughness: 0.8 });
+    // the ceiling: copper waves on every level (its own model file)
+    lgCeilingWaves(root, W, D, H, q);
+    const wallM = lv === 0 ? M({ color: 0xE3E6EA, roughness: 0.9 }) : lv === 1 ? M({ map: ctTex(lgPlaster(), 3, 1), roughness: 0.9 }) : M({ color: 0xEDE6DA, roughness: 0.8 });
     // the back wall has the way in: an opening for the sliding doors (dx ± LG_DOOR_W/2, LG_DOOR_H high)
     const dxo = W / 2 - 6.3, oa = dxo - LG_DOOR_W / 2, ob = dxo + LG_DOOR_W / 2;
     const backSeg = (xa: number, xb: number, ya: number, yb: number, m: any, dz: number) => { if (xb - xa < 0.01 || yb - ya < 0.01) return; const p = new T.Mesh(new T.PlaneGeometry(xb - xa, yb - ya), m); p.position.set((xa + xb) / 2, (ya + yb) / 2, z1 - dz); p.rotation.y = Math.PI; p.receiveShadow = true; root.add(p); };
     backSeg(x0, oa, 0, H, wallM, 0); backSeg(ob, x1, 0, H, wallM, 0); backSeg(oa, ob, LG_DOOR_H, H, wallM, 0);
     for (const [w, x, z, ry] of [[D, x0, 0, Math.PI / 2], [D, x1, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, H), wallM); p.position.set(x, H / 2, z); p.rotation.y = ry; p.receiveShadow = true; root.add(p); }
-    if (lv === 2) { for (const [w, x, z, ry] of [[D, x0 + 0.02, 0, Math.PI / 2], [D, x1 - 0.02, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, 1.1), marble); p.position.set(x, 0.55, z); p.rotation.y = ry; root.add(p); const t = new T.Mesh(new T.BoxGeometry(w, 0.04, 0.03), gold); t.position.set(x, 1.12, z); t.rotation.y = ry; root.add(t); }
-      for (const [xa, xb] of [[x0, oa - 0.12], [ob + 0.12, x1]]) { backSeg(xa, xb, 0, 1.1, marble, 0.02); const t = new T.Mesh(new T.BoxGeometry(xb - xa, 0.04, 0.03), gold); t.position.set((xa + xb) / 2, 1.12, z1 - 0.02); root.add(t); } }
+    if (lv >= 1) { const wains = lv === 2 ? marble : walnut;   // a wainscot to 1.1 m with a gold line (walnut in the Business lounge, marble in the Flagship)
+      for (const [w, x, z, ry] of [[D, x0 + 0.02, 0, Math.PI / 2], [D, x1 - 0.02, 0, -Math.PI / 2]] as number[][]) { const p = new T.Mesh(new T.PlaneGeometry(w, 1.1), wains); p.position.set(x, 0.55, z); p.rotation.y = ry; root.add(p); const t = new T.Mesh(new T.BoxGeometry(w, 0.04, 0.03), gold); t.position.set(x, 1.12, z); t.rotation.y = ry; root.add(t); }
+      for (const [xa, xb] of [[x0, oa - 0.12], [ob + 0.12, x1]]) { backSeg(xa, xb, 0, 1.1, wains, 0.02); const t = new T.Mesh(new T.BoxGeometry(xb - xa, 0.04, 0.03), gold); t.position.set((xa + xb) / 2, 1.12, z1 - 0.02); root.add(t); } }
     // the carpet (its own model file per level)
     // under the seating (the groups of armchairs start 2.6 m from the windows, one or two rows of them)
     const rows = lv === 0 ? 1 : 2, cw = W * 0.7, cd = rows * 3.3 + 1.4, cz = z0 + 2.6 + (rows - 1) * 1.65;
@@ -206,6 +210,10 @@ function lgBuild(scene: any, q: number): any {
     // the green exit sign over the doors, inside
     { const ex = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), new T.MeshBasicMaterial({ map: ctTex(ctExit()), toneMapped: false })); ex.position.set(dx, dh + 0.42, z1 - 0.02); ex.rotation.y = Math.PI; root.add(ex); }
     const hit = new T.Mesh(new T.BoxGeometry(dw, dh, 0.4), new T.MeshBasicMaterial({ visible: false })); hit.position.set(dx, dh / 2, z1 - 0.2); hit.userData.act = 'door'; root.add(hit); A.hits.push(hit); A.door = new T.Vector3(dx, 0, z1 - 1.4);
+    // the arrival area: a mat inside the doors, kept clear; where you start when you open the lounge from the menus
+    A.spawn = { x: dx, z: z1 - 2.3, yaw: 0.15 };
+    prop('welcome-mat', dx, z1 - 1.9, 0, () => { const [mc, mx] = ctCanvas(512, 256); mx.fillStyle = '#23262B'; mx.fillRect(0, 0, 512, 256); mx.strokeStyle = '#C9A25E'; mx.lineWidth = 6; mx.strokeRect(14, 14, 484, 228); mx.fillStyle = '#C9A25E'; mx.font = '600 44px Georgia, serif'; mx.textAlign = 'center'; mx.textBaseline = 'middle'; mx.fillText('WELCOME', 256, 130);
+      const mat = new T.Mesh(new T.BoxGeometry(2.0, 0.01, 1.2), M({ map: ctTex(mc), roughness: 1 })); mat.position.set(dx, 0.005, z1 - 1.9); mat.receiveShadow = true; root.add(mat); });
     prop('reception-desk', dx - 2.6, z1 - 1.6, Math.PI, () => {
       const top = lv === 2 ? marble : lv === 1 ? walnut : M({ color: 0xE9E4DA, roughness: 0.35 });
       bx(2.2, 1.05, 0.6, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, dx - 2.6, 0.525, z1 - 1.6); bx(2.3, 0.05, 0.75, top, dx - 2.6, 1.07, z1 - 1.6);
@@ -263,27 +271,74 @@ function lgBuild(scene: any, q: number): any {
     const fx = x1 - 0.62, fz = cz - 1.6;
     HG_VR = LoungeRoom; hgVendBuild(A, fx, fz, -Math.PI / 2); }
   // a magazine rack by the door, the departures screen on the front wall
-  { const mx = x0 + 1.2, mz = z1 - 0.5;
+  { const mx = x0 + (lv >= 1 ? 0.62 : 1.2), mz = z1 - 0.5;   // beside the bar's end on the bar's levels
     prop('magazine-rack', mx, mz, Math.PI, () => { bx(0.7, 1.0, 0.3, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, mx, 0.5, mz); const cols = [0xC0392B, 0x2E5C8A, 0xF2B544, 0x2F6B4A, 0x8E44AD, 0xE67E22]; for (let r = 0; r < 3; r++) for (let i = 0; i < 2; i++) { const m = new T.Mesh(new T.PlaneGeometry(0.26, 0.3), M({ color: cols[(r * 2 + i) % cols.length] })); m.position.set(mx - 0.16 + i * 0.32, 0.3 + r * 0.3, mz - 0.17); m.rotation.set(0.15, Math.PI, 0); root.add(m); } });
     block(mx - 0.45, mz - 0.3, mx + 0.45, z1);
     // the flight boards: Departures and Arrivals side by side, 30 cm apart (fids3d.ts)
-    try { A.fids = fidsPair(root, R.k, -W * 0.05, 2.0, z1 - 0.07, Math.PI, 1.6); } catch (e) { A.fids = []; } }
-  // Business and Flagship: the bar with stools and a shelf of bottles (back left)
-  if (lv >= 1) { const bxp = x0 + 3.2, bz = z1 - 1.2;
-    prop('bar-counter', bxp, bz, Math.PI, () => { bx(3.6, 1.08, 0.6, walnut, bxp, 0.54, bz); bx(3.8, 0.06, 0.8, lv === 2 ? marble : M({ color: 0x1A1C20, roughness: 0.2 }), bxp, 1.1, bz); if (lv === 2) bx(3.62, 0.04, 0.02, gold, bxp, 0.2, bz - 0.31); });
-    block(bxp - 1.9, bz - 0.5, bxp + 1.9, z1); A.surf.push({ x: bxp, z: bz - 0.1, top: 1.13, w: 3.7, d: 0.7 });
-    for (let i = 0; i < 4; i++) { const sx = bxp - 1.3 + i * 0.86, sz = bz - 0.75;
-      prop('bar-stool', sx, sz, 0, () => { add(new T.CylinderGeometry(0.2, 0.2, 0.08, 20), fabric, sx, 0.78, sz); add(new T.CylinderGeometry(0.025, 0.025, 0.74, 10), lv === 2 ? gold : chrome, sx, 0.38, sz); add(new T.TorusGeometry(0.16, 0.012, 8, 24), lv === 2 ? gold : chrome, sx, 0.3, sz).rotation.x = Math.PI / 2; add(new T.CylinderGeometry(0.2, 0.22, 0.02, 20), lv === 2 ? gold : chrome, sx, 0.01, sz); });
-      block(sx - 0.25, sz - 0.25, sx + 0.25, sz + 0.25); seats.push({ x: sx, z: sz, ry: 0, hip: 0.84, kind: 'stool' }); }
-    prop('bottle-shelf', bxp, z1 - 0.2, Math.PI, () => { for (const y of [1.4, 1.8, 2.2]) bx(3.0, 0.03, 0.25, lv === 2 ? brass : walnut, bxp, y, z1 - 0.2); bx(3.0, 1.2, 0.03, lv === 2 ? brass : walnut, bxp, 1.8, z1 - 0.33 + 0.3); });
+    try { A.fids = fidsPair(root, R.k, -W * 0.05, 2.0, z1 - 0.07, Math.PI, 1.6); } catch (e) { A.fids = []; }
+    // and a pair on each side wall, high over the sofas (the walls are tall enough now)
+    for (const s2 of [-1, 1]) { try { A.fids = A.fids.concat(fidsPair(root, R.k, s2 * (W / 2 - 0.07), 2.75, z0 + D * 0.42, -s2 * Math.PI / 2, 1.3)); } catch (e) { /* that wall without */ } } }
+  // Business and Flagship: the bar (back left). An L-shaped counter in black lacquer with a top of black stone veined
+  // with gold, returning to the back wall at its right end; a brass foot rail; stools on brass legs; behind it a mirrored
+  // wall in a brass frame with glass shelves of bottles, lit from below; globe lights hanging over the counter.
+  // The bartender works along the long side as before (lounge-bar.ts).
+  if (lv >= 1) { const bxp = x0 + 3.2, bz = z1 - 1.2, xa = bxp - 1.85, xc = bxp + 1.85, xr = bxp + 2.45;   // xa..xr the counter, xc..xr the return
+    const lacq = M({ color: 0x111214, roughness: 0.18, metalness: 0.1 }), stone = M({ map: ctTex(lgDarkMarble()), roughness: 0.2, metalness: 0.05 }), brassB = M({ color: 0xC9A25E, metalness: 0.95, roughness: 0.28 });
+    prop('bar-counter', bxp, bz, Math.PI, () => {
+      bx(xr - xa, 1.08, 0.6, lacq, (xa + xr) / 2, 0.54, bz);                                   // the long side
+      bx(0.6, 1.08, z1 - bz - 0.3, lacq, (xc + xr) / 2, 0.54, (bz + 0.3 + z1) / 2);            // the return to the wall
+      bx(xr - xa + 0.2, 0.06, 0.8, stone, (xa + xr) / 2 + 0.1 - 0.1, 1.1, bz);                 // the tops
+      bx(0.8, 0.06, z1 - bz - 0.4, stone, (xc + xr) / 2, 1.1, (bz + 0.4 + z1) / 2 - 0.02);
+      bx(xr - xa, 0.03, 0.012, brassB, (xa + xr) / 2, 1.06, bz - 0.306);                        // a brass line under the top
+      bx(0.012, 0.03, z1 - bz - 0.3, brassB, xr + 0.006, 1.06, (bz + 0.3 + z1) / 2);
+      // the foot rail, on brass brackets
+      const rail = (x0r: number, z0r: number, x1r: number, z1r: number) => { const len = Math.hypot(x1r - x0r, z1r - z0r), r = add(new T.CylinderGeometry(0.022, 0.022, len, 12), brassB, (x0r + x1r) / 2, 0.2, (z0r + z1r) / 2); r.rotation.z = Math.PI / 2; r.rotation.y = -Math.atan2(z1r - z0r, x1r - x0r);
+        for (let k = 0; k <= Math.floor(len / 1.1); k++) { const t = k / Math.max(1, Math.floor(len / 1.1)); add(new T.CylinderGeometry(0.012, 0.012, 0.2, 8), brassB, x0r + (x1r - x0r) * t, 0.1, z0r + (z1r - z0r) * t); } };
+      rail(xa + 0.05, bz - 0.4, xr + 0.1, bz - 0.4); rail(xr + 0.1, bz - 0.4, xr + 0.1, z1 - 0.12); });
+    block(xa - 0.1, bz - 0.5, xr + 0.15, z1); A.surf.push({ x: bxp, z: bz - 0.1, top: 1.13, w: 3.7, d: 0.7 }, { x: (xc + xr) / 2, z: (bz + z1) / 2 + 0.2, top: 1.13, w: 0.7, d: z1 - bz - 0.6 });
+    const seatM = M({ map: ctTex(ctLeather('#1E1E20')), roughness: 0.5 }), stool = (sx: number, sz: number, ry: number) => {
+      prop('bar-stool', sx, sz, ry, () => { add(new T.CylinderGeometry(0.21, 0.2, 0.07, 24), seatM, sx, 0.8, sz); add(new T.CylinderGeometry(0.2, 0.2, 0.02, 24), brassB, sx, 0.755, sz);
+        for (let k = 0; k < 4; k++) { const a = k / 4 * Math.PI * 2 + 0.4, l = add(new T.CylinderGeometry(0.012, 0.014, 0.78, 8), brassB, sx + Math.cos(a) * 0.15, 0.38, sz + Math.sin(a) * 0.15); l.rotation.z = Math.cos(a) * 0.12; l.rotation.x = -Math.sin(a) * 0.12; }
+        add(new T.TorusGeometry(0.19, 0.01, 8, 28), brassB, sx, 0.3, sz).rotation.x = Math.PI / 2; });
+      block(sx - 0.25, sz - 0.25, sx + 0.25, sz + 0.25); seats.push({ x: sx, z: sz, ry, hip: 0.84, kind: 'stool' }); };
+    for (let i = 0; i < 5; i++) stool(bxp - 1.6 + i * 0.72, bz - 0.75, 0);     // along the long side (room to stand at the corner)
+    for (const sz of [bz + 0.05, bz + 0.78]) stool(xr + 0.7, sz, -Math.PI / 2);   // and along the return
+    // the back wall: lacquer cabinet, the mirror in its brass frame, glass shelves with light under them
+    prop('bar-mirror', bxp, z1 - 0.03, Math.PI, () => {
+      bx(3.6, 0.9, 0.3, lacq, bxp, 0.45, z1 - 0.15); bx(3.64, 0.03, 0.34, stone, bxp, 0.915, z1 - 0.17);
+      // the mirror: a real reflection of the room, as wide as the back bar and up to the brass line
+      const mir = lgMirror(root, 3.6, 1.9, bxp, 1.95, z1 - 0.012, Math.PI, 0xD8D0C0); mir.userData.keep = true; A.mirrors = (A.mirrors || []).concat([mir]);
+      for (const [w, h, x, y] of [[3.7, 0.04, bxp, 2.92], [3.7, 0.04, bxp, 0.98], [0.04, 1.98, bxp - 1.83, 1.95], [0.04, 1.98, bxp + 1.83, 1.95]] as number[][]) bx(w, h, 0.03, brassB, x, y, z1 - 0.02);
+      bx(xr + 0.4 - (x0 + 0.1), 0.02, 0.02, brassB, (x0 + 0.1 + xr + 0.4) / 2, 3.02, z1 - 0.012); });   // a brass line along the wall
+    prop('bottle-shelf', bxp, z1 - 0.2, Math.PI, () => { const glassS = new T.MeshStandardMaterial({ color: 0xDDEFF2, roughness: 0.05, transparent: true, opacity: 0.35, depthWrite: false }), led = new T.MeshBasicMaterial({ color: 0xFFD9A0, toneMapped: false });
+      for (const y of [1.4, 1.8, 2.2]) { bx(3.0, 0.015, 0.25, glassS, bxp, y, z1 - 0.2).castShadow = false; bx(3.0, 0.01, 0.01, brassB, bxp, y - 0.012, z1 - 0.33); const l = add(new T.BoxGeometry(2.9, 0.008, 0.02), led, bxp, y - 0.012, z1 - 0.1); l.castShadow = false; }
+      for (const sx of [-1.52, 1.52]) bx(0.02, 1.0, 0.02, brassB, bxp + sx, 1.8, z1 - 0.33); });
+    // globe lights over the counter, a little in front of it (the glass rack hangs over the top)
+    for (let i = 0; i < 5; i++) { const gx = xa + 0.4 + i * (xr - xa - 0.8) / 4, gz = bz - 0.5, gy = Math.min(2.85, H - 1.4);
+      prop('bar-pendant-globe', gx, gz, 0, () => { add(new T.CylinderGeometry(0.004, 0.004, H - gy - 0.17, 6), black, gx, (H + gy + 0.17) / 2, gz).castShadow = false; const gl = add(new T.SphereGeometry(0.17, 24, 16), new T.MeshStandardMaterial({ color: 0xFFFFFF, emissive: 0xFFF1DA, emissiveIntensity: 1.1, roughness: 0.4 }), gx, gy, gz); gl.castShadow = false; add(new T.CylinderGeometry(0.03, 0.03, 0.04, 12), brassB, gx, gy + 0.18, gz); }); }
     try { lgBarBuild(A, root, lv, bxp, bz, z1, H, q); } catch (e) { console.error(e); } }
-  // Flagship: a fireplace, a grand piano, art and a champagne bucket
+  // Business and Flagship: the art deco fireplace on the west wall: a black lacquer chimney breast to the ceiling, a
+  // brass surround in five stepped frames like a sunburst, a fan of brass rays above, warm light washing up the breast.
+  // The fire is the lounge's own (its flames and their light). File: lounge-props/fireplace.glb.
+  if (lv >= 1) {
+    const fx = x0, fz = z0 + D * 0.72, brassF = M({ color: 0xC9A25E, metalness: 0.95, roughness: 0.28, emissive: 0x5A3E14, emissiveIntensity: 0.55 });   // the brass catches the fire's glow
+    // w along the wall (z), d out from it (x), at a distance x from the wall
+    const at = (w: number, h: number, d: number, m: any, x: number, y: number, z: number) => bx(d, h, w, m, fx + x, y, fz + z);
+    prop('fireplace', fx + 0.3, fz, Math.PI / 2, () => {
+      at(3.0, H, 0.12, M({ color: 0x111111, roughness: 0.15, metalness: 0.2 }), 0.06, H / 2, 0);
+      for (let s2 = 0; s2 < 5; s2++) { const w2 = 1.2 + s2 * 0.28, h2 = 1.0 + s2 * 0.14, d2 = 0.14 + (4 - s2) * 0.02;
+        at(w2 + 0.04, 0.04, d2, brassF, 0.12 + d2 / 2, h2, 0); at(0.04, h2, d2, brassF, 0.12 + d2 / 2, h2 / 2, w2 / 2); at(0.04, h2, d2, brassF, 0.12 + d2 / 2, h2 / 2, -w2 / 2); }
+      at(1.16, 0.96, 0.06, M({ color: 0x050505, roughness: 0.9 }), 0.13, 0.48, 0);                     // the firebox
+      at(2.6, 0.05, 0.6, M({ map: ctTex(lgDarkMarble()), roughness: 0.25 }), 0.42, 0.025, 0);         // the hearth
+      const fl = new T.Mesh(new T.PlaneGeometry(1.0, 0.5), new T.MeshBasicMaterial({ map: ctTex(lgFlame()), transparent: true, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })); fl.position.set(fx + 0.3, 0.32, fz); fl.rotation.y = Math.PI / 2; root.add(fl); A.flames.push(fl);
+      at(0.9, 0.06, 0.18, M({ color: 0x3A2214, roughness: 0.9 }), 0.26, 0.08, 0);                     // the logs' bed
+      for (let i = 0; i < 9; i++) { const a2 = (i - 4) * 0.22, r2 = add(new T.BoxGeometry(0.02, 1.2, 0.03), brassF, fx + 0.14, 2.6 + Math.cos(a2) * 0.6, fz + Math.sin(a2) * 0.6); r2.rotation.x = a2; r2.castShadow = false; }
+      const L = new T.PointLight(0xFF8A3C, 1.6, 6, 2); L.position.set(fx + 0.8, 0.5, fz); root.add(L); A.fireL = L;
+      if (q >= 2) { const up = new T.SpotLight(0xFFC98A, 4, 4.5, 0.5, 0.8, 2); up.position.set(fx + 0.8, 0.25, fz); up.target.position.set(fx, 3.5, fz); root.add(up); root.add(up.target); } });
+    block(fx - 0.5, fz - 1.5, fx + 0.8, fz + 1.5);
+  }
+  // Flagship: a grand piano, art and a champagne bucket
   if (lv === 2) {
-    const fx = x0 + 0.3, fz = z0 + D * 0.72;
-    prop('fireplace', fx, fz, Math.PI / 2, () => { bx(0.5, 1.3, 2.2, marble, fx + 0.1, 0.65, fz); bx(0.62, 0.08, 2.4, marble, fx + 0.14, 1.34, fz); bx(0.2, 0.6, 1.2, black, fx + 0.26, 0.45, fz);
-      const fl = new T.Mesh(new T.PlaneGeometry(1.0, 0.4), new T.MeshBasicMaterial({ map: ctTex(lgFlame()), transparent: true, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false })); fl.position.set(fx + 0.37, 0.42, fz); fl.rotation.y = Math.PI / 2; root.add(fl); A.flames.push(fl);
-      const L = new T.PointLight(0xFF8A3C, 1.6, 6, 2); L.position.set(fx + 0.8, 0.5, fz); root.add(L); A.fireL = L; });
-    block(fx - 0.5, fz - 1.3, fx + 0.7, fz + 1.3);
     const px = W * 0.28, pz = z0 + D * 0.2;
     prop('grand-piano', px, pz, -0.5, () => { const g = new T.Group(); g.position.set(px, 0, pz); g.rotation.y = -0.5; root.add(g); const pm = M({ color: 0x0A0A0C, roughness: 0.08, metalness: 0.2 });
       const sh = new T.Shape(); sh.moveTo(-0.75, -0.8); sh.lineTo(0.75, -0.8); sh.lineTo(0.75, 0.2); sh.bezierCurveTo(0.75, 0.9, 0.1, 1.0, -0.1, 1.1); sh.bezierCurveTo(-0.6, 1.2, -0.75, 0.9, -0.75, 0.6); sh.lineTo(-0.75, -0.8);
@@ -303,6 +358,8 @@ function lgBuild(scene: any, q: number): any {
     if (lv === 1) for (const c of clusters) prop('pendant-light', c[0], c[1], 0, () => { add(new T.CylinderGeometry(0.006, 0.006, 1.2, 6), black, c[0], H - 0.6, c[1]); add(new T.ConeGeometry(0.28, 0.3, 24, 1, true), brass, c[0], H - 1.3, c[1]); const b = new T.Mesh(new T.SphereGeometry(0.08, 12, 8), lamp); b.position.set(c[0], H - 1.38, c[1]); root.add(b); });
     if (lv === 2) for (const c of [[-W * 0.2, z0 + D * 0.45], [W * 0.2, z0 + D * 0.45]]) prop('chandelier', c[0], c[1], 0, () => { const cy = H - 1.1; add(new T.CylinderGeometry(0.01, 0.01, 0.8, 6), gold, c[0], H - 0.4, c[1]); for (const [rr, y] of [[0.7, cy], [0.45, cy + 0.25], [0.22, cy + 0.45]]) { add(new T.TorusGeometry(rr, 0.02, 8, 40), gold, c[0], y, c[1]).rotation.x = Math.PI / 2; const n = Math.round(rr * 22); for (let i = 0; i < n; i++) { const a = i / n * 6.283; const cr = add(new T.OctahedronGeometry(0.035), new T.MeshPhysicalMaterial({ color: 0xFFFFFF, roughness: 0, transmission: 0.6, thickness: 0.05, emissive: 0xFFF3DC, emissiveIntensity: 0.3 }), c[0] + Math.cos(a) * rr, y - 0.08, c[1] + Math.sin(a) * rr); cr.castShadow = false; } } const b = new T.Mesh(new T.SphereGeometry(0.15, 16, 10), lamp); b.position.set(c[0], cy + 0.1, c[1]); root.add(b); });
   }
+  // every metal: a subtle reflection
+  try { lgMetalShine(root, R.ren || (typeof TestRooms !== 'undefined' ? TestRooms.ren : null)); } catch (e) { /* plain */ }
   return A;
 }
 function lgMarble(): HTMLCanvasElement {
@@ -373,12 +430,12 @@ function lgSpots(): { k: string; x: number; z: number; ry: number; t: [number, n
   const cx = x1 - 3.0, cz = z1 - 1.0, out: any[] = [
     { k: 'coffee', x: cx - 1.1, z: cz - 0.85, ry: 0, t: [8, 16] }, { k: 'tea', x: cx - 0.35, z: cz - 0.85, ry: 0, t: [8, 14] }, { k: 'snacks', x: cx + 1.0, z: cz - 0.85, ry: 0, t: [5, 10] },
     { k: 'fridge', x: x1 - 1.45, z: cz - 1.6, ry: Math.PI / 2, t: [6, 12] },
-    { k: 'magazines', x: x0 + 1.2, z: z1 - 1.2, ry: 0, t: [8, 18] },
+    { k: 'magazines', x: x0 + (lv >= 1 ? 0.62 : 1.2), z: z1 - 1.2, ry: 0, t: [8, 18] },
     { k: 'departures', x: -W * 0.05, z: z1 - 2.6, ry: 0, t: [10, 22] },
     { k: 'window', x: -W * 0.3, z: z0 + 0.9, ry: Math.PI, t: [15, 35] }, { k: 'window', x: W * 0.05, z: z0 + 0.9, ry: Math.PI, t: [15, 35] }, { k: 'window', x: W * 0.35, z: z0 + 0.9, ry: Math.PI, t: [15, 35] },
   ];
-  if (lv >= 1) { const bxp = x0 + 3.2, bz = z1 - 1.2; out.push({ k: 'bar', x: bxp + 1.7, z: bz - 0.95, ry: -0.4, t: [12, 25] }); }
-  if (lv === 2) { out.push({ k: 'fireplace', x: x0 + 1.9, z: z0 + D * 0.72, ry: -Math.PI / 2, t: [15, 30] }, { k: 'piano', x: W * 0.28 - 1.6, z: z0 + D * 0.2 + 0.4, ry: Math.PI / 2, t: [10, 20] }); }
+  if (lv >= 1) { const bxp = x0 + 3.2, bz = z1 - 1.2; out.push({ k: 'bar', x: bxp + 2.0, z: bz - 0.95, ry: -0.4, t: [12, 25] }, { k: 'fireplace', x: x0 + 1.9, z: z0 + D * 0.72, ry: -Math.PI / 2, t: [15, 30] }); }
+  if (lv === 2) { out.push({ k: 'piano', x: W * 0.28 - 1.6, z: z0 + D * 0.2 + 0.4, ry: Math.PI / 2, t: [10, 20] }); }
   return out.filter(o => !lgBlocked(o.x, o.z));
 }
 function lgGuests() {
@@ -514,7 +571,7 @@ function lgOpen2(root: HTMLElement, q: number) {
     else R.guests = A.guests || [];
     const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
     if (!H) { fit(); R.fit = fit; window.addEventListener('resize', fit); } else R.fit = null;
-    R.free = { x: A.door.x - 0.2, z: A.door.z - 0.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.04 }; R.sit = null; R.cups = A.cups || (A.cups = []);
+    { const sp0 = A.spawn || { x: A.door.x - 0.2, z: A.door.z - 0.6, yaw: 0.25 }; R.free = { x: sp0.x, z: sp0.z, v: 0, bob: 0 }; R.look = { yaw: sp0.yaw, pitch: -0.04 }; } R.sit = null; R.cups = A.cups || (A.cups = []);
     if (H && H.enterAt) { const e = H.enterAt; H.enterAt = null; R.free = { x: e.x, z: e.z, v: e.v || 0, bob: 0 }; R.look = { yaw: e.yaw, pitch: e.pitch || 0 }; }
     lgInput(root, cv);
     lgStart(root, ren, scene, cam);
@@ -526,7 +583,7 @@ function lgLights(scene: any, q: number) {
     const sp: LgSpec = R.spec, sunK = S.k;
     const win = new T.DirectionalLight(0xEAF2FF, 1.2 * sunK + 0.1); win.position.set(0, sp.H * 1.5, -sp.D * 1.5); win.target.position.set(0, 0, 0); if (q >= 2) { win.castShadow = true; win.shadow.mapSize.set(DESKTOP ? 2048 : 1024, DESKTOP ? 2048 : 1024); const c = win.shadow.camera; c.left = -sp.W / 2; c.right = sp.W / 2; c.top = sp.D; c.bottom = -sp.D; } scene.add(win); scene.add(win.target);
     const nL = DESKTOP ? 6 : q >= 2 ? 4 : 2;
-    for (let i = 0; i < nL; i++) { const L = new T.PointLight(0xFFE6C4, (R.lvl === 2 ? 9 : 7) * (1.2 - 0.5 * sunK), 12, 1.6); L.position.set(-sp.W * 0.35 + (i % 3) * sp.W * 0.35, sp.H - 0.4, -sp.D * 0.2 + Math.floor(i / 3) * sp.D * 0.45); scene.add(L); }
+    for (let i = 0; i < nL; i++) { const L = new T.PointLight(0xFFE6C4, (R.lvl === 2 ? 9 : 7) * 1.25 * (1.2 - 0.5 * sunK), 14, 1.6); L.position.set(-sp.W * 0.35 + (i % 3) * sp.W * 0.35, sp.H - 0.4, -sp.D * 0.2 + Math.floor(i / 3) * sp.D * 0.45); scene.add(L); }
 }
 /** The room comes alive: compiled, shown, drawn every frame (in the building, the building draws it). */
 function lgStart(root: HTMLElement, ren: any, scene: any, cam: any) {
@@ -622,6 +679,7 @@ function lgFrameRest(now: number, dt: number) {
     const held0 = lgHeldCup(), tx = hint === 'bartender' ? 'Click to order a drink at the bar' : hint === 'cup' ? (held0 ? 'You already have something in your hand' : 'Click to pick it up') : hint === 'surface' ? 'Click to put it down here' : held0 && !hint ? (held0.snack && hgProd(held0.snack).type === 'bar' ? 'Click to take a bite · aim at a table or a counter to put it down' : 'Click to sip · aim at a table or a counter to put it down') : hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'vend' ? (R.vend && R.vend.st === 'ready' ? 'Open the flap at the bottom to take it' : 'Click to choose a snack or a drink') : hint === 'flap' ? (R.vend && R.vend.st === 'ready' ? 'Click to take it' : 'The tray') : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : (() => { const G = lgGuestAt(); return G ? `${G.P.name} · ${G.P.cls} to ${(apt(G.P.to) || {} as any).city || G.P.to}, ${new Date(G.P.dep).toTimeString().slice(0, 5)}` : ''; })() || (R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''); dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
   // frame generation: the cup, glass or snack in your hand moves with your view, not with the room
   if (R.perf) { const held = lgHeldCup(); R.perf.anchor = held && held.g ? R.cam : null; R.perf.anchorDraw = held && held.g ? [held.g] : null; }
+  try { lgMirrorsStep(R); } catch (e) { /* no mirror */ }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
   try { lgDrunkScreen(R, lgDrunkK(), now); } catch (e) { /* clear */ }   // straight after drawing: a copy of this picture
 }
@@ -901,6 +959,7 @@ function lgGoto(where: string) {
 LoungeRoom.close = function (quiet?: boolean) {
   const R = LoungeRoom; if (!R.on) return; R.on = false;
   try { lgDrunkClear(R); } catch (e) { /* clear */ }
+  if (!R.host) { for (const m of (R.A && R.A.mirrors) || []) { try { m.userData.dispose(); } catch (e) { /* gone */ } } }
   if (R.host) {   // in the building: only the room's own controls go; the building keeps the room (and its guests)
     const H = R.host; R.host = null;
     clearInterval(R.iv); window.removeEventListener('keydown', R.key$, true); window.removeEventListener('keyup', R.ku$, true); document.removeEventListener('mousemove', R.mm$);

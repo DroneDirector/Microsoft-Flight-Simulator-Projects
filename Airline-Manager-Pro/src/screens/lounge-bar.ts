@@ -134,7 +134,7 @@ function lgBarBuild(A: any, root: any, lv: number, bxp: number, bz: number, z1: 
     B.inst[id] = ims;
   }
   // the glass rack over the counter, hung from the ceiling: glasses upside down by their foot
-  const metal = new T.MeshStandardMaterial({ color: lv === 2 ? 0xB08D57 : 0x2A2D33, metalness: 0.9, roughness: 0.3 });
+  const metal = new T.MeshStandardMaterial({ color: 0xC9A25E, metalness: 0.9, roughness: 0.3 }); void lv;
   const ry = 2.42, rz = bz + 0.02, rack = new T.Group(); rack.name = 'glass-rack'; root.add(rack);
   for (const s of [-1, 1]) { const rail = new T.Mesh(new T.BoxGeometry(3.0, 0.02, 0.02), metal); rail.position.set(bxp, ry, rz + s * 0.12); rack.add(rail); }
   for (const x of [-1.4, 0, 1.4]) { const rod = new T.Mesh(new T.CylinderGeometry(0.008, 0.008, Math.max(0.1, H - ry), 6), metal); rod.position.set(bxp + x, ry + (H - ry) / 2, rz); rack.add(rod); }
