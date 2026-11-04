@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.134 (2026-11-04)
+
+- Joined building in the game (TestRooms game mode, trHost/trEnter/trRoomFrame): office, Operations and the hub lounge run hosted (OfficeRoom/OpsRoom/LoungeRoom open(…, host)); their controls via AbortController; doorways via host.pass/out
+- Office/Operations/Lounge buttons open the building at your chair (trJoined, setting joinedRooms)
+- docs/rooms.md: where everything in each room is built
+
 ## 0.9.133 (2026-11-04)
 
 - Recommended graphics (gfx-advice.ts): gfxSpec (WebGL renderer, AppTools.deviceInfo ramMb/cores/soc/hz, PC /api/sysinfo), gfxRecommend, apply/undo
