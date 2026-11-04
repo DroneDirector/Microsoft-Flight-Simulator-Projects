@@ -262,6 +262,11 @@ Only damage the simulator can actually detect.
 | Drunk passengers at the gate on your flights: deny or allow boarding, with consequences | Built |
 | Real-world crew rules (attendants per seats, co-pilot, mechanics per base and fleet) block flights | Built |
 | Birthday greeting in the app and as a phone notification | Built |
+| Security officers: hire (at least 12 looking for work at the start, new ones every few days, dearer when few are looking) or borrow from other airlines for 30 days | Built |
+| Security incidents in the lounge: two officers talk a drunk or unruly guest out, warnings getting firmer, the guest arguing back and cutting in | Built |
+| Your rules for Security: tasers allowed (the officers warn, draw and use the taser, cuff and walk them out) or forbidden (they call the police, who take over) | Built (setting) |
+| Security officers rank up for keeping to your rules and get a conduct report for force used too early or against them | Built |
+| Security uniforms: jackets, uniform shirts with epaulettes, tactical vests, jumpers; peaked caps, baseball caps, berets; the airline's name with SECURITY GUARD on the chest and back | Built |
 
 ## Flight data
 
@@ -291,3 +296,16 @@ Only damage the simulator can actually detect.
 | Discord posts through a webhook | Built |
 | Public airline page to save and share | Built |
 | Built-in ATC clearance tracking | Planned (the sim doesn't expose clearances directly) |
+
+## Mods
+
+| Feature | Status |
+|---|---|
+| Mod Manager from the start screen, with the title film behind it | Built |
+| Replace any model, picture or sound by its slot ID; the game's own files are never changed | Built |
+| Install packages: a .zip on the phone, the Mods folder on the PC; each package is checked (only models, pictures and sounds, no code; sizes, triangles, slot IDs, game version) | Built |
+| Installed and Browse tabs; sort by load order, newest, updated, name, author, size, category, downloads or rating; filters and search by name, author or slot ID | Built |
+| Details: description, screenshots, slots replaced with a 3D preview beside the game's own, version, changelog, size, author, date, dependencies | Built |
+| Conflicts with a chosen winner, drag the load order, profiles, updates, favourites, ratings, undo, all mods off, health check, storage use | Built |
+| Co-op: compare your mods with your partners' | Built |
+| Mods to download | Built (demo) |

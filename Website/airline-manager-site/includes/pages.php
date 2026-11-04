@@ -18,6 +18,9 @@ function ams_page_defs() {
         'features' => ['title' => 'All features', 'slug' => 'airline-manager-pro-features', 'widgets' => array_merge([
             ['ams-nav', ['solid' => 'yes']], ['ams-features', []], ['ams-download', ['compact' => 'yes']],
         ], $tail)],
+        'modding' => ['title' => 'Modding guide', 'slug' => 'airline-manager-pro-modding', 'widgets' => array_merge([
+            ['ams-nav', ['solid' => 'yes']], ['ams-guide', []], ['ams-download', ['compact' => 'yes']],
+        ], $tail)],
     ];
 }
 

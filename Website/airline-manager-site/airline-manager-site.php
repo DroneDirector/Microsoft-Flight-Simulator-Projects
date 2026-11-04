@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Airline Manager Pro Website
  * Description: The Airline Manager Pro website for Elementor: a showcase home page with a live route map, the app on Android and Windows, downloads that follow the newest release, and the full feature list. Every section is an Elementor widget.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * Requires Plugins: elementor
@@ -13,7 +13,7 @@
 
 if (!defined('ABSPATH')) exit;
 
-define('AMS_VERSION', '1.0.1');
+define('AMS_VERSION', '1.0.2');
 define('AMS_FILE', __FILE__);
 define('AMS_DIR', plugin_dir_path(__FILE__));
 define('AMS_URL', plugin_dir_url(__FILE__));
@@ -42,7 +42,7 @@ function ams_opt($key = null) {
     return $key === null ? $o : ($o[$key] ?? '');
 }
 
-/** Link of one of the plugin's pages ('home', 'features'). */
+/** Link of one of the plugin's pages ('home', 'features', 'modding'). */
 function ams_page_url($key) {
     $ids = (array) get_option('ams_pages', []);
     if (!empty($ids[$key]) && get_post_status($ids[$key])) return get_permalink($ids[$key]);
@@ -173,3 +173,5 @@ add_action('admin_notices', function () {
 register_activation_hook(__FILE__, function () {
     ams_create_pages(false);
 });
+// a page added in a newer version is made once, after the update
+add_action('admin_init', function () { if (get_option('ams_pages_ver') === AMS_VERSION || !did_action('elementor/loaded')) return; ams_create_pages(false); update_option('ams_pages_ver', AMS_VERSION); });

@@ -13,6 +13,7 @@ on:
     paths:
       - 'Website/**'
       - 'Airline-Manager-Pro/docs/FEATURES.md'
+      - 'Airline-Manager-Pro/docs/modding-guide.md'
       - 'Airline-Manager-Pro/src/**'
       - 'Airline-Manager-Pro/www/styles.css'
       - '.github/workflows/airline-manager-pro-website.yml'
@@ -35,6 +36,9 @@ jobs:
 
       - name: Feature list from the app's FEATURES.md
         run: python3 .github/scripts/website-amp/features.py Airline-Manager-Pro/docs/FEATURES.md Website/airline-manager-site/data
+
+      - name: Modding guide from the app's docs/modding-guide.md
+        run: python3 .github/scripts/website-amp/guide.py Airline-Manager-Pro/docs/modding-guide.md Website/airline-manager-site/data
 
       - name: Did the app's screens change?
         id: screens

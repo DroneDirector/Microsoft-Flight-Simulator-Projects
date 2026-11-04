@@ -1,5 +1,5 @@
 // Borrowed crew: when there aren't enough people to hire, other airlines lend you some of theirs (flight attendants,
-// mechanics, ramp teams) on a 30-day contract. They work like your own people but cost far more: 2.5 to 5 times the
+// mechanics, ramp teams, security officers) on a 30-day contract. They work like your own people but cost far more: 2.5 to 5 times the
 // normal pay, paid each week with the salaries. A few days before a contract ends you are told; renew it for another
 // 30 days or send them back. If nothing is done, they go back to their airline the day it ends.
 
@@ -25,15 +25,15 @@ function leaseOffers(role: CrewRole): { from: string; mult: number }[] {
   return out.sort((a, b) => a.mult - b.mult);
 }
 function leasedOf(cid?: string): any[] { const id = cid || State.companyId; return ((State as any).staff || []).filter((p: any) => p.companyId === id && p.lease && !p.left); }
-const LEASE_LABEL: { [r: string]: [string, string] } = { fa: ['flight attendant', 'flight attendants'], mech: ['mechanic', 'mechanics'], ground: ['ramp agent', 'ramp team'] };
+const LEASE_LABEL: { [r: string]: [string, string] } = { fa: ['flight attendant', 'flight attendants'], mech: ['mechanic', 'mechanics'], ground: ['ramp agent', 'ramp team'], security: ['security officer', 'security officers'] };
 
 ACTIONS['crew-lease'] = el => {
   const role = el.getAttribute('data-id') as CrewRole, base = el.getAttribute('data-base') || company().hub, n = Math.max(1, +(el.getAttribute('data-n') || 1));
-  if (LEASE_ROLES.indexOf(role) < 0) return;
-  const sample = makePerson('lease-sample', role, '', base), normal = sample.salary || 1000, L = LEASE_LABEL[role];
+  const sec = (role as string) === 'security'; if (LEASE_ROLES.indexOf(role) < 0 && !sec) return;
+  const sample = sec ? makeSecurity('lease-sample', base, '') : makePerson('lease-sample', role, '', base), normal = sample.salary || 1000, L = LEASE_LABEL[role];
   Sound.tick();
-  openLayer('modal', `<div class="modal-head"><h2>Borrow ${n} ${n === 1 ? L[0] : L[1]}${role === 'ground' ? ` at ${esc(base)}` : ''}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
-    <div class="modal-body"><p class="lede">${icon('info')}Not enough people are looking for work. Other airlines can lend you some of theirs for ${LEASE_DAYS} days. They cost far more than your own crew (your own: about ${money(normal)} a week each). You'll be asked to renew or send them back each month.</p>
+  openLayer('modal', `<div class="modal-head"><h2>Borrow ${n} ${n === 1 ? L[0] : L[1]}${role === 'ground' || sec ? ` at ${esc(base)}` : ''}</h2><button class="icon-btn" data-act="close-layer" aria-label="Close">${icon('close')}</button></div>
+    <div class="modal-body"><p class="lede">${icon('info')}${sec ? 'Short of security officers? ' : 'Not enough people are looking for work. '} Other airlines can lend you some of theirs for ${LEASE_DAYS} days. They cost far more than your own crew (your own: about ${money(normal)} a week each). You'll be asked to renew or send them back each month.</p>
     <div class="lease-offers">${leaseOffers(role).map(o => { const each = Math.round(normal * o.mult / 10) * 10;
       return `<div class="lease-offer"><span><b>${esc(o.from)}</b><small>${money(each)} a week each · ${o.mult}× normal pay · ${money(each * n)} a week for all ${n}</small></span>
         <button class="btn primary sm" data-act="crew-lease-take" data-id="${role}" data-base="${esc(base)}" data-n="${n}" data-from="${esc(o.from)}" data-mult="${o.mult}">Borrow for ${LEASE_DAYS} days</button></div>`; }).join('')}</div></div>`, { cls: 'narrow' });
@@ -44,10 +44,12 @@ ACTIONS['crew-lease-take'] = el => {
   const jobs = ['ramp', 'baggage', 'pushback', 'baggage', 'stairs', 'baggage', 'ramp', 'fuel', 'catering'];
   const names: string[] = [];
   for (let i = 0; i < n; i++) {
-    const p: any = makePerson('lease-' + role + uid(), role, c.id, base);
+    const sec = (role as string) === 'security', p: any = sec ? makeSecurity('lease-sec' + uid(), base, c.id) : makePerson('lease-' + role + uid(), role, c.id, base);
+    if (sec) p.companyId = c.id;
     p.salary = Math.round((p.salary || 1000) * mult / 10) * 10; p.hired = day; p.status = 'on duty';
     p.lease = { from, mult, until, warned: false };
     if (role === 'ground') p.job = jobs[i % jobs.length];
+    if (sec) p.id = 'sec-' + p.id.replace(/^sec-/, '');
     S.staff.push(p); names.push(p.name);
   }
   closeAll(); Store.save();
@@ -90,6 +92,6 @@ function leasedCardHtml(): string {
   const from = L.map((p: any) => p.lease.from).filter((f: string, i: number, l: string[]) => l.indexOf(f) === i);
   return `<div class="card lease-card"><div class="cn-h"><span><b>${icon('swap')}Borrowed crew</b><small>${L.length} from other airlines · ${money(L.reduce((s: number, p: any) => s + (p.salary || 0), 0))} a week</small></span></div>
     ${from.map((f: string) => { const ps = L.filter((p: any) => p.lease.from === f), days = Math.max(0, Math.ceil((Math.min(...ps.map((p: any) => p.lease.until)) - Date.now()) / 864e5));
-      return `<div class="lease-row ${days <= 3 ? 'soon' : ''}"><span><b>${esc(f)}</b><small>${ps.length} · ${esc(ps.map((p: any) => `${p.name} (${ROLE_NAMES[p.role] || p.role}${p.role === 'ground' ? ', ' + p.base : ''})`).slice(0, 4).join(', '))}${ps.length > 4 ? '…' : ''}</small><em>${days ? `Contract ends in ${days} ${days === 1 ? 'day' : 'days'}` : 'Contract ends today'} · ${ps[0].lease.mult}× normal pay</em></span>
+      return `<div class="lease-row ${days <= 3 ? 'soon' : ''}"><span><b>${esc(f)}</b><small>${ps.length} · ${esc(ps.map((p: any) => `${p.name} (${p.job === 'security' ? 'Security' : ROLE_NAMES[p.role] || p.role}${p.role === 'ground' ? ', ' + p.base : ''})`).slice(0, 4).join(', '))}${ps.length > 4 ? '…' : ''}</small><em>${days ? `Contract ends in ${days} ${days === 1 ? 'day' : 'days'}` : 'Contract ends today'} · ${ps[0].lease.mult}× normal pay</em></span>
         <button class="btn sm primary" data-act="lease-renew" data-from="${esc(f)}">Renew ${LEASE_DAYS} days</button><button class="btn sm ghost" data-act="lease-end" data-from="${esc(f)}">Send back</button></div>`; }).join('')}</div>`;
 }
