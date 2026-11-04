@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.127 (2026-11-04)
+
+- Terrain: V3dTerrain.retire / swapIn / dropOld (old ground kept, moved and tilted to the new centre, new rings and sea hidden until complete with satellite), v3dNeedRecentre (35% of the fine ring's half width; 75% while a swap is pending), v3dFreeMesh
+- Clouds: kept in world place on recentre (v3dCloudReplace, lon/lat per puff); key without the origin
+- Rain and snow eased separately (kr, ks)
+- Perf: new pixel ratio applied in skip() before drawing (pending), two readings in a row before changing
+- Sky: wider twilight band, deeper orange near the sun, pink belt opposite, violet zenith, warm glow round a low sun; sun colour and golden light warmer and longer; clouds take more of the tint
+- Lounge coffee: lgPour one at a time, lgCupGroup, lgPickCup, lgPutCup (surfaces), lgSip, lgCupsStep, heat shimmer (lgHeatMat, setting loungeHeat)
+- Market: View (mk-view) opens HangarRoom with a showroom (HgShow)
+
 ## 0.9.126 (2026-11-04)
 
 - Gfx.placeQ / placeSharp / placeShadow / placePeople / placePeopleQ for lounge, hangar and room; placeSettingsHtml tabs Lounges, Hangars, Offices and rooms (place-opt)
