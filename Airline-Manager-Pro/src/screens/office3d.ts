@@ -769,7 +769,7 @@ function ofClickAt(e?: PointerEvent) {
   if (R.bw) { if (R.bw.st === 'hold') ofBowlPut(); return; }   // the food bowl in your hands: a click puts it down
   if (R.ph && R.ph.st !== 'idle') { if (R.ph.st === 'hold') ofPhotoPut(); return; }   // holding the photo: a click puts it back
   // the phone in your hand: a tap brings its screen up; a click on the laptop puts the phone down first, then opens it
-  if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') { if (ofAimed(e) === 'laptop') phoneThen(R, () => ofLaptopOpen()); else ofPhoneOpen(); } return; }
+  if (R.pk && R.pk.st !== 'idle') { if (R.pk.st === 'hold') { const a0 = ofAimed(e); if (a0 === 'laptop') phoneThen(R, () => ofLaptopOpen()); else if (a0 === 'phone') ofPhoneOpen(); else ofPhonePut(); } return; }   // a click on the phone uses it; anywhere else puts it back on the desk
   const a = ofAimed(e) || (R.seat ? '' : ofAimed());
   if (a === 'photo' && R.seat) { ofPhotoPick(); return; }
   if (a === 'phone' && R.seat) { ofPhonePick(); return; }

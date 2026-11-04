@@ -39,6 +39,72 @@ function cabinGeometry(s: ShapeSpec, sy: number, measured?: number[]): { eye: nu
   return { eye, tip, win };
 }
 
+/* ---------- the cabin window (after real ones) ----------
+ * A deep, soft surround in satin white plastic, rounded like a pillow, curling in to a reveal that goes back to the
+ * pane; a thin grey seal round the pane; a pull-down shade with a lip along its edge and a small grip in the middle.
+ * All one shape swept round the window's rounded outline, so it is smooth at any size: more points on the higher
+ * cabin qualities (Very high and Ultra for strong PCs), fewer on phones, never jagged (the shading is smooth). */
+const CabWin: any = { geo: {} };
+/** The rounded outline at offset o outside the pane (w × h, corner r), always the same number of points in the
+ *  same places, so outlines at different offsets line up point for point. */
+function cabWinLoop(w: number, h: number, r: number, o: number, nc: number, ns: number): number[][] {
+  const W = w / 2 + o, H = h / 2 + o, R = Math.max(0.002, r + o), cx = W - R, cy = H - R, out: number[][] = [];
+  const corners = [[cx, cy, 0], [-cx, cy, Math.PI / 2], [-cx, -cy, Math.PI], [cx, -cy, Math.PI * 1.5]];
+  corners.forEach((c, i) => {
+    for (let k = 0; k <= nc; k++) { const a = c[2] + k / nc * Math.PI / 2; out.push([c[0] + Math.cos(a) * R, c[1] + Math.sin(a) * R]); }
+    const n = corners[(i + 1) % 4], a1 = c[2] + Math.PI / 2, p0 = [c[0] + Math.cos(a1) * R, c[1] + Math.sin(a1) * R], p1 = [n[0] + Math.cos(n[2]) * R, n[1] + Math.sin(n[2]) * R];
+    for (let k = 1; k <= ns; k++) { const t = k / (ns + 1); out.push([p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t]); }
+  });
+  return out;
+}
+/** A profile [offset outside the pane, depth (+ towards the cabin)] swept round the outline: one smooth mesh. */
+function cabWinSweep(w: number, h: number, r: number, prof: number[][], nc: number, ns: number): any {
+  const T = THREE, loops = prof.map(p => cabWinLoop(w, h, r, p[0], nc, ns)), n = loops[0].length, P: number[] = [], I: number[] = [];
+  loops.forEach((L, j) => { for (const q of L) P.push(q[0], q[1], prof[j][1]); });
+  for (let j = 0; j < loops.length - 1; j++) for (let i = 0; i < n; i++) { const a = j * n + i, b = j * n + (i + 1) % n, c = (j + 1) * n + i, d = (j + 1) * n + (i + 1) % n; I.push(a, c, b, b, c, d); }
+  const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(P, 3)); g.setIndex(I); g.computeVertexNormals(); return g;
+}
+/** The surround's profile: deep (a single window you sit at) or for the long cabin (set into the wall panel, the
+ *  outer edge sloping back to the cabin's curved wall). Fewer steps on the lighter qualities. */
+function cabWinProfile(kind: 'deep' | 'row', q: number): number[][] {
+  const deep = [[0.075, 0.0], [0.073, 0.008], [0.066, 0.016], [0.055, 0.022], [0.043, 0.024], [0.032, 0.021], [0.024, 0.014], [0.018, 0.004], [0.015, -0.012], [0.012, -0.04], [0.008, -0.08], [0.005, -0.104], [0.002, -0.11]];
+  const row = [[0.12, -0.066], [0.1, -0.034], [0.082, -0.008], [0.073, 0.008], [0.062, 0.016], [0.05, 0.02], [0.038, 0.018], [0.028, 0.011], [0.021, 0.002], [0.017, -0.012], [0.012, -0.034], [0.006, -0.054], [0.002, -0.06]];
+  const pr = kind === 'deep' ? deep : row;
+  if (q >= 2) return pr;
+  const keep = q === 1 ? [0, 1, 2, 3, 4, 6, 7, 8, 10, 12] : [0, 2, 4, 6, 8, 10, 12];
+  return keep.map(i => pr[i]);
+}
+/** The parts of a window for this cabin style and quality, made once and shared. */
+function cabWinParts(st: CabinStyle, kind: 'deep' | 'row'): any {
+  const q = cabinQ(), key = [st.ww, st.wh, st.round, kind, q].join('|'); if (CabWin.geo[key]) return CabWin.geo[key];
+  const T = THREE, ww = st.ww, wh = st.wh, r = Math.min(ww, wh) * st.round, nc = [6, 9, 12, 18][q], ns = [1, 1, 2, 3][q];   // round corners even on Low (only a few hundred points a window)
+  const prof = cabWinProfile(kind, q), back = prof[prof.length - 1][1];
+  const ring = cabWinSweep(ww, wh, r, prof, nc, ns);
+  // the grey seal round the pane
+  const seal = cabWinSweep(ww, wh, r, [[0.004, back + 0.001], [0.0, back - 0.001], [-0.004, back - 0.002]], nc, ns);
+  // the pane itself (the outside is seen through it; on the long cabin, drawn behind it)
+  const pane = new T.ShapeGeometry(new T.Shape(cabWinLoop(ww, wh, r, -0.002, nc, ns).map(p => new T.Vector2(p[0], p[1]))));
+  pane.translate(0, 0, back - 0.003);
+  // the shade: a panel 1 high from its bottom edge up (scaled to how far it is down), its lip and the grip
+  const shade = new T.PlaneGeometry(ww + 0.03, 1); shade.translate(0, 0.5, 0);
+  const lip = new T.BoxGeometry(ww + 0.02, 0.012, 0.014, 1, 1, 1); lip.translate(0, 0.006, 0.007);
+  const grip = new T.CylinderGeometry(0.034, 0.034, 0.01, [12, 16, 20, 28][q], 1, false, Math.PI / 2, Math.PI); grip.rotateX(Math.PI / 2); grip.scale(1, 0.4, 1); grip.translate(0, 0.0, 0.014);   // the half-oval tab under the lip
+  const shadeZ = Math.max(back + 0.03, -0.035);   // just behind the surround's lip, in the reveal
+  return (CabWin.geo[key] = { ring, seal, pane, shade, lip, grip, back, shadeZ, ww, wh, r });
+}
+/** Where the shade's bottom edge is for how far it is down (0 up, the lip just showing at the top; 1 shut). */
+function cabWinShadeY(W: any, k: number): number { const top = W.wh / 2 + 0.004; return top - 0.012 - k * (W.wh - 0.043); }   // shut: the lip and its grip a little above the bottom, as on board
+const CABWIN_MAT: any = {};
+function cabWinMats(): any {
+  if (CABWIN_MAT.ring) return CABWIN_MAT;
+  const T = THREE;
+  CABWIN_MAT.ring = cabinMat(0xF2F0EB, { side: T.DoubleSide });
+  CABWIN_MAT.seal = cabinMat(0xC9CDD2, { side: T.DoubleSide });
+  CABWIN_MAT.shade = cabinMat(0xE3E1DC, { side: T.DoubleSide });
+  CABWIN_MAT.lip = cabinMat(0xF7F5F1, {});
+  return CABWIN_MAT;
+}
+
 function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
   const T = THREE, g = new T.Group(), st = cabinStyle(s);
   const ww = st.ww, wh = st.wh, r = Math.min(ww, wh) * st.round;
@@ -47,25 +113,28 @@ function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
   const mat = (c: number, rough: number, em?: number) => { const m = cabinMat(c, { side: T.DoubleSide }); if (em) { m.emissive = new T.Color(0xFFE2B8); m.emissiveIntensity = em; } void rough; return m; };
   const mWall = cabinMat(st.wall, { side: T.DoubleSide, map: (() => { const t = cabinSatinTex().clone(); t.needsUpdate = true; t.repeat.set(6, 3.4); return t; })() }), mBezel = mat(0xF3F1EC, 0.5), mReveal = mat(new T.Color(st.wall).multiplyScalar(0.94).getHex(), 0.9), mShade = mat(0xEDEAE3, 0.7), mBin = cabinMat(new T.Color(st.wall).lerp(new T.Color(0xFFFFFF), 0.35).getHex(), { side: T.DoubleSide, map: cabinSatinTex() }), mSeat = cabinMat(st.seat, { side: T.DoubleSide, map: cabinFabricTex() }), mTrim = mat(st.trim, 0.45), mDark = mat(0x3A3D42, 0.8);
   // the wall: a large panel with the window cut out, its frame going back through the wall's thickness
-  const wall = new T.Mesh(new T.ExtrudeGeometry(shapeWith(rr(8, 4.6, 0.01), rr(ww + 0.12, wh + 0.15, r + 0.06)), { depth: 0.02, bevelEnabled: false }), mWall);
+  const wpitch = Math.max(0.5, s.win.pitch || 0.53) * 1.95, nq = cabinQv([12, 24, 40, 64]), wsh = new T.Shape(rr(8, 4.6, 0.01).getPoints(nq));
+  for (const dx of [0, -1, 1]) wsh.holes.push(new T.Path(rr(ww + 0.11, wh + 0.11, r + 0.07).getPoints(nq).map((p: any) => new T.Vector2(p.x + dx * wpitch, p.y))));   // this window and the next ones along
+  const wall = new T.Mesh(new T.ExtrudeGeometry(wsh, { depth: 0.02, bevelEnabled: false }), mWall);
   // the rest of the cabin around the seat, closed all round (only the window looks out), so no sky shows through a gap
   const roomM = [mWall, mWall, cabinMat(0xEDEEEF, { side: T.BackSide }), cabinMat(0x3A3F48, { side: T.BackSide, map: cabinCarpetTex() }), mWall, new T.MeshBasicMaterial({ visible: false })];
   const room = new T.Mesh(new T.BoxGeometry(8, 4, 3), roomM); room.position.set(0, 0.3, 0.03 + 1.5); g.add(room);
   wall.position.z = 0.02; g.add(wall);
-  const bezel = new T.Mesh(new T.ExtrudeGeometry(shapeWith(rr(ww + 0.13, wh + 0.16, r + 0.065), rr(ww + 0.02, wh + 0.03, r + 0.01)), { depth: 0.02, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2 }), mBezel);
-  bezel.position.z = 0.015; g.add(bezel);
-  const reveal = new T.Mesh(new T.ExtrudeGeometry(shapeWith(rr(ww + 0.04, wh + 0.05, r + 0.02), rr(ww, wh, r)), { depth: 0.13, bevelEnabled: false }), mReveal);
-  reveal.position.z = -0.11; g.add(reveal);
-  // the pane: a faint tint and a hint of the cabin's reflection
-  const pane = new T.Mesh(new T.ShapeGeometry(new T.Shape(rr(ww, wh, r).getPoints(cabinQv([12, 24, 40, 64])))), new T.MeshBasicMaterial({ color: 0x9FB4C8, transparent: true, opacity: 0.08, depthWrite: false, side: T.DoubleSide }));
-  pane.material.userData.noDim = true; pane.position.z = -0.1; g.add(pane);
-  // the shade, pushed up most of the way, its pull lip showing at the top of the window
-  if (st.shade === 'blind') {
-    const shade = new T.Mesh(new T.BoxGeometry(ww + 0.01, 0.05, 0.012), mShade); shade.position.set(0, wh / 2 - 0.01, -0.02); g.add(shade);
-    const lip = new T.Mesh(new T.BoxGeometry(ww * 0.45, 0.018, 0.022), mTrim); lip.position.set(0, wh / 2 - 0.035, -0.008); g.add(lip);
-  } else if (st.shade === 'dim') {   // the dimming button under the window
-    const btn = new T.Mesh(new T.BoxGeometry(0.03, 0.06, 0.012), mat(0x2C3138, 0.4, 0.4)); btn.position.set(0, -wh / 2 - 0.09, 0.01); g.add(btn);
+  // the window, after real ones: the soft surround and its deep reveal, the seal, the pane, the shade pushed up
+  // (its lip just showing at the top), as in the photo of an open window
+  const W = cabWinParts(st, 'deep'), WM = cabWinMats(), wg = new T.Group(); wg.position.z = 0.02; g.add(wg);
+  wg.add(new T.Mesh(W.ring, WM.ring), new T.Mesh(W.seal, WM.seal));
+  const pane = new T.Mesh(W.pane, new T.MeshBasicMaterial({ color: 0x9FB4C8, transparent: true, opacity: 0.08, depthWrite: false, side: T.DoubleSide })); pane.material.userData.noDim = true; wg.add(pane);
+  const shadeAt = (par: any, k: number) => {
+    if (st.shade !== 'blind') return;
+    const y = cabWinShadeY(W, k), sh = new T.Mesh(W.shade, WM.shade); sh.position.set(0, y, W.shadeZ); sh.scale.y = W.wh + 0.08; par.add(sh);
+    const lp = new T.Mesh(W.lip, WM.lip); lp.position.set(0, y, W.shadeZ); par.add(lp); const gp = new T.Mesh(W.grip, WM.lip); gp.position.set(0, y, W.shadeZ); par.add(gp);
+  };
+  shadeAt(wg, 0.02);
+  if (st.shade === 'dim') {   // the dimming button under the window
+    const btn = new T.Mesh(new T.BoxGeometry(0.03, 0.06, 0.012), mat(0x2C3138, 0.4, 0.4)); btn.position.set(0, -wh / 2 - 0.1, 0.03); g.add(btn);
   }
+  void mShade; void mReveal; void mBezel;
   // the overhead bin: above the window, coming out over the seats, with its lower lip and a reading-light strip
   if (st.bin !== 'none') {
     const big = st.bin === 'small' ? 0.7 : 1, binH = 0.42 * big, binD = 0.62 * big;
@@ -89,8 +158,9 @@ function cabinBuild(s: ShapeSpec, sy: number, win: number[]): any {
   const head = new T.Mesh(new T.BoxGeometry(0.14, 0.24, 0.42), cabinMat(st.head, { map: cabinLeatherTex() })); head.position.set(-0.62, -wh / 2 + 0.38, 0.42); g.add(head);
   // the next window along, on both sides (part of the row)
   for (const dx of [-1, 1]) {
-    const pitch = Math.max(0.5, s.win.pitch || 0.53), bz = new T.Mesh(bezel.geometry, mBezel); bz.position.set(dx * pitch * 1.95, 0, 0.015); g.add(bz);
-    const dk = new T.Mesh(new T.ShapeGeometry(new T.Shape(rr(ww, wh, r).getPoints(cabinQv([12, 24, 40, 64])))), mat(0xB8C4D0, 0.3)); dk.position.set(dx * pitch * 1.95, 0, -0.02); g.add(dk);
+    const pitch = Math.max(0.5, s.win.pitch || 0.53), ng = new T.Group(); ng.position.set(dx * pitch * 1.95, 0, 0.02); g.add(ng);
+    ng.add(new T.Mesh(W.ring, WM.ring), new T.Mesh(W.seal, WM.seal), new T.Mesh(W.pane, mat(0xB8C4D0, 0.3)));
+    shadeAt(ng, dx < 0 ? 1 : 0.55);   // the neighbours' shades: one shut, one half down
   }
   // place it: the panel's x along the fuselage, y up, z into the cabin (aircraft axes → the model's)
   const ex = _av(1, 0, 0), ey = _av(0, 0, 1), ez = _av(0, -sy, 0), o = _av(win[0], win[1], win[2]);
@@ -481,20 +551,29 @@ function cabinFwdBuild(P: any, s: ShapeSpec, f: any): any {
   // the windows along both walls
   const pitch = Math.max(0.45, s.win.pitch || 0.53), nW = Math.floor((s.win.to - s.win.from) / pitch), zW = Math.min(zf + 1.12, zc + ri * 0.2);   // window middle about 1.1 m above the floor, as in real cabins
   if (!V3dCabinF.winTex) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 96; const x = cv.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 64, 96); x.fillStyle = '#fff'; x.beginPath(); (x as any).roundRect ? (x as any).roundRect(4, 4, 56, 88, 24) : x.rect(4, 4, 56, 88); x.fill(); V3dCabinF.winTex = new T.CanvasTexture(cv); }
-  const winGeo = new T.PlaneGeometry(st.ww * 1.25, st.wh * 1.2), winMat = cabinOutsideMat() || new T.MeshBasicMaterial({ color: 0xFFFFFF, map: cabinSkyTex(), alphaMap: V3dCabinF.winTex, transparent: true, fog: false }); winMat.userData.noDim = true;
+  const winGeo = new T.PlaneGeometry(st.ww * 1.08, st.wh * 1.06), winMat = cabinOutsideMat() || new T.MeshBasicMaterial({ color: 0xFFFFFF, map: cabinSkyTex(), alphaMap: V3dCabinF.winTex, transparent: true, fog: false }); winMat.userData.noDim = true;
   const wins = new T.InstancedMesh(winGeo, winMat, nW * 2), M = new T.Matrix4(), Q = new T.Quaternion(), S = new T.Vector3(1, 1, 1);
   let wi = 0;
+  // each window: its frame set into the wall panel, 7 cm in from the cabin's curved wall (room for the reveal)
+  const WR = cabWinParts(st, 'row'), WMr = cabWinMats(), frames: any[] = [], IN = 0.07;
   for (let i = 0; i < nW; i++) for (const side of [-1, 1]) {
-    const wy = Math.sqrt(Math.max(0, ri * ri - (zW - zc) * (zW - zc))) - 0.02;
-    Q.setFromEuler(new T.Euler(0, side > 0 ? 0 : Math.PI, 0)); M.compose(V(s.win.from + i * pitch, side * wy, zW), Q, S); wins.setMatrixAt(wi++, M);
+    const wy = Math.sqrt(Math.max(0, ri * ri - (zW - zc) * (zW - zc))) - 0.02 - IN;
+    Q.setFromEuler(new T.Euler(0, side > 0 ? 0 : Math.PI, 0)); M.compose(V(s.win.from + i * pitch, side * wy, zW), Q, S);
+    frames.push(M.clone());
+    const Mo = M.clone().multiply(new T.Matrix4().makeTranslation(0, 0, WR.back - 0.004));   // the view out: just behind the pane
+    wins.setMatrixAt(wi++, Mo);
   }
   g.add(wins); g.userData.wins = wins;
-  if (!V3dCabinF.bezTex) { const cv = document.createElement('canvas'); cv.width = 96; cv.height = 128; const x = cv.getContext('2d'); const rr = (a: number, b: number, w: number, h: number, r: number) => { x.beginPath(); (x as any).roundRect ? (x as any).roundRect(a, b, w, h, r) : x.rect(a, b, w, h); };
-    x.fillStyle = '#E4E6E8'; rr(2, 2, 92, 124, 40); x.fill(); const gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(0,0,0,.18)'); gr.addColorStop(0.5, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(255,255,255,.2)'); x.fillStyle = gr; rr(2, 2, 92, 124, 40); x.fill();
-    x.globalCompositeOperation = 'destination-out'; rr(18, 18, 60, 92, 26); x.fill(); V3dCabinF.bezTex = new T.CanvasTexture(cv); V3dCabinF.bezTex.colorSpace = T.SRGBColorSpace; }
-  const bez = new T.InstancedMesh(new T.PlaneGeometry(st.ww * 1.9, st.wh * 1.65), cabinMat(0xFFFFFF, { map: V3dCabinF.bezTex, transparent: true, alphaTest: 0.5 }), nW * 2);
-  for (let i = 0; i < nW * 2; i++) { wins.getMatrixAt(i, M); const e = new T.Matrix4().makeTranslation(0, 0, 0.012); M.multiply(e); bez.setMatrixAt(i, M); }
-  g.add(bez);
+  // the surrounds and the seals: every window in one draw each
+  const nF = frames.length, inst = (geo: any, m: any, at: (i: number, M: any) => any) => { const im = new T.InstancedMesh(geo, m, nF); for (let i = 0; i < nF; i++) im.setMatrixAt(i, at(i, frames[i])); im.instanceMatrix.needsUpdate = true; g.add(im); return im; };
+  inst(WR.ring, WMr.ring, (i, F) => F); inst(WR.seal, WMr.seal, (i, F) => F);
+  // the shades: most up, some halfway, a few down (as on a real flight); at night more of them down
+  if (st.shade === 'blind') {
+    const night = (() => { try { return ((V3dSky as any).U ? (V3dSky as any).U.uNight.value : 0) > 0.6; } catch (e) { return false; } })();
+    const ks = frames.map((F, i) => { const r2 = cloudHash(i, 7, 911); return r2 < (night ? 0.35 : 0.12) ? 1 : r2 < (night ? 0.5 : 0.25) ? 0.35 + cloudHash(i, 9, 913) * 0.4 : 0.02; });
+    const at = (i: number, F: any, sh: boolean) => F.clone().multiply(new T.Matrix4().compose(new T.Vector3(0, cabWinShadeY(WR, ks[i]), WR.shadeZ), new T.Quaternion(), new T.Vector3(1, sh ? WR.wh + 0.08 : 1, 1)));
+    inst(WR.shade, WMr.shade, (i, F) => at(i, F, true)); inst(WR.lip, WMr.lip, (i, F) => at(i, F, false)); inst(WR.grip, WMr.lip, (i, F) => at(i, F, false));
+  }
   // every window shade is up: the view out of each one
   // the seats, row by row, from the passenger list's layout (first class and business at the front, wider)
   const list: PaxSeat[] = f ? (() => { try { return manifestOf(f); } catch (e) { return []; } })() : [];
