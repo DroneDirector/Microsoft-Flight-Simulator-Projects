@@ -9,7 +9,7 @@ const MM_FILTERS: [string, string][] = [['on', 'On'], ['off', 'Off'], ['conflict
 /** Open: the splash ("Loading Mod Manager") while the list, the Mods folder and the check are got ready. */
 ACTIONS['ts-mods'] = () => {
   const T = TitleScreen; if (!T.on || MM.on) return; Sound.tick(); titlePanel('');
-  MM.on = true; T.root.classList.add('mm-on');
+  MM.on = true; T.root.classList.add('mm-on'); mmPhoneMark();
   const sp = document.createElement('div'); sp.className = 'mm-splash'; sp.innerHTML = `<div class="mm-sp-in"><div class="mm-sp-ring"><i></i><i></i><i></i></div><h2>Loading Mod Manager</h2><div class="mm-sp-bar"><i style="width:0%"></i></div><small>Reading your mods…</small><b class="mm-sp-pct">0%</b></div>`;
   T.root.appendChild(sp); requestAnimationFrame(() => sp.classList.add('in'));
   const step = (k: number, what: string) => { const b = sp.querySelector('.mm-sp-bar i') as HTMLElement; if (b) b.style.width = k + '%'; const s = sp.querySelector('small'); if (s) s.textContent = what; const p = sp.querySelector('.mm-sp-pct'); if (p) p.textContent = Math.round(k) + '%'; };
@@ -26,7 +26,12 @@ ACTIONS['ts-mods'] = () => {
     if (MM.scan && MM.scan.failed.length) toast(`${MM.scan.failed.length} package${MM.scan.failed.length === 1 ? '' : 's'} in your Mods folder couldn't be installed`, 'info');
   })();
 };
-ACTIONS['mm-close'] = () => { Sound.tick(); mmPreviewClose(); const T = TitleScreen; if (MM.root) { MM.root.classList.remove('in'); const r = MM.root; setTimeout(() => r.remove(), 350); } MM.root = null; MM.on = false; MM.sel = ''; if (T.root) T.root.classList.remove('mm-on', 'mm-dim'); };
+ACTIONS['mm-close'] = () => { Sound.tick(); mmPreviewClose(); const T = TitleScreen; if (MM.root) { MM.root.classList.remove('in'); const r = MM.root; setTimeout(() => r.remove(), 350); } MM.root = null; MM.on = false; MM.sel = ''; if (T.root) T.root.classList.remove('mm-on', 'mm-dim', 'mm-phone'); };
+
+/** Phones get their own layout (the whole page scrolls, smaller header and tools, details over the list). Decided
+ *  by the device's screen, not the window: tablets (the iPad mini and up) and the PC keep the full layout. */
+function mmPhone(): boolean { if (DESKTOP) return false; const w = screen.width || innerWidth, h = screen.height || innerHeight; return Math.min(w, h) < 600; }
+function mmPhoneMark() { const on = mmPhone(); if (MM.root) { MM.root.classList.toggle('phone', on); if (on && !MM.root._sc) { MM.root._sc = 1; MM.root.addEventListener('scroll', () => MM.root && MM.root.classList.toggle('scrolled', MM.root.scrollTop > 60), { passive: true }); } } if (TitleScreen.root) TitleScreen.root.classList.toggle('mm-phone', on && MM.on); }
 
 /* ---------- the list ---------- */
 interface MmRow { id: string; name: string; author: string; version: string; game: string; cat: string; desc: string; size: number; date: number; downloads: number; rating: number; official: boolean; demo: boolean; installed: ModRec | null; slots: string[]; tint: string }
@@ -73,7 +78,7 @@ function mmShot(r: { id: string; cat: string; tint: string; name: string }, k: n
 
 /* ---------- drawing the page ---------- */
 function mmRender() {
-  const r = MM.root; if (!r) return; const S = modsState(), conf = modConflicts(), ups = S.mods.filter(m => modUpdate(m)).length, coop = (() => { try { return coopOn(); } catch (e) { return false; } })();
+  const r = MM.root; if (!r) return; mmPhoneMark(); const S = modsState(), conf = modConflicts(), ups = S.mods.filter(m => modUpdate(m)).length, coop = (() => { try { return coopOn(); } catch (e) { return false; } })();
   const tabs: [string, string, number | string][] = [['installed', 'Installed', S.mods.length], ['browse', 'Browse', MOD_DEMO.length], ['slots', 'Slots', modSlots().length]];
   if (coop) tabs.push(['coop', 'Co-op', '']);
   const st = MM.store, quota = st && st.quota ? st.quota : 0;

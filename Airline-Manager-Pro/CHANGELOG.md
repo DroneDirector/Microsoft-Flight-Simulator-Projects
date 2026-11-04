@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.155
+- Mod Manager scrolls and fits on phones; tablets and the PC unchanged.
+
 ## 0.9.154
 - Security incidents in the lounge: warnings, the taser or the police by your rules, cuffs and escort; more officers to hire, and officers to borrow. The Mod Manager on the start screen.
 

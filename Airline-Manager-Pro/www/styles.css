@@ -4570,3 +4570,27 @@ body.scn-set-on .fg-mon { z-index: 1201; }
   .mm-tb { padding: 6px 8px; font-size: 12px; } .mm-foot-r { display: none; }
 }
 .ts.mm-on .ts-ver { display: none; }
+/* Mod Manager on phones only (.phone is set from the device's screen size; tablets and the PC never get it) */
+.ts.mm-phone .ts-left { padding: 6px 0 0 12px; } .ts.mm-phone .ts-logo { animation: none; transform: scale(.26); transform-origin: left top; } .ts.mm-phone .ts-mute { transform: scale(.8); transform-origin: right bottom; opacity: .75; }
+.mm.phone { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; display: block; padding: 50px max(10px, env(safe-area-inset-right)) 70px max(10px, env(safe-area-inset-left)); }
+.mm.phone > * { margin-bottom: 8px; }
+.mm.phone .mm-top { flex-direction: column; align-items: stretch; gap: 6px; }
+.mm.phone .mm-title h1 { font-size: 18px; } .mm.phone .mm-title small { display: none; }
+.mm.phone .mm-tools { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; } .mm.phone .mm-tools::-webkit-scrollbar { display: none; }
+.mm.phone .mm-tools > * { flex: none; } .mm.phone .mm-tb { padding: 6px 9px; font-size: 12px; } .mm.phone .mm-tools .ts-x { position: fixed; top: 8px; right: 10px; z-index: 5; width: 32px; height: 32px; background: rgba(14, 10, 40, .85); transition: opacity .2s, transform .2s; }
+.mm.phone.scrolled .mm-tools .ts-x { opacity: 0; transform: scale(.6); pointer-events: none; }
+.mm.phone .mm-tab { padding: 7px 10px; font-size: 11.5px; }
+.mm.phone .mm-note, .mm.phone .mm-health { padding: 6px 10px; font-size: 12px; }
+.mm.phone .mm-body, .mm.phone .mm-body.has-det { display: block; }
+.mm.phone .mm-main, .mm.phone .mm-det { overflow: visible; padding: 8px; }
+.mm.phone .mm-body.has-det .mm-main { display: none; }
+.mm.phone .mm-bar { gap: 6px; } .mm.phone .mm-search { flex-basis: 100%; } .mm.phone .mm-sel { flex: 1; }
+.mm.phone .mm-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .mm.phone .mm-chips::-webkit-scrollbar { display: none; } .mm.phone .mm-chip { flex: none; }
+.mm.phone .mm-hint { font-size: 11px; }
+.mm.phone .mm-card { gap: 7px; padding: 6px; } .mm.phone .mm-thumb img { width: 64px; height: 40px; } .mm.phone .mm-meta, .mm.phone .mm-n { display: none; }
+.mm.phone .mm-txt b { font-size: 13px; } .mm.phone .mm-fav { width: 22px; }
+.mm.phone .mm-shots img { width: 88%; }
+.mm.phone .mm-tr { grid-template-columns: 1fr 1fr; } .mm.phone .mm-th { display: none; }
+.mm.phone .mm-foot { font-size: 11px; } .mm.phone .mm-foot-r { display: none; }
+.mm.phone .mm-prev { width: calc(100% - 16px); padding: 8px; gap: 6px; } .mm.phone .mm-pv-c canvas { height: min(58vh, 300px); } .mm.phone .mm-pv-spec { font-size: 11px; gap: 8px; } .mm.phone .mm-pv-spec small { display: none; }
+@media (orientation: portrait) { .mm.phone .mm-pv-c canvas { height: 46vh; } }
