@@ -299,6 +299,7 @@ function v3dDist(): number { const p = V3d.planes[V3d.target]; const span = p ? 
 function v3dTap(x: number, y: number) {
   if (aimLocked(V3d.cv)) { x = innerWidth / 2; y = innerHeight / 2; }   // walking with the mouse taken: what is at the dot in the middle
   if (V3d.mode === 'cabin' || V3d.mode === 'walk') { try { if (cabinTap(x, y)) return; } catch (e) { /* the aircraft below */ } }
+  if (/^win/.test(V3d.mode)) { try { const Gw = V3dCabin.grp, SW = Gw && Gw.userData.shade; if (SW) { const r0 = new THREE.Raycaster(); r0.setFromCamera(new THREE.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1), V3d.cam); if (r0.intersectObjects(SW.hit, false).length && cabShadeToggle(SW, 0)) return; } } catch (e) { /* the aircraft below */ } }   // your window's shade
   const T = THREE, ray = new T.Raycaster(), v = new T.Vector2(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
   ray.setFromCamera(v, V3d.cam);
   const objs: any[] = []; for (const id in V3d.planes) objs.push(V3d.planes[id].model);
