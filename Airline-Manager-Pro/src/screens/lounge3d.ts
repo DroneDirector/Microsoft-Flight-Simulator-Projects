@@ -271,7 +271,7 @@ function lgBuild(scene: any, q: number): any {
     const fx = x1 - 0.62, fz = cz - 1.6;
     HG_VR = LoungeRoom; hgVendBuild(A, fx, fz, -Math.PI / 2); }
   // a magazine rack by the door, the departures screen on the front wall
-  { const mx = x0 + 1.2, mz = z1 - 0.5;
+  { const mx = x0 + (lv >= 1 ? 0.62 : 1.2), mz = z1 - 0.5;   // beside the bar's end on the bar's levels
     prop('magazine-rack', mx, mz, Math.PI, () => { bx(0.7, 1.0, 0.3, lv === 0 ? M({ color: 0x3C5A72 }) : walnut, mx, 0.5, mz); const cols = [0xC0392B, 0x2E5C8A, 0xF2B544, 0x2F6B4A, 0x8E44AD, 0xE67E22]; for (let r = 0; r < 3; r++) for (let i = 0; i < 2; i++) { const m = new T.Mesh(new T.PlaneGeometry(0.26, 0.3), M({ color: cols[(r * 2 + i) % cols.length] })); m.position.set(mx - 0.16 + i * 0.32, 0.3 + r * 0.3, mz - 0.17); m.rotation.set(0.15, Math.PI, 0); root.add(m); } });
     block(mx - 0.45, mz - 0.3, mx + 0.45, z1);
     // the flight boards: Departures and Arrivals side by side, 30 cm apart (fids3d.ts)
@@ -430,7 +430,7 @@ function lgSpots(): { k: string; x: number; z: number; ry: number; t: [number, n
   const cx = x1 - 3.0, cz = z1 - 1.0, out: any[] = [
     { k: 'coffee', x: cx - 1.1, z: cz - 0.85, ry: 0, t: [8, 16] }, { k: 'tea', x: cx - 0.35, z: cz - 0.85, ry: 0, t: [8, 14] }, { k: 'snacks', x: cx + 1.0, z: cz - 0.85, ry: 0, t: [5, 10] },
     { k: 'fridge', x: x1 - 1.45, z: cz - 1.6, ry: Math.PI / 2, t: [6, 12] },
-    { k: 'magazines', x: x0 + 1.2, z: z1 - 1.2, ry: 0, t: [8, 18] },
+    { k: 'magazines', x: x0 + (lv >= 1 ? 0.62 : 1.2), z: z1 - 1.2, ry: 0, t: [8, 18] },
     { k: 'departures', x: -W * 0.05, z: z1 - 2.6, ry: 0, t: [10, 22] },
     { k: 'window', x: -W * 0.3, z: z0 + 0.9, ry: Math.PI, t: [15, 35] }, { k: 'window', x: W * 0.05, z: z0 + 0.9, ry: Math.PI, t: [15, 35] }, { k: 'window', x: W * 0.35, z: z0 + 0.9, ry: Math.PI, t: [15, 35] },
   ];
