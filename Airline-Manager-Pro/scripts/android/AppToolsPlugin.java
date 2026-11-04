@@ -138,6 +138,49 @@ public class AppToolsPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /* ---------- printing a document on a real printer (Android's print screen) ---------- */
+
+    /** A page made in the game (a report, a schedule): Android's print screen with the page ready to print or save as PDF. */
+    @PluginMethod
+    public void printHtml(final PluginCall call) {
+        final String html = call.getString("html", ""), name = call.getString("name", "Document");
+        getActivity().runOnUiThread(() -> {
+            try {
+                final android.webkit.WebView wv = new android.webkit.WebView(getActivity());
+                wv.setWebViewClient(new android.webkit.WebViewClient() {
+                    @Override public void onPageFinished(android.webkit.WebView view, String url) {
+                        android.print.PrintManager pm = (android.print.PrintManager) getActivity().getSystemService(Context.PRINT_SERVICE);
+                        if (pm != null) pm.print(name, view.createPrintDocumentAdapter(name), new android.print.PrintAttributes.Builder().build());
+                        call.resolve(new JSObject());
+                    }
+                });
+                wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+            } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
+        });
+    }
+
+    /** A PDF (from your device, kept in the game): straight to Android's print screen. */
+    @PluginMethod
+    public void printPdf(final PluginCall call) {
+        try {
+            final byte[] data = android.util.Base64.decode(call.getString("base64", ""), android.util.Base64.DEFAULT);
+            final String name = call.getString("name", "Document");
+            android.print.PrintManager pm = (android.print.PrintManager) getActivity().getSystemService(Context.PRINT_SERVICE);
+            if (pm == null) { call.reject("No printing on this device"); return; }
+            pm.print(name, new android.print.PrintDocumentAdapter() {
+                @Override public void onLayout(android.print.PrintAttributes o, android.print.PrintAttributes n, android.os.CancellationSignal c, LayoutResultCallback cb, android.os.Bundle b) {
+                    if (c.isCanceled()) { cb.onLayoutCancelled(); return; }
+                    cb.onLayoutFinished(new android.print.PrintDocumentInfo.Builder(name + ".pdf").setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build(), true);
+                }
+                @Override public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor dest, android.os.CancellationSignal c, WriteResultCallback cb) {
+                    try (OutputStream out = new FileOutputStream(dest.getFileDescriptor())) { out.write(data); cb.onWriteFinished(new android.print.PageRange[] { android.print.PageRange.ALL_PAGES }); }
+                    catch (Exception e) { cb.onWriteFailed(String.valueOf(e.getMessage())); }
+                }
+            }, null);
+            call.resolve(new JSObject());
+        } catch (Exception e) { call.reject(String.valueOf(e.getMessage())); }
+    }
+
     /** Android's own Bluetooth settings. */
     @PluginMethod
     public void btSettings(PluginCall call) {

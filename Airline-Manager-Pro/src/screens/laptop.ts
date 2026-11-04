@@ -13,31 +13,32 @@
 //    engine; on the phone in a browser view laid over the laptop's screen. Videos go full screen and come back.
 // Everything works on the phone and on the PC.
 
-interface LapMail { id: string; at: number; from: string; addr: string; subject: string; body: string; kind: 'court' | 'report' | 'lease' | 'family' | 'bank' | 'note'; ref?: string; read?: boolean; acts?: { label: string; act: string; data?: string; kind?: string }[]; done?: string; offer?: any; fam?: any }
+interface LapMail { id: string; at: number; from: string; addr: string; subject: string; body: string; kind: 'court' | 'report' | 'lease' | 'family' | 'bank' | 'note' | 'spam'; box?: string; star?: boolean; ref?: string; read?: boolean; acts?: { label: string; act: string; data?: string; kind?: string }[]; done?: string; offer?: any; fam?: any }
 interface CalNote { id: string; date: string; text: string; told?: boolean }
 interface SubAcct { id: string; name: string; kind: string; balance: number; opened: number; tx?: { at: number; label: string; amount: number }[] }
 /** A line in an account of your own's history (newest first, the last 300 kept). */
 function lapSubTx(a: SubAcct, label: string, amount: number) { a.tx = a.tx || []; a.tx.unshift({ at: Date.now(), label, amount }); if (a.tx.length > 300) a.tx.length = 300; }
 
 const LAP_APPS: [string, string, string, string][] = [
-  ['mail', 'Mail', 'mail', '#3FA2F0'], ['calendar', 'Calendar', 'calendar', '#F06A6A'], ['bank', 'Bank', 'bank', '#2FBF8F'], ['photos', 'Screenshots', 'camera', '#B07CF0'],
-  ['ranking', 'Ranking', 'trophy', '#F5B544'], ['career', 'My career', 'user', '#3FD0E8'], ['markets', 'Markets', 'fuel', '#E98B3A'], ['acmarket', 'Aircraft market', 'market', '#7C8CF0'], ['browser', 'Web browser', 'globe', '#5BC0EB'],
+  ['mail', 'Mail', 'mail', '#3FA2F0'], ['calendar', 'Calendar', 'calendar', '#F06A6A'], ['bank', 'Bank', 'bank', '#2FBF8F'], ['docs', 'My Documents', 'news', '#4F8CF6'], ['photos', 'Photos', 'camera', '#B07CF0'], ['videos', 'Videos', 'cinema', '#E2557A'], ['recorder', 'Recorder', 'cinema', '#F0546E'],
+  ['ranking', 'Ranking', 'trophy', '#F5B544'], ['career', 'My career', 'user', '#3FD0E8'], ['markets', 'Markets', 'fuel', '#E98B3A'], ['acmarket', 'Aircraft market', 'market', '#7C8CF0'], ['browser', 'Web browser', 'globe', '#5BC0EB'], ['settings', 'Settings', 'gear', '#8A97A8'],
 ];
 const Lap: any = { app: '', root: null as HTMLElement, clock: 0, mailId: '', calMonth: '', photo: '', bankTab: 'main', web: null as any, webUrl: 'https://www.youtube.com', native: null as any };
 
 function lapS(): any { const S: any = State; S.mail = S.mail || []; S.calendar = S.calendar || []; S.bankSubs = S.bankSubs || {}; S.mailSeen = S.mailSeen || {}; return S; }
 function lapMail(): LapMail[] { return lapS().mail; }
-function lapUnread(): number { return lapMail().filter(m => !m.read).length; }
+function lapUnread(): number { return lapMail().filter(m => !m.read && !m.box).length; }   // the inbox's (not Spam, Deleted or your folders)
 function lapGameNow(): Date { try { return companyDate(); } catch (e) { return new Date(); } }
 function lapYmd(d: Date): string { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
 /* ---------- mail ---------- */
 function mailAdd(m: Partial<LapMail> & { from: string; subject: string; body: string; kind: LapMail['kind'] }) {
   const S = lapS(); const full: LapMail = Object.assign({ id: 'm-' + uid(), at: Date.now(), addr: '', read: false }, m) as LapMail;
+  if (full.kind === 'spam') full.box = 'spam';
   S.mail.unshift(full); S.mail = S.mail.slice(0, 300);
   try { renderTopbar(); } catch (e) { /* not ready */ }
   lapRefresh();
-  phoneNote({ title: full.from, body: full.subject, ic: 'mail', c: '#2C8CFF', app: 'mail', id: full.id });
+  if (full.kind !== 'spam') phoneNote({ title: full.from, body: full.subject, ic: 'mail', c: '#2C8CFF', app: 'mail', id: full.id });
   return full;
 }
 /** A notification sliding down from the top of the phone while you are using it (new mail, messages from the
@@ -70,8 +71,15 @@ function phoneNote(n: { title: string; body?: string; ic?: string; c?: string; a
 }
 /** Every minute (with the court's clock): new mail from the court and the investigators, lease requests, the family,
  *  and the calendar's reminders. */
+const MAIL_SPAM: [string, string, string][] = [
+  ['Prize Department', 'You have won a free A380!!', 'Congratulations! Your airline was chosen to receive a brand new A380 at no cost. Just send the delivery fee to claim it today.'],
+  ['Cheap Fuel Direct', 'Jet fuel at half price, today only', 'Unbeatable deal: jet fuel at 50% off, cash only, no questions. Reply now.'],
+  ['Pilot Lottery', 'Your licence number won the lottery', 'Your pilot licence number was drawn. Confirm your bank details to receive the winnings.'],
+  ['Mr. Crown Prince', 'A business proposal of great importance', 'I wish to move 40 aircraft through your airline and share the profit. Kindly send your password.'],
+];
 function mailTick() {
   const S = lapS(), now = Date.now(), co: any = company(); if (!co) return;
+  if (Math.random() < 0.004 && now - (S.spamAt || 0) > 6 * 3600e3) { S.spamAt = now; const x = MAIL_SPAM[Math.floor(Math.random() * MAIL_SPAM.length)]; mailAdd({ from: x[0], addr: x[0].toLowerCase().replace(/[^a-z]+/g, '') + '@offers.example', subject: x[1], body: x[2], kind: 'spam' }); }
   // the court and the investigators write to you too (the bell keeps its own copy)
   for (const n of (State.notices as any[]).slice(0, 40)) {
     if (S.mailSeen[n.id]) continue;
@@ -204,6 +212,7 @@ function lapRender(soft?: boolean) {
   const desk = R.querySelector('.lap-desk') as HTMLElement, win = R.querySelector('.lap-win') as HTMLElement;
   desk.innerHTML = lapDeskHtml();
   const dock = R.querySelector('.ph-dock') as HTMLElement; if (dock) dock.innerHTML = phDockHtml();
+  try { lapDevApply(); lapPopups(); } catch (e) { /* as it was */ }
   if (!Lap.app) { win.hidden = true; win.innerHTML = ''; return; }
   const sk = /^scr:/.test(Lap.app) ? Lap.app.slice(4) : '', A = sk ? [Lap.app, SCREENS[sk] ? SCREENS[sk].title : sk, (SCREENS[sk] && SCREENS[sk].icon) || 'ops', '#3FD0E8'] : LAP_APPS.concat(PH_APPS).filter(x => x[0] === Lap.app)[0]; if (!A) return;
   if (Lap.app === 'browser' && soft && win.querySelector('.lap-br')) { lapBrowserChrome(); return; }   // the page itself is never drawn again
@@ -213,18 +222,18 @@ function lapRender(soft?: boolean) {
   if (soft && win.firstElementChild) patchHtml(win, html); else win.innerHTML = html;
   const sec = win.querySelector('.lap-win-b > section.screen') as HTMLElement, key = sec && sec.getAttribute('data-k');
   if (sec && key && SCREENS[key] && SCREENS[key].mount && !soft) { try { SCREENS[key].mount(sec); } catch (e) { /* shows what it can */ } }
-  if (Lap.app === 'photos') lapPhotosFill();
   if (Lap.app === 'browser') lapBrowserStart();
 }
 function lapBar() {
   const R = Lap.root as HTMLElement; if (!R) return; const bar = R.querySelector('.lap-bar') as HTMLElement; if (!bar) return;
   const d = lapGameNow(), today = lapYmd(d), notes = (lapS().calendar as CalNote[]).filter(c => c.date === today).length, un = lapUnread();
-  const time = d.toTimeString().slice(0, 5), date = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const D0 = lapDev(), time = D0.clock24 === false ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : d.toTimeString().slice(0, 5), date = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   if (Lap.phone) {   // the phone's status bar: the time, mail waiting, signal and battery
     patchHtml(bar, `<b class="ph-time">${time}</b><span class="ph-notch"></span><span class="ph-ind">${un ? `<i class="ph-dot" title="${un} unread">${icon('mail')}</i>` : ''}<svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><span class="ph-bat"><i style="width:${78}%"></i></span></span>`);
     return;
   }
-  patchHtml(bar, `<button class="lb-home ${Lap.app ? '' : 'on'}" data-act="lap-app" data-k="" aria-label="Desktop">${icon('star')}</button>
+  patchHtml(bar, `<button class="lb-home ${Lap.startOn ? 'on' : ''}" data-act="lap-start" aria-label="Start">${icon('star')}</button>
+    <input class="lb-search" placeholder="Search" aria-label="Search apps, folders and files" value="${esc(Lap.searchQ || '')}" autocomplete="off">
     <div class="lb-apps">${lapDeskApps().map(a => `<button class="lb-app ${Lap.app === a[0] ? 'on' : ''}" data-act="lap-app" data-k="${a[0]}" title="${esc(a[1])}" style="--c:${a[3]}">${icon(a[2])}${a[0] === 'mail' && un ? `<i class="lb-badge">${un}</i>` : ''}</button>`).join('')}</div>
     <span class="lb-sp"></span>
     ${notes ? `<button class="lb-note" data-act="lap-app" data-k="calendar">${icon('calendar')}${notes} today</button>` : ''}
@@ -239,7 +248,7 @@ function lapDeskApps(): [string, string, string, string][] {
 }
 function lapDeskHtml(): string {
   const co: any = company(), d = lapGameNow(), today = lapYmd(d), notes = (lapS().calendar as CalNote[]).filter(c => c.date >= today).sort((a, b) => a.date < b.date ? -1 : 1).slice(0, 3), un = lapUnread();
-  return `<div class="ld-wall" style="--c1:${co.color};--c2:${co.color2 || '#0B2A55'}"><span class="ld-brand">${esc(co.name)}</span></div>
+  return `${Lap.phone ? `<input class="lb-search ph-search" placeholder="Search" aria-label="Search apps and files" value="${esc(Lap.searchQ || '')}" autocomplete="off">` : ''}<div class="ld-wall" style="--c1:${co.color};--c2:${co.color2 || '#0B2A55'}"><span class="ld-brand">${esc(co.name)}</span></div>
     <div class="ld-icons">${lapDeskApps().map(a => `<button class="ld-ic" data-act="lap-app" data-k="${a[0]}"><span style="--c:${a[3]}">${icon(a[2])}${a[0] === 'mail' && un ? `<i class="lb-badge">${un}</i>` : ''}</span><b>${esc(a[1])}</b></button>`).join('')}</div>
     <div class="ld-widget"><b class="ld-time">${d.toTimeString().slice(0, 5)}</b><small>${esc(d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</small>
       <div class="ld-notes">${notes.length ? notes.map(n => `<span><i>${esc(n.date.slice(5).split('-').reverse().join('/'))}</i>${esc(n.text)}</span>`).join('') : '<span class="muted">Nothing in your calendar</span>'}</div>
@@ -251,7 +260,9 @@ function lapAppHtml(k: string): string {
   if (k === 'mail') return lapMailHtml();
   if (k === 'calendar') return lapCalHtml();
   if (k === 'bank') return lapBankHtml();
-  if (k === 'photos') return `<div class="lap-photos"><p class="muted">Loading…</p></div>`;
+  if (k === 'photos' || k === 'videos' || k === 'docs') return lapExpHtml(k);
+  if (k === 'recorder') return lapRecorderHtml();
+  if (k === 'settings') return lapSettingsHtml();
   if (k === 'markets') return `<div class="lap-mkts">${marketsCardHtml()}</div>`;
   if (k === 'browser') return lapBrowserHtml();
   const key = /^scr:/.test(k) ? k.slice(4) : k === 'acmarket' ? 'market' : k;
@@ -260,24 +271,81 @@ function lapAppHtml(k: string): string {
 }
 
 /* ---------- Mail ---------- */
+/** Mail's folders: Inbox, Starred, Spam, Deleted, and your own. */
+function mailBoxes(): { id: string; name: string; ic: string }[] {
+  const S = lapS(); S.mailBoxes = S.mailBoxes || [];
+  return [{ id: '', name: 'Inbox', ic: 'mail' }, { id: 'star', name: 'Starred', ic: 'star' }, { id: 'spam', name: 'Spam', ic: 'alert' }, { id: 'deleted', name: 'Deleted', ic: 'trash' }].concat((S.mailBoxes as any[]).map(b => ({ id: b.id, name: b.name, ic: 'layers' })));
+}
+function mailIn(box: string): LapMail[] { const L = lapMail(); return box === 'star' ? L.filter(m => m.star && m.box !== 'deleted') : L.filter(m => (m.box || '') === box); }
 function lapMailHtml(): string {
-  const L = lapMail(), cur = L.filter(m => m.id === Lap.mailId)[0];
-  const kindIc: any = { court: 'shield', report: 'alert', lease: 'fleet', family: 'user', bank: 'bank', note: 'calendar' };
-  const list = L.slice(0, 120).map(m => `<button class="lm-row ${m.read ? '' : 'new'} ${cur === m ? 'on' : ''}" data-act="lap-mail" data-id="${m.id}"><span class="lm-ic k-${m.kind}">${icon(kindIc[m.kind] || 'mail')}</span><span class="lm-t"><b>${esc(m.from)}</b><span>${esc(m.subject)}</span><small>${esc(atText(m.at))}${m.done ? ' · ' + esc(m.done) : ''}</small></span></button>`).join('') || '<p class="muted lm-empty">No mail yet.</p>';
-  const view = cur ? `<div class="lm-view"><div class="lm-vh">${Lap.phone ? `<button class="lm-back" data-act="lap-mail-back">${icon('back')}Inbox</button>` : ''}<h3>${esc(cur.subject)}</h3><small><b>${esc(cur.from)}</b>${cur.addr ? ` &lt;${esc(cur.addr)}&gt;` : ''} · ${esc(dateStr(new Date(cur.at)))}</small></div>
+  const box = Lap.mailBox || '', L = mailIn(box), cur = L.filter(m => m.id === Lap.mailId)[0];
+  const kindIc: any = { court: 'shield', report: 'alert', lease: 'fleet', family: 'user', bank: 'bank', note: 'calendar', spam: 'alert' };
+  const boxes = mailBoxes(), bname = (boxes.filter(b => b.id === box)[0] || boxes[0]).name;
+  const S: any = State.settings, guide = !S.mailGuideSeen ? `<div class="lm-guide">${icon('info')}<span><b>New in Mail</b>${DESKTOP ? 'Drag a message onto a folder to move it. Right-click a message for Move to, Delete, Star and more.' : 'Press, then drag a message onto a folder to move it. Press and hold a message for Move to, Delete, Star and more.'} Make your own folders with New folder; Spam and Deleted keep what you put away.</span><button class="btn ghost sm" data-act="mail-guide-ok">Got it</button></div>` : '';
+  const folders = `<div class="lm-boxes">${boxes.map(b => { const n = mailIn(b.id).filter(m => !m.read).length; return `<button class="lm-box ${b.id === box ? 'on' : ''}" data-act="mail-box" data-b="${b.id}" data-mail-box="${b.id}">${icon(b.ic)}<span>${esc(b.name)}</span>${n ? `<em>${n}</em>` : ''}</button>`; }).join('')}
+    <button class="lm-box add" data-act="mail-newbox">${icon('plus')}<span>New folder</span></button></div>`;
+  const list = L.slice(0, 150).map(m => `<button class="lm-row ${m.read ? '' : 'new'} ${cur === m ? 'on' : ''}" data-act="lap-mail" data-id="${m.id}" data-mail-it="${m.id}"><span class="lm-ic k-${m.kind}">${icon(kindIc[m.kind] || 'mail')}</span><span class="lm-t"><b>${m.star ? '★ ' : ''}${esc(m.from)}</b><span>${esc(m.subject)}</span><small>${esc(atText(m.at))}${m.done ? ' · ' + esc(m.done) : ''}</small></span></button>`).join('') || `<p class="muted lm-empty">Nothing in ${esc(bname)}.</p>`;
+  const view = cur ? `<div class="lm-view"><div class="lm-vh">${Lap.phone ? `<button class="lm-back" data-act="lap-mail-back">${icon('back')}${esc(bname)}</button>` : ''}<h3>${esc(cur.subject)}</h3><small><b>${esc(cur.from)}</b>${cur.addr ? ` &lt;${esc(cur.addr)}&gt;` : ''} · ${esc(dateStr(new Date(cur.at)))}</small></div>
       <div class="lm-body">${esc(cur.body).replace(/\n/g, '<br>')}</div>
       ${cur.kind === 'family' && cur.fam && cur.fam.chosen != null ? `<div class="lm-sent"><small>You replied</small><p>${esc(cur.fam.replies[cur.fam.chosen][0])}</p></div>` : ''}
       ${cur.acts && cur.acts.length && !(cur.kind === 'lease' && cur.done) && !(cur.kind === 'family' && cur.fam && cur.fam.chosen != null) ? `<div class="lm-acts">${cur.kind === 'family' ? '<small>Reply</small>' : ''}${cur.acts.map(a => `<button class="btn ${a.kind === 'primary' ? 'primary' : 'ghost'} sm" data-act="${a.act}" data-id="${esc(a.act === 'lap-lease' || a.act === 'lap-fam' ? cur.id : (a.data || ''))}" data-v="${esc(a.data || '')}">${esc(a.label)}</button>`).join('')}</div>` : ''}
       ${cur.kind === 'lease' && cur.done ? `<p class="fine-print">${icon(cur.done === 'accepted' ? 'check' : 'info')}${cur.done === 'accepted' ? 'Accepted: the aircraft is leased out and the rent comes in every month.' : cur.done === 'declined' ? 'You declined.' : 'This offer has expired.'}</p>` : ''}
-      <div class="lm-foot"><button class="btn ghost sm" data-act="lap-mail-del" data-id="${cur.id}">${icon('trash')}Delete</button></div></div>`
+      <div class="lm-foot"><button class="btn ghost sm" data-act="mail-star" data-id="${cur.id}">${icon('star')}${cur.star ? 'Unstar' : 'Star'}</button><button class="btn ghost sm" data-act="mail-menu-btn" data-id="${cur.id}">${icon('layers')}Move to…</button><button class="btn ghost sm" data-act="lap-mail-del" data-id="${cur.id}">${icon('trash')}${box === 'deleted' ? 'Delete for good' : 'Delete'}</button></div></div>`
     : `<div class="lm-view lm-none"><span>${icon('mail')}</span><p>Choose a message.</p></div>`;
   const on = (State.settings as any).mailReports !== false;
-  return `<div class="lm ${cur ? 'lm-open' : ''}"><div class="lm-list"><div class="lm-lh"><b>Inbox</b><small>${lapUnread()} unread</small></div>${list}
-    <label class="lm-set"><input type="checkbox" data-act="lap-mail-reports" ${on ? 'checked' : ''}> Receive the accident investigators' preliminary reports</label></div>${view}</div>`;
+  return `${guide}<div class="lm lm3 ${cur ? 'lm-open' : ''}">${folders}<div class="lm-list"><div class="lm-lh"><b>${esc(bname)}</b><small>${L.filter(m => !m.read).length} unread</small></div>${list}
+    ${box === '' ? `<label class="lm-set"><input type="checkbox" data-act="lap-mail-reports" ${on ? 'checked' : ''}> Receive the accident investigators' preliminary reports</label>` : ''}</div>${view}</div>`;
 }
-ACTIONS['lap-mail'] = el => { const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (!m) return; Lap.mailId = m.id; if (!m.read) { m.read = true; Store.soon(); } Sound.tick(); lapRender(true); try { renderTopbar(); } catch (e) { /* ignore */ } };
+ACTIONS['mail-guide-ok'] = () => { (State.settings as any).mailGuideSeen = true; Store.soon(); Sound.tick(); lapRender(true); };
+ACTIONS['mail-box'] = el => { if (Lap.mailDragged) { Lap.mailDragged = false; return; } Lap.mailBox = el.getAttribute('data-b') || ''; Lap.mailId = ''; Sound.tick(); lapRender(true); };
+ACTIONS['mail-newbox'] = () => { const S = lapS(), n = (window.prompt('Name of the new folder', 'Folder ' + ((S.mailBoxes || []).length + 1)) || '').trim().slice(0, 30); if (!n) return; S.mailBoxes = S.mailBoxes || []; S.mailBoxes.push({ id: 'b-' + uid(), name: n }); Store.soon(); Sound.tick(); lapRender(true); };
+ACTIONS['mail-star'] = el => { const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (!m) return; m.star = !m.star; Store.soon(); Sound.tick(); mailMenuClose(); lapRender(true); };
+function mailMove(id: string, box: string) {
+  const m = lapMail().filter(x => x.id === id)[0]; if (!m) return;
+  if (box === 'star') { m.star = true; } else m.box = box || undefined;
+  if (Lap.mailId === id && box !== (Lap.mailBox || '') && box !== 'star') Lap.mailId = '';
+  Store.soon(); Sound.tick(); const b = mailBoxes().filter(x => x.id === box)[0]; toast(box === 'star' ? 'Starred' : `Moved to ${b ? b.name : 'Inbox'}`, 'ok'); lapRender(true);
+}
+/** The message menu: right-click, press and hold, or Move to… */
+function mailMenuOpen(id: string, x: number, y: number) {
+  mailMenuClose(); const m = lapMail().filter(z => z.id === id)[0]; if (!m) return;
+  const el = document.createElement('div'); el.className = 'fx-menu'; el.style.left = Math.min(x, innerWidth - 220) + 'px'; el.style.top = Math.min(y, innerHeight - 300) + 'px';
+  el.innerHTML = `<button data-act="mail-m-open" data-id="${id}">Open</button><button data-act="mail-star" data-id="${id}">${m.star ? 'Unstar' : 'Star'}</button><button data-act="mail-m-unread" data-id="${id}">${m.read ? 'Mark as unread' : 'Mark as read'}</button>`
+    + `<button data-act="mail-m-to" data-id="${id}" data-b="${m.box === 'spam' ? '' : 'spam'}">${m.box === 'spam' ? 'Not spam' : 'Spam'}</button><button data-act="lap-mail-del" data-id="${id}">${m.box === 'deleted' ? 'Delete for good' : 'Delete'}</button>`
+    + `<div class="fx-move">${mailBoxes().filter(b => b.id !== 'star' && b.id !== (m.box || '')).map(b => `<button data-act="mail-m-to" data-id="${id}" data-b="${b.id}">${icon(b.ic)}Move to ${esc(b.name)}</button>`).join('')}</div>`;
+  document.body.appendChild(el); Lap.mailMenu = el; setTimeout(() => document.addEventListener('pointerdown', mailMenuAway, true), 0);
+}
+function mailMenuAway(e: Event) { if (Lap.mailMenu && !Lap.mailMenu.contains(e.target as Node)) mailMenuClose(); }
+function mailMenuClose() { if (Lap.mailMenu) { Lap.mailMenu.remove(); Lap.mailMenu = null; } document.removeEventListener('pointerdown', mailMenuAway, true); }
+ACTIONS['mail-menu-btn'] = el => { const r = el.getBoundingClientRect(); mailMenuOpen(el.getAttribute('data-id'), r.left, r.top - 260); };
+ACTIONS['mail-m-open'] = el => { mailMenuClose(); const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (!m) return; Lap.mailId = m.id; m.read = true; Store.soon(); lapRender(true); };
+ACTIONS['mail-m-unread'] = el => { mailMenuClose(); const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (!m) return; m.read = !m.read; if (!m.read && Lap.mailId === m.id) Lap.mailId = ''; Store.soon(); Sound.tick(); lapRender(true); try { renderTopbar(); } catch (e) { /* ignore */ } };
+ACTIONS['mail-m-to'] = el => { mailMenuClose(); mailMove(el.getAttribute('data-id'), el.getAttribute('data-b') || ''); };
+document.addEventListener('contextmenu', e => { const it = (e.target as HTMLElement).closest && (e.target as HTMLElement).closest('[data-mail-it]') as HTMLElement; if (!it) return; e.preventDefault(); mailMenuOpen(it.getAttribute('data-mail-it'), e.clientX, e.clientY); });
+document.addEventListener('pointerdown', e => {
+  const it = (e.target as HTMLElement).closest && (e.target as HTMLElement).closest('[data-mail-it]') as HTMLElement; if (!it || e.button > 0) return;
+  const D: any = { id: it.getAttribute('data-mail-it'), it, x0: e.clientX, y0: e.clientY, touch: e.pointerType !== 'mouse', armed: e.pointerType === 'mouse', held: false, ghost: null };
+  if (D.touch) D.timer = setTimeout(() => { D.armed = true; D.held = true; try { navigator.vibrate && navigator.vibrate(15); } catch (x) { /* none */ } it.classList.add('fx-lift'); }, 380);
+  Lap.mailDrag = D;
+});
+document.addEventListener('pointermove', e => {
+  const D = Lap.mailDrag; if (!D) return; const far = Math.hypot(e.clientX - D.x0, e.clientY - D.y0) > 8;
+  if (!D.armed) { if (far) { clearTimeout(D.timer); Lap.mailDrag = null; } return; }
+  if (!far && !D.ghost) return;
+  if (!D.ghost) { D.ghost = document.createElement('div'); D.ghost.className = 'lm-ghost'; D.ghost.innerHTML = D.it.querySelector('.lm-t').innerHTML; document.body.appendChild(D.ghost); }
+  D.ghost.style.left = e.clientX + 8 + 'px'; D.ghost.style.top = e.clientY + 8 + 'px'; e.preventDefault();
+  document.querySelectorAll('.lm-box.over').forEach(x => x.classList.remove('over'));
+  const u = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement, b = u && u.closest && u.closest('[data-mail-box]'); if (b) b.classList.add('over');
+}, { passive: false });
+document.addEventListener('pointerup', e => {
+  const D = Lap.mailDrag; if (!D) return; Lap.mailDrag = null; clearTimeout(D.timer); D.it.classList.remove('fx-lift');
+  document.querySelectorAll('.lm-box.over').forEach(x => x.classList.remove('over'));
+  if (D.ghost) { D.ghost.remove(); Lap.mailDragged = true; setTimeout(() => { Lap.mailDragged = false; }, 300); const u = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement, b = u && u.closest && u.closest('[data-mail-box]') as HTMLElement; if (b) mailMove(D.id, b.getAttribute('data-mail-box') || ''); return; }
+  if (D.held && D.touch) { Lap.mailDragged = true; setTimeout(() => { Lap.mailDragged = false; }, 300); mailMenuOpen(D.id, e.clientX, e.clientY); }
+});
+ACTIONS['lap-mail'] = el => { if (Lap.mailDragged) { Lap.mailDragged = false; return; } const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (!m) return; Lap.mailId = m.id; if (!m.read) { m.read = true; Store.soon(); } Sound.tick(); lapRender(true); try { renderTopbar(); } catch (e) { /* ignore */ } };
 ACTIONS['lap-mail-back'] = () => { Lap.mailId = ''; Sound.tick(); lapRender(true); };
-ACTIONS['lap-mail-del'] = el => { const S = lapS(); S.mail = S.mail.filter((x: LapMail) => x.id !== el.getAttribute('data-id')); Lap.mailId = ''; Store.soon(); Sound.tick(); lapRender(true); };
+ACTIONS['lap-mail-del'] = el => { mailMenuClose(); const S = lapS(), id = el.getAttribute('data-id'), m = lapMail().filter(x => x.id === id)[0]; if (!m) return; if (m.box === 'deleted') S.mail = S.mail.filter((x: LapMail) => x.id !== id); else m.box = 'deleted'; if (Lap.mailId === id) Lap.mailId = ''; Store.soon(); Sound.tick(); toast(m.box === 'deleted' && S.mail.indexOf(m) >= 0 ? 'Moved to Deleted' : 'Deleted for good', 'ok'); lapRender(true); };
 ACTIONS['lap-mail-reports'] = el => { (State.settings as any).mailReports = (el as HTMLInputElement).checked; Store.soon(); };
 ACTIONS['lap-lease'] = el => { const m = lapMail().filter(x => x.id === el.getAttribute('data-id'))[0]; if (m) lapLeaseAnswer(m, el.getAttribute('data-v') === 'yes'); };
 ACTIONS['lap-fam'] = el => {
@@ -500,7 +568,7 @@ ACTIONS['lap-app'] = el => {
   const k = el.getAttribute('data-k') || '';
   if (k === Lap.app) return;
   if (Lap.app === 'browser') lapBrowserHide();
-  Lap.app = k; Lap.photo = ''; Sound.tick();
+  Lap.app = k; Lap.photo = ''; Lap.startOn = false; Lap.searchOn = false; Lap.startFolder = ''; LapFs.open = ''; LapFs.newDoc = false; LapFs.q = ''; Sound.tick();
   lapRender();
 };
 ACTIONS['lap-close'] = () => { if (typeof HangarRoom !== 'undefined' && HangarRoom.on && HangarRoom.overlay) { hgScreenClose(); return; } if (typeof OpsRoom !== 'undefined' && OpsRoom.on && OpsRoom.overlay) { opsScreenClose(); return; } if (typeof ofLaptopClose === 'function') ofLaptopClose(); };
