@@ -733,11 +733,12 @@ ACTIONS['dev-voice-try'] = el => {
 /** Automatic performance: fewer frames and a little less sharpness while the device is warm or slow. */
 function perfSettingsHtml(): string {
   const S: any = State.settings, cur = S.perfAuto == null ? 'auto' : S.perfAuto === false || S.perfAuto === 'off' ? 'off' : 'on';
-  const opts: [string, string][] = [['auto', `Automatic (${DESKTOP ? 'off on the PC' : 'on'})`], ['on', 'On'], ['off', 'Off']];
+  const opts: [string, string][] = [['auto', 'Automatic (off: frame generation keeps it smooth)'], ['on', 'On'], ['off', 'Off']];
   return `<div class="set-card col cab-opts">
     <div class="sc-h">${icon('sliders')}<span><b>Smooth on this device</b><small>The 3D view, your offices and the courtroom keep their frame rate up: while it drops, they are drawn a little less sharply, and sharp again when there is room. When the ${DESKTOP ? 'computer' : 'phone or tablet'} gets warm or battery saver is on, they draw up to 30 frames a second, which also keeps it cooler and saves battery.</small></span></div>
     <div class="ch-row"><span><b>Automatic performance</b><small>${esc(Perf.label())}</small></span><div class="seg">${opts.map(o => `<button class="${cur === o[0] ? 'on' : ''}" data-act="perf-set" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>
-    <div class="ch-row"><span><b>Frame generation (smoother turning)</b><small>While a view draws 30 frames a second (the 3D view always; your offices and the courtroom when the device is warm or saving battery), the frames in between are made from the last one, shifted to where you are looking now. Looking around, orbiting and walking become as smooth as your screen. Things that move by themselves, like aircraft and people, still move 30 times a second, and the very edges of the screen can look a little smeared while you turn.</small></span><div class="seg">${([['off', 'Off'], ['auto', 'With automatic performance'], ['on', 'On']] as [string, string][]).map(o => `<button class="${(S.frameGen || 'off') === o[0] ? 'on' : ''}" data-act="framegen-set" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>
+    <div class="ch-row"><span><b>Frame generation</b><small>Extra frames made between the ones the device draws, from the last one and how far it lies (its depth), shifted to where you are looking now: the 3D view, the cabin, the rooms and the hangars become smoother, often nearly twice the frames a second on slower phones and tablets. Always on: as many frames in between as help, none when the device keeps up by itself. With automatic performance: only while the frame rate is held at 30. Things that move by themselves (other aircraft, people) still move at the real frame rate, and the very edges can look a little smeared while you turn quickly.</small></span><div class="seg">${([['off', 'Off'], ['auto', 'With automatic performance'], ['on', 'Always on']] as [string, string][]).map(o => `<button class="${FrameGen.mode() === o[0] ? 'on' : ''}" data-act="framegen-set" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>
+    <label class="tg-row"><span><b>Performance monitor</b><small>A small panel of text in the 3D places: frames a second (real and made), the processor's and the graphics chip's time per frame, the processor's cores, and a quick switch for frame generation. Drag it anywhere.</small></span><button class="tg ${(S as any).fgMon !== false ? 'on' : ''}" role="switch" aria-checked="${(S as any).fgMon !== false}" data-act="fgmon-toggle"><i></i></button></label>
   </div>`;
 }
 ACTIONS['perf-set'] = el => {
@@ -745,7 +746,8 @@ ACTIONS['perf-set'] = el => {
   if (v === 'auto') delete S.perfAuto; else S.perfAuto = v === 'on';
   Store.save(); Sound.tick(); rerenderSettingsBody();
 };
-ACTIONS['framegen-set'] = el => { const S: any = State.settings; S.frameGen = el.getAttribute('data-v'); Store.save(); Sound.tick(); rerenderSettingsBody(); };
+ACTIONS['framegen-set'] = el => { const S: any = State.settings; S.frameGen = el.getAttribute('data-v'); Store.save(); Sound.tick(); rerenderSettingsBody(); try { fgMonSync(true); } catch (e) { /* not open */ } };
+ACTIONS['fgmon-toggle'] = () => { const S: any = State.settings; S.fgMon = S.fgMon === false; Store.save(); Sound.tick(); rerenderSettingsBody(); try { fgMonSync(true); } catch (e) { /* none */ } };
 
 // the terrain detail slider: the name shows while dragging, it's kept when let go
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-tq')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.tq-h'); if (h) h.textContent = 'Terrain detail: ' + TERRAIN_Q_NAMES[+el.value]; });

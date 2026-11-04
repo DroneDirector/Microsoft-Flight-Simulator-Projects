@@ -138,6 +138,22 @@ public class AppToolsPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /* ---------- the performance monitor: each core's speed now and its top speed ---------- */
+    @PluginMethod
+    public void cpuInfo(PluginCall call) {
+        JSObject r = new JSObject(); JSArray mhz = new JSArray(), max = new JSArray();
+        int n = Runtime.getRuntime().availableProcessors();
+        for (int i = 0; i < n; i++) {
+            mhz.put(readKhz("/sys/devices/system/cpu/cpu" + i + "/cpufreq/scaling_cur_freq") / 1000);
+            max.put(readKhz("/sys/devices/system/cpu/cpu" + i + "/cpufreq/cpuinfo_max_freq") / 1000);
+        }
+        r.put("cores", n); r.put("mhz", mhz); r.put("max", max); call.resolve(r);
+    }
+    private static long readKhz(String path) {
+        try (java.io.BufferedReader b = new java.io.BufferedReader(new java.io.FileReader(path))) { String l = b.readLine(); return l == null ? 0 : Long.parseLong(l.trim()); }
+        catch (Exception e) { return 0; }
+    }
+
     /* ---------- printing a document on a real printer (Android's print screen) ---------- */
 
     /** A page made in the game (a report, a schedule): Android's print screen with the page ready to print or save as PDF. */
