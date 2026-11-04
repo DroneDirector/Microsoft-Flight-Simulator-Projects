@@ -80,14 +80,17 @@ function v3dWeatherStep(now: number) {
     const a: any = (V3dSky as any).a; if (a && a.wx) { const sp = a.wx.wind * 14; V3dWx.wind = [Math.cos(a.wx.dir) * sp, Math.sin(a.wx.dir) * sp]; }
   }
   V3dWx.k += (V3dWx.want - V3dWx.k) * Math.min(1, dt / 4);
+  // rain and snow each ease in and out on their own, so rain turning to snow fades across instead of switching
+  V3dWx.kr = (V3dWx.kr || 0) + ((V3dWx.snow1 ? 0 : V3dWx.want) - (V3dWx.kr || 0)) * Math.min(1, dt / 4);
+  V3dWx.ks = (V3dWx.ks || 0) + ((V3dWx.snow1 ? V3dWx.want : 0) - (V3dWx.ks || 0)) * Math.min(1, dt / 4);
   for (const snow of [0, 1]) {
-    const key = snow ? 'snow' : 'rain', on = V3dWx.k > 0.01 && V3dWx.snow1 === snow && V3d.mode !== 'cabin';
+    const kk = snow ? V3dWx.ks : V3dWx.kr, key = snow ? 'snow' : 'rain', on = kk > 0.01 && V3d.mode !== 'cabin';
     let m = V3dWx[key];
     if (on && (!m || m.parent !== V3d.scene)) { m = V3dWx[key] = v3dPrecipMesh(!!snow); V3d.scene.add(m); }
     if (!m) continue;
     m.visible = on; if (!on) continue;
     const u = m.material.uniforms, amb = Math.max(0.12, (V3dSky as any).amb || 1), tint = (V3dSky as any).tint || [1, 1, 1];
-    u.uCam.value.copy(cam); u.uTime.value = now / 1000; u.uK.value = V3dWx.k;
+    u.uCam.value.copy(cam); u.uTime.value = now / 1000; u.uK.value = kk;
     u.uWind.value.set(V3dWx.wind[0], 0, V3dWx.wind[1]);
     u.uPx.value = (V3d.r ? V3d.r.domElement.height : 800) / (2 * Math.tan(V3d.cam.fov * D2R / 2));
     const b = snow ? 0.95 : 0.78; u.uCol.value.setRGB(b * amb * tint[0] + V3dWx.flashNow * 0.6, b * amb * tint[1] + V3dWx.flashNow * 0.6, (b + 0.05) * amb * tint[2] + V3dWx.flashNow * 0.7);

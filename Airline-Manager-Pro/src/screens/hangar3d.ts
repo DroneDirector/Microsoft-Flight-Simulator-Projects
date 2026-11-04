@@ -223,22 +223,23 @@ const HG_EMBLEM = `<svg class="ctl-scales hg-emb" viewBox="0 0 200 200" aria-hid
 const HG_SCENE = `<svg class="ctl-house hg-scene" viewBox="0 0 560 260" aria-hidden="true"><rect x="0" y="236" width="560" height="24"/>
   <path d="M120 236 V120 Q280 50 440 120 V236 Z"/><rect x="40" y="170" width="70" height="66"/><rect x="450" y="186" width="80" height="50"/></svg>`;
 
-HangarRoom.open = function (reg: string, base?: string, sizeK?: string) {
+HangarRoom.open = function (reg: string, base?: string, sizeK?: string, show?: HgShow) {
   const R = HangarRoom; if (R.on) return;
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
+  R.show = show || null;   // a showroom: an aircraft you are thinking of buying or leasing, on its own in a hangar of its size
   // an aircraft stands in a hangar only while it is in for work; otherwise it is an empty hangar of that size
-  const a0: any = reg ? plane(reg) : null, a: any = a0 && hgInWork(a0) ? a0 : null;
+  const a0: any = reg && !show ? plane(reg) : null, a: any = a0 && hgInWork(a0) ? a0 : null;
   try { if (typeof OfficeRoom !== 'undefined' && OfficeRoom.on) OfficeRoom.close(true); } catch (e) { /* none */ }
   try { if (typeof OpsRoom !== 'undefined' && OpsRoom.on) OpsRoom.close(true); } catch (e) { /* none */ }
-  const co: any = company(), sz = a ? hgSizeFor(a.typeId) : a0 ? hgSizeFor(a0.typeId) : hgSizeK(sizeK || 'm');
-  R.on = true; R.loading = true; R.reg = a ? a.reg : ''; R.sz = sz; R.base = a ? hgWhere(a) : base || (a0 ? hgWhere(a0) : co.hub); R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now();
+  const co: any = company(), sz = show ? hgSizeFor(show.typeId) : a ? hgSizeFor(a.typeId) : a0 ? hgSizeFor(a0.typeId) : hgSizeK(sizeK || 'm');
+  R.on = true; R.loading = true; R.reg = a ? a.reg : ''; R.sz = sz; R.base = show ? 'Showroom' : a ? hgWhere(a) : base || (a0 ? hgWhere(a0) : co.hub); R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now();
   R.overlay = null; R.hold = null; R.vend = null; R.talk = -1; R.hover = null;
   if (hgClean()) hgSave();
   const q = Gfx.placeQ('hangar');
   const root = document.createElement('div'); root.className = 'court3d office3d ops3d hg3d'; R.root = root;
   root.innerHTML = `<canvas></canvas>
-    <div class="ct-top"><div><small>${esc(co.name)} · ${esc(R.base)}</small><b>${esc(sz.name)} · ${a ? esc(a.reg) : 'empty'}</b></div></div>
-    <button class="ct-leave" data-op="leave">${icon('close')}<span>Leave the hangar</span><kbd>Esc</kbd></button>
+    <div class="ct-top"><div><small>${show ? 'Showroom · ' + esc(sz.name) : esc(co.name) + ' · ' + esc(R.base)}</small><b>${show ? esc(show.label) : `${esc(sz.name)} · ${a ? esc(a.reg) : 'empty'}`}</b></div></div>
+    <button class="ct-leave" data-op="leave">${icon('close')}<span>${show ? 'Back to the market' : 'Leave the hangar'}</span><kbd>Esc</kbd></button>
     <div class="ct-spots of-spots op-spots hg-spots" hidden></div><div class="of-aim op-aim" hidden></div><div class="walk-pad ct-pad op-pad" hidden><i></i></div><div class="of-aim op-dot" hidden>+</div>
     <div class="hg-hand" hidden></div><div class="hg-panel" hidden></div><div class="hg-fade"></div>
     ${ctLoaderHtml(sz.name, 'Opening the hangar…', HG_EMBLEM, HG_SCENE)}`;
@@ -410,8 +411,8 @@ function hgBuild(scene: any, q: number): any {
     const f = hgShellFile(sz); if (f) { try { Models.swap(shell, f, false); } catch (e) { /* our own building */ } } }
   // the aircraft: your own, nose towards the doors, on the centre line
   {
-    const a: any = R.reg ? plane(R.reg) : null, lv = (a && a.livery) || liveryFor(co.color, co.color2, co.id);
-    let m: any = null; if (a) try { m = buildAircraftModel(a.typeId, lv); m.userData.set && m.userData.set({ flaps: 0, gear: 1 }); } catch (e) { m = null; }
+    const a: any = R.reg ? plane(R.reg) : null, sh: HgShow = R.show, lv = sh ? (sh.used ? liveryFor('#C9D2DE', '#5D6B7E') : liveryFor(co.color, co.color2, co.id)) : (a && a.livery) || liveryFor(co.color, co.color2, co.id);
+    let m: any = null; const tid = sh ? sh.typeId : a ? a.typeId : ''; if (tid) try { m = buildAircraftModel(tid, lv); m.userData.set && m.userData.set({ flaps: 0, gear: 1 }); } catch (e) { m = null; }
     if (m) {
       const holder = new T.Group(); holder.add(m); root.add(holder);
       m.traverse((o: any) => { if (o.isMesh) { o.castShadow = shadow; o.receiveShadow = true; } });
@@ -1019,7 +1020,7 @@ function hgUi(first?: boolean) {
   const pad = R.root.querySelector('.op-pad') as HTMLElement; if (pad) pad.hidden = DESKTOP;
   hgHandUi();
   const hint = R.root.querySelector('.op-aim') as HTMLElement;
-  if (hint && first) { hint.hidden = false; hint.classList.add('op-hint'); hint.textContent = !R.reg ? `This hangar is empty: no ${R.sz.name.toLowerCase().replace(' hangar', '')} aircraft is in for work at ${R.base}.` : R.noMech ? `No mechanics are free at ${R.base}: hire some in Crew.` : DESKTOP ? 'W A S D to walk, Shift to run · the mouse looks around · click what glows' : 'Stick to walk (push it all the way to run) · drag to look · tap what glows'; setTimeout(() => { if (hint) hint.hidden = true; }, 7000); }
+  if (hint && first) { hint.hidden = false; hint.classList.add('op-hint'); hint.textContent = R.show ? `${R.show.label}: walk round it and take a look. Back to the market with Esc.` : !R.reg ? `This hangar is empty: no ${R.sz.name.toLowerCase().replace(' hangar', '')} aircraft is in for work at ${R.base}.` : R.noMech ? `No mechanics are free at ${R.base}: hire some in Crew.` : DESKTOP ? 'W A S D to walk, Shift to run · the mouse looks around · click what glows' : 'Stick to walk (push it all the way to run) · drag to look · tap what glows'; setTimeout(() => { if (hint) hint.hidden = true; }, 7000); }
 }
 function hgHandUi() {
   const R = HangarRoom, el = R.root && R.root.querySelector('.hg-hand') as HTMLElement; if (!el) return;
@@ -1332,12 +1333,21 @@ HangarRoom.close = function (quiet?: boolean) {
 };
 function hgLeave(to?: string) {
   if (!HangarRoom.on || ExitSplash.on) return;
+  const show = !!HangarRoom.show;
   exitSplash('hangar', HangarRoom.sz ? 'Leaving the ' + HangarRoom.sz.name.toLowerCase() : 'Leaving the hangar', [
     { pct: 30, step: 'Closing the hangar…', run: () => HangarRoom.close(true) },
     { pct: 55, step: 'Clearing the hangar from memory…', run: exitFreeMemory },
-    { pct: 85, step: to && to !== 'hangars' ? 'On your way…' : 'Loading your hangars…', run: () => { try { roomGoTo(to || 'hangars'); } catch (e) { refresh(); } } },
+    { pct: 85, step: show ? 'Back to the aircraft market…' : to && to !== 'hangars' ? 'On your way…' : 'Loading your hangars…', run: () => { try { if (show && !to) go('market'); else roomGoTo(to || 'hangars'); } catch (e) { refresh(); } } },
   ]);
 }
+
+/** The showroom: an aircraft from the market, on its own in a new hangar the size it needs (none of your hangars). */
+interface HgShow { typeId: string; label: string; used?: boolean }
+ACTIONS['mk-view'] = el => {
+  const id = el.getAttribute('data-id'), used = el.getAttribute('data-used'), t = acType(id); if (!t) return;
+  const u: any = used ? (usedList() as any[]).filter(x => x.id === used)[0] : null;
+  Sound.tick(); HangarRoom.open('', '', '', { typeId: t.id, label: `${t.maker} ${t.model}${u ? ` · used, ${u.ageY} years` : ''}`, used: !!u });
+};
 
 /* ---------- the door: where to next ---------- */
 // The doors of your office, the Operations office and the hangars ask where you are going: the Overview, the hangars,

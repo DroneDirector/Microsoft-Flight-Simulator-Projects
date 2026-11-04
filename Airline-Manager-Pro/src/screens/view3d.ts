@@ -596,6 +596,14 @@ function v3dNoteSwitch(L: AirportLayout) {
   } catch (e) { /* no log */ }
 }
 
+/** Time to move the view's centre: well before the finest ground (about 25 km across) runs out under you, so the
+ *  detail round you never changes; the swap then only moves the far edges of the rings, out in the haze. While the
+ *  last move is still loading, the next waits (unless you are close to the edge of the fine ground). */
+function v3dNeedRecentre(w: { lon: number; lat: number }): boolean {
+  const d = gcDistanceNm(V3d.origin, [w.lon, w.lat]) * 1.852, half = 2.5 * 40075 / 4096 * Math.cos(w.lat * D2R);   // km
+  const busy = !V3dTerrain.done || !!(V3dTerrain as any).old;
+  return busy ? d > half * 0.75 : d > half * 0.35;
+}
 /** Centre the view on an airport (its layout, its aircraft on the ground) or on open country. */
 function v3dRecentre(f: LiveFlight, w: { lon: number; lat: number }) {
   const ctr = v3dCentre(f, [w.lon, w.lat]);
@@ -637,7 +645,7 @@ function v3dLoop(now: number) {
   // the centre: follow the aircraft to the next airport, or move with it over open country
   const ctr = v3dCentre(f, [w0.lon, w0.lat]);
   if (V3d.mode === 'free' && V3d.origin) v3dFreeRecentre();
-  else if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && gcDistanceNm(V3d.origin, [w0.lon, w0.lat]) > 14)) v3dRecentre(f, w0);
+  else if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && v3dNeedRecentre(w0))) v3dRecentre(f, w0);
   v3dPrefetch(f, w0);
   if (V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
   v3dLoaderTick(now);

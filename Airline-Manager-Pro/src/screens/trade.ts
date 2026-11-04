@@ -61,7 +61,7 @@ function usedMarketHtml(): string {
         ${engineFor(t.id, u.id) ? `<div class="mk-cap mk-eng">${icon('fuel')}<span>${esc(engineOptions(t.id).filter(x => x.id === engineFor(t.id, u.id))[0].name)}</span></div>` : ''}
         <div class="mk-specs"><span><small>Age</small>${u.ageY} yrs</span><span><small>Hours</small>${num(u.hoursMin / 60)}</span><span><small>Cycles</small>${num(u.cycles)}</span><span><small>Condition</small>${u.condition}%</span></div>
         <small class="muted">${esc(u.was)} at ${esc(u.location)}, sold by ${esc(u.seller)}. New: ${money(t.price, { compact: true })}</small>
-        <div class="mk-foot"><b class="mk-price">${money(u.price, { compact: true })}</b><button class="btn primary" data-act="buy-used" data-id="${u.id}">Buy</button></div>
+        <div class="mk-foot"><b class="mk-price">${money(u.price, { compact: true })}</b><button class="btn ghost mk-view" data-act="mk-view" data-id="${t.id}" data-used="${u.id}" title="See it in a hangar and walk round it">${icon('focus')}View</button><button class="btn primary" data-act="buy-used" data-id="${u.id}">Buy</button></div>
       </div>
     </div>`;
   }).join('') || emptyState('No used aircraft this week', 'A new list comes every Monday.')}</div>

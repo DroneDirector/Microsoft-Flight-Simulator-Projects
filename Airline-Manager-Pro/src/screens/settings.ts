@@ -662,6 +662,7 @@ function placeSettingsHtml(pl: 'lounge' | 'hangar' | 'room'): string {
       : seg(pl + 'Q', 'Quality', pl === 'lounge' ? 'Furniture, carpets, curves, light and the view from the windows.' : 'The building, the aircraft inside, the equipment and the light.', QN.map((n, i) => [String(i), n] as [string, string]), QN[rq])}
     ${seg(pl + 'Sharp', 'Sharpness', 'How finely it is drawn against your screen. Above 100% edges are smoother, at the cost of speed.', [['0', '75%'], ['1', '100%'], ['2', '150%'], ['3', '200%'], ['4', '300%']], scAuto)}
     ${seg(pl + 'Shadow', 'Shadows', 'Real shadows from the lights. Off: quicker on slower devices.', [['on', 'On'], ['off', 'Off']], shAuto)}
+    ${pl === 'lounge' ? tg('loungeHeat', 'Heat above hot drinks', 'A small shimmer of heat rising from a fresh coffee or tea, like the heat behind the engines; it fades as the drink cools. Off: no shimmer.') : ''}
     ${pl === 'room' ? '' : `${tg(pl + 'People', pl === 'lounge' ? 'Guests' : 'Mechanics', pl === 'lounge' ? 'Your waiting business and first class passengers, sitting, walking about and helping themselves. Off: an empty lounge (quicker on slower devices).' : 'The mechanics working on the aircraft. Off: an empty hangar floor (quicker on slower devices).')}
     ${seg(pl + 'PplQ', pl === 'lounge' ? 'Detail of each guest' : 'Detail of each mechanic', 'How finely each person is made: faces, hair and clothes.', [['0', 'Light'], ['1', 'Normal'], ['2', 'High'], ['3', 'Highest']], q >= 2 ? 'High' : 'Light')}`}
   </div>`;
