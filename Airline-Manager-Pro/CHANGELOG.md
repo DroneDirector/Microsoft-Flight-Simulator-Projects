@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.151
+- Lounge guests drink at the bar (paid into your balance); drunk passengers reported to you or refused by the crew; spirits stock in storage.
+
 ## 0.9.150
 - Departures and Arrivals boards in the lounge and the concourse, with real traffic, expected times, delays and split-flap text.
 

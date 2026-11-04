@@ -191,29 +191,35 @@ function lgBarHand(R: any, B: any, sd: 'L' | 'R', arm: number[]): any {
 /** Click on the bartender: the drinks. */
 function lgBarMenu() {
   const R = LoungeRoom, B = R.A && R.A.bar; if (!B) return;
-  if (B.order) { toast('He is pouring your drink', 'info'); return; }
+  if (B.order) { toast(B.order.guest ? 'He is serving another guest: a moment' : 'He is pouring your drink', 'info'); return; }
   const held = lgHeldCup(), waiting = (R.cups || []).filter((c: any) => c.spirit && (c.st === 'ready' || c.st === 'pour'))[0];
   if (waiting) { toast('Your drink is on the counter: pick it up first', 'info'); return; }
   if (held) { toast('Finish what you have or put it down first', 'info'); return; }
   aimUnlock(); Sound.tick();
   const el = R.root.querySelector('.hg-panel') as HTMLElement; if (!el) return; el.hidden = false;
   el.innerHTML = `<div class="hg-vend lg-barmenu"><div class="hg-vend-h"><b>The bar</b><small>What would you like? The strength is the share of alcohol in it; a standard drink is 10 g of alcohol.</small><button data-op="bar-close" aria-label="Close">${icon('close')}</button></div>
-    <div class="lg-bar-list">${LG_SPIRITS.map(d => { const g = spiritGrams(d), c = '#' + d.col.toString(16).padStart(6, '0');
-      return `<button data-op="bar-pick" data-k="${d.id}"><i class="lg-bar-sw" style="--c:${c}"></i><span><b>${esc(d.name)}</b><small>${esc(d.what)}</small><small class="lg-bar-num">${d.abv}% · ${d.ml} ml · ${g.toFixed(1)} g alcohol (${(g / 10).toFixed(1)} standard drinks)</small></span><em>${money(d.price)}</em></button>`; }).join('')}</div></div>`;
+    ${spiritAny() ? '' : `<p class="lg-bar-out">${icon('alert')}The bar has run out of everything. Order spirits for your lounges under Finance → Storage.</p>`}
+    <div class="lg-bar-list">${LG_SPIRITS.map(d => { const g = spiritGrams(d), c = '#' + d.col.toString(16).padStart(6, '0'), left = spiritLeft(d.id);
+      return `<button data-op="bar-pick" data-k="${d.id}" ${left ? '' : 'disabled'}><i class="lg-bar-sw" style="--c:${c}"></i><span><b>${esc(d.name)}</b><small>${esc(d.what)}</small><small class="lg-bar-num">${d.abv}% · ${d.ml} ml · ${g.toFixed(1)} g alcohol (${(g / 10).toFixed(1)} standard drinks)</small></span><em>${left ? `${num(left)} left` : 'Run out'}</em></button>`; }).join('')}</div></div>`;
 }
 function lgBarClose() { const R = LoungeRoom, el = R.root && R.root.querySelector('.hg-panel') as HTMLElement; if (el) { el.hidden = true; el.innerHTML = ''; } Sound.tick(); }
 /** A drink ordered: paid for, the menu goes, and he gets to work. */
 function lgBarPick(id: string) {
   const R = LoungeRoom, B = R.A && R.A.bar, d = lgSpirit(id); if (!B || !d || B.order) return;
   const el = R.root.querySelector('.hg-panel') as HTMLElement; if (el) { el.hidden = true; el.innerHTML = ''; }
-  try { const c = company(); if (c) payTxn(c.id, `Lounge bar: ${d.name}`, -d.price, 'catering', [[d.name, -d.price]]); } catch (e) { /* free */ }
-  Sound.tick();
+  if (!spiritTake(id)) { toast(`Sorry, the ${d.name.toLowerCase()} has run out`, 'info'); return; }   // from your own storage: it's your bar
+  Sound.tick(); lgBarOrder(id, null);
+}
+/** An order for you (guest null) or for a guest at the bar: he takes a bottle and a glass, and pours. */
+function lgBarOrder(id: string, guest: any): boolean {
+  const R = LoungeRoom, B = R.A && R.A.bar, d = lgSpirit(id); if (!B || !d || B.order) return false;
   const bottles = B.bottles.filter((b: any) => b.d.id === id && !b.out), bottle = bottles[Math.floor(Math.random() * bottles.length)];
   const want = (LG_GLASSES[d.glass] ? d.glass : 'wine'), F = R.free;
   const slots = B.rack.filter((s: any) => s.type === want && s.g && s.fade >= 1);
-  const px = F ? F.x : B.bxp, slot = slots.sort((a: any, b: any) => Math.abs(a.home.x - px) - Math.abs(b.home.x - px))[0] || B.rack.filter((s: any) => s.g)[0];
-  if (!bottle || !slot) { toast('Sorry, that one has run out', 'info'); return; }
-  B.order = { st: 'toBottle', t: 0, d, bottle, slot, serveX: clamp(slot.home.x, B.bxp - 1.5, B.bxp + 1.5) };
+  const px = guest ? guest.x : F ? F.x : B.bxp, slot = slots.sort((a: any, b: any) => Math.abs(a.home.x - px) - Math.abs(b.home.x - px))[0] || B.rack.filter((s: any) => s.g)[0];
+  if (!bottle || !slot) { if (!guest) toast('Sorry, that one has run out', 'info'); return false; }
+  B.order = { st: 'toBottle', t: 0, d, bottle, slot, guest, serveX: clamp(guest ? guest.x : slot.home.x, B.bxp - 1.5, B.bxp + 1.5) };
+  return true;
 }
 /** Each frame: the bartender (idle, greeting you, or making your drink), the rack refilling. */
 function lgBarStep(dt: number, now: number) {
@@ -253,7 +259,9 @@ function lgBarStep(dt: number, now: number) {
       O.bottleTilt = tilt * 2.1;
       const flow = O.t > 0.5 && O.t < dur + 0.5 ? 1 : 0, k = clamp((O.t - 0.5) / dur, 0, 1);
       O.cup.lvl = O.cup.full * k; lgBarStream(R, O, flow);
-      if (O.t > dur + 1.0) { lgBarStream(R, O, 0); O.st = 'toShelf'; O.t = 0; O.cup.st = 'ready'; if (O.cup.g.userData.hit) R.A.hits.push(O.cup.g.userData.hit); toast(`${d2.name}: your glass is on the counter, pick it up`, 'ok'); } }
+      if (O.t > dur + 1.0) { lgBarStream(R, O, 0); O.st = 'toShelf'; O.t = 0;
+        if (O.guest) { O.cup.st = 'guest'; O.cup.guest = O.guest; O.guest.drink = O.cup; O.guest.drinkT = 0; }   // the guest's: they pick it up
+        else { O.cup.st = 'ready'; if (O.cup.g.userData.hit) R.A.hits.push(O.cup.g.userData.hit); toast(`${d2.name}: your glass is on the counter, pick it up`, 'ok'); } } }
     else if (O.st === 'toShelf') { wantYaw = 0; armR = lgBarReach(R, B, 'R', lgBarFront(R, B, 'R', 0.3, 1.2)); O.bottleTilt = 0;
       if (toward(b.pos.x) && Math.abs(angDiffRad(B.yaw, 0)) < 0.2) { O.st = 'putBottle'; O.t = 0; } }
     else if (O.st === 'putBottle') { wantYaw = 0; armR = lgBarReach(R, B, 'R', b.pos.clone().add(new T.Vector3(0, 0.12, -0.03)));
@@ -381,3 +389,43 @@ function lgDrunkScreen(R: any, k: number, now: number) {
   cv.style.filter = `blur(${(0.3 + 1.2 * k).toFixed(2)}px)`;
 }
 function lgDrunkClear(R: any) { if (R.drunkEl) { R.drunkEl.remove(); R.drunkEl = null; } try { if (R.ren && R.ren.domElement) R.ren.domElement.style.filter = ''; } catch (e) { /* gone */ } LgDrunk.pend = 0; LgDrunk.bac = 0; }
+
+/* ---------- guests at the bar ---------- */
+/** A guest standing at the bar: they order when the bartender is free, pick up their glass when it is poured, and
+ *  drink it sip by sip (each sip's alcohol counts: lounge-drunk.ts), then go and do something else. */
+function lgGuestBar(G: any, dt: number) {
+  const R = LoungeRoom, B = R.A && R.A.bar; if (!B || !G.spot || G.spot.k !== 'bar' || !G.wantsDrink) return;
+  G.bacK = clamp(guestBac(drunkKey(G.P.name, G.P.callsign, G.P.dep)) / 1.5, 0, 1);
+  if (!G.ordered && !G.drink) {
+    if (B.m && !B.order) { const have = LG_SPIRITS.filter(d => spiritLeft(d.id) > 0), pick = have[Math.floor(Math.random() * have.length)];
+      if (!pick) { G.wantsDrink = false; G.timer = 2; return; }   // nothing left to serve
+      if (spiritTake(pick.id) && lgBarOrder(pick.id, G)) { G.ordered = true; spiritSale(pick.id); } }
+    G.timer = Math.max(G.timer, 4); return;
+  }
+  if (G.ordered && !G.drink) { G.timer = Math.max(G.timer, 4); return; }
+  const c = G.drink; G.timer = Math.max(G.timer, 3); G.drinkT = (G.drinkT || 0) + dt;
+  // a sip about every eight seconds (sooner for those who like it), a quarter of the glass each
+  if (!G.sip && G.drinkT > (G.heavy ? 5 : 8)) { G.sip = { t: 0, from: c.lvl }; G.drinkT = 0; }
+  if (G.sip) { G.sip.t += dt; const k = clamp((G.sip.t - 0.6) / 0.8, 0, 1), was = c.lvl;
+    c.lvl = Math.max(0, G.sip.from - c.full / 4 * k); if (c.lvl < was && c.alc) { guestDrink(G.P, c.alc.g * (was - c.lvl) / c.full); G.bacK = clamp(guestBac(drunkKey(G.P.name, G.P.callsign, G.P.dep)) / 1.5, 0, 1); }
+    if (G.sip.t > 2.0) G.sip = null; }
+  if (c.lvl < 0.02 && !G.sip) {   // finished: the glass goes back on the counter and is cleared away
+    c.st = 'done'; if (c.g && c.g.parent) c.g.parent.remove(c.g); c.g = null; G.drink = null; G.ordered = false; G.wantsDrink = G.heavy && Math.random() < 0.6 || (!G.heavy && G.bacK < 0.3 && Math.random() < 0.15); G.timer = G.wantsDrink ? 3 : 1.5;
+  }
+}
+/** The guest's right arm: holding the glass in front of them, or up to their mouth for a sip. */
+function lgGuestArms(G: any, t: number): number[] | null {
+  const T = THREE, m = G.m, J = m.joints.R; if (!J) return null; m.root.updateMatrixWorld(true);
+  const top = m.top || 1.75, up = G.sip ? Math.sin(Math.PI * clamp(G.sip.t / 2.0, 0, 1)) : 0;
+  const at = new T.Vector3(J.s.x * 0.55, top * (0.62 + 0.28 * up), 0.26 - 0.12 * up);
+  G.armR = humanReach(m, 'R', at, G.armR || [0.4, 0.1, 0.05, 1.2]); void t; return G.armR;
+}
+/** The glass in the guest's hand (picked up off the counter at first). */
+function lgGuestGlass(G: any, arms: number[] | null) {
+  const R = LoungeRoom, c = G.drink; if (!c || !c.g || !arms) return;
+  const m = G.m; m.root.updateMatrixWorld(true);
+  const h = R.A.root.worldToLocal(m.root.localToWorld(humanHandAt(m, 'R', arms, undefined, m.joints.R.palm)));
+  if (!c.from) c.from = c.g.position.clone(); c.w = Math.min(1, (c.w || 0) + 0.04);
+  const want = h.add(new THREE.Vector3(0, -0.06, 0)); c.g.position.copy(c.from.clone().lerp(want, c.w * c.w * (3 - 2 * c.w)));
+  c.g.rotation.set(G.sip ? -0.7 * Math.sin(Math.PI * clamp(G.sip.t / 2.0, 0, 1)) : 0, G.yaw, 0, 'YXZ');
+}

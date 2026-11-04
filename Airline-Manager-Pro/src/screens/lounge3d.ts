@@ -363,7 +363,7 @@ function lgPassengers(): { name: string; look: any; cls: string; to: string; dep
     if (!n.paxSeed) { n.paxSeed = 'lp-' + uid(); try { Store.soon(); } catch (e) { /* saved later */ } }
     const a = plane(n.reg), pseudo: any = { id: n.paxSeed, paxSeed: n.paxSeed, reg: n.reg, typeId: a.typeId, from: n.from, to: n.to, pax: ld.pax, paxJ: ld.paxJ, paxF: ld.paxF };
     let list: any[] = []; try { list = manifestOf(pseudo).filter((p: any) => p.cls !== 'Y'); } catch (e) { list = []; }
-    for (const p of list) out.push({ name: p.name, look: p.look, cls: p.cls === 'F' ? 'First' : 'Business', to: n.to, dep: n.depAt, callsign: n.callsign || n.reg });
+    for (const p of list) out.push({ name: p.name, look: p.look, cls: p.cls === 'F' ? 'First' : 'Business', to: n.to, from: n.from, reg: n.reg, dep: n.depAt, callsign: n.callsign || n.reg });
   }
   return out;
 }
@@ -393,7 +393,7 @@ function lgGuests() {
     try { modelsPeople(m, P.look); } catch (e) { /* the app's own figure */ }
     const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); A.root.add(pivot);
     m.root.traverse((o: any) => { if (o.isMesh) { o.castShadow = R.q >= 1; o.receiveShadow = true; } });
-    const G: any = { m, pivot, holder, P, seed: r() * 10, v: 0, dist: 0, sitK: 0, st: 'sit', timer: 0 };
+    const G: any = { m, pivot, holder, P, seed: r() * 10, v: 0, dist: 0, sitK: 0, st: 'sit', timer: 0, heavy: r() < 0.05 };   // now and then one who drinks far too much (about one in twenty)
     // at the start most are sitting, the rest up and about
     const fs = free(), seat = r() < 0.72 && fs.length ? fs[Math.floor(r() * fs.length)] : null;
     if (seat) { lgTake(G, seat); G.sitK = 1; G.st = 'sit'; G.timer = 20 + r() * 120; const p = lgSeatPos(seat); G.x = p.x; G.z = p.z; G.yaw = seat.ry; }
@@ -417,6 +417,10 @@ function lgNext(G: any) {
   const R = LoungeRoom, now = Date.now(), r = Math.random();
   if (G.P.dep - now < 25 * 60e3) { lgFreeSeat(G); G.st = 'go'; G.goal = { x: R.A.door.x, z: R.A.door.z }; G.then = 'leave'; return; }   // their flight is boarding
   if (G.st === 'sit') { const side = lgSeatSide(G.seat); G.st = 'stand'; G.timer = 0; G.side = side; return; }
+  // a drink at the bar (Business and Flagship lounges): now and then, and often for some
+  const barS = R.spots.filter((x: any) => x.k === 'bar')[0];
+  if (barS && !G.drink && (G.heavy ? r < 0.55 : r < 0.12 && (G.bacK || 0) < 0.3) && !(R.guests || []).some((o: any) => o !== G && o.wantsDrink)) {
+    G.st = 'go'; G.spot = barS; G.goal = { x: barS.x + (Math.random() - 0.5) * 0.3, z: barS.z }; G.then = 'use'; G.wantsDrink = true; G.ordered = false; return; }
   const fs = (R.A.seats || []).filter((x: any) => !x.taken && x !== R.sit);
   if ((G.st === 'use' && r < 0.7 && fs.length) || !R.spots.length) {   // somewhere to sit, the nearer the likelier
     const pick = fs.map((x: any) => ({ x, d: Math.hypot(x.x - G.x, x.z - G.z) + Math.random() * 6 })).sort((a: any, b: any) => a.d - b.d)[0];
@@ -438,7 +442,7 @@ function lgGuestStep(G: any, now: number, dt: number) {
     const st = G.seat, p = lgSeatPos(st); G.sitK = Math.min(1, G.sitK + dt * 1.4);
     G.x = G.from.x + (p.x - G.from.x) * G.sitK; G.z = G.from.z + (p.z - G.from.z) * G.sitK; G.yaw += angDiffRad(G.yaw, st.ry) * Math.min(1, dt * 6);
     if (G.sitK >= 1) { G.st = 'sit'; G.timer = 40 + Math.random() * 120; }
-  } else if (G.st === 'use') { if (G.spot) G.yaw += angDiffRad(G.yaw, G.spot.ry) * Math.min(1, dt * 4); if (G.timer <= 0) lgNext(G); }
+  } else if (G.st === 'use') { if (G.spot) G.yaw += angDiffRad(G.yaw, G.spot.ry) * Math.min(1, dt * 4); try { lgGuestBar(G, dt); } catch (e) { G.wantsDrink = false; } if (G.timer <= 0) lgNext(G); }
   else if (G.st === 'go') {
     const dx = G.goal.x - G.x, dz = G.goal.z - G.z, d = Math.hypot(dx, dz);
     if (d < 0.12) {
@@ -464,7 +468,11 @@ function lgGuestStep(G: any, now: number, dt: number) {
   const t = now + G.seed; let g = humanGesture(null, t);
   if (G.v > 0.05) g = cabinLerpG(g, humanGesture({ kind: 'walk', v: Math.max(0.6, G.v), seed: G.P.name } as any, G.dist / 1.25), Math.min(1, G.v / 0.6));
   if (k > 0) g = cabinLerpG(g, humanGesture({ kind: 'sit', v: 0 }, t), k);
+  // a guest who has been drinking sways and lurches a little
+  const bk = G.bacK || 0; if (bk > 0.05) { g.roll = (g.roll || 0) + 0.07 * bk * Math.sin(t * 1.1); g.lean = (g.lean || 0) + 0.04 * bk * Math.sin(t * 0.7 + 1); g.nod = (g.nod || 0) + 0.08 * bk; }
+  const arms = G.drink ? lgGuestArms(G, t) : null; if (arms) g.R = arms;
   try { G.m.pose({ t, yaw: 0, gaze: [Math.sin(t * 0.3) * 0.3, 0], blink: (t % 4.2) < 0.12 ? 1 : 0, g, talk: 0 }); } catch (e) { /* still */ }
+  if (G.drink) lgGuestGlass(G, arms);
 }
 function angDiffRad(a: number, b: number): number { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
 /** Blocked for a guest: the furniture and walls, and the other people (not themselves). */

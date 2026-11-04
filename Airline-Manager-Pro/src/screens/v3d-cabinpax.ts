@@ -205,6 +205,7 @@ function cabinHdStep(G: any, dt: number) {
     // in an aircraft seat: the thighs slope gently down over the front of the cushion and the shins go slightly
     // forward to the floor, so knees, shins and feet stay clear of the seat (not straight out through its edge)
     if (sk > 0 && g.legs) { const SEAT = [-1.36, 1.12, -1.36, 1.12]; g.legs = g.legs.map((v: number, i: number) => v + (SEAT[i] - (sit.legs ? sit.legs[i] : v)) * sk); }
+    if (f.p && (f.p as any).drunk) { const dk = clamp((f.p as any).drunk / 1.8, 0.3, 1); g.roll = (g.roll || 0) + 0.08 * dk * Math.sin(tt * 0.9); g.nod = (g.nod || 0) + 0.18 * dk + 0.06 * Math.sin(tt * 0.5); g.tilt = (g.tilt || 0) + 0.1 * dk * Math.sin(tt * 0.4); }   // drunk: slumped, head lolling
     h.g = h.g ? cabinLerpG(h.g, g, Math.min(1, dt * 7)) : g;
     m.pose({ t: tt, yaw: 0, gaze: [Math.sin(tt * 0.27 + h.t0) * 0.3, 0], blink: (tt % 4.3) < 0.12 ? 1 : 0, g: h.g, talk: f.p ? cabinTalkJaw('pax:' + f.p.key) : 0 });
     cabinHdFade(h, ps.a * h.mix);

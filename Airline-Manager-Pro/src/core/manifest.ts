@@ -107,6 +107,9 @@ function manifestOf(f: LiveFlight): PaxSeat[] {
     const who = pool[Math.floor(r() * pool.length)];
     who.famous = CELEB_JOBS[Math.floor(r() * CELEB_JOBS.length)]; who.age = clamp(who.age, 22, 78); who.record = null;
   }
+  // passengers who drank too much in your lounge: refused ones aren't on board; those you let on are marked
+  try { for (const d of drunkList()) { if (d.callsign !== f.callsign || Math.abs(d.dep - ((F.depAt || 0) as number)) > 6 * 3600e3) continue;
+    const i = out.findIndex(p => p.name === d.name); if (d.decided === 'deny') { if (i >= 0) out.splice(i, 1); } else if (d.decided === 'allow') { const p: any = i >= 0 ? out[i] : out.filter(x => x.cls !== 'Y')[0]; if (p) { if (i < 0) p.name = d.name; p.drunk = d.bac; } } } } catch (e) { /* none */ }
   _manifests.set(key, out);
   if (_manifests.size > 40) _manifests.delete(_manifests.keys().next().value);
   return out;
@@ -196,7 +199,7 @@ function paxRowHtml(fid: string, p: PaxSeat, i: number): string {
   return `<div role="button" tabindex="0" data-act="pax-card" data-f="${esc(fid)}" data-key="${esc(p.key)}" class="pax-row ${banned ? 'banned' : rec ? 'warned' : ''} ${p.famous ? 'famous' : ''} ${p.pet ? (p.pet.left ? 'has-petleft' : 'has-pet') : ''} ${rec ? 'has-rec' : ''} ${p.famous ? 'has-star' : ''}">
     <span class="pax-face" data-face="${esc(fid)}|${esc(p.key)}" data-i="${i}"></span>
     <span class="pax-who"><b>${esc(p.name)}${typeof ffTierChip === 'function' ? ffTierChip(p.name) : ''}${p.famous ? ` <i class="pax-star">${icon('star')}</i>` : ''}</b><small>${p.famous ? esc(p.famous) + ' · ' : ''}${natLabel(p.nat)} · ${p.age}</small>${p.pet ? `<span class="pax-pet ${p.pet.left ? 'left' : ''}" role="button" data-act="pet-visit" data-f="${esc(fid)}" data-key="${esc(p.key)}" title="${esc(p.pet.left || 'Visit ' + p.pet.name)}">${petSvg(p.pet)}<small>${esc(p.pet.name)}, ${p.pet.kind}, ${p.pet.left ? 'stayed behind' : p.pet.where === 'cabin' ? 'under the seat' : 'in the hold'}</small></span>` : ''}</span>
-    <span class="pax-seat">${esc(p.seat)}</span>
+    <span class="pax-seat">${esc(p.seat)}</span>${(p as any).drunk ? `<span class="pax-drunk" title="Boarded drunk: about ${(p as any).drunk.toFixed(1)} per mille">Drunk</span>` : ''}
     ${(() => { try { const f: any = State.live.filter(x => x.id === fid)[0]; return f ? moodChip(f, p, manifestOf(f)) : ''; } catch (e) { return ''; } })()}
     ${rec ? `<button class="pax-rec ${banned ? 'ban' : ''}" data-act="pax-record" data-key="${esc(p.key)}">${icon('alert')}${banned ? 'Banned' : rec.notes.length + ' warning' + (rec.notes.length > 1 ? 's' : '')}</button>` : '<span class="pax-clean">Clean</span>'}
   </div>`;
