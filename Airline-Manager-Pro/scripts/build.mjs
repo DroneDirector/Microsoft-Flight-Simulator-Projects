@@ -105,7 +105,7 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   }
   const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
   const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
-  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES'), shp = pairs('PROP_FILES'), crm = pairs('CRASH_FILES'), crx = pairs('CRASH_FX_FILES');
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES'), tpr = pairs('TRAINING_PROP_FILES'), shp = pairs('PROP_FILES'), crm = pairs('CRASH_FILES'), crx = pairs('CRASH_FX_FILES');
   const have = f => files.includes(f) ? ' (in use)' : '';
   const md = [
     '# Replaceable models', '',
@@ -157,6 +157,12 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     'towards +Z (where you sit or stand to use it), standing on the floor; fitted to the size of the app\'s own.', '',
     '| File | What |', '|---|---|',
     ...lpr.map(([f, n]) => `| \`lounge-props/${f}.glb\`${have('lounge-props/' + f + '.glb')} | ${n} |`), '',
+    '## Training room (`training-props/`)', '',
+    'One file for each kind of thing in the Training room (the Academy), used for every one of that kind. Metres, front',
+    'towards +Z (the side you sit at or look at), standing on the floor (or the desk); fitted to the size of the app\'s own.',
+    'The plants are the shared ones (`props/plant-3.glb`). The people are the people files.', '',
+    '| File | What |', '|---|---|',
+    ...tpr.map(([f, n]) => `| \`training-props/${f}.glb\`${have('training-props/' + f + '.glb')} | ${n} |`), '',
     '## Crash scene (`crash/`)', '',
     'What is at a crash site besides the aircraft itself (the wreck is the aircraft\'s own model, broken and scorched).',
     'Models: metres, +Y up, the front towards +Z, standing on the ground; each is fitted to the size of the app\'s own.',

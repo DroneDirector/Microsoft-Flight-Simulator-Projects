@@ -35,7 +35,7 @@ TestRooms.open = function (opts?: any) {
   root.innerHTML = `<canvas></canvas><div class="tr-halls-ui">
     <div class="ct-top tr-top"><div><small>${R.game ? esc(company().name) : opts && opts.stress ? 'Graphics' : 'Testing'}</small><b>${R.game ? 'Staff corridor and concourse' : opts && opts.stress ? 'Stress test' : 'Office · Operations · Lounge'}</b></div></div>
     <button class="ct-leave tr-leave" data-tr="exit">${icon('close')}<span>${R.game ? 'Leave' : opts && opts.stress ? 'Stop the test' : 'Exit testing'}</span><kbd>Esc</kbd></button>
-    <div class="ct-spots tr-go"><button data-tr="go" data-k="office">Your office</button><button data-tr="go" data-k="corridor">Corridor</button><button data-tr="go" data-k="ops">Operations</button><button data-tr="go" data-k="concourse">Concourse</button><button data-tr="go" data-k="lounge">Lounge</button><button data-tr="visitor">A visitor</button></div>
+    <div class="ct-spots tr-go"><button data-tr="go" data-k="office">Your office</button><button data-tr="go" data-k="corridor">Corridor</button><button data-tr="go" data-k="ops">Operations</button><button data-tr="go" data-k="training">Training</button><button data-tr="go" data-k="concourse">Concourse</button><button data-tr="go" data-k="lounge">Lounge</button><button data-tr="visitor">A visitor</button></div>
     <div class="walk-pad ct-pad op-pad"><i></i></div><div class="of-aim op-dot" hidden>+</div><div class="tr-hint" hidden></div></div>
     ${R.game ? ctLoaderHtml(R.gameRoom === 'ops' ? 'Operations' : R.gameRoom === 'lounge' ? 'Your lounge' : 'Your office', 'Unlocking the doors…', R.gameRoom === 'ops' ? OPS_EMBLEM : R.gameRoom === 'lounge' ? LG_EMBLEM : OF_WINGS) : ctLoaderHtml('Test rooms', 'Joining the rooms…', '')}`;
   if (R.game) root.classList.add('tr-game');
@@ -56,6 +56,7 @@ function trOpen2(root: HTMLElement, q: number) {
     [15, 'Your office…', () => trOffice(scene, q)],
     [40, 'The Operations office…', () => trOps(scene, q, ren)],
     [60, 'The lounge…', () => trLounge(scene, q)],
+    [70, 'The training room…', () => trTraining(scene, q)],
     [80, 'The corridor and the concourse…', () => trHalls(scene, q)],
   ];
   R.hits = []; R.doors = []; R.walk = []; R.walkOf = {};
@@ -194,11 +195,20 @@ function trHalls(scene: any, q: number) {
   quad(C[2] - C[0], C[3] - C[1], vinyl, (C[0] + C[2]) / 2, 0, (C[1] + C[3]) / 2, 0, -Math.PI / 2);
   quad(C[2] - C[0], C[3] - C[1], ceil, (C[0] + C[2]) / 2, H, (C[1] + C[3]) / 2, 0, Math.PI / 2);
   wallZ(C[1], C[3], C[2] - 0.02, -1, H, [[TR_L.ofDoor[0], TR_L.ofDoor[1], 2.2], [TR_L.opsDoor[0], TR_L.opsDoor[1], 2.15]]);
-  const future = [[-9.0, -8.0], [-15.6, -14.6]];
-  wallZ(C[1], C[3], C[0], 1, H, []);
+  const future = [[-9.0, -8.0]];
+  wallZ(C[1], C[3], C[0], 1, H, [[TRN_L.door[0], TRN_L.door[1], 2.25]]);   // the training room's double doors
   wallX(C[0], C[2], C[1], 1, H, []);
   wallX(C[0], C[2], C[3] - 0.02, -1, H, [[TR_L.staffDoor[0], TR_L.staffDoor[1], 2.2]]);
-  for (const [x, f] of [[C[0] + 0.03, 1], [C[2] - 0.05, -1]] as number[][]) { box(0.04, 0.15, C[3] - C[1], rail, x, 0.95, (C[1] + C[3]) / 2); box(0.012, 0.12, C[3] - C[1], dark, x - f * 0.01, 0.06, (C[1] + C[3]) / 2); }
+  // the guard rail and the kick strip along both walls: stopping at every doorway and its frame, never across them
+  const sideDoors: number[][][] = [future.concat([TRN_L.door]), [TR_L.ofDoor, TR_L.opsDoor]];
+  for (const [i, [x, f]] of ([[C[0] + 0.03, 1], [C[2] - 0.05, -1]] as number[][]).entries()) {
+    const gaps = sideDoors[i].map(d => [Math.min(d[0], d[1]) - 0.09, Math.max(d[0], d[1]) + 0.09]).sort((a, b) => a[0] - b[0]);
+    let z = C[1];
+    for (const [a, b] of gaps.concat([[C[3], C[3]]])) {
+      if (a - z > 0.05) { box(0.04, 0.15, a - z, rail, x, 0.95, (z + a) / 2); box(0.012, 0.12, a - z, dark, x - f * 0.01, 0.06, (z + a) / 2); }
+      z = Math.max(z, b);
+    }
+  }
   for (let z = C[1] + 1.5; z < C[3]; z += 3) { const p = quad(1.2, 0.6, lamp, (C[0] + C[2]) / 2, H - 0.01, z, 0, Math.PI / 2); void p; }
   // real lamps cost every surface a little more to draw, so fewer on lighter settings (the panels still glow, and
   // a soft fill light stands in for them); phones and tablets keep their speed
@@ -314,6 +324,7 @@ function trFrame() {
   try { if (R.of) petStep(R.of, now, dt); } catch (e) { /* no pet */ }
   for (const D of R.doors) if (D.k0 !== D.to) { D.k0 += Math.sign(D.to - D.k0) * Math.min(Math.abs(D.to - D.k0), dt * (D.slide ? 1.6 : 1.4)); const e = D.k0 * D.k0 * (3 - 2 * D.k0); D.set(e); }
   try { trVisStep(dt, now); } catch (e) { R.vis = null; }
+  try { trnStep(); } catch (e) { /* no clock */ }
   trWalk(dt);
   trAim();
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
@@ -473,7 +484,7 @@ function trVisStep(dt: number, now: number) {
 
 /* ---------- moving about: keys, the mouse, touch ---------- */
 const TR_SPOTS: any = {
-  office: { x: 0.9, z: 1.6, yaw: Math.PI + 0.3 }, corridor: { x: -4.4, z: -6, yaw: Math.PI }, ops: { x: -2.1, z: -12.4, yaw: Math.PI / 2 },
+  office: { x: 0.9, z: 1.6, yaw: Math.PI + 0.3 }, corridor: { x: -4.4, z: -6, yaw: Math.PI }, training: { x: -6.5, z: -15.1, yaw: -Math.PI / 2 }, ops: { x: -2.1, z: -12.4, yaw: Math.PI / 2 },
   concourse: { x: -4.4, z: 8, yaw: Math.PI / 2 }, lounge: { x: 31.5, z: 12, yaw: Math.PI / 2 },
 };
 function trInput(root: HTMLElement, cv: HTMLCanvasElement) {
