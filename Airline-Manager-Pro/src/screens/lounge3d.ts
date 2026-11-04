@@ -196,7 +196,7 @@ function lgBuild(scene: any, q: number): any {
     for (const [dx, dz, ry] of [[0, -1.0, 0], [0, 1.0, Math.PI], [-1.0, 0, Math.PI / 2], [1.0, 0, -Math.PI / 2]] as number[][]) {
       if (ci % 2 && dx === 0 && dz < 0) continue;
       armchair(c[0] + dx, c[1] + dz, ry); block(c[0] + dx - 0.45, c[1] + dz - 0.45, c[0] + dx + 0.45, c[1] + dz + 0.45);
-      seats.push({ x: c[0] + dx, z: c[1] + dz, ry });
+      seats.push({ x: c[0] + dx, z: c[1] + dz, ry, hip: 0.55, kind: 'armchair' });
     }
     // cups and napkins on the tables
     prop(ci % 2 ? 'teacup-and-saucer' : 'coffee-cup-and-saucer', c[0] + 0.18, c[1] + 0.1, 0, () => lgCup(add, porcelain, lv === 2 ? gold : null, c[0] + 0.18, 0.445, c[1] + 0.1, ci % 2 === 1, ci % 2 ? 0x7A3E14 : 0x3A1F0E));
@@ -209,6 +209,7 @@ function lgBuild(scene: any, q: number): any {
       const o = (w: number, h: number, d: number, m: any, X: number, Y: number, Z: number) => { const k = new T.Mesh(new T.BoxGeometry(w, h, d), m); k.position.set(X, Y, Z); k.castShadow = shadow; k.receiveShadow = true; g.add(k); return k; };
       o(2.2, 0.18, 0.8, fabric, 0, 0.36, 0.02); o(2.2, 0.6, 0.18, fabric, 0, 0.72, -0.32); for (const t of [-1, 1]) o(0.16, 0.34, 0.8, fabric, t * 1.1, 0.55, 0); for (let k = -1; k <= 1; k++) o(0.68, 0.12, 0.64, fabric, k * 0.7, 0.5, 0.05); });
     block(x - 0.5, z - 1.2, x + 0.5, z + 1.2);
+    for (let k = -1; k <= 1; k++) seats.push({ x: x - s * 0.05, z: z + s * k * 0.7, ry: -s * Math.PI / 2, hip: 0.52, kind: 'sofa' });   // three places on the sofa
     // a floor lamp and a plant beside it
     prop('floor-lamp', x, z + 1.6, 0, () => { add(new T.CylinderGeometry(0.16, 0.18, 0.03, 20), lv === 2 ? brass : black, x, 0.015, z + 1.6); add(new T.CylinderGeometry(0.015, 0.015, 1.5, 8), lv === 2 ? brass : black, x, 0.76, z + 1.6); const sh = add(new T.CylinderGeometry(0.18, 0.25, 0.3, 24, 1, true), new T.MeshStandardMaterial({ color: 0xF4ECD8, emissive: 0xFFE2A8, emissiveIntensity: 0.6, side: T.DoubleSide }), x, 1.55, z + 1.6); void sh; });
     prop('potted-plant', x, z - 1.7, 0, () => lgPlant(add, x, z - 1.7, lv));
@@ -251,7 +252,7 @@ function lgBuild(scene: any, q: number): any {
     block(bxp - 1.9, bz - 0.5, bxp + 1.9, z1);
     for (let i = 0; i < 4; i++) { const sx = bxp - 1.3 + i * 0.86, sz = bz - 0.75;
       prop('bar-stool', sx, sz, 0, () => { add(new T.CylinderGeometry(0.2, 0.2, 0.08, 20), fabric, sx, 0.78, sz); add(new T.CylinderGeometry(0.025, 0.025, 0.74, 10), lv === 2 ? gold : chrome, sx, 0.38, sz); add(new T.TorusGeometry(0.16, 0.012, 8, 24), lv === 2 ? gold : chrome, sx, 0.3, sz).rotation.x = Math.PI / 2; add(new T.CylinderGeometry(0.2, 0.22, 0.02, 20), lv === 2 ? gold : chrome, sx, 0.01, sz); });
-      block(sx - 0.25, sz - 0.25, sx + 0.25, sz + 0.25); }
+      block(sx - 0.25, sz - 0.25, sx + 0.25, sz + 0.25); seats.push({ x: sx, z: sz, ry: 0, hip: 0.84, kind: 'stool' }); }
     prop('bottle-shelf', bxp, z1 - 0.2, Math.PI, () => { for (const y of [1.4, 1.8, 2.2]) { bx(3.0, 0.03, 0.25, lv === 2 ? brass : walnut, bxp, y, z1 - 0.2); for (let i = 0; i < 12; i++) { const h = 0.22 + (i % 3) * 0.04, col = [0x2F6B34, 0x7A3E14, 0xD9D2C0, 0x4A1A20, 0xC9A55B][i % 5]; const b = add(new T.CylinderGeometry(0.035, 0.04, h, 12), new T.MeshPhysicalMaterial({ color: col, roughness: 0.1, transparent: true, opacity: 0.85 }), bxp - 1.35 + i * 0.245, y + 0.015 + h / 2, z1 - 0.2); b.castShadow = false; add(new T.CylinderGeometry(0.012, 0.015, 0.06, 8), new T.MeshPhysicalMaterial({ color: col, roughness: 0.1 }), bxp - 1.35 + i * 0.245, y + 0.045 + h, z1 - 0.2); } } }); }
   // Flagship: a fireplace, a grand piano, art and a champagne bucket
   if (lv === 2) {
@@ -333,7 +334,7 @@ function lgPlant(add: any, x: number, z: number, lv: number) {
 
 /* ---------- guests ---------- */
 function lgGuests() {
-  const R = LoungeRoom, T = THREE, A = R.A, seats = (A.seats || []).slice(), r = ctRng(7 + R.lvl * 31 + R.k.length);
+  const R = LoungeRoom, T = THREE, A = R.A, seats = (A.seats || []).filter((x: any) => x.kind !== 'stool'), r = ctRng(7 + R.lvl * 31 + R.k.length);
   R.guests = [];
   // shuffle the seats, sit some guests down; one or two stand at the window with a cup
   for (let i = seats.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = seats[i]; seats[i] = seats[j]; seats[j] = t; }
@@ -343,7 +344,7 @@ function lgGuests() {
     let m: any = null; try { m = Human.build(dressed(look, 'fa' as any), 'fa', '#2C8CFF', av3Style(), q); } catch (e) { m = null; } if (!m) continue;
     const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); A.root.add(pivot);
     m.root.traverse((o: any) => { if (o.isMesh) { o.castShadow = R.q >= 1; o.receiveShadow = true; } });
-    const s = seats[i]; const standing = !s || i >= n - 2;
+    const s = seats[i]; const standing = !s || i >= n - 2; if (s && !standing) s.taken = true;
     if (!standing) { pivot.position.set(s.x + Math.sin(s.ry) * 0.06, 0.45, s.z + Math.cos(s.ry) * 0.06); pivot.rotation.y = s.ry; holder.position.y = -(m.top || 1.75) * 0.52; }
     else { const x = -R.spec.W * 0.3 + r() * R.spec.W * 0.6, z = -R.spec.D / 2 + 0.9; pivot.position.set(x, 0, z); pivot.rotation.y = Math.PI + (r() - 0.5) * 0.8; A.blocks.push([x - 0.3, z - 0.3, x + 0.3, z + 0.3]); }
     R.guests.push({ m, pivot, sit: !standing, seed: r() * 10 });
@@ -374,9 +375,10 @@ function lgOpen2(root: HTMLElement, q: number) {
     for (let i = 0; i < nL; i++) { const L = new T.PointLight(0xFFE6C4, (R.lvl === 2 ? 9 : 7) * (1.2 - 0.5 * sunK), 12, 1.6); L.position.set(-sp.W * 0.35 + (i % 3) * sp.W * 0.35, sp.H - 0.4, -sp.D * 0.2 + Math.floor(i / 3) * sp.D * 0.45); scene.add(L); }
     ctProgress(60, 'The guests are arriving…', R);
     try { lgGuests(); } catch (e) { R.guests = []; }
+    try { lgSeatHits(); } catch (e) { /* no seats to click */ }
     const fit = () => { const w = root.clientWidth, h = root.clientHeight; ren.setSize(w, h, false); cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix(); };
     fit(); R.fit = fit; window.addEventListener('resize', fit);
-    R.free = { x: A.door.x - 0.2, z: A.door.z - 0.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.04 };
+    R.free = { x: A.door.x - 0.2, z: A.door.z - 0.6, v: 0, bob: 0 }; R.look = { yaw: 0.25, pitch: -0.04 }; R.sit = null;
     lgInput(root, cv);
     ctProgress(85, 'Opening the doors…', R);
     setTimeout(() => {
@@ -417,6 +419,8 @@ function lgFrame() {
   if (K.arrowleft) R.look.yaw += dt * 1.6; if (K.arrowright) R.look.yaw -= dt * 1.6;
   if (!R.meTried) { R.meTried = true; const mk = () => { try { if (!R.on || !R.scene) return; const me: any = myPilot(); R.me = selfBody(R.scene, me && me.look ? Object.assign({}, me.look, { hat: 'none' }) : ctLook('me', 'm', 'public'), company().color); } catch (e) { R.me = null; } }; if (Human.ready) mk(); else Human.load().then(mk, () => { /* without */ }); }
   const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], rr = (K.d ? 1 : 0) - (K.a ? 1 : 0) + R.stick[0];
+  if (R.sit && Math.hypot(f, rr) > 0.3) lgStand();   // walking gets you up
+  if (R.sit) { lgSeated(now, dt); return; }
   const mag = Math.min(1, Math.hypot(f, rr)), vmax = K.shift ? 2.4 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
   let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
@@ -426,6 +430,11 @@ function lgFrame() {
   R.cam.position.set(F.x, 1.64 + bobY, F.z);
   if (R.me) { try { const S = R.me, yb = yaw + Math.PI, o = selfEyeOff(S, yb, 0); S.pitch = R.look.pitch; const eye = selfPose(S, new T.Vector3(F.x - o.x, S.hipY, F.z - o.z), yb, 0, 0, F.v, F.bob, now, dt); R.cam.position.set(eye.x, eye.y + bobY, eye.z); } catch (e) { R.me = null; } }
   const p = R.look.pitch; R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p))));
+  lgFrameRest(now, dt);
+}
+/** Everything that goes on in the room each frame, standing or sitting: the guests, the fire, steam, what you look at. */
+function lgFrameRest(now: number, dt: number) {
+  const R = LoungeRoom;
   // guests: sitting back, talking now and then, sipping; the fire flickers; steam rises from fresh cups
   for (const G of R.guests || []) { const t = now + G.seed; let g = humanGesture(null, t); if (G.sit) g = cabinLerpG(g, humanGesture({ kind: 'sit', v: 0 }, t), 1); try { G.m.pose({ t, yaw: 0, gaze: [Math.sin(t * 0.3) * 0.3, 0], blink: (t % 4.2) < 0.12 ? 1 : 0, g, talk: Math.sin(t * 0.21) > 0.6 ? humanSpeech('Our flight leaves at ten, there is time for another coffee.', (G.seed * 1000) | 0, ((t * 1000) | 0)) : 0 }); } catch (e) { /* still */ } }
   for (const fl of R.A.flames) { fl.scale.y = 0.85 + 0.25 * Math.abs(Math.sin(now * 7.3) * Math.sin(now * 3.1)); fl.material.opacity = 0.8 + 0.2 * Math.sin(now * 11); }
@@ -433,9 +442,21 @@ function lgFrame() {
   for (let i = R.A.steam.length - 1; i >= 0; i--) { const s = R.A.steam[i]; s.t += dt; s.m.position.y += dt * 0.08; s.m.material.opacity = Math.max(0, 0.35 * (1 - s.t / 4)); s.m.scale.setScalar(1 + s.t * 0.6); if (s.t > 4) { R.A.root.remove(s.m); R.A.steam.splice(i, 1); } }
   // what you look at glows
   const obj = lgAimedObj(), hint = obj ? obj.userData.act : '', dot = R.root.querySelector('.op-dot') as HTMLElement;
-  if (R.glow) { if (obj) R.glow.showObj(obj); else R.glow.hide(); R.glow.step(dt); }
-  if (dot) { const tx = hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : ''; dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
+  const mine = obj && obj.userData.seat != null && R.A.seats[obj.userData.seat] === R.sit;   // the seat you're in doesn't glow
+  if (R.glow) { if (obj && !mine) R.glow.showObj(obj); else R.glow.hide(); R.glow.step(dt); }
+  if (dot) { const seat = obj && obj.userData.seat != null ? R.A.seats[obj.userData.seat] : null;
+    const tx = hint === 'door' ? 'The door: click to leave the lounge' : hint === 'coffee' ? 'Click for a coffee or a tea' : hint === 'sit' && seat !== R.sit ? `${LG_SEAT_NAME[seat.kind] || 'A seat'}: click to sit down` : hint === 'taken' ? 'Someone is sitting there' : R.sit ? (DESKTOP ? 'Sitting · W A S D or click to stand up' : 'Sitting · the stick or a tap to stand up') : ''; dot.hidden = !tx && !aimLocked(); dot.textContent = tx || '·'; dot.classList.toggle('on', !!tx); }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
+}
+/** A frame while you are sitting: your body in the seat, the view from your eyes, the room carrying on around you. */
+function lgSeated(now: number, dt: number) {
+  const R = LoungeRoom, T = THREE, st = R.sit; R.sitK = Math.min(1, (R.sitK || 0) + dt * 2.2);
+  const face = st.ry + Math.PI, yaw = R.look.yaw, p = R.look.pitch, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  let eye = new T.Vector3(st.x - Math.sin(st.ry) * 0.05, st.hip + 0.68, st.z - Math.cos(st.ry) * 0.05);
+  if (R.me) { try { const S = R.me; S.pitch = p; const turn = Math.atan2(Math.sin(yaw - face), Math.cos(yaw - face));
+    eye = selfPose(S, new T.Vector3(st.x - Math.sin(st.ry) * 0.04, st.hip, st.z - Math.cos(st.ry) * 0.04), st.ry + clamp(turn, -0.6, 0.6) * 0.4, 0, R.sitK, 0, 0, now, dt); } catch (e) { R.me = null; } }
+  R.cam.position.copy(eye); R.cam.lookAt(R.cam.position.clone().add(new T.Vector3(fx * Math.cos(p), Math.sin(p), fz * Math.cos(p))));
+  lgFrameRest(now, dt);
 }
 function lgAimedObj(e?: PointerEvent): any {
   const R = LoungeRoom, T = THREE, rc = new T.Raycaster();
@@ -446,9 +467,34 @@ function lgAimedObj(e?: PointerEvent): any {
 function lgClickAt(e?: PointerEvent) {
   const R = LoungeRoom; if (R.loading) return; const o = lgAimedObj(e), a = o ? o.userData.act : '';
   if (a === 'door') { roomExitMenu(R.root, 'lounges', to => lgLeave(to)); return; }
-  if (a === 'coffee') lgPour();
+  if (a === 'coffee') { if (R.sit) lgStand(); lgPour(); return; }
+  if (a === 'sit' && o.userData.seat != null && R.A.seats[o.userData.seat] !== R.sit) { lgSit(o.userData.seat); return; }
+  if (a === 'taken') { toast('Someone is sitting there', 'info'); return; }
+  if (R.sit) lgStand();   // sitting: a click anywhere else stands you up
 }
 /** A fresh cup: the machine hums, a cup on its saucer appears under the spout, steaming. */
+/** Every chair, sofa place and bar stool can be clicked: a free one to sit down in it. */
+function lgSeatHits() {
+  const R = LoungeRoom, T = THREE, A = R.A, m = new T.MeshBasicMaterial({ visible: false });
+  (A.seats || []).forEach((st: any, i: number) => {
+    const w = st.kind === 'stool' ? 0.5 : 0.75, h = new T.Mesh(new T.BoxGeometry(w, st.hip + 0.35, w), m);
+    h.position.set(st.x, (st.hip + 0.35) / 2, st.z); h.userData.act = st.taken ? 'taken' : 'sit'; h.userData.seat = i; A.root.add(h); A.hits.push(h);
+  });
+}
+const LG_SEAT_NAME: { [k: string]: string } = { armchair: 'An armchair', sofa: 'The sofa', stool: 'A bar stool' };
+/** Sit down: the view settles into the seat, facing the way it faces; look around freely. */
+function lgSit(i: number) {
+  const R = LoungeRoom, st = R.A && R.A.seats[i]; if (!st || st.taken) return;
+  Sound.tick(); aimUnlock(); R.sit = st; R.sitK = 0; R.free.v = 0; R.look = { yaw: st.ry + Math.PI, pitch: st.kind === 'stool' ? -0.05 : -0.12 };
+}
+/** Stand up again, beside the seat (wherever there is room). */
+function lgStand() {
+  const R = LoungeRoom, st = R.sit; if (!st) return; R.sit = null; Sound.tick();
+  const fx = Math.sin(st.ry), fz = Math.cos(st.ry);
+  for (const [a, b] of [[0.85, 0], [0, 0.85], [0, -0.85], [-0.85, 0], [1.3, 0], [0, 1.3], [0, -1.3]]) {   // in front, either side, behind
+    const x = st.x + fx * a + fz * b, z = st.z + fz * a - fx * b; if (!lgBlocked(x, z)) { R.free.x = x; R.free.z = z; return; }
+  }
+}
 function lgPour() {
   const R = LoungeRoom, T = THREE, A = R.A; if (!A || !A.coffeeAt) return;
   Sound.tick(); try { hgSnd('motor'); } catch (e) { /* quiet */ }
