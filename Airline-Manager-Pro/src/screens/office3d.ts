@@ -1102,7 +1102,7 @@ function ofBowlFrame(dt: number, now: number) {
 const OF_PH_D = { reach: 0.85, lift: 1.15, lower: 1.15, release: 0.75 };
 function ofPhotoPick() {
   const R = OfficeRoom, A = R.A; if (!A || !A.photoAt || (R.ph && R.ph.st !== 'idle') || (R.pk && R.pk.st !== 'idle') || ofLapK() > 0) return;
-  R.ph = { st: 'reach', t: 0, P0: A.photoAt.position.clone(), q0: A.photoAt.quaternion.clone(), tilt: [0, 0], want: [0, 0], a: {} };
+  R.ph = { st: 'reach', t: 0, P0: A.photoAt.position.clone(), q0: A.photoAt.quaternion.clone(), tilt: [0, 0], want: [0, 0], a: {}, tf: null };
   if (R.glow) R.glow.hide(); R.lapHover = false; ofPhotoUi(); Sound.tick();
 }
 function ofPhotoPut() { const ph = OfficeRoom.ph; if (!ph || ph.st !== 'hold') return; ph.st = 'lower'; ph.t = 0; ofPhotoUi(); }
@@ -1138,11 +1138,14 @@ function ofPhotoStep(dt: number, t: number): { lean: number; turn: number; slide
   // leaning in and turning to the desk while it is down there, upright again as it comes up
   const down = ph.st === 'reach' || ph.st === 'release' ? wL : 1 - mv;
   out.lean = 0.55 * down; out.turn = 0.45 * down; out.slide = 0.14 * down;   // forward on the seat, leaning in and turning to it
-  // in your hands: a little in front of your eyes, tilted as you like, never quite still
+  // in your hands: a little in front of your eyes, tilted as you like. While you hold it your body keeps still (no
+  // swaying or breathing in the arms: the time stands still for your figure), and the photo sits flush between your
+  // hands as one piece with them; tilting it moves your arms and the photo together
   ph.tilt[0] += (ph.want[0] - ph.tilt[0]) * Math.min(1, dt * 5); ph.tilt[1] += (ph.want[1] - ph.tilt[1]) * Math.min(1, dt * 5);
-  const e0 = R.me && R.me.eye0 ? R.me.eye0 : new T.Vector3(0, 1.2, 1.02), hold = new T.Vector3(e0.x, e0.y - 0.19, e0.z - 0.39), S = Math.sin;
-  hold.x += 0.002 * S(t * 1.1) + 0.001 * S(t * 2.9); hold.y += 0.0025 * S(t * 0.8 + 1) + 0.001 * S(t * 3.3);
-  const qh = new T.Quaternion().setFromEuler(new T.Euler(0.12 + ph.tilt[1] + 0.008 * S(t * 1.3), ph.tilt[0] + 0.012 * S(t * 0.9 + 2), 0.007 * S(t * 0.7), 'YXZ'));
+  const e0 = R.me && R.me.eye0 ? R.me.eye0 : new T.Vector3(0, 1.2, 1.02), hold = new T.Vector3(e0.x, e0.y - 0.19, e0.z - 0.39);
+  const qh = new T.Quaternion().setFromEuler(new T.Euler(0.12 + ph.tilt[1], ph.tilt[0], 0, 'YXZ'));
+  if (ph.tf == null) ph.tf = t;
+  (out as any).t = ph.tf;
   const pos = ph.P0.clone().lerp(hold, mv); pos.y += 0.09 * Math.sin(Math.PI * mv);   // up off the desk in an arc
   A.photoAt.position.copy(pos); A.photoAt.quaternion.copy(ph.q0).slerp(qh, mv); A.photoAt.updateMatrixWorld(true);
   out.at = A.photoAt.localToWorld(new T.Vector3(0, 0.09, 0));

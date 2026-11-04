@@ -4417,3 +4417,18 @@ body.scn-set-on .fg-mon { z-index: 1201; }
 .trn-box { position: absolute; left: 50%; transform: translateX(-50%); bottom: 96px; width: min(560px, calc(100% - 32px)); z-index: 30; }
 .trn-box[hidden] { display: none; }
 .trn-box .of-x { position: absolute; right: 8px; top: 8px; }
+
+/* 3D view: the aircraft switcher at the top right is gone (the controller still steps through the aircraft); Cinema
+   sits there instead. Satellite and Other airlines are down at the bottom right, where Cinema was, above the route
+   label, in the same dark blue as the other buttons (switched on: a light ring and a bright icon). */
+.v3d:not(.v3d-aptonly) .v3d-pick { display: none; }
+.v3d:not(.v3d-aptonly) .v3d-top { right: 150px; }
+.v3d .v3d-cine { top: calc(10px + env(safe-area-inset-top)); bottom: auto; right: 12px; height: 40px; }
+.v3d .v3d-sat { top: auto; right: 16px; bottom: 96px; height: 34px; border-radius: 99px; padding: 0 14px; background: rgba(10,22,38,.62); color: #EAF2FA; border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(8px); box-shadow: 0 6px 18px rgba(0,0,0,.35); z-index: 8; }
+.v3d .v3d-sat.v3d-tfc { bottom: 54px; }
+.v3d .v3d-sat:hover { background: rgba(30,52,80,.8); }
+.v3d .v3d-sat.on, .v3d .v3d-sat.v3d-tfc.on { background: rgba(10,22,38,.78); color: #FFFFFF; border-color: rgba(120,190,255,.75); }
+.v3d .v3d-sat.on .ic { color: #8CC8FF; }
+.v3d .v3d-shot { bottom: 140px; }
+@media (max-width: 600px) { .v3d .v3d-sat { top: auto; bottom: 96px; } .v3d .v3d-sat.v3d-tfc { top: auto; bottom: 54px; } .v3d:not(.v3d-aptonly) .v3d-top { right: 136px; } }
+.v3d.ui-off .v3d-sat { opacity: 0; pointer-events: none; }
