@@ -456,6 +456,9 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
     if (E.kind === 'fan' || E.kind === 'rear') {
       const prof = [[0, d * 0.43], [L * 0.012, d * 0.495], [L * 0.06, d * 0.5], [L * 0.42, d * 0.5], [L * 0.7, d * 0.44], [L * 0.86, d * 0.34], [L * 0.9, d * 0.31]];
       add(latheX(prof, [E.x, y, E.z], 26, 1, s.cockpit === 'b737' ? 0.9 : 1), mEng);
+      // the inside of the cowl: a dark duct from the intake to the exhaust, seen from within, so the engine is solid
+      // from every side (before, looking into its back at an angle, you saw straight through its wall)
+      add(latheX(prof.map(q => [q[0], q[1] * 0.96]), [E.x, y, E.z], 26, 1, s.cockpit === 'b737' ? 0.9 : 1), acMat('duct', () => std({ color: 0x15191F, roughness: 0.85, metalness: 0.15, side: THREE.BackSide })));
       add(latheX([[L * 0.86, d * 0.3], [L * 1.02, d * 0.22], [L * 1.12, 0.02]], [E.x, y, E.z], 18), mMetal);
       // the fan behind the intake
       const fan = new T.Mesh(new T.CircleGeometry(d * 0.44, 24), mDark); fan.position.copy(_av(E.x + L * 0.05, y, E.z)); fan.rotation.y = -Math.PI / 2; root.add(fan);
