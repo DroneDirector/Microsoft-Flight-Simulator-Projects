@@ -169,7 +169,14 @@ const FrameGen = {
       const was = ren.autoClear; ren.autoClear = false;
       L.matrixWorldAutoUpdate = false;
       // the aircraft in plain white (it keeps its place in the scene: only drawn from here)
-      if (A) { L.overrideMaterial = G.white; L.children = [A]; ren.render(L, cam); }
+      if (A) {
+        // only its solid parts: lights' glows, halos and other see-through bits would mark the sky round them as aircraft
+        const off: any[] = [];
+        A.traverseVisible((o: any) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && (Array.isArray(m) ? m.some((x: any) => x.transparent) : m.transparent))) off.push(o); });
+        for (const o of off) o.visible = false;
+        L.overrideMaterial = G.white; L.children = [A];
+        try { ren.render(L, cam); } finally { for (const o of off) o.visible = true; }
+      }
       // the clouds: only their distance, where they are thick enough to be seen
       L.overrideMaterial = null;
       for (const o of extra) {
