@@ -109,10 +109,14 @@ const LG_EMBLEM = `<svg class="ctl-scales lg-emb" viewBox="0 0 200 200" aria-hid
 
 LoungeRoom.open = function (k: string, host?: any) {
   const R = LoungeRoom; if (R.on) return;
-  if (!host && trJoined() && k === company().hub && lgList().some(l => l.k === k)) { if (TestRooms.on && TestRooms.game) trEnter('lounge', null); else TestRooms.open({ game: true, room: 'lounge' }); return; }   // your hub's lounge: in the joined building
+  if (!host && trJoined()) {   // your lounges: in the joined building, at the end of the concourse
+    const want = trLgPick(k);
+    if (TestRooms.on && TestRooms.game && TestRooms.lgKey === want) trEnter('lounge', null);
+    else { if (TestRooms.on) TestRooms.close(true); TestRooms.open({ game: true, room: 'lounge', lk: want }); }
+    return; }
   R.host = host || null;
   const T = THREE; if (!T) { toast('3D is not available on this device', 'warn'); return; }
-  const it = lgList().filter(l => l.k === k)[0] || lgList()[0]; if (!it) { toast('Build a lounge first (Lounges)', 'info'); return; }
+  const it = lgList().filter(l => l.k === k)[0] || (host ? { k, lvl: clamp(TestRooms.lgLv || 0, 0, 2), name: '' } : lgList()[0]); if (!it) { toast('Build a lounge first (Lounges)', 'info'); return; }
   if (!host) for (const X of [typeof OfficeRoom !== 'undefined' ? OfficeRoom : null, typeof OpsRoom !== 'undefined' ? OpsRoom : null, typeof HangarRoom !== 'undefined' ? HangarRoom : null]) { try { if (X && X.on) X.close(true); } catch (e) { /* none */ } }
   R.on = true; R.loading = true; R.k = it.k; R.lvl = it.lvl; R.spec = LG_SPECS[it.lvl]; R.keys = {}; R.stick = [0, 0]; R.last = 0; R.loadT0 = performance.now(); R.overlay = null;
   const q = Gfx.placeQ('lounge'), co: any = company(), A: any = apt(it.k);

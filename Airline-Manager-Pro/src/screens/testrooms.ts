@@ -27,7 +27,7 @@ const TR_L = {
 
 TestRooms.open = function (opts?: any) {
   const R = TestRooms; if (R.on) return; R.stressMode = !!(opts && opts.stress);
-  R.game = !!(opts && opts.game); R.gameRoom = opts && opts.room || 'office'; R.gameInc = opts && opts.inc || null; R.in = 'halls';
+  R.game = !!(opts && opts.game); R.gameRoom = opts && opts.room || 'office'; R.gameInc = opts && opts.inc || null; R.lgWant = opts && opts.lk || ''; R.in = 'halls';
   if (typeof company !== 'function' || !company()) { toast('Start or load a game first: the rooms are your own', 'info'); return; }
   const q = Gfx.roomQ();
   R.on = true; R.q = q; R.pct = 0; R.keys = {}; R.stick = [0, 0]; R.loading = true; R.loadT0 = performance.now(); R.overlay = null;
@@ -141,9 +141,8 @@ function trOps(scene: any, q: number, ren: any) {
   R.walk.push(R.walkOf.ops = (x: number, z: number) => { const [lx, lz] = R.opsLocal(x, z); return lx > -2.8 && lx < 2.8 && lz > -2.9 && lz < 2.5 && !opsBlocked(lx, lz); });
 }
 function trLounge(scene: any, q: number) {
-  const R = TestRooms, LR = LoungeRoom, k = company().hub, L = loyalty(), have = L && L.lounges && L.lounges[k];
-  if (R.game && !have) { R.lg = null; return; }   // no lounge at your hub yet: the concourse ends in a wall
-  const lv = have ? clamp(have.lvl || 0, 0, 2) : 1, sp = LG_SPECS[lv];
+  const R = TestRooms, LR = LoungeRoom, k = R.game ? trLgPick(R.lgWant) : company().hub, L = loyalty(), have = L && L.lounges && L.lounges[k];
+  const lv = have ? clamp(have.lvl || 0, 0, 2) : R.game ? 0 : 1, sp = LG_SPECS[lv];
   const keep = { spec: LR.spec, lvl: LR.lvl, k: LR.k, linked: LR.linked };
   LR.spec = sp; LR.lvl = lv; LR.k = k; LR.linked = true;
   const ox = TR_L.con[2] + sp.D / 2, oz = TR_L.lgDoorZ - (sp.W / 2 - 6.3);
@@ -598,4 +597,10 @@ function trLeaveBuilding(to?: string) {
   ]);
 }
 /** Should the game's Office, Operations and Lounge buttons open the joined building? (Settings → Graphics.) */
+/** Which lounge the building ends in: the one asked for, else your hub's, else any of yours, else a plain lounge at your hub. */
+function trLgPick(want?: string): string {
+  const ks = lgList().map(l => l.k), hub = company().hub;
+  if (want && ks.indexOf(want) >= 0) return want;
+  return ks.indexOf(hub) >= 0 ? hub : ks[0] || hub;
+}
 function trJoined(): boolean { return (State.settings as any).joinedRooms !== false && typeof company === 'function' && !!company(); }
