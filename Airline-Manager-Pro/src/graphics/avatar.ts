@@ -17,7 +17,7 @@ interface Look {
   bottom: 'trousers' | 'skirt' | 'shorts';
   shoes: 'oxford' | 'boots' | 'pumps' | 'sneakers';
   neck: 'tie' | 'scarf' | 'open';
-  hat: 'none' | 'cap' | 'pillbox';
+  hat: 'none' | 'cap' | 'pillbox' | 'ball' | 'beret';
   uniform: number;         // index into UNIFORM_COLORS
   voice?: string;          // your own pilot only: the voice you speak with (MY_VOICES in src/core/voice.ts)
 }
@@ -44,7 +44,7 @@ function shade(hex: string, f: number): string {
 /** Make sure a look is complete and dressed, whatever was stored. */
 function dressed(l: Look, role: CrewRole): Look {
   const d: Look = Object.assign(defaultLook(l && l.sex || 'm', role), l || {});
-  if ((d as any).sec && role === 'ground') { d.top = 'jacket'; d.bottom = 'trousers'; d.neck = 'tie'; if (d.hat === 'pillbox') d.hat = 'none'; }   // security officers: a dark jacket and tie, not overalls
+  if ((d as any).sec && role === 'ground') { if (d.top === 'overalls' || d.top === 'blouse' || !d.top) d.top = 'jacket'; if (d.bottom === 'shorts') d.bottom = 'trousers'; if (d.hat === 'pillbox') d.hat = 'none'; }   // security officers: their own uniform, not overalls
   else if ((role === 'mech' || role === 'ground')) { d.top = 'overalls'; d.bottom = 'trousers'; if (d.hat === 'pillbox') d.hat = 'none'; }
   if ((role === 'captain' || role === 'fo') && d.hat === 'pillbox') d.hat = 'cap';
   if (d.top === 'overalls') d.bottom = 'trousers';
@@ -65,8 +65,16 @@ function dressed(l: Look, role: CrewRole): Look {
 }
 
 /** Garment choices that suit a man or a woman in a given role (used by the look editor). */
-function garmentOptions(sex: 'm' | 'f', role: CrewRole) {
+function garmentOptions(sex: 'm' | 'f', role: CrewRole, sec?: boolean) {
   const f = sex === 'f', fa = role === 'fa', mech = (role === 'mech' || role === 'ground');
+  // security officers: clothing that shows what they are (the airline's name and SECURITY GUARD printed on it)
+  if (sec) return {
+    top: [['jacket', 'Smart jacket'], ['shirt', 'Uniform shirt with epaulettes'], ['vest', 'Tactical vest'], ['pullover', 'Jumper']],
+    bottom: f ? [['trousers', 'Trousers'], ['skirt', 'Skirt']] : [['trousers', 'Trousers']],
+    neck: f ? [['tie', 'Tie'], ['scarf', 'Scarf'], ['open', 'Open collar']] : [['tie', 'Tie'], ['open', 'Open collar']],
+    shoes: [['boots', 'Boots'], ['oxford', 'Oxfords'], ['sneakers', 'Sneakers']],
+    hat: [['none', 'No hat'], ['cap', 'Peaked security cap'], ['ball', 'Baseball cap'], ['beret', 'Beret']],
+  };
   return {
     top: fa ? (f ? [['blouse', 'Blouse'], ['vest', 'Waistcoat'], ['jacket', 'Jacket'], ['pullover', 'Pullover']] : [['vest', 'Waistcoat'], ['jacket', 'Jacket'], ['pullover', 'Pullover']])
       : [['jacket', 'Jacket'], ['shirt', 'Short-sleeve shirt'], ['pullover', 'Pullover']],

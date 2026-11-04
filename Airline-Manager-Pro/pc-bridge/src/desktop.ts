@@ -80,6 +80,16 @@ export class Desktop {
     if (url === '/api/hide' && req.method === 'POST') { json(res, { ok: true }); if (Desktop.host && Desktop.host.hide) Desktop.host.hide(); else { this.closeWindow(); setTimeout(() => process.exit(0), 1500); } return true; }
     if (url === '/api/show' && req.method === 'POST') { json(res, { ok: true }); if (Desktop.host && Desktop.host.show) Desktop.host.show(); return true; }
     if (url === '/api/backup') return this.backup(req, res), true;
+    // mods: the .zip packages in Documents\Airline Manager Pro\Mods (the game installs new and changed ones)
+    if (url === '/api/mods') { const d = path.join(this.backupDir(), 'Mods'); try { fs.mkdirSync(d, { recursive: true }); } catch (e) { /* read-only */ }
+      let files: any[] = []; try { files = fs.readdirSync(d).filter(f => /\.zip$/i.test(f)).map(f => { const st = fs.statSync(path.join(d, f)); return { name: f, size: st.size, mtime: Math.round(st.mtimeMs) }; }); } catch (e) { files = []; }
+      json(res, { dir: d, files }); return true; }
+    if (url.indexOf('/mods/') === 0) {
+      const f = path.join(this.backupDir(), 'Mods', path.basename(decodeURIComponent(url.slice(6))));
+      if (!/\.zip$/i.test(f) || !fs.existsSync(f)) { res.writeHead(404); res.end(); return true; }
+      res.writeHead(200, isolate({ 'Content-Type': 'application/zip', 'Content-Length': String(fs.statSync(f).size), 'Cache-Control': 'no-cache' })); fs.createReadStream(f).pipe(res); return true;
+    }
+    if (url === '/api/mods/open' && req.method === 'POST') { const d = path.join(this.backupDir(), 'Mods'); try { fs.mkdirSync(d, { recursive: true }); spawn('explorer.exe', [d], { detached: true, stdio: 'ignore' }).unref(); } catch (e) { /* not on Windows */ } json(res, { ok: true, dir: d }); return true; }
     if (url === '/api/saves') return this.saves(req, res), true;
     // Game Booster: readings for the charts, the programs you can pick to close, and the app saying it is open
     if (url === '/api/boost') { this.booster.touch(); json(res, this.booster.status()); return true; }

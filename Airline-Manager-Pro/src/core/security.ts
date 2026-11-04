@@ -43,15 +43,39 @@ function secExit(place: string): string { return SEC_EXIT[place] || 'door'; }
  *  calmly; a weak one may cause a scene. Seen in the lounge when you are there. */
 function secEscort(key: string) {
   const d = drunkList().filter(x => x.key === key)[0]; if (!d || d.decided) return;
-  const o = secPick(d.from), q = secQuality(d.from), scene = !o || Math.random() > 0.35 + 0.6 * q;
+  const L = secStaff(d.from).sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0)), o = L[0] || null;
   d.decided = 'deny'; d.crew = false; (d as any).escort = o ? o.name : '';
   try { const n = ((State as any).aiNext || []).filter((x: any) => x.callsign === d.callsign && Math.abs(x.depAt - d.dep) < 120000)[0]; if (n) { const ld = aiPlannedLoad(n); if (ld.pax > 0) { ld.pax--; if (d.cls === 'First' && ld.paxF > 0) ld.paxF--; else if (ld.paxJ > 0) ld.paxJ--; } } } catch (e) { /* as planned */ }
-  if (scene) { try { Progress.popularity(-0.5, `${d.name} was led out of your lounge, loudly`); } catch (e) { /* as it was */ } }
-  State.notices.unshift({ id: uid(), kind: 'staff' as any, title: `Security collected ${d.name}`, body: o
-    ? `${o.name} went to the lounge and led ${d.name} out${scene ? `, but ${d.name} made a scene and the other guests noticed (your popularity drops a little)` : ', calmly and quietly'}. ${d.name} doesn't board ${d.callsign}.`
-    : `No security officer at ${d.from}: the cabin crew turned ${d.name} away at the gate instead.`, time: 'Now', read: false } as any);
-  try { if (typeof LoungeRoom !== 'undefined' && LoungeRoom.on && LoungeRoom.k === d.from && o) lgSecurityEscort(d.name, o, scene); } catch (e) { /* not seen */ }
+  if (!o) {
+    State.notices.unshift({ id: uid(), kind: 'staff' as any, title: `${d.name} turned away at the gate`, body: `No security officer at ${d.from}: the cabin crew turned ${d.name} away at the gate instead. ${d.name} doesn't board ${d.callsign}.`, time: 'Now', read: false } as any);
+    try { Store.soon(); renderTopbar(); } catch (e) { /* later */ } return;
+  }
+  // a second officer: another of yours there, or the airport's officer on duty with them
+  const o2 = L[1] || { name: 'Duty officer', look: Object.assign(randomLook('duty-' + d.from, Math.random() < 0.6 ? 'm' : 'f', 'ground' as any), { sec: true, top: 'jacket', uniform: 1, neck: 'tie', hat: 'none' }), rating: 3.5 };
+  const plan = secPlan(d.bac, (d as any).heavy || d.bac >= 1.6, Math.random, o.rating || 3.5);
+  secOutcome(d, o, plan);
+  const seen = typeof LoungeRoom !== 'undefined' && LoungeRoom.on && LoungeRoom.k === d.from;
+  if (seen) { try { const G = (LoungeRoom.guests || []).filter((g: any) => g.P && g.P.name === d.name && !g.gone)[0]; if (!G || !secIncident(G, plan, o, o2)) lgSecurityEscort(d.name, o, plan.refusals > 2); } catch (e) { /* not seen */ } }
   try { Store.soon(); renderTopbar(); } catch (e) { /* later */ }
+}
+/** What came of it: the notice, popularity, and the officer's record (rules kept: up; broken: down and a conduct report). */
+function secOutcome(d: DrunkPax, o: any, plan: SecPlan) {
+  const how = plan.refusals <= 0 ? `${d.name} came along quietly`
+    : plan.refusals <= 3 ? `${d.name} argued for a while, then walked out with them`
+    : plan.police ? `${d.name} refused every warning; tasers aren't allowed by your rules, so the officers called the police, who ${plan.refusals >= 7 ? 'tased, cuffed and arrested' : 'cuffed and arrested'} ${d.name}`
+    : plan.refusals >= 7 || plan.early || plan.rogue ? `${d.name} refused every warning and was tased, cuffed and led out`
+    : `${d.name} refused several warnings, gave in when the taser came out, and was cuffed and led out`;
+  const loud = plan.refusals >= 4;
+  if (loud) { try { Progress.popularity(plan.refusals >= 7 ? -0.6 : -0.3, `A guest was ${plan.police ? 'arrested' : 'restrained'} in your lounge`); } catch (e) { /* as it was */ } }
+  let rec = '';
+  const S: any = State;
+  if (plan.rogue || plan.early) {
+    o.rating = Math.max(1, Math.round(((o.rating || 3.5) - (plan.rogue ? 0.3 : 0.15)) * 100) / 100);
+    const why = plan.rogue ? 'used a taser although your rules forbid tasers' : 'used the taser before giving all the warnings';
+    S.incidents = S.incidents || []; S.incidents.unshift({ id: uid(), staffId: o.id, sev: plan.rogue ? 'serious' : 'minor', title: `Use of force: ${o.name}`, text: `${o.name} ${why} with ${d.name} in the lounge at ${d.from}.`, date: Date.now(), status: 'open' });
+    rec = ` A conduct report was filed: ${o.name} ${why}.`;
+  } else if (plan.refusals >= 1) { o.rating = Math.min(5, Math.round(((o.rating || 3.5) + 0.05) * 100) / 100); rec = ` ${o.name} kept to your rules: their rating rises a little.`; }
+  State.notices.unshift({ id: uid(), kind: 'staff' as any, title: `Security collected ${d.name}`, body: `${o.name} went to the lounge at ${d.from}: ${how}. ${d.name} doesn't board ${d.callsign}.${loud ? ' Other guests saw it (your popularity drops a little).' : ''}${rec}`, time: 'Now', read: false } as any);
 }
 ACTIONS['drunk-escort'] = el => { secEscort(el.getAttribute('data-k') || ''); Sound.tick(); closeTop(); setTimeout(drunkAsk, 400); };
 

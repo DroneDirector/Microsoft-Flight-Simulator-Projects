@@ -9,7 +9,7 @@ use Elementor\Widget_Base;
 require_once AMS_DIR . 'includes/content.php';
 
 function ams_widget_classes() {
-    return ['AMS_Nav', 'AMS_Hero', 'AMS_Stats', 'AMS_Link', 'AMS_Show', 'AMS_Windows', 'AMS_Cards', 'AMS_Download', 'AMS_Faq', 'AMS_Share', 'AMS_Footer', 'AMS_Features'];
+    return ['AMS_Nav', 'AMS_Hero', 'AMS_Stats', 'AMS_Link', 'AMS_Show', 'AMS_Windows', 'AMS_Cards', 'AMS_Download', 'AMS_Faq', 'AMS_Share', 'AMS_Footer', 'AMS_Features', 'AMS_Guide'];
 }
 
 /* ------------------------------------------------------------------ small helpers */
@@ -440,7 +440,7 @@ class AMS_Footer extends AMS_Base {
         $soc = ['facebook' => 'Facebook', 'youtube' => 'YouTube', 'instagram' => 'Instagram', 'tiktok' => 'TikTok'];
         echo '<footer class="ams ams-footer"><div class="ams-wrap"><div class="ams-footer__top">';
         echo '<div class="ams-footer__brand"><a class="ams-logo" href="' . esc_url($home) . '">' . ams_logo() . '</a><p>' . esc_html($s['tagline']) . '</p></div>';
-        echo '<nav class="ams-footer__links" aria-label="Footer"><a href="' . esc_url(ams_page_url('features')) . '">All features</a><a href="' . esc_url($home . '#download') . '">Download</a><a href="' . esc_url(ams_releases_url()) . '">Release notes</a><a href="' . esc_url($home . '#faq') . '">Questions</a></nav>';
+        echo '<nav class="ams-footer__links" aria-label="Footer"><a href="' . esc_url(ams_page_url('features')) . '">All features</a><a href="' . esc_url(ams_page_url('modding')) . '">Modding guide</a><a href="' . esc_url($home . '#download') . '">Download</a><a href="' . esc_url(ams_releases_url()) . '">Release notes</a><a href="' . esc_url($home . '#faq') . '">Questions</a></nav>';
         echo '<div class="ams-social">';
         foreach ($soc as $k => $label) {
             $u = ams_opt($k);
@@ -483,5 +483,22 @@ class AMS_Features extends AMS_Base {
             echo '</ul></section>';
         }
         echo '</div><p class="ams-features__empty" hidden>No feature matches that search.</p></div></section>';
+    }
+}
+
+/** The modding guide, from the app's docs/modding-guide.md (data/modding.json, updated by GitHub with the app). */
+class AMS_Guide extends AMS_Base {
+    public function get_name() { return 'ams-guide'; }
+    public function get_title() { return 'Airline Manager: Modding guide'; }
+    public function get_icon() { return 'eicon-document-file'; }
+    protected function fields() { return ['title' => ['text', 'Title (empty = the guide\'s own)', '']]; }
+    protected function render() {
+        $s = $this->s();
+        $g = json_decode((string) @file_get_contents(AMS_DIR . 'data/modding.json'), true) ?: ['title' => 'Modding guide', 'html' => ''];
+        $allow = ['h2' => [], 'h3' => [], 'p' => [], 'ul' => [], 'ol' => [], 'li' => [], 'strong' => [], 'em' => [], 'code' => [], 'pre' => [], 'table' => [], 'thead' => [], 'tbody' => [], 'tr' => [], 'th' => [], 'td' => []];
+        echo '<section class="ams ams-features ams-guide"><canvas class="ams-routes ams-routes--soft" aria-hidden="true"></canvas><div class="ams-wrap">';
+        echo '<a class="ams-back" href="' . esc_url(ams_page_url('home')) . '">← Back to the overview</a>';
+        echo '<div class="ams-features__head"><p class="ams-eyebrow" data-reveal>' . ams_line_icon('list') . ' Mods</p><h1 class="ams-h2" data-reveal>' . esc_html($s['title'] ?: $g['title']) . '</h1></div>';
+        echo '<div class="ams-group ams-guide__body" data-reveal>' . wp_kses($g['html'], $allow) . '</div></div></section>';
     }
 }

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.154
+- Security incidents in the lounge: warnings, the taser or the police by your rules, cuffs and escort; more officers to hire, and officers to borrow. The Mod Manager on the start screen.
+
 ## 0.9.153
 - No more flicker of what you hold with frame generation on; spills fade away.
 

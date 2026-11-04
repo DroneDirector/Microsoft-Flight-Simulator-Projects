@@ -16,11 +16,11 @@ const POOL_MIN = 20;
 function poolTopUp(): number {
   const S: any = State; let n = 0; S.staffCandidates = S.staffCandidates || [];
   for (const role of POOL_ROLES) {
-    let have = S.staffCandidates.filter((x: Staff) => x.role === role).length;
+    let have = S.staffCandidates.filter((x: Staff) => x.role === role && (x as any).job !== 'security').length;
     while (have < POOL_MIN) { S.staffCandidates.push(makePerson('cand-' + role + uid(), role, '', POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)])); have++; n++; }
   }
   while (State.candidates.length < POOL_MIN) { State.candidates.push(makePilotCandidate('cap' + uid())); n++; }
-  n += secPoolTop(8);
+  n += secPoolTop(SEC_POOL_START);
   return n;
 }
 const POOL_BASES = ['EKVG', 'EKCH', 'ENGM', 'BIKF', 'EGLL', 'EDDF', 'PALH', 'EKBI', 'KJFK', 'CYYZ'];
@@ -68,24 +68,47 @@ function makePilotCandidate(seed: string): any {
 
 /** The job market moves: candidates leave, new ones arrive (some days more, some days fewer). */
 /** Security officers on the hiring list (at least `min`, a few new ones now and then). */
+/** Security officers on the hiring list: at least 12 from the start; after that a few new ones every 2 to 4 real
+ *  days (some find other jobs meanwhile). Few of them looking means they ask for more pay (up to a quarter more). */
+const SEC_POOL_START = 12;
+function secCands(): any[] { const S: any = State; return (S.staffCandidates || []).filter((x: any) => x.job === 'security'); }
+function secMakeCand(): any {
+  const p = makeSecurity('cand-sec' + uid(), POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)], ''), n = secCands().length;
+  const scarce = n < 4 ? 1.15 + Math.random() * 0.1 : n < 8 ? 1.05 + Math.random() * 0.05 : 1;   // scarce: dearer
+  p.salary = Math.round(p.salary * scarce / 10) * 10; return p;
+}
 function secPoolTop(min: number): number {
   if (typeof secOn !== 'function' || !secOn()) return 0;
   const S: any = State; S.staffCandidates = S.staffCandidates || []; let n = 0;
-  const have = () => S.staffCandidates.filter((x: any) => x.job === 'security').length;
-  while (have() < min) { S.staffCandidates.push(makeSecurity('cand-sec' + uid(), POOL_BASES[Math.floor(Math.random() * POOL_BASES.length)], '')); n++; }
+  while (secCands().length < min) { S.staffCandidates.push(secMakeCand()); n++; }
   return n;
+}
+/** Every few real days: some officers on the list take other jobs, and new ones come looking. */
+function secPoolAdvance() {
+  if (typeof secOn !== 'function' || !secOn()) return;
+  const S: any = State, now = Date.now();
+  if (!S.secPool12) { S.secPool12 = 1; secPoolTop(SEC_POOL_START); }   // an older save: the list fills once
+  if (!S.secPoolNext) { S.secPoolNext = now + (2 + Math.random() * 2) * 864e5; return; }
+  let k = 0;
+  while (S.secPoolNext <= now && k++ < 10) {
+    const L = secCands(), leave = Math.floor(Math.random() * Math.min(3, Math.max(0, L.length - 6)));
+    for (let i = 0; i < leave; i++) { const g = L.splice(Math.floor(Math.random() * L.length), 1)[0]; S.staffCandidates = S.staffCandidates.filter((x: any) => x !== g); }
+    const come = Math.min(3 + Math.floor(Math.random() * 4), Math.max(0, 18 - secCands().length));
+    for (let i = 0; i < come; i++) S.staffCandidates.push(secMakeCand());
+    S.secPoolNext += (2 + Math.random() * 2) * 864e5;
+  }
 }
 function poolAdvance() {
   const S: any = State, now = Date.now();
   if (S.poolFill) { S.poolFill = false; if (poolTopUp()) Store.soon(); }   // a new career: the list starts full
+  try { secPoolAdvance(); } catch (e) { /* later */ }
   if (!S.poolNext) { S.poolNext = now + (2 + Math.random() * 4) * 3600e3; return; }
   let rounds = 0, arrived = 0;
   while (S.poolNext <= now && rounds < 20) {
     rounds++;
-    try { if (Math.random() < 0.5) secPoolTop(4 + Math.floor(Math.random() * 6)); } catch (e) { /* none */ }
     const busy = Math.random();   // a busy day brings more people, a quiet one fewer
     for (const role of POOL_ROLES) {
-      const list = S.staffCandidates.filter((x: Staff) => x.role === role);
+      const list = S.staffCandidates.filter((x: Staff) => x.role === role && (x as any).job !== 'security');
       // some find other jobs
       const leave = Math.floor(Math.random() * (list.length > 6 ? 3 : 2));
       for (let i = 0; i < leave && list.length > 1; i++) { const gone = list.splice(Math.floor(Math.random() * list.length), 1)[0]; S.staffCandidates = S.staffCandidates.filter((x: Staff) => x !== gone); }

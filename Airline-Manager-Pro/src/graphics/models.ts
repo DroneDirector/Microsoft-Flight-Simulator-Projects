@@ -67,6 +67,11 @@ const TRAINING_PROP_FILES: [string, string][] = [
   ['poster', 'Academy poster in its frame'], ['wall-clock', 'Wall clock (the app draws its hands, which keep the time)'],
   ['double-door-leaf', 'One leaf of the double doors (opens inwards; the app turns it)'],
 ];
+/** Security's things (security-props/<name>.glb). */
+const SECURITY_PROP_FILES: [string, string][] = [
+  ['taser', 'Taser held by an officer (the grip at the origin, the muzzle towards +Z, about 16 cm long)'],
+  ['handcuffs', 'Handcuffs on the wrists behind the back (the two cuffs side by side along X, about 15 cm across)'],
+];
 /** The shared props, one file each (props/<name>.glb). */
 const PROP_FILES: [string, string][] = [
   ['plant-1', 'Potted plant 1: fiddle-leaf fig in a glazed ceramic pot (about 1.6 m)'],
@@ -138,13 +143,16 @@ const Models = {
       for (const f of Object.keys(this.list)) if (/\.glb$/i.test(f)) this.load(f);
     });
   },
-  has(path: string): boolean { return !!(this.list && this.list[path]); },
+  /** Files from switched-on mods, used in place of the folder's (src/core/mods.ts). */
+  over: {} as { [path: string]: string },
+  has(path: string): boolean { return !!(this.over[path] || (this.list && this.list[path])); },
+  url(path: string): string { return this.over[path] || MODEL_DIR + path; },
   _tex: {} as { [path: string]: any },
   /** A picture from the folder (crash effects): a texture that fills in when it has loaded, or null without the file. */
   tex(path: string): any {
     if (!this.has(path)) return null;
     if (this._tex[path]) return this._tex[path];
-    const T = THREE, t = new T.TextureLoader().load(MODEL_DIR + path); t.colorSpace = T.SRGBColorSpace;
+    const T = THREE, t = new T.TextureLoader().load(this.url(path)); t.colorSpace = T.SRGBColorSpace;
     return (this._tex[path] = t);
   },
   first(paths: string[]): string { for (const p of paths) if (this.has(p)) return p; return ''; },
@@ -153,7 +161,7 @@ const Models = {
     const W: any = window;
     if (!W.GLTFLoader || !this.has(path)) return (this.cache[path] = Promise.resolve(null));
     this.cache[path] = new Promise(res => {
-      try { new W.GLTFLoader().load(MODEL_DIR + path, (g: any) => { this.ready[path] = g; res(g); }, undefined, () => res(null)); } catch (e) { res(null); }
+      try { new W.GLTFLoader().load(this.url(path), (g: any) => { this.ready[path] = g; res(g); }, undefined, () => res(null)); } catch (e) { res(null); }
     });
     return this.cache[path];
   },

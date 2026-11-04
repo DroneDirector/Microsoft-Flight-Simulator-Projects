@@ -93,6 +93,7 @@ function titleHtml(): string {
         ${item('ts-new', 'plus', 'New game', 'Create your pilot and airline')}
         ${Store.nogame() ? '' : item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
         ${item('ts-load', 'download', 'Load game', 'Pick up any save')}
+        ${item('ts-mods', 'layers', 'Mods', 'Replace models, pictures and sounds')}
         ${item('ts-options', 'gear', 'Options', 'Every setting')}
         ${item('ts-quit', 'power', 'Quit', 'Asks first, offers to save')}
       </nav>
@@ -310,6 +311,7 @@ function titleCaption(sh: TsShot) {
 /* ---------- the menu ---------- */
 function titleKey(e: KeyboardEvent) {
   const T = TitleScreen; if (!T.on || _layers.length) return;
+  if (typeof MM !== 'undefined' && MM.on) { if (e.key === 'Escape') { e.preventDefault(); if (MM.prev) ACTIONS['mm-preview-close'](null as any, null as any); else if (MM.sel) { MM.sel = ''; mmRender(); } else ACTIONS['mm-close'](null as any, null as any); } return; }
   const btns = Array.from(T.root.querySelectorAll('.ts-nav .ts-btn')) as HTMLElement[]; if (!btns.length) return;
   const cur = btns.indexOf(document.activeElement as HTMLElement);
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = cur < 0 ? 0 : (cur + (e.key === 'ArrowDown' ? 1 : btns.length - 1)) % btns.length; btns[n].focus(); Sound.tick(); }

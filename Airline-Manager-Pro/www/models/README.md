@@ -246,6 +246,16 @@ The plants are the shared ones (`props/plant-3.glb`). The people are the people 
 | `training-props/wall-clock.glb` | Wall clock (the app draws its hands, which keep the time) |
 | `training-props/double-door-leaf.glb` | One leaf of the double doors (opens inwards; the app turns it) |
 
+## Security (`security-props/`)
+
+What the security officers and the police carry. Metres, the front towards +Z. The officers and the police themselves are
+the people files; the officers' print (the airline name and SECURITY GUARD) is drawn by the app on their jacket or shirt.
+
+| File | What |
+|---|---|
+| `security-props/taser.glb` | Taser held by an officer (the grip at the origin, the muzzle towards +Z, about 16 cm long) |
+| `security-props/handcuffs.glb` | Handcuffs on the wrists behind the back (the two cuffs side by side along X, about 15 cm across) |
+
 ## Crash scene (`crash/`)
 
 What is at a crash site besides the aircraft itself (the wreck is the aircraft's own model, broken and scorched).

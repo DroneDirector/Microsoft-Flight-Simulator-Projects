@@ -1218,6 +1218,13 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
   function hat(kind, I, uni, accent) {
     const g = new THREE.Group(), hc = I.headC, hs = I.headS;
     const navy = new THREE.MeshPhysicalMaterial({ color: uni, roughness: 0.8, sheen: 0.4, sheenColor: new THREE.Color(uni).offsetHSL(0, 0, 0.25) }), gm = gold();
+    if (kind === 'beret') {   // a soft beret, pulled down to one side
+      const rx = hs[0] / 2 * 1.12, rz = hs[2] / 2 * 1.1, baseY = hc[1] + hs[1] * 0.18;
+      const b = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 16), navy); b.scale.set(rx, hs[1] * 0.16, rz); b.position.set(hc[0] - 0.012, baseY, hc[2] - 0.008); b.rotation.z = 0.18; g.add(b);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1, 0.06, 8, 40), navy); band.scale.set(rx * 0.92, rz * 0.92, 0.12); band.rotation.x = Math.PI / 2; band.position.set(hc[0], baseY - 0.012, hc[2] - 0.004); g.add(band);
+      const badgeM = new THREE.Mesh(new THREE.CircleGeometry(0.012, 16), gm); badgeM.position.set(hc[0] + 0.03, baseY - 0.004, hc[2] + rz * 0.9); g.add(badgeM);
+      return g;
+    }
     if (kind === 'mech') {
       const rx = hs[0] / 2 * 1.08, rz = hs[2] / 2 * 1.02, baseY = hc[1] - 0.018;
       const crown = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), navy); crown.scale.set(rx * 0.98, hs[1] * 0.62, rz); crown.position.set(hc[0], baseY + 0.006, hc[2] - 0.004);
@@ -1322,7 +1329,7 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
 
   /* ================= look → outfit ================= */
   function outfit(L, role, accent, I) {
-    const f = L.sex === 'f', pilot = role === 'captain' || role === 'fo', mech = (role === 'mech' || role === 'ground') || L.top === 'overalls';
+    const f = L.sex === 'f', pilot = role === 'captain' || role === 'fo', mech = ((role === 'mech' || role === 'ground') && !(L as any).sec) || L.top === 'overalls';   // security officers wear their own uniform
     const skin = SKIN_3D[L.skin] || SKIN_3D[2], hair = HAIR_COLORS[L.hairColor] || HAIR_COLORS[1], uni = UNIFORM_COLORS[L.uniform] || UNIFORM_COLORS[0];
     const dark = L.skin > 5;
     const lip = '#' + new THREE.Color(shade(skin, dark ? -0.34 : -0.14)).lerp(new THREE.Color(dark ? '#4a2220' : '#c4645c'), dark ? 0.35 : 0.55).getHexString();
@@ -1392,7 +1399,9 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     const np = I.neckPivot, headPivot = new THREE.Group(), head = new THREE.Group();
     headPivot.position.set(np[0], np[1], np[2]); head.position.set(-np[0], -np[1], -np[2]); headPivot.add(head); root.add(headPivot);
     const eyes = [eye(I.eyeL, c.eyeR, c.iris), eye(I.eyeR, c.eyeR, c.iris)]; eyes.forEach(e => head.add(e));
-    const hatKind = L.hat === 'none' ? null : (role === 'mech' || role === 'ground') ? 'mech' : L.hat === 'pillbox' ? 'pillbox' : role === 'captain' ? 'captain' : role === 'fa' ? 'fa' : 'fo';
+    const sec = !!(L as any).sec;   // a security officer: their own hats, epaulettes on the uniform shirt, and the print
+    if (sec && L.top === 'shirt') c.epaulettes = true;
+    const hatKind = L.hat === 'none' ? null : sec ? (L.hat === 'ball' ? 'mech' : L.hat === 'beret' ? 'beret' : 'fo') : (role === 'mech' || role === 'ground') ? 'mech' : L.hat === 'pillbox' ? 'pillbox' : role === 'captain' ? 'captain' : role === 'fa' ? 'fa' : 'fo';
     const strandHair = ['bald', 'buzz'].indexOf(L.hair) < 0;
     t0 = tick('material', t0);
     const hm = hairMode(); if (strandHair && hm !== 'flat') head.add(buildHair(L.hair, geo, b, I, c, q, hatKind && hatKind !== 'pillbox' ? I.headC[1] - 0.006 : 0, hm === 'cards'));
@@ -1407,6 +1416,16 @@ float pores(vec3 p){ vec3 i = floor(p), f = fract(p); float d = 1.0;
     const shoeG = shoes(b, I, c.shoe, L.shoes, accent); root.add(shoeG);
     const chestG = new THREE.Group(); chestG.matrixAutoUpdate = false; root.add(chestG);   // badges, buttons, epaulettes, the scarf: they go with the chest
     const gm = gold();
+    if (sec) {   // the airline's name with SECURITY GUARD under it: small on the chest, large across the back
+      try { const pol = !!(L as any).police, nm = pol ? 'POLICE' : (typeof company === 'function' && company() && company().name) || 'Airline';
+        const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256; const k = cv.getContext('2d') as CanvasRenderingContext2D;
+        k.fillStyle = '#ECEFF3'; k.textAlign = 'center'; let fs = 64; k.font = `700 ${fs}px Inter, Arial, sans-serif`; while (k.measureText(nm).width > 480 && fs > 26) { fs -= 4; k.font = `700 ${fs}px Inter, Arial, sans-serif`; }
+        if (pol) { k.fillStyle = '#F4F6F8'; k.font = '900 120px Inter, Arial, sans-serif'; k.fillText('POLICE', 256, 170); } else { k.fillText(nm, 256, 96); k.fillStyle = '#F2C230'; k.font = '800 58px Inter, Arial, sans-serif'; k.fillText('SECURITY GUARD', 256, 190); }
+        const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; const mt = new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false });
+        const yf = I.neckY - 0.17, zf = surfaceZ(body, -0.085, yf); const front = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.06), mt); front.position.set(-0.085, yf, zf + 0.004); front.rotation.y = -0.25; chestG.add(front);
+        const yb = I.neckY - 0.22, rc = new THREE.Raycaster(new THREE.Vector3(0, yb, -2), new THREE.Vector3(0, 0, 1)), hb = rc.intersectObject(body)[0], zb = hb ? hb.point.z : -0.12;
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.15), mt); back.position.set(0, yb, zb - 0.005); back.rotation.y = Math.PI; chestG.add(back);
+      } catch (e) { /* no print */ } }
     if (c.wings) { const y = I.neckY - 0.16, z = surfaceZ(body, 0.085, y); const w = badge(accent, c.wings); w.position.set(0.085, y, z + 0.004); w.rotation.y = 0.3; chestG.add(w); }
     if (c.buttons) for (const y of [c.vBot - 0.03, c.vBot - 0.13]) { const z = surfaceZ(body, 0.012, y); const bt = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.004, 20), gm); bt.rotation.x = Math.PI / 2; bt.position.set(0.012, y, z + 0.002); chestG.add(bt); }
     if (c.epaulettes) {
