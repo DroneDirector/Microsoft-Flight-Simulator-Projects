@@ -5,6 +5,9 @@ const CLOUD_COV: { [k: string]: number } = { FEW: 0.19, SCT: 0.44, BKN: 0.75, OV
 function cloudKm(): number { const v = (State.settings as any).cloudKm; return clamp(v == null ? 80 : +v, 0, 300); }
 function cloudDetail(): number { const v = (State.settings as any).cloudDetail; return clamp(v == null ? 2 : Math.round(+v), 1, 4); }
 const CLOUD_DETAIL_NAMES = ['Light', 'Normal', 'Detailed', 'Very detailed'];
+/** 2D clouds: flat layers instead of clouds built in three dimensions (lighter to draw). They come from the same
+ *  reports: the cover, the height of each layer, rain, snow and storms. */
+function cloudFlat(): boolean { return (State.settings as any).cloud2d === true; }
 
 /* ---------- shared: noise and the reports near a place ---------- */
 
@@ -217,7 +220,7 @@ function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): Clou
   const R = km * 1000, ll0 = v3dLonLat(cx, cz), list = cloudStations(ll0[0], ll0[1], km + 160), out: CloudPuff[] = [];
   V3dClouds.storms = [];
   if (!list.length) return out;
-  const per = [5, 8, 12, 18][detail - 1], budget = [2000, 4500, 7500, 11000][detail - 1];
+  const per = [5, 8, 12, 18][detail - 1], budget = [2000, 4500, 7500, 11000][detail - 1], flat = cloudFlat();
   // the size of one cloud cell: smaller cells mean more, better-shaped clouds; the area must fit the budget
   let cell = [3200, 2600, 2000, 1600][detail - 1];
   cell = Math.max(cell, Math.sqrt(Math.PI * R * R / (budget / (per * 0.45))));
@@ -247,6 +250,15 @@ function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): Clou
       const base = st.elev + l.base * 0.3048 - curve, rnd = (k: number) => cloudHash(c[3], c[4], li * 131 + k);
       const tag = `${c[3]},${c[4]},${li},${kind},${Math.round(l.base / 100)},${Math.round(dens * 4)},${cell}`;
       const sd = rnd(999) * 10;
+      if ((kind === 'cb' || kind === 'tcu') && flat) {
+        // 2D: a dark, dense layer at the base, the anvil spread high above a thunderstorm, rain or snow under it
+        const cxx = c[0] + (rnd(1) - 0.5) * cell * 0.3, czz = c[1] + (rnd(2) - 0.5) * cell * 0.3, top = base + (kind === 'cb' ? 9000 - l.base * 0.3048 * 0.5 : 3500);
+        for (let s = 0; s < 2; s++) add({ x: cxx + (rnd(s + 30) - 0.5) * cell * 0.3, y: base + 60 + s * 180, z: czz + (rnd(s + 31) - 0.5) * cell * 0.3, m: 0, s: cell * 1.9, h: s * 0.35, a: 0.95, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|f${s}` });
+        if (kind === 'cb') add({ x: cxx, y: top, z: czz, m: 0, s: cell * 3.4, h: 1, a: 0.7, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|anvil` });
+        if (rains || kind === 'cb') add({ x: cxx, y: base + 60, z: czz, m: 3, s: cell * 1.1, h: 0, a: 0.55 * (pr ? 0.6 + 0.4 * pr.k : 0.8), sd, dx: pr && pr.kind === 'sn' ? 1 : 0, dy: 0, dz: 0, w: base + 60 - (st.elev - curve), id: `${tag}|shaft` });
+        if (kind === 'cb') V3dClouds.storms.push([cxx, base, czz, top, cell, pr && pr.ts ? 1 : 0.25]);
+        return;
+      }
       if (kind === 'cb' || kind === 'tcu') {
         // a tower of puffs up to about 9 km (thunderstorm) or 3.5 km (towering cumulus); a thunderstorm spreads into an anvil at the top
         const top = base + (kind === 'cb' ? 9000 - l.base * 0.3048 * 0.5 : 3500), lv = clamp(Math.round((top - base) / (cell * 0.45)), 5, 14);
@@ -273,8 +285,19 @@ function v3dCloudBuild(cx: number, cz: number, km: number, detail: number): Clou
         const th = l.cover === 'OVC' ? 420 : 300;
         for (let s = 0; s < 3; s++) add({ x: c[0] + (rnd(s) - 0.5) * cell * 0.5, y: base + 40 + s * th / 2, z: c[1] + (rnd(s + 9) - 0.5) * cell * 0.5, m: 0, s: cell * 1.75, h: s / 2, a: 0.8, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|st${s}` });
         if (rains && rnd(77) < 0.45) add({ x: c[0] + (rnd(78) - 0.5) * cell * 0.4, y: base + 40, z: c[1] + (rnd(79) - 0.5) * cell * 0.4, m: 3, s: cell * 1.5, h: 0, a: 0.3 + 0.3 * pr.k, sd, dx: pr.kind === 'sn' ? 1 : 0, dy: 0, dz: 0, w: base + 40 - (st.elev - curve), id: `${tag}|shaft` });
-        if (detail >= 3 && lod > 0.6) for (let s = 0; s < 2; s++)
+        if (!flat && detail >= 3 && lod > 0.6) for (let s = 0; s < 2; s++)
           add({ x: c[0] + (rnd(s + 40) - 0.5) * cell * 0.8, y: base + th, z: c[1] + (rnd(s + 50) - 0.5) * cell * 0.8, m: 1, s: cell * 0.7, h: 0.9, a: 0.7, sd, dx: 0, dy: 1, dz: 0, id: `${tag}|top${s}` });
+        return;
+      }
+      if (flat) {   // 2D: a heap is a soft patch of cloud at its base, fuller and greyer underneath where it is denser
+        const W = cell * (0.75 + 0.6 * dens), ccx = c[0] + (rnd(1) - 0.5) * cell * 0.35, ccz = c[1] + (rnd(2) - 0.5) * cell * 0.35;
+        // a few overlapping, offset sheets, each fainter: their edges break up into an irregular, soft-edged patch
+        const nf = 3 + (dens > 0.6 ? 1 : 0) + (detail >= 3 ? 1 : 0);
+        for (let f = 0; f < nf; f++) {
+          const ang = rnd(f * 7 + 60) * Math.PI * 2, rr = (f ? 0.18 + 0.2 * rnd(f * 7 + 61) : 0) * W;
+          add({ x: ccx + Math.cos(ang) * rr, y: base + 30 + f * 45, z: ccz + Math.sin(ang) * rr, m: 0, s: W * (0.62 + 0.3 * rnd(f * 7 + 62)), h: 0.1 + f * 0.15, a: 0.3 + 0.28 * dens, sd: sd + f * 1.7, dx: 0, dy: 1, dz: 0, id: `${tag}|f${f}` });
+        }
+        if (rains && dens > 0.45) add({ x: ccx, y: base + 50, z: ccz, m: 3, s: W * 0.6, h: 0, a: 0.25 + 0.35 * pr.k, sd, dx: pr.kind === 'sn' ? 1 : 0, dy: 0, dz: 0, w: base + 50 - (st.elev - curve), id: `${tag}|shaft` });
         return;
       }
       // a heap (cumulus): round puffs in a dome with a flat base, bigger and taller where the cell is denser
@@ -320,7 +343,7 @@ function v3dCloudsStep(now: number) {
   const oKey = V3d.origin.join(',');
   if (V3dClouds.oKey && V3dClouds.oKey !== oKey && V3dClouds.list.length) v3dCloudReplace();
   V3dClouds.oKey = oKey;
-  const key = km + '|' + detail;
+  const key = km + '|' + detail + '|' + (cloudFlat() ? '2d' : '3d');
   if (!V3dClouds.mesh || V3dClouds.mesh.parent !== V3d.scene) { V3dClouds.mesh = v3dCloudMesh(12000); V3d.scene.add(V3dClouds.mesh); V3dClouds.key = ''; V3dClouds.list = []; V3dClouds.built = false; }
   const M: any = V3dClouds.mesh, t = cloudClock();
   M.visible = V3d.mode !== 'cabin'; M.material.uniforms.uTime.value = t;

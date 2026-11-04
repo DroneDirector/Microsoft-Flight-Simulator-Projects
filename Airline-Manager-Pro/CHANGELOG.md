@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.132 (2026-11-04)
+
+- Clouds 3D/2D (cloud2d, cloudFlat): flat sheets from the same reports; v3dReloadAll after leaving the settings (cloudReload)
+- Props: shared copies (PR_BUILT), Props.placeMany (InstancedMesh per material); lounge armchairs and concourse seats instanced
+- Lighter settings: fewer lamps in the office, Operations office and test-room halls
+- 3D view: a late webglcontextlost from the old canvas no longer closes a reloaded view
+
 ## 0.9.131 (2026-11-04)
 
 - Test rooms (title → Testing): ofBuild/opsBuild/lgBuild copies joined by a staff corridor and a concourse (trCopy, trCut doorways), clickable doors, walking, room signs, visitor walk-in and sit, view-only computer (TR_LOOK)

@@ -208,7 +208,7 @@ function lgBuild(scene: any, q: number): any {
   // seating: groups of armchairs (and a sofa) round coffee tables on the carpet
   const seats: any[] = [];
   const upCol = [0x3E6A8A, 0x7A3F22, 0x1F5C4A][lv];
-  const armchair = (x: number, z: number, ry: number) => Props.place(root, 'armchair-' + (lv + 1), x, z, ry, q, { color: upCol });
+  const chairsAt: number[][] = [], armchair = (x: number, z: number, ry: number) => { chairsAt.push([x, z, ry]); };   // all drawn together below
   const table = (x: number, z: number) => prop(['coffee-table-oak', 'coffee-table-walnut', 'coffee-table-marble'][lv], x, z, 0, () => {
     const top = [oak, walnut, marble][lv]; add(new T.CylinderGeometry(0.5, 0.5, 0.05, 40), top, x, 0.42, z);
     if (lv === 2) { for (let i = 0; i < 3; i++) { const a = i / 3 * 6.283; const l = add(new T.CylinderGeometry(0.02, 0.02, 0.4, 8), gold, x + Math.cos(a) * 0.3, 0.2, z + Math.sin(a) * 0.3); l.rotation.z = Math.cos(a) * 0.2; l.rotation.x = -Math.sin(a) * 0.2; } }
@@ -226,6 +226,7 @@ function lgBuild(scene: any, q: number): any {
     prop(ci % 2 ? 'teacup-and-saucer' : 'coffee-cup-and-saucer', c[0] + 0.18, c[1] + 0.1, 0, () => lgCup(add, porcelain, lv === 2 ? gold : null, c[0] + 0.18, 0.445, c[1] + 0.1, ci % 2 === 1, ci % 2 ? 0x7A3E14 : 0x3A1F0E));
     prop('napkin-stack', c[0] - 0.2, c[1] - 0.08, 0.3, () => lgNapkins(add, c[0] - 0.2, 0.445, c[1] - 0.08, 4, lv));
   });
+  Props.placeMany(root, 'armchair-' + (lv + 1), chairsAt, q, { color: upCol });   // every armchair at once: one draw call per material
   A.seats = seats;
   // a sofa against each side wall
   for (const s of [-1, 1]) { const x = s * (W / 2 - 0.65), z = z0 + D * 0.42;
