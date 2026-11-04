@@ -449,17 +449,32 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
   }
 
   /* engines */
-  const props: any[] = [], revParts: any[] = [], engPts: any[] = [];
+  const props: any[] = [], revParts: any[] = [], engPts: any[] = [], fans: any[] = [];
   for (const E of s.eng) for (const side of E.y ? [1, -1] : [1]) {
     const y = side * E.y, d = E.d, L = E.l;
     engPts.push({ y, mid: _av(E.x + L * 0.55, y, E.z), exh: _av(E.x + L * (E.kind === 'tprop' ? 0.9 : 1.08), y, E.z), d });
     if (E.kind === 'fan' || E.kind === 'rear') {
       const prof = [[0, d * 0.43], [L * 0.012, d * 0.495], [L * 0.06, d * 0.5], [L * 0.42, d * 0.5], [L * 0.7, d * 0.44], [L * 0.86, d * 0.34], [L * 0.9, d * 0.31]];
       add(latheX(prof, [E.x, y, E.z], 26, 1, s.cockpit === 'b737' ? 0.9 : 1), mEng);
+      // the inside of the cowl: a dark duct from the intake to the exhaust, seen from within, so the engine is solid
+      // from every side (before, looking into its back at an angle, you saw straight through its wall)
+      add(latheX(prof.map(q => [q[0], q[1] * 0.96]), [E.x, y, E.z], 26, 1, s.cockpit === 'b737' ? 0.9 : 1), acMat('duct', () => std({ color: 0x15191F, roughness: 0.85, metalness: 0.15, side: THREE.BackSide })));
       add(latheX([[L * 0.86, d * 0.3], [L * 1.02, d * 0.22], [L * 1.12, 0.02]], [E.x, y, E.z], 18), mMetal);
       // the fan behind the intake
-      const fan = new T.Mesh(new T.CircleGeometry(d * 0.44, 24), mDark); fan.position.copy(_av(E.x + L * 0.05, y, E.z)); fan.rotation.y = -Math.PI / 2; root.add(fan);
-      add(latheX([[L * 0.04, d * 0.12], [L * 0.09, 0.02]], [E.x, y, E.z], 14), mMetal);
+      // the fan behind the intake: a dark disc behind, the titanium blades (twisted, as real fan blades are) round the
+      // hub, and the spinner pointing forwards; the blades turn while the engine runs (see userData.set)
+      const fan = new T.Mesh(new T.CircleGeometry(d * 0.44, 24), mDark); fan.position.copy(_av(E.x + L * 0.1, y, E.z)); fan.rotation.y = -Math.PI / 2; root.add(fan);
+      { const fg = new T.Group(); fg.position.copy(_av(E.x + L * 0.075, y, E.z)); root.add(fg);
+        const nB = d > 2.6 ? 22 : d > 1.8 ? 24 : 18, rIn = d * 0.12, rOut = d * 0.435, parts: any[] = [];
+        for (let i = 0; i < nB; i++) {
+          const g = new T.BoxGeometry(L * 0.012, rOut - rIn, d * 0.075); g.translate(0, rIn + (rOut - rIn) / 2, 0);
+          g.rotateY(0.62); g.rotateX(i / nB * Math.PI * 2); parts.push(g);   // twisted, then round the hub (the model's axes: x along the engine)
+        }
+        const BGU: any = (window as any).BufferGeometryUtils, mFan = acMat('fanblade', () => std({ color: 0xA9B2BC, metalness: 0.85, roughness: 0.32 }));
+        if (BGU && BGU.mergeGeometries) { const mg = BGU.mergeGeometries(parts); if (mg) fg.add(new T.Mesh(mg, mFan)); else parts.forEach(g => fg.add(new T.Mesh(g, mFan))); }
+        else parts.forEach(g => fg.add(new T.Mesh(g, mFan)));
+        fans.push(fg); }
+      add(latheX([[L * 0.03, 0.02], [L * 0.05, d * 0.08], [L * 0.085, d * 0.13]], [E.x, y, E.z], 16), acMat('spinner', () => std({ color: 0xD8DDE2, metalness: 0.6, roughness: 0.3 })));
       // thrust reverser (jet airliners): the cowl's sleeve slides back and opens the cascade vanes
       if (s.cockpit !== 'ga') {
         const casc = add(latheX([[L * 0.4, d * 0.503], [L * 0.6, d * 0.49]], [E.x, y, E.z], 26), acMat('cascade', () => std({ color: 0x24282E, roughness: 0.9, metalness: 0.3 })));
@@ -567,6 +582,7 @@ function buildAircraftModel(typeId: string, lv: Livery): any {
     // amphibian wheels: 0 up inside the floats (water), 1 down below them (a runway); they slide straight down
     if ((o as any).amphib != null && s.gear.floats) { const k = clamp((o as any).amphib, 0, 1); ampG.visible = k > 0.02; ampG.position.y = (1 - k) * AMP_OUT; root.userData.ampLift = k * AMP_OUT; }
     if (o.gear != null && !s.gear.fixed && !s.gear.floats) { gearG.visible = o.gear > 0.02; gearG.scale.y = 0.2 + 0.8 * clamp(o.gear, 0, 1); gearG.position.y = (1 - clamp(o.gear, 0, 1)) * s.ground * 0.55; }
+    if (o.spin != null) fans.forEach((g, i) => { if ((o as any).stopped !== i) g.rotation.x = -o.spin * 0.28; });   // the jet engines' fans turning (a stopped engine's stands still)
     if (o.spin != null) props.forEach((p, i) => { const out = (o as any).stopped === propIdx[i]; if (!out) p.blades.rotation.x = o.spin; p.disc.visible = !out; });   // a stopped engine's propeller stands still (feathered)
   };
   try { Models.swap(root, aircraftModelFile(typeId)); } catch (e) { /* the app's own model */ }
