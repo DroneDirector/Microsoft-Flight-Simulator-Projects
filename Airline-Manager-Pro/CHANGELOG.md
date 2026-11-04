@@ -1,7 +1,7 @@
 # Changelog
 
 ## 0.9.156
-- Frame generation in the rooms draws real frames again (no more streaks); aircraft on the ground no longer jump: one ground model for every view.
+- Frame generation in the rooms draws real frames again (no more streaks); aircraft on the ground no longer jump: one ground model for every view; an intoxicated note with a countdown to sober.
 
 ## 0.9.155
 - Mod Manager scrolls and fits on phones; tablets and the PC unchanged.
