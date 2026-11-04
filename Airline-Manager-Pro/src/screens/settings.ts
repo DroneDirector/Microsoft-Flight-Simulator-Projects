@@ -377,7 +377,8 @@ function settingsBody(): string {
   const S: any = State.settings, groups = setGroups(sec), gi = setSubOf(sec.id, groups.length);
   // two or more parts: a switch at the top, one part shown at a time
   const sw = groups.length > 1 ? `<div class="seg set-sub" role="tablist">${groups.map((g, i) => `<button class="${i === gi ? 'on' : ''}" role="tab" aria-selected="${i === gi}" data-act="set-sub" data-g="${i}">${esc(g.title)}</button>`).join('')}</div>` : '';
-  return `<h2>${esc(sec.title)}</h2>` + sw + groups[gi].items.map(it => {
+  const saveCard = sec.id === 'view3d' ? setSaveCardHtml('gfx') : sec.id === 'general' && gi === 0 ? setSaveCardHtml('other') : '';
+  return `<h2>${esc(sec.title)}</h2>` + sw + saveCard + groups[gi].items.map(it => {
     if ((it as any).when && !(it as any).when()) return '';
     if (it.type === 'toggle') return `<label class="tg-row"><span><b>${esc(it.label)}</b>${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span>${toggle(it.key, !!S[it.key])}</label>`;
     if (it.type === 'choice') return `<div class="ch-row"><span><b>${esc(it.label)}</b>${it.hint ? `<small>${esc(it.hint)}</small>` : ''}</span><div class="seg">${it.options.map(o => `<button class="${S[it.key] === o[0] ? 'on' : ''}" data-act="set-choice" data-key="${it.key}" data-v="${o[0]}">${esc(o[1])}</button>`).join('')}</div></div>`;
@@ -754,3 +755,40 @@ ACTIONS['fgmon-toggle'] = () => { const S: any = State.settings; S.fgMon = S.fgM
 // the terrain detail slider: the name shows while dragging, it's kept when let go
 document.addEventListener('input', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-tq')) return; const h = el.closest('.set-card') && el.closest('.set-card').querySelector('.tq-h'); if (h) h.textContent = 'Terrain detail: ' + TERRAIN_Q_NAMES[+el.value]; });
 document.addEventListener('change', e => { const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('v3d-tq')) return; (State.settings as any).v3dTerrainQ = +el.value; Store.save(); rerenderSettingsBody(); });
+
+
+/* ---------- saving settings yourself: the graphics settings, and the others, each on their own ---------- */
+// The game keeps every change by itself; these keep a copy you made on purpose, to go back to after trying things,
+// and can be saved to a file and loaded again (another device, a new install). Nothing private goes into the file.
+const SET_PRIVATE = /licen|regkey|token|secret|password|supabase|anon|serial|reactiv/i;
+function setIsGfx(k: string): boolean { return /^(v3d|cab|gfx|frameGen|hairMode|perfAuto|fgMon|room|place|anim|cloud|cl[A-Z]|terrain|water|sat|shadow|fps|stress|joinedRooms|sceneGear|recShow)/.test(k); }
+function setPick(kind: 'gfx' | 'other'): { [k: string]: any } {
+  const S: any = State.settings, out: any = {};
+  for (const k of Object.keys(S)) { if (SET_PRIVATE.test(k) || k === 'setSaved') continue; if (setIsGfx(k) === (kind === 'gfx')) out[k] = JSON.parse(JSON.stringify(S[k])); }
+  return out;
+}
+function setSaved(): any { const S: any = State; S.setSaved = S.setSaved || {}; return S.setSaved; }
+function setSaveCardHtml(kind: 'gfx' | 'other'): string {
+  const sv = setSaved()[kind], name = kind === 'gfx' ? 'graphics settings' : 'other settings (everything but graphics)';
+  return `<div class="set-card col"><div class="sc-h">${icon('download')}<span><b>Save your ${kind === 'gfx' ? 'graphics settings' : 'other settings'}</b><small>The game keeps every change by itself. Save your ${esc(name)} yourself too, to go back to them after trying something, or to a file for another device. ${sv ? `Last saved ${esc(dateStr(new Date(sv.at)))}.` : 'Not saved yet.'}</small></span></div>
+    <div class="btn-row"><button class="btn primary sm" data-act="set-save" data-k="${kind}">${icon('check')}Save now</button>${sv ? `<button class="btn ghost sm" data-act="set-restore" data-k="${kind}">${icon('reload')}Go back to the saved ones</button>` : ''}<button class="btn ghost sm" data-act="set-file" data-k="${kind}">${icon('download')}Save to a file</button><label class="btn ghost sm">${icon('copy')}Load from a file<input type="file" accept=".json,application/json" class="set-load" data-k="${kind}" hidden></label></div></div>`;
+}
+ACTIONS['set-save'] = el => { const k = el.getAttribute('data-k') as 'gfx' | 'other'; setSaved()[k] = { at: Date.now(), vals: setPick(k) }; Store.save(); Sound.purchase(); toast(k === 'gfx' ? 'Graphics settings saved' : 'Settings saved', 'ok'); rerenderSettingsBody(); };
+function setApply(k: 'gfx' | 'other', vals: any) {
+  const S: any = State.settings; for (const key of Object.keys(setPick(k))) if (!(key in vals)) delete S[key];
+  for (const key of Object.keys(vals)) if (!SET_PRIVATE.test(key) && setIsGfx(key) === (k === 'gfx')) S[key] = vals[key];
+  Store.save(); try { applyCompanyTheme(); } catch (e) { /* none */ } try { boosterSync(); } catch (e) { /* none */ }
+  if (k === 'gfx') { try { if (typeof V3d !== 'undefined' && V3d.open) v3dReloadAll(); } catch (e) { /* next time */ } }
+}
+ACTIONS['set-restore'] = el => { const k = el.getAttribute('data-k') as 'gfx' | 'other', sv = setSaved()[k]; if (!sv) return; setApply(k, sv.vals); Sound.tick(); toast(k === 'gfx' ? 'Back to your saved graphics settings' : 'Back to your saved settings', 'ok'); rerenderSettingsBody(); };
+ACTIONS['set-file'] = el => {
+  const k = el.getAttribute('data-k') as 'gfx' | 'other', data = JSON.stringify({ app: APP.name, version: APP.version, kind: k, at: new Date().toISOString(), settings: setPick(k) }, null, 1);
+  const a = document.createElement('a'); a.download = `${k === 'gfx' ? 'graphics-settings' : 'settings'}-${new Date().toISOString().slice(0, 10)}.json`; a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' })); document.body.appendChild(a); a.click(); a.remove();
+  toast('Saved to a file on your device', 'ok');
+};
+document.addEventListener('change', e => {
+  const el = e.target as HTMLInputElement; if (!el || !el.classList || !el.classList.contains('set-load') || !el.files || !el.files[0]) return;
+  const k = el.getAttribute('data-k') as 'gfx' | 'other';
+  el.files[0].text().then(t => { const j = JSON.parse(t); if (!j || !j.settings) throw new Error('not a settings file'); if (j.kind && j.kind !== k) { toast(j.kind === 'gfx' ? 'That file has graphics settings: load it under Graphics' : 'That file has the other settings: load it under General', 'warn'); return; } setApply(k, j.settings); toast('Settings loaded from the file', 'ok'); rerenderSettingsBody(); })
+    .catch(() => toast('That file is not a settings file from the game', 'warn'));
+});
