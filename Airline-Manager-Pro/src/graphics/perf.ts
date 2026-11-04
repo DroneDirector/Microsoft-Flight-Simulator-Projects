@@ -124,6 +124,7 @@ const FrameGen = {
     cam.updateMatrixWorld();
     let real: boolean;
     if (always) { if (st.plan) { real = st.plan === 'real' || !G.fresh; st.plan = ''; } else { const n = this.between(st); real = !G.fresh || n === 0 || (st.madeRun || 0) >= n; } }
+    else real = !G.fresh || !st.realAt || t - st.realAt >= 1000 / cap - 3;
     // circling round the aircraft you follow: when the camera has swung round it too far since the drawn picture, the
     // picture can't be shifted far enough without gaps opening round the aircraft (the jumping): a real frame instead
     if (!real && G.aOn === 1 && st.anchor && st.anchor.parent && G.camA) {
@@ -133,7 +134,8 @@ const FrameGen = {
       const moved = Math.hypot(e[12] - p[12], e[13] - p[13], e[14] - p[14]), dist = Math.max(1, Math.hypot(p[12], p[13], p[14]));
       if (dot < Math.cos(0.03) || moved / dist > 0.03) real = true;
     }
-    else real = !G.fresh || !st.realAt || t - st.realAt >= 1000 / cap - 3;
+    // never a long run of made frames: a real one at least every few frames, whatever the room
+    if (!real && (st.madeRun || 0) >= 3) real = true;
     if (real) {
       // the real frame: drawn into the picture, with the camera it was drawn from
       const q = this.gpuBegin(ren); ren.setRenderTarget(G.rt); ren.render(scene, cam); this.layer(G, st, ren, cam, scene); ren.setRenderTarget(null); this.gpuEnd(q);
