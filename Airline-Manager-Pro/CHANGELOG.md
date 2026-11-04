@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.145
+- Frame generation: no glitches on the followed aircraft, the cabin, clouds or lights; edge smoothing; crash fix after recentring. Settings gear in the 3D view's top bar.
+
 ## 0.9.144
 - Frame generation: frames in between skip the scene work and follow the screen's pace, so they are actually made (the monitor no longer shows 0 made); the cabin gets them too.
 
