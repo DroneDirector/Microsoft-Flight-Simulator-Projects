@@ -324,46 +324,46 @@ function hgBuild(scene: any, q: number): any {
   const bay = 8, nb = Math.max(3, Math.round((D - 1) / bay)), bz = (D - 1) / nb, wy0 = H - 5.2, wy1 = H - 2.2;
   for (const s of [-1, 1]) {
     const x = s * W / 2, ry = -s * Math.PI / 2, kp = s > 0 ? 'e' : 'w';
-    quad(D, 2.4, mat.block, x - s * 0.01, 1.2, 0, ry);
+    quad(D, 2.4, mat.block, x - s * 0.03, 1.2, 0, ry);
     quad(D, wy0 - 2.4, mat.liner, x, 2.4 + (wy0 - 2.4) / 2, 0, ry);
     quad(D, H - wy1, mat.liner, x, wy1 + (H - wy1) / 2, 0, ry);
     for (let i = 0; i <= nb; i++) {
       const z = z0 + 0.5 + i * bz;
       bx(0.5, H, 0.5, mat.steel, x - s * 0.3, H / 2, z);   // the column
-      if (i < nb) { const zc = z + bz / 2, pw = bz - 0.8; quad(pw, wy1 - wy0, pane(kp), x - s * 0.02, (wy0 + wy1) / 2, zc, ry, 0, false); bx(0.12, wy1 - wy0, 0.12, mat.steel, x - s * 0.08, (wy0 + wy1) / 2, zc, 0); bx(0.14, 0.14, bz, mat.steel, x - s * 0.08, wy0, zc); bx(0.14, 0.14, bz, mat.steel, x - s * 0.08, wy1, zc); }
+      if (i < nb) { const zc = z + bz / 2, pw = bz - 0.8; quad(pw, wy1 - wy0, pane(kp), x - s * 0.04, (wy0 + wy1) / 2, zc, ry, 0, false); bx(0.12, wy1 - wy0, 0.12, mat.steel, x - s * 0.1, (wy0 + wy1) / 2, zc, 0); bx(0.14, 0.14, bz, mat.steel, x - s * 0.11, wy0, zc); bx(0.14, 0.14, bz, mat.steel, x - s * 0.11, wy1, zc); }
       // the wall between the windows, round the column
-      bx(0.06, wy1 - wy0, 0.8, mat.liner, x - s * 0.03, (wy0 + wy1) / 2, z);
+      bx(0.06, wy1 - wy0 - 0.02, 0.8, mat.liner, x - s * 0.035, (wy0 + wy1) / 2, z);
     }
     block(x - 0.6, z0, x + 0.6, z1);
   }
   // the back wall: blocks and liner, two small windows in the rooms
-  quad(W, 2.4, mat.block, 0, 1.2, z0 + 0.01, 0); quad(W, H - 2.4, mat.liner, 0, 2.4 + (H - 2.4) / 2, z0, 0);
+  quad(W, 2.4, mat.block, 0, 1.2, z0 + 0.03, 0); quad(W, H - 2.4, mat.liner, 0, 2.4 + (H - 2.4) / 2, z0, 0);
   for (let x = x0 + 0.5; x <= x1; x += 8) bx(0.5, H, 0.5, mat.steel, x, H / 2, z0 + 0.3);
   // high on the back wall, a row of windows too (as most hangars have, over the shops)
-  for (let x = x0 + 5; x < x1 - 4; x += 8) quad(5.4, 2.4, pane('n'), x + 3.2, H - 3.6, z0 + 0.03, 0, 0, false);
+  for (let x = x0 + 5; x < x1 - 4; x += 8) quad(5.4, 2.4, pane('n'), x + 3.2, H - 3.6, z0 + 0.08, 0, 0, false);
   block(x0, z0 - 1, x1, z0 + 0.35);
   // the roof: trusses across the width every bay, roof panels between skylight strips that run across the hangar
   {
     const tH = Math.min(3.2, H * 0.16), yb = H - tH, nT = nb + 1, trussBars: number[][] = [];
     for (let i = 0; i < nT; i++) {
       const z = z0 + 0.5 + i * bz;
-      trussBars.push([0, yb, z, W, 0.3, 0.3, 0]); trussBars.push([0, H - 0.15, z, W, 0.3, 0.3, 0]);
+      trussBars.push([0, yb, z, W, 0.3, 0.3, 0]); trussBars.push([0, H - 0.25, z, W, 0.3, 0.3, 0]);   // the top chord 10 cm under the roof panels, not touching them
       const n = Math.round(W / 3), sw = W / n;
       for (let k = 0; k <= n; k++) { const x = x0 + k * sw; trussBars.push([x, yb + tH / 2, z, 0.14, tH, 0.14, 0]); if (k < n) { const L = Math.hypot(sw, tH); trussBars.push([x + sw / 2, yb + tH / 2, z, L, 0.12, 0.12, (k % 2 ? 1 : -1) * Math.atan2(tH, sw)]); } }
     }
     // purlins along the hangar
-    for (let k = 0; k <= 8; k++) trussBars.push([x0 + k * W / 8, H - 0.35, 0, 0.2, 0.25, D, 0]);
+    for (let k = 0; k <= 8; k++) trussBars.push([x0 + k * W / 8, H - 0.55, 0, 0.2, 0.25, D, 0]);
     const im = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), mat.truss, trussBars.length), m4 = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), S = new T.Vector3(), P = new T.Vector3();
     trussBars.forEach((b, i) => { E.set(0, 0, b[6]); Q.setFromEuler(E); m4.compose(P.set(b[0], b[1], b[2]), Q, S.set(b[3], b[4], b[5])); im.setMatrixAt(i, m4); });
     im.castShadow = shadow; root.add(im);
     // the roof itself, with a skylight strip in every other bay
     for (let i = 0; i < nb; i++) {
       const zc = z0 + 0.5 + (i + 0.5) * bz, sky = i % 2 === 1 && zc > z0 + HG_RD + 2;
-      if (sky) { const sw = bz * 0.42; quad(W, sw, pane('up'), 0, H + 0.02, zc, 0, Math.PI / 2, false); A.skylights = (A.skylights || []).concat([[zc, sw]]);
+      if (sky) { const sw = bz * 0.42; quad(W, sw, pane('up'), 0, H + 0.06, zc, 0, Math.PI / 2, false); A.skylights = (A.skylights || []).concat([[zc, sw]]);
         for (const s of [-1, 1]) quad(W, (bz - sw) / 2, mat.roof, 0, H, zc + s * (bz + sw) / 4, 0, Math.PI / 2); }
       else quad(W, bz, mat.roof, 0, H, zc, 0, Math.PI / 2);
     }
-    quad(W, 1, mat.roof, 0, H, z0 + 0.25, 0, Math.PI / 2); quad(W, 1, mat.roof, 0, H, z1 - 0.25, 0, Math.PI / 2);
+    quad(W, 0.5, mat.roof, 0, H, z0 + 0.25, 0, Math.PI / 2); quad(W, 0.5, mat.roof, 0, H, z1 - 0.25, 0, Math.PI / 2);   // end strips that meet the bays, not overlap them
     // the outside of the roof (for the sun's shadows)
     if (shadow) { const top = new T.Mesh(new T.PlaneGeometry(W + 1, D + 1), new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false })); top.rotation.x = -Math.PI / 2; top.position.y = H + 0.5; top.castShadow = false; root.add(top); }
     // the high-bay lamps under the trusses
@@ -498,8 +498,14 @@ function hgRooms(A: any, mat: any, add: any, bx: any, quad: any, surf: any, bloc
   wall(HG_RX0, HG_RX1, zf, doors.concat(wins));
   for (const w of wins) { const g = new T.Mesh(new T.PlaneGeometry(w[1] - w[0], w[3] - w[2]), mat.glass); g.position.set((w[0] + w[1]) / 2, (w[2] + w[3]) / 2, zf); g.renderOrder = 3; A.root.add(g); bx(w[1] - w[0] + 0.1, 0.06, 0.24, mat.steel, (w[0] + w[1]) / 2, w[2] - 0.03, zf); }
   for (const d of doors) { bx(0.08, 2.2, 0.2, mat.steel, d[0] - 0.04, 1.1, zf); bx(0.08, 2.2, 0.2, mat.steel, d[1] + 0.04, 1.1, zf); bx(d[1] - d[0] + 0.16, 0.08, 0.2, mat.steel, (d[0] + d[1]) / 2, 2.19, zf);
-    // the door leaf, open into the room
-    const leaf = new T.Mesh(new T.BoxGeometry(1.08, 2.12, 0.045), new T.MeshStandardMaterial({ color: 0x2E5C8A, roughness: 0.5 })); leaf.position.set(d[0] + 0.05, 1.07, zf - 0.56); leaf.rotation.y = Math.PI / 2; leaf.castShadow = q >= 1; A.root.add(leaf); }
+    // the door: a steel leaf on its hinges (props/door-1), shut until you open it; it opens into the room
+    const k = doors.indexOf(d), pv = new T.Group(); pv.position.set(d[0] + 0.01, 0, zf); A.root.add(pv);
+    const leaf = Props.place(pv, 'door-1', 0, 0, 0, q, { w: d[1] - d[0] - 0.02, h: 2.13, color: k ? 0x8A2F2A : 0x2E5C8A });
+    const hit = new T.Mesh(new T.BoxGeometry(d[1] - d[0], 2.1, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set((d[1] - d[0]) / 2, 1.05, 0); hit.userData.act = 'rdoor'; hit.userData.i = k; pv.add(hit); A.hits.push(hit); void leaf;
+    const blk = [d[0], zf - 0.1, d[1], zf + 0.1]; A.blocks.push(blk);
+    (A.rdoors = A.rdoors || []).push({ pv, k: 0, to: 0, blk, d });
+    // the room's sign beside its door, on the hangar side (airport style)
+    const sg = Props.place(A.root, 'room-sign', d[1] + 0.36, zf + 0.075, 0, q, k ? { name: 'Break room', sub: 'Staff rest area', num: 'H.02', pict: 'break', staff: true } : { name: 'Maintenance\noffice', sub: 'Engineering', num: 'H.01', pict: 'tools', staff: true }, 1.25); void sg; }
   // room signs over the doors
   const sign = (text: string, x: number) => { const [c, x2] = ctCanvas(512, 96); x2.fillStyle = '#12304E'; x2.fillRect(0, 0, 512, 96); x2.fillStyle = '#FFFFFF'; x2.font = '700 44px Inter, Arial, sans-serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText(text, 256, 50);
     const o = new T.Mesh(new T.PlaneGeometry(1.6, 0.3), new T.MeshBasicMaterial({ map: ctTex(c) })); o.position.set(x, 2.55, zf + 0.08); A.root.add(o); };
@@ -558,7 +564,7 @@ function hgRooms(A: any, mat: any, add: any, bx: any, quad: any, surf: any, bloc
     });
     prop('sink', cx0 + 0.6, cz - 0.02, 0, () => { bx(0.5, 0.012, 0.4, mat.metal, cx0 + 0.6, 0.945, cz - 0.02); add(new T.CylinderGeometry(0.015, 0.015, 0.3, 8), mat.metal, cx0 + 0.6, 1.08, cz - 0.22); });
     // the coffee machine and a few mugs
-    prop('coffee-machine', cx1 - 0.4, cz - 0.06, 0, () => { bx(0.32, 0.42, 0.36, mat.black, cx1 - 0.4, 1.15, cz - 0.06); bx(0.2, 0.08, 0.04, M2(0x2C8CFF), cx1 - 0.4, 1.28, cz + 0.125); bx(0.1, 0.06, 0.1, mat.metal, cx1 - 0.4, 0.97, cz + 0.06); });
+    Props.place(A.root, 'coffee-machine-1', cx1 - 0.4, cz - 0.08, 0, R.q, {}, 0.94);
     for (let i = 0; i < 3; i++) prop('coffee-mug', cx1 - 1.0 + i * 0.13, cz + 0.06, 0, () => { const mm = new T.MeshStandardMaterial({ color: [0xF4F4F2, 0x2E5C8A, 0xB3261E][i], roughness: 0.3 }); add(new T.CylinderGeometry(0.04, 0.035, 0.095, 16), mm, cx1 - 1.0 + i * 0.13, 0.988, cz + 0.06); const h = new T.Mesh(new T.TorusGeometry(0.025, 0.007, 8, 16, Math.PI), mm); h.position.set(cx1 - 1.0 + i * 0.13 + 0.04, 0.99, cz + 0.06); h.rotation.z = -Math.PI / 2; A.root.add(h); });
     for (let i = 0; i < 2; i++) prop('drinking-glass', cx1 - 1.5 + i * 0.1, cz + 0.1, 0, () => { const gl = new T.Mesh(new T.CylinderGeometry(0.035, 0.03, 0.11, 18, 1, true), new T.MeshPhysicalMaterial({ color: 0xE8F2FA, roughness: 0.05, transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false })); gl.position.set(cx1 - 1.5 + i * 0.1, 0.995, cz + 0.1); A.root.add(gl); });
     prop('waste-bin', xa + 0.45, z0 + 1.75, 0, () => hgBin(add, xa + 0.45, z0 + 1.75, 0x3C5A72)); block(xa + 0.2, z0 + 1.5, xa + 0.7, z0 + 2.0);
@@ -783,7 +789,7 @@ function hgOpen2(root: HTMLElement, q: number) {
   ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('hangar', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
   ren.shadowMap.enabled = Gfx.placeShadow('hangar', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
-  const cam = new T.PerspectiveCamera(60, 1, 0.03, 400); R.cam = cam;
+  const cam = new T.PerspectiveCamera(60, 1, 0.1, 400); R.cam = cam;   // a near plane of 10 cm keeps the depth fine at the far roof (no flicker)
   R.hemi = new T.HemisphereLight(0xEAF2FF, 0x3A3F46, 0.9); scene.add(R.hemi);
   ctProgress(12, 'Switching on the lights…', R);
   setTimeout(() => {
@@ -890,7 +896,7 @@ function hgFrame() {
   if (!R.panelOpen && R.talk < 0) { if (k.arrowleft) R.look.yaw += dt * 1.6; if (k.arrowright) R.look.yaw -= dt * 1.6; }
   // you: your own figure, seen from your eyes
   if (!R.meTried) { R.meTried = true; const mk = () => { try { if (!R.on || !R.scene) return; const me: any = myPilot(); R.me = selfBody(R.scene, me && me.look ? Object.assign({}, me.look, { hat: 'none' }) : ctLook('me', 'm', 'public'), company().color); } catch (e) { R.me = null; } }; if (Human.ready) mk(); else Human.load().then(mk, () => { /* without */ }); }
-  hgWalk(dt, now);
+  hgWalk(dt, now); hgRoomDoorsStep(dt);
   // the doors (shut; ready to slide), the vending machine, the mechanics
   if (R.A && R.A.doorLeaves && R.A.doorK !== R.doorK0) { R.doorK0 = R.A.doorK; hgDoors(R.A.doorK); }
   hgVendStep(dt);
@@ -909,6 +915,18 @@ function hgFrame() {
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function lerpAng(a: number, b: number, k: number): number { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; }
+/** A room's door: open it, or shut it (not while you stand in its way). */
+function hgRoomDoor(i: number) {
+  const R = HangarRoom, A = R.A, D0 = A && A.rdoors && A.rdoors[i]; if (!D0) return;
+  if (D0.to) { const F = R.free, d = D0.d, zf = D0.pv.position.z; if (F && F.x > d[0] - 0.3 && F.x < d[1] + 0.3 && F.z > zf - 1.25 && F.z < zf + 0.3) { toast('Step out of the doorway first', 'info'); return; } }
+  D0.to = D0.to ? 0 : 1; try { Sound.tick(); } catch (e) { /* quiet */ }
+  const at = A.blocks.indexOf(D0.blk); if (D0.to && at >= 0) A.blocks.splice(at, 1); if (!D0.to && at < 0) A.blocks.push(D0.blk);
+}
+/** The rooms' doors swinging, a little each frame. */
+function hgRoomDoorsStep(dt: number) {
+  const A = HangarRoom.A; if (!A || !A.rdoors) return;
+  for (const D0 of A.rdoors) if (D0.k !== D0.to) { D0.k += Math.sign(D0.to - D0.k) * Math.min(Math.abs(D0.to - D0.k), dt * 1.8); const e = D0.k * D0.k * (3 - 2 * D0.k); D0.pv.rotation.y = e * Math.PI * 0.55; }
+}
 /** The door leaves: 0 shut … 1 open, each sliding along its own track into the end of the opening. */
 function hgDoors(k: number) { const A = HangarRoom.A; if (!A || !A.doorLeaves) return; const e = k * k * (3 - 2 * k); for (const L of A.doorLeaves) L.position.x = L.userData.x0 + (L.userData.x1 - L.userData.x0) * e; }
 
@@ -961,6 +979,7 @@ function hgWalk(dt: number, now: number) {
 function hgHint(obj: any, spot: any): string {
   const R = HangarRoom, a = obj ? obj.userData.act : '';
   if (a === 'door') return 'The door: click to leave the hangar';
+  if (a === 'rdoor') { const D0 = R.A && R.A.rdoors && R.A.rdoors[obj.userData.i]; return D0 && D0.to ? 'Click to close the door' : 'Click to open the door'; }
   if (a === 'monitor') return 'Click to work at the monitor';
   if (a === 'vend') return R.vend && R.vend.st === 'ready' ? 'Open the flap at the bottom to take it' : 'Click to choose a snack or a drink';
   if (a === 'flap') return R.vend && R.vend.st === 'ready' ? 'Click to take it' : 'The tray';
@@ -1003,6 +1022,7 @@ function hgClickAt(e?: PointerEvent) {
   if (R.talk >= 0) return;
   const o = hgAimedObj(e), a = o ? o.userData.act : '';
   if (a === 'door') { roomExitMenu(R.root, 'hangars', to => hgLeave(to)); return; }
+  if (a === 'rdoor') { hgRoomDoor(o.userData.i); return; }
   if (a === 'monitor') { hgScreenOpen('schedule'); return; }
   if (a === 'mech') { hgTalkOpen(o.userData.i); return; }
   if (a === 'vend') { if (R.vend && R.vend.st === 'ready') { hgTake(); return; } hgVendOpen(); return; }

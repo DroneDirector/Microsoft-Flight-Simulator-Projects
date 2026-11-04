@@ -159,8 +159,7 @@ function opsBuild(scene: any, q: number) {
     const sign = new T.Mesh(new T.PlaneGeometry(0.34, 0.09), new T.MeshBasicMaterial({ color: 0x1FA36B, toneMapped: false })); sign.position.set(dx, dh + 0.2, z - 0.07); sign.rotation.y = Math.PI; root.add(sign);
     const hit = new T.Mesh(new T.BoxGeometry(dw, dh, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set(dx, dh / 2, z - 0.15); hit.userData.act = 'door'; root.add(hit); A.hits.push(hit); }
   // a plant in the corner
-  { const px = X1 - 0.4, pz = Z0 + 0.4; add(new T.CylinderGeometry(0.2, 0.16, 0.42, 24), mat.pot, px, 0.21, pz); const r = ctRng(5);
-    for (let i = 0; i < 24; i++) { const lf = new T.Mesh(new T.PlaneGeometry(0.11, 0.5), mat.plant); const a = r() * 6.3, t = 0.4 + r() * 0.7; lf.position.set(px + Math.cos(a) * 0.1, 0.42 + 0.25 + r() * 0.55, pz + Math.sin(a) * 0.1); lf.rotation.set(-t * Math.cos(a) * 0.8, a, t * 0.8 * Math.sin(a)); root.add(lf); } }
+  Props.place(root, 'plant-2', X1 - 0.42, Z0 + 0.42, 0.3, q, { seed: 8 });
   // the lights: linear ceiling lights, cool white
   for (const z of [-1.6, 0.2, 1.6]) { const ln = new T.Mesh(new T.BoxGeometry(2.6, 0.02, 0.08), mat.glow); ln.position.set(0, HH - 0.012, z); root.add(ln); }
   for (const [x, z] of [[-1.3, -1.6], [1.3, -1.6], [-1.3, 1.0], [1.3, 1.0], [0, -0.3]]) { const L = new T.SpotLight(0xF2F6FF, 4.5, 7, 0.95, 0.7, 1.6); L.position.set(x, HH - 0.05, z); L.target.position.set(x, 0, z); if (q >= 2 && x === 0 && (!DESKTOP || Gfx.lights() >= 2)) { L.castShadow = true; L.shadow.mapSize.set(1024, 1024); } root.add(L); root.add(L.target); }

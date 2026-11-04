@@ -33,23 +33,36 @@ const HANGAR_PROP_FILES: [string, string][] = [
   ['tool-trolley', 'Red rolling tool chest (tools on top)'], ['work-stand', 'Yellow work platform with steps (at the engine)'], ['traffic-cone', 'Traffic cone on its base'],
   ['workbench', 'Workbench with pegboard and vice (along the back wall)'], ['fire-extinguisher', 'Fire extinguisher on its stand'], ['waste-bin', 'Waste bin (hangar, office, break room)'],
   ['office-desk', 'Work table in the maintenance office (the monitor, keyboard and mouse stand on it)'], ['office-chair', 'Office chair'], ['keyboard', 'Computer keyboard'], ['computer-mouse', 'Computer mouse'], ['bookshelf', 'Shelf of manuals'],
-  ['kitchen-counter', 'Break room counter with cupboards'], ['sink', 'Sink and tap'], ['coffee-machine', 'Coffee machine'], ['coffee-mug', 'Coffee mug'], ['drinking-glass', 'Drinking glass'],
+  ['kitchen-counter', 'Break room counter with cupboards'], ['sink', 'Sink and tap'], ['coffee-mug', 'Coffee mug'], ['drinking-glass', 'Drinking glass'],
   ['break-room-table', 'Break room table'], ['break-room-chair', 'Break room chair'],
 ];
 /** Equipment and furniture in the lounges, one file each (front towards +Z, standing on the floor). */
 const LOUNGE_PROP_FILES: [string, string][] = [
   ['carpet-lounge', 'Carpet, Lounge'], ['carpet-business', 'Carpet, Business lounge'], ['carpet-flagship', 'Carpet, Flagship lounge (the finest)'],
-  ['armchair-fabric', 'Armchair, fabric (Lounge)'], ['armchair-leather', 'Armchair, leather (Business lounge)'], ['armchair-velvet', 'Armchair, velvet on gold legs (Flagship lounge)'],
-  ['sofa-fabric', 'Sofa, fabric'], ['sofa-leather', 'Sofa, leather'], ['sofa-velvet', 'Sofa, velvet'],
   ['coffee-table-oak', 'Coffee table, oak'], ['coffee-table-walnut', 'Coffee table, walnut'], ['coffee-table-marble', 'Coffee table, marble and gold'],
-  ['floor-lamp', 'Floor lamp'], ['potted-plant', 'Potted plant'], ['magazine-rack', 'Magazine rack'], ['reception-desk', 'Reception desk'],
-  ['buffet-counter', 'Refreshment counter'], ['espresso-machine', 'Espresso machine'], ['tea-urn', 'Tea urn (samovar)'], ['teapot', 'Teapot'],
+  ['floor-lamp', 'Floor lamp'], ['magazine-rack', 'Magazine rack'], ['reception-desk', 'Reception desk'],
+  ['buffet-counter', 'Refreshment counter'], ['tea-urn', 'Tea urn (samovar)'], ['teapot', 'Teapot'],
   ['coffee-cup-and-saucer', 'Coffee cup and saucer'], ['teacup-and-saucer', 'Teacup and saucer'], ['napkin-stack', 'Napkins'], ['fruit-bowl', 'Fruit bowl'],
   ['drinks-fridge', 'Glass-fronted fridge (the drinks and snacks in it are the items/ files)'],
   ['bar-counter', 'Bar counter (Business and Flagship)'], ['bar-stool', 'Bar stool'], ['bottle-shelf', 'Shelf of bottles behind the bar'],
   ['pendant-light', 'Pendant light (Business)'], ['chandelier', 'Chandelier (Flagship)'], ['fireplace', 'Fireplace (Flagship)'], ['grand-piano', 'Grand piano (Flagship)'],
   ['wall-art', 'Framed art (Flagship)'], ['champagne-bucket', 'Champagne bucket (Flagship)'], ['departures-screen', 'Departures screen frame (the list is drawn by the app)'],
 ];
+/** The shared props, one file each (props/<name>.glb). */
+const PROP_FILES: [string, string][] = [
+  ['plant-1', 'Potted plant 1: fiddle-leaf fig in a glazed ceramic pot (about 1.6 m)'],
+  ['plant-2', 'Potted plant 2: kentia palm in a tall square planter (about 1.9 m)'],
+  ['plant-3', 'Potted plant 3: snake plant in a low concrete bowl (about 0.9 m)'],
+  ['sofa-1', 'Sofa 1: fabric, soft rounded cushions, tapered oak legs (Lounge)'],
+  ['sofa-2', 'Sofa 2: leather, buttoned back, chrome sled legs (Business lounge, your office)'],
+  ['sofa-3', 'Sofa 3: velvet Chesterfield, rolled arms, gold legs (Flagship lounge)'],
+  ['armchair-1', 'Armchair 1: fabric, to match sofa 1'], ['armchair-2', 'Armchair 2: leather, to match sofa 2'], ['armchair-3', 'Armchair 3: velvet, to match sofa 3'],
+  ['coffee-machine-1', 'Coffee machine 1: bean-to-cup with a touchscreen, two bean hoppers, a drip tray (lounges, the hangar break room)'],
+  ['door-1', 'Door 1: painted steel door leaf with a narrow glass panel, lever handles and kick plates (hangar rooms). Hinge on its left edge (x = 0), the leaf along +X; it turns about the hinge'],
+  ['door-2', 'Door 2: one leaf of the automatic sliding glass doors (lounge entrance); two are used, one sliding each way'],
+  ['room-sign', 'Room sign by a door: the frame only (the name, number and pictogram are drawn by the app on a panel in front)'],
+];
+
 /** The hangar's vending machine and what it sells (no real brands). Cans and bars stand upright: the top towards +Y. */
 const ITEM_FILES: [string, string][] = [
   ['vending-machine', 'Vending machine (the hangar break room)'],

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.131 (2026-11-04)
+
+- Test rooms (title → Testing): ofBuild/opsBuild/lgBuild copies joined by a staff corridor and a concourse (trCopy, trCut doorways), clickable doors, walking, room signs, visitor walk-in and sit, view-only computer (TR_LOOK)
+- Shared replaceable props (src/graphics/props.ts, PROP_FILES → www/models/props/): plant-1..3, sofa-1..3, armchair-1..3, coffee-machine-1, door-1, door-2, room-sign
+- Lounge: sliding doors (door-2) with an opening in the back wall, moved clear of the refreshment counter; exit sign
+- Hangar: room doors open and shut (hgRoomDoor), room signs; flicker fixes (truss top chord, end strips, skylights, panes, near plane 0.1)
+
 ## 0.9.130 (2026-11-04)
 
 - Window seat views: default zoom 0.7 (v3dWinZoom)
