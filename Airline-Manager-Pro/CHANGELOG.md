@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.148
+- Flight trace: no false "no touchdown" reports after the app was away during a landing, or for very short landings.
+
 ## 0.9.147
 - Family photo held still and flush in both hands; Cinema at the top right, Satellite and Other airlines in blue at the bottom right; frame generation fixes for the cabin windows and for circling the aircraft.
 
