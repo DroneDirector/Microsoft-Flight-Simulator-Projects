@@ -119,7 +119,7 @@ function cabinTips(body: any): number[][] {
 }
 
 /** How close to the window you sit in the window views: 0 in your seat, 1 as close as it goes (kept). */
-function cabinWinZoom(): number { const v = (State.settings as any).v3dWinZoom; return v == null ? 0 : clamp(+v, 0, 1); }
+function cabinWinZoom(): number { const v = (State.settings as any).v3dWinZoom; return v == null ? 0.7 : clamp(+v, 0, 1); }   // starts zoomed well in to the window (the wing and the view filling it)
 function cabinWinZoomSet(v: number) {
   (State.settings as any).v3dWinZoom = clamp(v, 0, 1); Store.soon();
   const el = V3d.root && V3d.root.querySelector('.v3d-wz') as HTMLInputElement; if (el && document.activeElement !== el) el.value = String(Math.round(cabinWinZoom() * 100));
