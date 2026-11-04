@@ -55,7 +55,12 @@ const SETTINGS: SetSection[] = [
       const km = cloudKm(), d = cloudDetail();
       const note = (km >= 200 || d >= 4) ? `<p class="v3d-note warn">${icon('alert')}Very high settings might affect performance: more clouds to draw, a warmer device and more battery use.</p>`
         : (km && km <= 40) || d === 1 ? `<p class="v3d-note ok">${icon('info')}Low settings might improve performance on slower phones and PCs.</p>` : '';
-      return `<div class="set-card col"><div class="sc-h">${icon('wind')}<span><b class="cl-km-h">Cloud distance: ${km ? km + ' km' : 'Off'}</b><small>How far you see clouds in the 3D view. They follow the real-world weather reports around you.</small></span></div>
+      const flat = cloudFlat();
+      const mode = `<div class="sc-h">${icon('cloud')}<span><b>Clouds: ${flat ? '2D' : '3D'}</b><small>3D: clouds built in three dimensions, heaps and towering storms you fly round and through. 2D: flat cloud layers, lighter to draw on slower phones and PCs.</small></span></div>
+        <div class="seg cl-mode" role="group" aria-label="3D or 2D clouds"><button class="${flat ? '' : 'on'}" data-act="cl-mode" data-v="3d">3D clouds</button><button class="${flat ? 'on' : ''}" data-act="cl-mode" data-v="2d">2D clouds</button></div>
+        <p class="v3d-note">${icon('reload')}Switching between 3D and 2D clouds reloads the 3D view (with its loading screen) when you leave the settings.</p>
+        ${flat ? `<p class="v3d-note">${icon('info')}2D clouds might not show the real-world weather as closely as 3D clouds. They come from the same reports, so the cover, the height of each layer, rain, snow and storms are there, but heaps and towering storm clouds are drawn as flat layers.</p>` : ''}`;
+      return `<div class="set-card col">${mode}<div class="sc-h" style="margin-top:12px">${icon('wind')}<span><b class="cl-km-h">Cloud distance: ${km ? km + ' km' : 'Off'}</b><small>How far you see clouds in the 3D view. They follow the real-world weather reports around you.</small></span></div>
         <input type="range" class="cl-km" min="0" max="300" step="10" value="${km}" aria-label="Cloud distance in kilometres">
         <div class="v3d-scale"><span>Off</span><span>100</span><span>200</span><span>300 km</span></div>
         <div class="sc-h" style="margin-top:12px">${icon('layers')}<span><b class="cl-d-h">Cloud detail: ${CLOUD_DETAIL_NAMES[d - 1]}</b><small>How many puffs each cloud is made of. Higher looks fuller and softer.</small></span></div>
@@ -592,6 +597,7 @@ document.addEventListener('input', e => {
   if (el.classList.contains('cl-km')) { const h = card && card.querySelector('.cl-km-h'); if (h) h.textContent = `Cloud distance: ${+el.value ? el.value + ' km' : 'Off'}`; }
   if (el.classList.contains('cl-d')) { const h = card && card.querySelector('.cl-d-h'); if (h) h.textContent = `Cloud detail: ${CLOUD_DETAIL_NAMES[+el.value - 1]}`; }
 });
+ACTIONS['cl-mode'] = (b: HTMLElement) => { const v = b && b.getAttribute('data-v') === '2d'; if (cloudFlat() === v) return; Sound.tick(); (State.settings as any).cloud2d = v; if (V3d.open) (V3d as any).cloudReload = !(V3d as any).cloudReload; Store.save(); rerenderSettingsBody(); };
 document.addEventListener('change', e => {
   const el = e.target as HTMLInputElement; if (!el || !el.classList) return;
   if (el.classList.contains('cl-km')) (State.settings as any).cloudKm = +el.value;

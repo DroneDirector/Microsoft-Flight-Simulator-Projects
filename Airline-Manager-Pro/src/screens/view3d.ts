@@ -636,9 +636,24 @@ function v3dRecentre(f: LiveFlight, w: { lon: number; lat: number }) {
 
 /* ---------- each frame ---------- */
 
+/** Build the whole 3D view again (with its loading screen), where you were: the same aircraft or place, the same
+ *  camera. Used when a setting that the scene is built with has changed (3D or 2D clouds). */
+function v3dReloadAll() {
+  const VV: any = V3d; VV.cloudReload = false; if (!V3d.open || !V3d.target) return;
+  const id = V3d.target, map = V3d.map, mode = V3d.mode, yaw = V3d.yaw, pitch = V3d.pitch, dist = V3d.dist;
+  try { v3dOpen(id, map); } catch (e) { return; }
+  const t0 = performance.now(), back = () => {
+    if (!V3d.open || V3d.target !== id) return;
+    if (!V3d.loaded) { if (performance.now() - t0 < 120000) setTimeout(back, 300); return; }
+    try { if (mode && mode !== V3d.mode) { const b = document.createElement('b'); b.setAttribute('data-m', mode); ACTIONS['v3d-mode'](b, null as any); } } catch (e) { /* the default view */ }
+    V3d.yaw = yaw; V3d.pitch = pitch; if (dist) V3d.dist = dist;
+  };
+  setTimeout(back, 300);
+}
 function v3dLoop(now: number) {
   if (!V3d.open) return;
   V3d.raf = requestAnimationFrame(v3dLoop);
+  if ((V3d as any).cloudReload && !document.querySelector('#set-body')) { v3dReloadAll(); return; }   // the clouds changed between 3D and 2D: once out of the settings, everything again
   const VP: any = (V3d as any).perf, gen = FrameGen.on() && !(V3d as any).dprWas; if (VP) VP.genCap = gameBoost() ? 0 : V3D_FPS;   // frame generation fills the screen's other frames (not in the cabin)
   if (document.hidden || now - V3d.last < 1000 / (gameBoost() || gen ? 60 : V3D_FPS) - 2) return;
   if (Perf.skip((V3d as any).perf, now)) return;   // warm, or saving battery: fewer frames
