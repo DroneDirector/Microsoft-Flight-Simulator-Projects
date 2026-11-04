@@ -117,7 +117,7 @@ const FrameGen = {
     if (st) { const dt = st.prevT ? t - st.prevT : 0; st.prevT = t; if (dt > 0 && dt < 250) { if (st.lastWasReal) st.realDt = st.realDt ? st.realDt * 0.85 + dt * 0.15 : dt; else st.genDt = st.genDt ? st.genDt * 0.85 + dt * 0.15 : dt;
       if (!st.vsync || dt < st.vsync) st.vsync = st.vsync ? st.vsync * 0.5 + dt * 0.5 : dt; else st.vsync = Math.min(17.5, st.vsync * 1.002); } }   // the screen's pace: follows the shortest waits, creeps up slowly
     if (!st || !this.on() || (!cap && !always)) { const q = this.gpuBegin(ren); ren.render(scene, cam); this.gpuEnd(q); if (st) st.lastWasReal = true; this.tick(t, true, performance.now() - c0); return true; }
-    const G = st.gen || (st.gen = this.make());
+    const G = st.gen || (st.gen = this.make(this.samples(ren)));
     if (!G) { ren.render(scene, cam); return true; }
     const T = THREE, sz = ren.getDrawingBufferSize(new T.Vector2());
     if (G.rt.width !== sz.x || G.rt.height !== sz.y) { G.rt.setSize(sz.x, sz.y); G.fresh = false; }
@@ -127,35 +127,134 @@ const FrameGen = {
     else real = !G.fresh || !st.realAt || t - st.realAt >= 1000 / cap - 3;
     if (real) {
       // the real frame: drawn into the picture, with the camera it was drawn from
-      const q = this.gpuBegin(ren); ren.setRenderTarget(G.rt); ren.render(scene, cam); ren.setRenderTarget(null); this.gpuEnd(q);
+      const q = this.gpuBegin(ren); ren.setRenderTarget(G.rt); ren.render(scene, cam); this.layer(G, st, ren, cam, scene); ren.setRenderTarget(null); this.gpuEnd(q);
       G.prevVP.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse); G.fresh = true; st.realAt = t; st.real = (st.real || 0) + 1; st.madeRun = 0;
+      G.aOn = 0; const A = st.anchor; if (A && A.parent) { G.aPrev.copy(A.matrixWorld); G.aOn = st.anchorAll ? 2 : G.layOk ? 1 : 0; }
     } else { st.made = (st.made || 0) + 1; st.madeRun = (st.madeRun || 0) + 1; }
     st.lastWasReal = real;
     // on the screen: the picture, shifted from the camera it was drawn from to the camera now
     const U = G.mat.uniforms;
-    U.uPrevVP.value.copy(G.prevVP);
-    U.uInvVP.value.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).invert();
+    // from the screen now straight to the drawn picture, worked out here at full precision: in the shader, a trip
+    // through the world's own coordinates (kilometres from the centre, an eye a hand's width from a seat) loses so much
+    // that the picture breaks up into blocks
+    const inv = G.tmp.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).invert();
+    U.uMW.value.multiplyMatrices(G.prevVP, inv);
+    // what moves with the aircraft you follow: from where it is now back to where it was in the drawn picture
+    U.uUseA.value = 0;
+    if (G.aOn && st.anchor && st.anchor.parent) {
+      const A = st.anchor; A.updateMatrix(); G.aNow.multiplyMatrices(A.parent.matrixWorld, A.matrix);
+      U.uMA.value.copy(G.aNow).invert().premultiply(G.aPrev).premultiply(G.prevVP).multiply(inv); U.uUseA.value = G.aOn;
+    }
     U.uNear.value = cam.near; U.uFar.value = cam.far; U.uLog.value = ren.capabilities && ren.capabilities.logarithmicDepthBuffer ? 1 : 0; U.uP22.value = cam.projectionMatrix.elements[10]; U.uP32.value = cam.projectionMatrix.elements[14];
     ren.render(G.scene, G.cam);
     this.tick(t, real, performance.now() - c0);
     return real;
   },
-  make(): any {
+  /** Edge smoothing for the drawn picture: the same as the screen's (it was missing, so frame generation looked rough). */
+  samples(ren: any): number {
+    try { const gl = ren.getContext(), a = gl.getContextAttributes(); if (!a || !a.antialias || !ren.capabilities.isWebGL2) return 0; return Math.min(4, gl.getParameter(gl.MAX_SAMPLES) || 0); } catch (e) { return 0; }
+  },
+  /** Every light's glow in the scene (sprites, points and small additive glows; never the sky's own layers): they
+   *  leave no depth in the picture, so the motion layer gives them their own. Lights added later count by themselves. */
+  glows(G: any, scene: any, A: any): any[] {
+    if (!scene) return [];
+    const now = performance.now(); if (G.glowAt && now - G.glowAt < 2000 && G.glowScene === scene) return G.glowList;
+    G.glowAt = now; G.glowScene = scene; const out: any[] = [], T = THREE;
+    scene.traverse((o: any) => {
+      if (o === A) return;   // the followed aircraft's own lights move with it: left out of its layer, as see-through parts
+      const m = o.material; if (!m || Array.isArray(m) || !m.transparent || m.depthWrite || m.depthTest === false || m.side === T.BackSide) return;
+      let glow = o.isSprite || o.isPoints;
+      if (!glow && o.isMesh && m.blending === T.AdditiveBlending) { const g = o.geometry; if (g && !g.boundingSphere && g.computeBoundingSphere) g.computeBoundingSphere(); const r = g && g.boundingSphere ? g.boundingSphere.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) : 1e9; glow = r < 60; }
+      if (glow) { let p = o.parent, inA = false; while (p) { if (p === A) { inA = true; break; } p = p.parent; } if (!inA) out.push(o); }
+    });
+    G.glowList = out; return out;
+  },
+  /** With a real frame: the motion layer, a small picture of the aircraft you follow (st.anchor) and of the clouds'
+   *  distance (st.depthOnly), so made frames move each by its own motion. Nothing to do inside the aircraft. */
+  layer(G: any, st: any, ren: any, cam: any, scene?: any) {
+    G.layOk = false;
+    const A = st.anchor && st.anchor.visible && st.anchor.parent ? st.anchor : null, extra: any[] = (st.depthOnly || []).concat(this.glows(G, scene, A)).filter((o: any) => o && o.visible && o.parent);
+    if (st.anchorAll) return;   // inside the aircraft: everything moves with it, no layer needed
     try {
-      const T = THREE, rt = new T.WebGLRenderTarget(4, 4, { type: T.HalfFloatType });
+      const T = THREE, sz = ren.getDrawingBufferSize(new T.Vector2()), w = sz.x, h = sz.y;
+      if (G.lay.width !== w || G.lay.height !== h) G.lay.setSize(w, h);
+      G.mat.uniforms.uLTex.value.set(1 / w, 1 / h);
+      const col = ren.getClearColor(new T.Color()), alpha = ren.getClearAlpha(), L = G.lscene;
+      ren.setRenderTarget(G.lay); ren.setClearColor(0x000000, 0); ren.clear(true, true, false);
+      const was = ren.autoClear; ren.autoClear = false;
+      L.matrixWorldAutoUpdate = false;
+      // the aircraft in plain white (it keeps its place in the scene: only drawn from here)
+      if (A) {
+        // only its solid parts: lights' glows, halos and other see-through bits would mark the sky round them as aircraft
+        const off: any[] = [];
+        A.traverseVisible((o: any) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && (Array.isArray(m) ? m.some((x: any) => x.transparent) : m.transparent))) off.push(o); });
+        for (const o of off) o.visible = false;
+        L.overrideMaterial = G.white; L.children = [A];
+        try { ren.render(L, cam); } finally { for (const o of off) o.visible = true; }
+      }
+      // the clouds and every light's glow: only their distance (the clouds where they are thick enough to be seen), all
+      // in one go
+      L.overrideMaterial = null;
+      if (extra.length) {
+        const keep: any[] = [];
+        for (const o of extra) {
+          const m = o.material, U = m && m.uniforms; if (!m) continue;
+          keep.push([m, m.depthWrite, m.colorWrite, U && U.uCut ? U.uCut.value : null]);
+          m.depthWrite = true; m.colorWrite = false; if (U && U.uCut) U.uCut.value = 0.25;
+        }
+        L.children = extra;
+        try { ren.render(L, cam); } finally { for (const k of keep.reverse()) { k[0].depthWrite = k[1]; k[0].colorWrite = k[2]; if (k[3] != null) k[0].uniforms.uCut.value = k[3]; } }
+      }
+      L.children = []; ren.autoClear = was; ren.setClearColor(col, alpha); ren.setRenderTarget(G.rt);
+      G.layOk = !!A;
+    } catch (e) { try { G.lscene.children = []; ren.setRenderTarget(G.rt); } catch (e2) { /* as it was */ } }
+  },
+  make(aa: number): any {
+    try {
+      const T = THREE, rt = new T.WebGLRenderTarget(4, 4, { type: T.HalfFloatType, samples: aa });
       rt.depthTexture = new T.DepthTexture(4, 4); rt.depthTexture.type = T.UnsignedIntType;
+      // the motion layer (drawn with each real frame, plainly): where the aircraft you follow is (red) and how far away
+      // things are that leave no depth of their own in the picture (the clouds)
+      const lay = new T.WebGLRenderTarget(4, 4); lay.depthTexture = new T.DepthTexture(4, 4); lay.depthTexture.type = T.UnsignedIntType;
       const mat = new T.ShaderMaterial({
-        uniforms: { tCol: { value: rt.texture }, tDep: { value: rt.depthTexture }, uPrevVP: { value: new T.Matrix4() }, uInvVP: { value: new T.Matrix4() }, uNear: { value: 0.1 }, uFar: { value: 100 }, uLog: { value: 0 }, uP22: { value: -1 }, uP32: { value: -0.2 } },
+        uniforms: { tCol: { value: rt.texture }, tDep: { value: rt.depthTexture }, tLay: { value: lay.texture }, tLDep: { value: lay.depthTexture }, uUseA: { value: 0 }, uLTex: { value: new T.Vector2(0.01, 0.01) }, uMW: { value: new T.Matrix4() }, uMA: { value: new T.Matrix4() }, uNear: { value: 0.1 }, uFar: { value: 100 }, uLog: { value: 0 }, uP22: { value: -1 }, uP32: { value: -0.2 } },
         vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-        fragmentShader: `uniform sampler2D tCol; uniform sampler2D tDep; uniform mat4 uPrevVP; uniform mat4 uInvVP; uniform float uFar, uLog, uP22, uP32; varying vec2 vUv;
+        fragmentShader: `uniform sampler2D tCol; uniform sampler2D tDep; uniform sampler2D tLay; uniform sampler2D tLDep; uniform mat4 uMW; uniform mat4 uMA; uniform float uFar, uLog, uP22, uP32, uUseA; uniform vec2 uLTex; varying vec2 vUv;
           // a logarithmic depth buffer (the long-range 3D view) back to the ordinary depth this shift works with
-          float dep(vec2 uv) { float d = texture2D(tDep, uv).x; if (uLog < 0.5) return d; float w = exp2(d * log2(uFar + 1.0)) - 1.0; return ((uP22 * -w + uP32) / w) * 0.5 + 0.5; }
-          vec2 back(vec2 uv, float d) { vec4 w = uInvVP * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); w /= w.w; vec4 p = uPrevVP * vec4(w.xyz, 1.0); return p.xy / p.w * 0.5 + 0.5; }
+          float lin(float d) { if (uLog < 0.5) return d; float w = exp2(d * log2(uFar + 1.0)) - 1.0; return ((uP22 * -w + uP32) / w) * 0.5 + 0.5; }
+          float depP(vec2 uv) { return lin(texture2D(tDep, clamp(uv, 0.0, 1.0)).x); }
+          // the nearer of the picture and the motion layer: clouds count at their own distance, not the ground's behind them
+          float depS(vec2 uv) { vec2 c = clamp(uv, 0.0, 1.0); return min(lin(texture2D(tDep, c).x), lin(texture2D(tLDep, c).x)); }
+          float onA(vec2 uv) { return texture2D(tLay, clamp(uv, 0.0, 1.0)).r; }
+          // the world stands still between real frames: only the camera moved
+          vec2 backW(vec2 uv, float d) { vec4 p = uMW * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); return p.xy / p.w * 0.5 + 0.5; }
+          // the aircraft you follow (and everything in it: the cabin, the people) moved on with it
+          vec2 backA(vec2 uv, float d) { vec4 p = uMA * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0); return p.xy / p.w * 0.5 + 0.5; }
           void main() {
-            // where this point was in the drawn picture: guess with the depth here, then once more with the depth found there
-            float d = dep(vUv); vec2 s = back(vUv, d);
-            d = dep(clamp(s, 0.0, 1.0)); s = back(vUv, d);
-            d = min(d, dep(clamp(s, 0.0, 1.0))); s = back(vUv, d);
+            vec2 s;
+            if (uUseA > 1.5) {
+              // inside the aircraft: all of the picture moves with it
+              float d = depP(vUv); s = backA(vUv, d); d = depP(s); s = backA(vUv, d); d = min(d, depP(s)); s = backA(vUv, d);
+            } else {
+              // where this point was in the drawn picture: guess with the depth here, then once more with the depth found there
+              float d = depS(vUv); s = backW(vUv, d);
+              d = depS(s); s = backW(vUv, d);
+              d = min(d, depS(s)); s = backW(vUv, d);
+              if (uUseA > 0.5) {
+                float da = depP(vUv); vec2 sa = backA(vUv, da); da = depP(sa); sa = backA(vUv, da); da = depP(sa); sa = backA(vUv, da);
+                if (onA(sa) > 0.5) s = sa;   // the aircraft: carried along with it
+                else if (onA(s) > 0.5) {
+                  // ground or sky that the aircraft covered in the drawn picture: the nearest of it beside the aircraft
+                  vec2 dir = s - sa; float L = length(dir / uLTex);
+                  dir = L > 0.01 ? dir / L : vec2(uLTex.x, 0.0);
+                  for (int i = 1; i <= 24; i++) {
+                    vec2 q1 = s + dir * float(i) * 1.5, q2 = s - dir * float(i) * 1.5;
+                    if (onA(q1) < 0.5) { s = q1; break; }
+                    if (onA(q2) < 0.5) { s = q2; break; }
+                  }
+                }
+              }
+            }
             vec2 sc = clamp(s, vec2(0.0005), vec2(0.9995));
             gl_FragColor = texture2D(tCol, sc);
             // the background colour is never tone-mapped when drawn straight to the screen, so not here either
@@ -167,8 +266,8 @@ const FrameGen = {
         depthTest: false, depthWrite: false,
       });
       const scene = new T.Scene(), cam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1), q = new T.Mesh(new T.PlaneGeometry(2, 2), mat); q.frustumCulled = false; scene.add(q);
-      return { rt, mat, scene, cam, prevVP: new T.Matrix4(), fresh: false };
+      return { rt, lay, mat, scene, cam, prevVP: new T.Matrix4(), tmp: new T.Matrix4(), aPrev: new T.Matrix4(), aNow: new T.Matrix4(), aOn: 0, layOk: false, lscene: new T.Scene(), white: new T.MeshBasicMaterial({ color: 0xffffff }), fresh: false };
     } catch (e) { return null; }
   },
-  dispose(st: any) { const G = st && st.gen; if (!G) return; try { G.rt.dispose(); G.mat.dispose(); } catch (e) { /* gone */ } st.gen = null; },
+  dispose(st: any) { const G = st && st.gen; if (!G) return; try { G.rt.dispose(); G.lay.dispose(); G.mat.dispose(); G.white.dispose(); } catch (e) { /* gone */ } st.gen = null; },
 };

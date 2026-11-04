@@ -79,7 +79,7 @@ function v3dOpen(id: string, map: WorldMap, from?: HTMLElement) {
   const root = document.createElement('div'); root.className = 'v3d' + (id.indexOf('apt:') === 0 ? ' v3d-free v3d-aptonly' : '') + (DESKTOP ? ' v3d-pc' : '') + ((State.settings as any).fcMini ? ' v3d-mini' : '');
   root.innerHTML = `<canvas class="v3d-cv"></canvas><div class="v3d-labels"></div>
     <div class="v3d-top"><button class="icon-btn" data-act="v3d-close" aria-label="Close the 3D view">${icon('close')}</button>
-      <div class="v3d-modes">${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['cabin', 'Cabin'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera'], ['walk', 'Walk']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
+      <div class="v3d-modes"><button class="v3d-m v3d-gear" data-act="scene-settings" aria-label="Settings" title="Settings">${icon('gear')}</button>${[['chase', 'Behind'], ['side', 'Around'], ['tower', 'Tower'], ['fwd', 'Forward'], ['cabin', 'Cabin'], ['winL', 'Window L'], ['winR', 'Window R'], ['free', 'Free camera'], ['walk', 'Walk']].map(([k, l]) => `<button class="v3d-m ${k === 'chase' ? 'on' : ''}" data-act="v3d-mode" data-m="${k}">${l}</button>`).join('')}</div>
       <span class="v3d-batt">${typeof Battery !== 'undefined' ? Battery.html() : ''}</span>
       <span class="v3d-clock" title=""></span>
       <div class="v3d-pick"><button class="icon-btn" data-act="v3d-next" data-d="-1" aria-label="Previous aircraft">${icon('chevron', 'flip')}</button><span class="v3d-name"></span><button class="icon-btn" data-act="v3d-next" data-d="1" aria-label="Next aircraft">${icon('chevron')}</button></div></div>
@@ -661,7 +661,7 @@ function v3dLoop(now: number) {
   const dt = V3d.last ? Math.min(0.2, (now - V3d.last) / 1000) : 0; V3d.last = now;
   // frame generation: a made frame only moves the camera (from your input); the aircraft, the sky, the weather and
   // the rest are worked out on the real frames, so made frames cost next to nothing
-  const made = V3d.loaded && FrameGen.plan(VP, now) === 'made';
+  let made = V3d.loaded && FrameGen.plan(VP, now) === 'made';
   V3d.frames = (V3d.frames || 0) + 1;   // counted for the Game Booster's frame-rate chart
   if (V3d.root && V3d.root.getAttribute('data-m') !== V3d.mode) { V3d.root.setAttribute('data-m', V3d.mode); if (!/^(walk|free)$/.test(V3d.mode)) v3dUi(true); }
   const T = THREE, VK: any = V3d;
@@ -676,7 +676,7 @@ function v3dLoop(now: number) {
   // the centre: follow the aircraft to the next airport, or move with it over open country
   const ctr = v3dCentre(f, [w0.lon, w0.lat]);
   if (V3d.mode === 'free' && V3d.origin) v3dFreeRecentre();
-  else if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && v3dNeedRecentre(w0))) v3dRecentre(f, w0);
+  else if (!V3d.origin || ctr.icao !== V3d.icao || (!ctr.icao && v3dNeedRecentre(w0))) { v3dRecentre(f, w0); if (made) { made = false; VP.plan = 'real'; } }   // a new centre: every aircraft moves to it, so a real frame
   if (!made) v3dPrefetch(f, w0);
   if (!made && V3d.aptScene && V3d.aptScene.L) { try { V3d.aptScene.computePlanes(Date.now()); } catch (e) { /* not ready */ } }
   v3dLoaderTick(now);
@@ -684,11 +684,11 @@ function v3dLoop(now: number) {
 
   // aircraft within about 40 km
   const seen: { [id: string]: boolean } = {};
-  if (!made) {
-  // other airlines' aircraft: only those near enough and in front of the camera are drawn
-  const tfc = Traffic.live(), fr = new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(V3d.cam.projectionMatrix, V3d.cam.matrixWorldInverse));
+  // other airlines' aircraft: only those near enough and in front of the camera are drawn (on a made frame only the
+  // one you follow moves on, so the picture can carry it along smoothly; the rest wait for the next real frame)
+  const tfc = made ? [] : Traffic.live(), fr = new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(V3d.cam.projectionMatrix, V3d.cam.matrixWorldInverse));
   const tfcNear = tfc.filter((g: any) => { const a = apt(g.from), b = apt(g.to); if (!a || !b || !V3d.origin) return false; const pp = flightPathPos(g); if (!pp) return false; g._ll = pp.pos; return gcDistanceNm(V3d.origin, pp.pos) < 24; });
-  for (const g of (State.live as any[]).concat(tfcNear, parked ? [f] : [])) {
+  for (const g of made ? [f] : (State.live as any[]).concat(tfcNear, parked ? [f] : [])) {
     const w = g.id === f.id ? w0 : v3dWhere(g);
     const q = v3dXY(w.lon, w.lat); if (Math.hypot(q[0], q[1]) > 40000 && g.id !== f.id) continue;
     if ((g as any).tfc && g.id !== f.id) {   // the one you follow is always drawn (the camera is placed from it)
@@ -850,9 +850,8 @@ function v3dLoop(now: number) {
     }
     void s;
   }
-  v3dSmokeStep(dt);
-  for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); const PC: any = P; if (PC.ct) for (const r of PC.ct.rb) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } delete V3d.planes[id]; }
-  }   // the aircraft: real frames only
+  if (!made) v3dSmokeStep(dt);
+  if (!made) for (const id in V3d.planes) if (!seen[id]) { const P = V3d.planes[id]; V3d.scene.remove(P.model); P.label.remove(); const PC: any = P; if (PC.ct) for (const r of PC.ct.rb) { V3d.scene.remove(r.mesh); r.mesh.geometry.dispose(); } delete V3d.planes[id]; }
 
   // the camera follows the aircraft (or flies freely)
   const P = V3d.planes[f.id];
@@ -863,7 +862,7 @@ function v3dLoop(now: number) {
   }
   if (P && V3d.mode !== 'fwd' && !P.model.visible) P.model.visible = true;
   if (V3d.mode === 'free') { if (fc()) v3dFreeStep(dt); }
-  else if (P) {
+  else if (P && P.pos) {
     const s = shapeOf(P.type), centre = P.pos.clone().add(new T.Vector3(0, s.ground + s.h / 2, 0));
     const fwd = new T.Vector3(Math.sin(P.hdg * D2R), 0, -Math.cos(P.hdg * D2R));
     const VW: any = V3d;
@@ -930,6 +929,9 @@ function v3dLoop(now: number) {
   const VL: any = V3d;
   if (V3d.loaded || !VL.drawnAt || now - VL.drawnAt > 450) {
     VL.drawnAt = now;
+    // frame generation: the aircraft you follow moves on between real frames, so the picture carries it (and, from inside,
+    // everything you see) along with it; the clouds keep their own distance
+    if (VP) { const PF = V3d.planes[f.id]; VP.anchor = PF ? PF.model : null; VP.anchorAll = V3d.mode === 'cabin' || V3d.mode === 'walk'; VP.depthOnly = typeof V3dClouds !== 'undefined' && V3dClouds.mesh ? [V3dClouds.mesh] : []; }
     if (VL.cabinFwdFor && !made) { try { cabinOutsidePass(V3d.planes[VL.cabinFwdFor]); } catch (e) { /* the windows keep the last view */ } }
     if (V3d.loaded && (!(V3d as any).dprWas || FrameGen.mode() === 'on')) FrameGen.draw((V3d as any).perf, V3d.r, V3d.scene, V3d.cam, now); else V3d.r.render(V3d.scene, V3d.cam);
     if (V3d.loaded && !(V3d as any).dprWas) Perf.frame((V3d as any).perf, V3d.r, gameBoost() ? 60 : V3D_FPS);   // the cabin keeps its own sharpness

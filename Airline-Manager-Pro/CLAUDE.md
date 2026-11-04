@@ -53,6 +53,10 @@
   every name). A `.glb` there is used instead of the app's own model everywhere that model appears; without it, the
   app's own model. Anything new of these kinds (a new aircraft type, a new vehicle, new people) gets its file name
   and goes through `Models.swap` / `modelsPeople` the same way, in the same change.
+- **Frame generation and lights**: every light's glow, halo or other see-through light effect (now and later: aircraft,
+  airports, vehicles, rooms) is kept out of frame generation's aircraft layer and gets its own distance in its motion
+  layer (`FrameGen.glows` in `src/graphics/perf.ts` finds sprites, points and small additive glows by itself). A new
+  light effect made another way must be added there too, so the frames in between don't smear the sky or ground round it.
 - **The PC gets extra quality** (`hiQ()` in `src/core/util.ts`, true in the PC app): real lights and shadows instead of
   drawn ones, bigger shadow maps, a higher pixel ratio, sharper pictures and finer detail. Anything made lighter for
   phones and tablets stays full quality on the PC. Applies to everything from the seven batches of 0.9.105–0.9.111 on.

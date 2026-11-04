@@ -89,7 +89,7 @@ function v3dCloudMesh(max: number): any {
       uFar: { value: 1e5 }, uTime: { value: 0 }, uFadeT: { value: CLOUD_FADE_S }, uDetail: { value: 1 },
       uLight: { value: new T.Color(0.97, 0.98, 1) }, uDark: { value: new T.Color(0.5, 0.55, 0.63) },
       uSun: { value: new T.Vector3(0, 1, 0) }, uSunK: { value: 1 },
-      uFlashPos: { value: new T.Vector3() }, uFlashK: { value: 0 },
+      uFlashPos: { value: new T.Vector3() }, uFlashK: { value: 0 }, uCut: { value: 0.006 },
     }]),
     vertexShader: `
       #include <common>
@@ -126,7 +126,7 @@ function v3dCloudMesh(max: number): any {
       #include <common>
       #include <fog_pars_fragment>
       #include <logdepthbuf_pars_fragment>
-      uniform vec3 uLight; uniform vec3 uDark; uniform vec3 uSun; uniform float uSunK; uniform float uFar; uniform float uDetail; uniform float uTime;
+      uniform vec3 uLight; uniform vec3 uDark; uniform vec3 uSun; uniform float uSunK; uniform float uFar; uniform float uDetail; uniform float uTime; uniform float uCut;
       uniform vec3 uFlashPos; uniform float uFlashK;
       varying vec2 vUv; varying vec3 vCen; varying vec4 vData; varying vec3 vDir; varying float vMode; varying float vFade; varying float vHgt;
       float h31(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -190,7 +190,7 @@ function v3dCloudMesh(max: number): any {
           a *= smoothstep(30.0, 260.0, abs(cameraPosition.y - vCen.y)) * (1.0 - smoothstep(uFar * 0.75, uFar, dc));
         }
         a *= vFade;
-        if (a < 0.006) discard;
+        if (a < uCut) discard;   // frame generation's motion layer asks only for the thicker parts
         gl_FragColor = vec4(col, a);
         #include <fog_fragment>
       }`,
