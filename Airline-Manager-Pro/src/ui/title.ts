@@ -93,6 +93,7 @@ function titleHtml(): string {
         ${item('ts-new', 'plus', 'New game', 'Create your pilot and airline')}
         ${Store.nogame() ? '' : item('ts-save', 'check', 'Save game', 'Up to 20 saves')}
         ${item('ts-load', 'download', 'Load game', 'Pick up any save')}
+        ${Store.nogame() ? '' : item('ts-test', 'layers', 'Testing', 'Walk the joined rooms: office, operations, lounge')}
         ${item('ts-options', 'gear', 'Options', 'Every setting')}
         ${item('ts-quit', 'power', 'Quit', 'Asks first, offers to save')}
       </nav>
@@ -316,6 +317,7 @@ function titleKey(e: KeyboardEvent) {
   else if (e.key === 'Escape' && T.panel) { e.preventDefault(); titlePanel(''); }
 }
 function titleGo(then: () => void) { Sound.tick(); titleClose(then); }
+ACTIONS['ts-test'] = () => { Sound.tick(); titleClose(() => { try { TestRooms.open(); } catch (e) { toast('The test rooms could not open', 'info'); } }); };
 ACTIONS['ts-continue'] = () => { Sound.tick(); enterSplash(); titleClose(() => { /* back into the game, where you were */ }); };
 /** Continue: a loading screen (at least 5 seconds) while the game opens behind it, saying what is loading; when the
  *  loading takes longer, the bar follows it and the screen stays until everything is ready. */

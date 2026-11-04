@@ -789,7 +789,7 @@ function hgOpen2(root: HTMLElement, q: number) {
   ren.setPixelRatio(Gfx.pr(Gfx.placeSharp('hangar', q))); ren.outputColorSpace = T.SRGBColorSpace; ren.toneMapping = T.ACESFilmicToneMapping; ren.toneMappingExposure = 1.0;
   ren.shadowMap.enabled = Gfx.placeShadow('hangar', q >= 2); ren.shadowMap.type = T.PCFSoftShadowMap;
   const scene = new T.Scene(); R.scene = scene; scene.background = new T.Color(0x0B121B);
-  const cam = new T.PerspectiveCamera(60, 1, 0.1, 400);   // a near plane of 10 cm keeps the depth fine at the far roof (no flicker) R.cam = cam;
+  const cam = new T.PerspectiveCamera(60, 1, 0.1, 400); R.cam = cam;   // a near plane of 10 cm keeps the depth fine at the far roof (no flicker)
   R.hemi = new T.HemisphereLight(0xEAF2FF, 0x3A3F46, 0.9); scene.add(R.hemi);
   ctProgress(12, 'Switching on the lights…', R);
   setTimeout(() => {

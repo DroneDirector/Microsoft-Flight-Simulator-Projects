@@ -185,8 +185,9 @@ function lgBuild(scene: any, q: number): any {
       const [bc, bxx] = ctCanvas(256, 32); bxx.fillStyle = 'rgba(255,255,255,0.78)'; bxx.fillRect(0, 0, 256, 32); bxx.fillStyle = 'rgba(60,60,60,0.85)'; bxx.font = '600 15px Inter, Arial, sans-serif'; bxx.textAlign = 'center'; bxx.fillText(String(co.name || '').toUpperCase(), 128, 21);
       const band = new T.Mesh(new T.PlaneGeometry(dw / 2 - 0.06, 0.1), new T.MeshBasicMaterial({ map: ctTex(bc), transparent: true })); band.position.set(0, 1.2, -0.012); band.rotation.y = Math.PI; band.userData.keep = true; g.add(band); }
     A.doorLeaves = leaves; A.doorK = 0; A.doorTo = 0;
-    // beyond the doors: the concourse (a short hall with its floor, walls and lights, and the view along it)
-    { const fl = new T.Mesh(new T.PlaneGeometry(dw + 3, 3.2), M({ color: 0xB8B2A6, roughness: 0.45 })); fl.rotation.x = -Math.PI / 2; fl.position.set(dx, 0.002, z1 + 1.6); root.add(fl);
+    // beyond the doors: the concourse (a short hall with its floor, walls and lights, and the view along it); in the
+    // test rooms the real concourse is there instead
+    if (!R.linked) { const fl = new T.Mesh(new T.PlaneGeometry(dw + 3, 3.2), M({ color: 0xB8B2A6, roughness: 0.45 })); fl.rotation.x = -Math.PI / 2; fl.position.set(dx, 0.002, z1 + 1.6); root.add(fl);
       for (const s of [-1, 1]) { const w2 = new T.Mesh(new T.PlaneGeometry(3.2, 3.2), M({ color: 0xE9E7E1, roughness: 0.8 })); w2.position.set(dx + s * (dw / 2 + 1.5), 1.6, z1 + 1.6); w2.rotation.y = -s * Math.PI / 2; root.add(w2); }
       const ce = new T.Mesh(new T.PlaneGeometry(dw + 3, 3.2), new T.MeshBasicMaterial({ color: 0xF4F1EA })); ce.rotation.x = Math.PI / 2; ce.position.set(dx, 3.2, z1 + 1.6); root.add(ce);
       const [vc, vx] = ctCanvas(512, 320); const gr = vx.createLinearGradient(0, 0, 0, 320); gr.addColorStop(0, '#EDEAE2'); gr.addColorStop(0.55, '#D9D3C6'); gr.addColorStop(0.56, '#B9B2A4'); gr.addColorStop(1, '#A39C8E'); vx.fillStyle = gr; vx.fillRect(0, 0, 512, 320);

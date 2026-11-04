@@ -4224,3 +4224,11 @@ html.calm .dclock b em { animation: none; }
 .v3d .v3d-cine:active { transform: scale(.97); }
 .v3d .v3d-cine svg { width: 21px; height: 21px; }
 .v3d.ui-off .v3d-cine { opacity: 0; pointer-events: none; }
+
+/* ---------- test rooms (title screen → Testing) ---------- */
+.tr3d .tr-go button[data-tr="visitor"] { border-color: rgba(111,227,245,.5); }
+.tr3d .tr-hint { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); padding: 6px 12px; border-radius: 8px; background: rgba(12,16,22,.78); color: #F3ECE0; font: 600 13px Inter, sans-serif; pointer-events: none; white-space: nowrap; }
+.tr3d .tr-look-bar { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 14px; border-radius: 99px; background: rgba(12,16,22,.9); border: 1px solid rgba(244,197,66,.5); color: #F4C542; font: 600 13px Inter, sans-serif; }
+.tr3d .tr-look-bar span { display: inline-flex; align-items: center; gap: 6px; }
+.tr3d .tr-look-bar svg { width: 15px; height: 15px; }
+@media (max-width: 640px) { .tr3d .tr-look-bar { font-size: 11.5px; max-width: calc(100% - 24px); } }

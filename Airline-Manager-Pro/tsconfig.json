@@ -189,6 +189,7 @@
     "src/core/ops-decisions.ts",
     "src/screens/hangar3d.ts",
     "src/screens/lounge3d.ts",
+    "src/screens/testrooms.ts",
     "src/main.ts"
   ]
 }
