@@ -797,7 +797,8 @@ function ofWalk(dt: number, now?: number) {
   const f = (K.w || K.arrowup ? 1 : 0) - (K.s || K.arrowdown ? 1 : 0) + R.stick[1], r = (K.d || K.arrowright ? 1 : 0) - (K.a || K.arrowleft ? 1 : 0) + R.stick[0];
   const mag = Math.min(1, Math.hypot(f, r)), vmax = K.shift ? 2.0 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-  let mx = fx * f + rx * r, mz = fz * f + rz * r; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
+  let mx = fx * f + rx * r, mz = fz * f + rz * r; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; if (R.host && R.host.assist && ml > 0.05) { const g2 = R.host.assist('office', F.x, F.z, mx, mz); mx = g2[0]; mz = g2[1]; }   // eased through an open doorway
+  const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!ofBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!ofBlocked(nx, F.z)) F.x = nx; else if (!ofBlocked(F.x, nz)) F.z = nz; F.bob += step; }
   if (R.host && R.host.out('office', F.x, F.z, R.look, F.v)) return;   // through the door: the corridor takes over
   Sound.steps(F, F.bob, Math.abs(F.x) < 1.8 && Math.abs(F.z) < 1.5 ? 'carpet' : 'wood', F.v);   // the rug, or the parquet around it

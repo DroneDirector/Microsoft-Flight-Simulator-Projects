@@ -120,7 +120,7 @@ function trOffice(scene: any, q: number) {
   A.cam = trRoomCam(A.group, 58, 0.03);
   R.of = A; R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'office'; return h; }));
   // its door: hinged, swinging into the room
-  R.doors.push({ k: 'office', name: 'your office', k0: 0, to: 0, set: (e: number) => { if (A.doorLeaf) A.doorLeaf.rotation.y = -1.5 * e; },
+  R.doors.push({ k: 'office', name: 'your office', k0: 0, to: 0, n: 'x', mid: [-3.2, -2.6], half: 0.5, set: (e: number) => { if (A.doorLeaf) A.doorLeaf.rotation.y = -1.5 * e; },
     pass: [-3.55, -3.0, -2.75, -2.2] });   // where you walk through when it is open [x0, z0, x1, z1]
   // the visitor's chair and the route in, as in the office
   R.ofWalk = (x: number, z: number) => x > -3.2 && x < 3.2 && z > -3.4 && z < 3.0 && !ofBlocked(x, z);
@@ -133,7 +133,7 @@ function trOps(scene: any, q: number, ren: any) {
   A.cam = trRoomCam(A.group, 56, 0.03);
   R.ops = A; R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'ops'; return h; }));
   try { opsMonitorDraw(A); } catch (e) { /* the screen stays dark */ }
-  R.doors.push({ k: 'ops', name: 'the Operations office', k0: 0, to: 0, set: (e: number) => { if (A.door) A.door.rotation.y = e * 1.35; },
+  R.doors.push({ k: 'ops', name: 'the Operations office', k0: 0, to: 0, n: 'x', mid: [-3.2, (TR_L.opsDoor[0] + TR_L.opsDoor[1]) / 2], half: (TR_L.opsDoor[1] - TR_L.opsDoor[0]) / 2, set: (e: number) => { if (A.door) A.door.rotation.y = e * 1.35; },
     pass: [-3.55, TR_L.opsDoor[0] + 0.22, -2.75, TR_L.opsDoor[1] - 0.22] });
   // walking inside it: its own floor plan, turned into the building's
   const g = A.group, inv = new THREE.Matrix4();
@@ -159,7 +159,7 @@ function trLounge(scene: any, q: number) {
   A.cam = trRoomCam(A.group, 62, 0.06);
   R.lg = A; R.lgSpec = sp; R.lgLv = lv;
   R.hits.push(...A.hits.map((h: any) => { h.userData.room = 'lounge'; return h; }));
-  R.doors.push({ k: 'lounge', name: 'the lounge', k0: 0, to: 0, slide: true, locked: R.lgShut, set: (e: number) => { for (const Lf of A.doorLeaves || []) Lf.position.x = Lf.userData.x0 + (Lf.userData.x1 - Lf.userData.x0) * e; },
+  R.doors.push({ k: 'lounge', name: 'the lounge', k0: 0, to: 0, slide: true, n: 'x', mid: [TR_L.con[2], TR_L.lgDoorZ], half: LG_DOOR_W / 2, locked: R.lgShut, set: (e: number) => { for (const Lf of A.doorLeaves || []) Lf.position.x = Lf.userData.x0 + (Lf.userData.x1 - Lf.userData.x0) * e; },
     pass: [TR_L.con[2] - 0.6, TR_L.lgDoorZ - 0.7, TR_L.con[2] + 0.6, TR_L.lgDoorZ + 0.7] });
   const g = A.group, inv = new THREE.Matrix4();
   R.lgLocal = (x: number, z: number) => { inv.copy(g.matrixWorld).invert(); const v = new THREE.Vector3(x, 0, z).applyMatrix4(inv); return [v.x, v.z]; };
@@ -218,7 +218,7 @@ function trHalls(scene: any, q: number) {
   // the door at the end of the corridor, onto the concourse (opens outwards, into the concourse)
   { const pv = new T.Group(); pv.position.set(TR_L.staffDoor[0], 0, C[3]); g.add(pv); Props.place(pv, 'door-1', 0, 0, 0, q, { w: TR_L.staffDoor[1] - TR_L.staffDoor[0], h: 2.13, color: 0x5B636C });
     const hit = new T.Mesh(new T.BoxGeometry(TR_L.staffDoor[1] - TR_L.staffDoor[0], 2.1, 0.3), new T.MeshBasicMaterial({ visible: false })); hit.position.set((TR_L.staffDoor[1] - TR_L.staffDoor[0]) / 2, 1.05, 0); hit.userData.act = 'door'; hit.userData.room = 'staff'; pv.add(hit); R.hits.push(hit);
-    R.doors.push({ k: 'staff', name: 'the concourse', k0: 0, to: 0, set: (e: number) => { pv.rotation.y = -e * Math.PI * 0.55; }, pass: [TR_L.staffDoor[0] + 0.22, C[3] - 0.6, TR_L.staffDoor[1] - 0.22, C[3] + 0.6] });
+    R.doors.push({ k: 'staff', name: 'the concourse', k0: 0, to: 0, n: 'z', mid: [(TR_L.staffDoor[0] + TR_L.staffDoor[1]) / 2, C[3]], half: (TR_L.staffDoor[1] - TR_L.staffDoor[0]) / 2, set: (e: number) => { pv.rotation.y = -e * Math.PI * 0.55; }, pass: [TR_L.staffDoor[0] + 0.22, C[3] - 0.6, TR_L.staffDoor[1] - 0.22, C[3] + 0.6] });
     Props.place(g, 'room-sign', TR_L.staffDoor[1] + 0.4, C[3] + 0.02, 0, q, { name: 'Offices', sub: 'Operations · Director', num: 'L2', pict: 'office', staff: true }, 1.25);
     // a frame round it on both sides
     for (const z of [C[3] - 0.03, C[3] + 0.03]) { box(0.06, 2.2, 0.06, dark, TR_L.staffDoor[0] - 0.03, 1.1, z); box(0.06, 2.2, 0.06, dark, TR_L.staffDoor[1] + 0.03, 1.1, z); box(TR_L.staffDoor[1] - TR_L.staffDoor[0] + 0.12, 0.06, 0.06, dark, (TR_L.staffDoor[0] + TR_L.staffDoor[1]) / 2, 2.2, z); } }
@@ -319,9 +319,28 @@ function trFrame() {
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 /** Can you stand at x, z: in a room, the corridor or the concourse, or in a doorway that is open. */
+/** Going through a doorway: walking towards an open door (not a locked one), within a step or so of it, you are eased
+ *  onto the line through its middle, so you go straight through instead of catching on the frame. Sideways and away
+ *  from it, nothing changes. Returns the direction to move (building coordinates). */
+function trDoorAssist(x: number, z: number, mx: number, mz: number): [number, number] {
+  const R = TestRooms;
+  for (const D of R.doors || []) {
+    if (!D.mid || D.locked || D.k0 < 0.4) continue;
+    const nx = D.n === 'x', dN = nx ? D.mid[0] - x : D.mid[1] - z, dL = nx ? z - D.mid[1] : x - D.mid[0];   // to the doorway (across the wall), and off its middle (along it)
+    if (Math.abs(dN) > 1.4 || Math.abs(dL) > D.half + 0.75) continue;
+    const toward = (nx ? mx : mz) * Math.sign(dN || 1); if (toward < 0.25) continue;   // only when heading through
+    const room = Math.max(0, D.half - 0.24), off = Math.abs(dL) > room ? dL - Math.sign(dL) * room : 0;   // anywhere across its open width is fine
+    const pull = clamp(-off * 2.6, -0.9, 0.9) * (1 - Math.min(1, Math.abs(dN) / 1.4) * 0.5);
+    let ax = mx, az = mz; if (nx) az += pull; else ax += pull;
+    // straight through once in the opening
+    if (Math.abs(dN) < 0.45) { if (nx) az *= 0.35; else ax *= 0.35; }
+    const l = Math.hypot(ax, az) || 1; return [ax / l, az / l];
+  }
+  return [mx, mz];
+}
 function trFree(x: number, z: number): boolean {
   const R = TestRooms;
-  for (const D of R.doors) { const p = D.pass; if (x > p[0] && x < p[2] && z > p[1] && z < p[3]) return D.k0 > 0.75; }
+  for (const D of R.doors) { const p = D.pass; if (x > p[0] && x < p[2] && z > p[1] && z < p[3]) return !D.locked && D.k0 > 0.55; }
   for (const f of R.walk) if (f(x, z)) return true;
   return false;
 }
@@ -333,7 +352,7 @@ function trWalk(dt: number) {
   F.v += Math.max(-4 * dt, Math.min(4 * dt, want - F.v));
   if (F.v > 0.01) {
     const n = Math.max(0.001, Math.hypot(f, rr)), fx = (Math.sin(yaw) * f - Math.cos(yaw) * rr) / n, fz = (Math.cos(yaw) * f + Math.sin(yaw) * rr) / n;
-    const step = F.v * dt, nx = F.x + fx * step, nz = F.z + fz * step;
+    const [gx, gz] = trDoorAssist(F.x, F.z, fx, fz), step = F.v * dt, nx = F.x + gx * step, nz = F.z + gz * step;
     if (trFree(nx, nz)) { F.x = nx; F.z = nz; } else if (trFree(nx, F.z)) F.x = nx; else if (trFree(F.x, nz)) F.z = nz;
     F.bob += step;
     if (R.game) { for (const k of ['office', 'ops', 'lounge']) { const fn = R.walkOf && R.walkOf[k]; if (fn && fn(F.x, F.z)) { trEnter(k, { x: F.x, z: F.z, yaw: R.look.yaw, pitch: R.look.pitch, v: F.v }); return; } } }
@@ -555,8 +574,14 @@ function trHost(root: HTMLElement, cv: HTMLCanvasElement): any {
     /** In the room's own coordinates: in its doorway? 1 open, −1 shut, 0 not in it. */
     pass(k: string, x: number, z: number): number {
       const D = R.doors.filter((d: any) => d.k === k)[0]; if (!D) return 0; const [wx, wz] = toWorld(k, x, z), p = D.pass;
-      if (wx > p[0] && wx < p[2] && wz > p[1] && wz < p[3]) { const RR = TR_ROOMS[k](), open = k === 'lounge' ? (trRoomA(k).doorK || 0) > 0.75 : k === 'ops' ? (RR.doorK || 0) > 0.75 : -(trRoomA(k).doorLeaf ? trRoomA(k).doorLeaf.rotation.y : 0) > 1.1; return open ? 1 : -1; }
+      if (wx > p[0] && wx < p[2] && wz > p[1] && wz < p[3]) { const RR = TR_ROOMS[k](), open = !D.locked && (k === 'lounge' ? (trRoomA(k).doorK || 0) > 0.55 : k === 'ops' ? (RR.doorK || 0) > 0.55 : -(trRoomA(k).doorLeaf ? trRoomA(k).doorLeaf.rotation.y : 0) > 0.8); return open ? 1 : -1; }
       return 0;
+    },
+    /** The doorway help from inside a room (its own coordinates in, its own coordinates out). */
+    assist(k: string, x: number, z: number, mx: number, mz: number): [number, number] {
+      const A = trRoomA(k); if (!A) return [mx, mz]; const g = A.group, [wx, wz] = toWorld(k, x, z), r = g.rotation.y, c = Math.cos(r), s = Math.sin(r);
+      const dx = mx * c + mz * s, dz = -mx * s + mz * c, [ax, az] = trDoorAssist(wx, wz, dx, dz);
+      return [ax * c - az * s, ax * s + az * c];
     },
     /** Out of the room into the corridor or the concourse? Then the building takes over. */
     out(k: string, x: number, z: number, look: any, v: number): boolean {

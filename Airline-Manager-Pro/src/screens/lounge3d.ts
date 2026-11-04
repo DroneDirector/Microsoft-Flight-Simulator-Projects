@@ -568,7 +568,8 @@ function lgFrame() {
   const mag = R.press ? 0 : Math.min(1, Math.hypot(f, rr)), vmax = K.shift ? 2.4 : 1.2; F.v += ((mag > 0.05 ? vmax * mag : 0) - F.v) * Math.min(1, dt * 6);
   try { lgPressStep(dt); } catch (e) { R.press = null; }
   const yaw = R.look.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
-  let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; const step = F.v * dt;
+  let mx = fx * f + rx * rr, mz = fz * f + rz * rr; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml; if (R.host && R.host.assist && ml > 0.05) { const g2 = R.host.assist('lounge', F.x, F.z, mx, mz); mx = g2[0]; mz = g2[1]; }   // eased through an open doorway
+  const step = F.v * dt;
   if (step > 0) { const nx = F.x + mx * step, nz = F.z + mz * step; if (!lgBlocked(nx, nz)) { F.x = nx; F.z = nz; } else if (!lgBlocked(nx, F.z)) F.x = nx; else if (!lgBlocked(F.x, nz)) F.z = nz; F.bob += step; }
   if (R.host && R.host.out('lounge', F.x, F.z, R.look, F.v)) return;   // out through the doors: the concourse takes over
   try { Sound.steps(F, F.bob, 'carpet', F.v); } catch (e) { /* quiet */ }
