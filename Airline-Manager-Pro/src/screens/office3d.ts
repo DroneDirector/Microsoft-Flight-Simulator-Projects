@@ -328,7 +328,7 @@ function ofFamilyPhoto(ren: any, done: (tex: any) => void) {
   // the man on the left, the woman on the right, the children in front between them
   const meX = meL.sex === 'f' ? 0.38 : -0.38;
   const kids = [{ L: ctLook('kid1-' + base, 'f', 'public'), x: -0.16, s: 0.62, z: 0.55 }, { L: ctLook('kid2-' + base, 'm', 'public'), x: 0.2, s: 0.54, z: 0.6 }, { L: ctLook('kid3-' + base, 'm', 'public'), x: 0.02, s: 0.46, z: 0.9 }];
-  const famAll: any[] = [{ L: meL, x: meX, s: hOf(meL) }, { L: ptL, x: -meX, s: hOf(ptL) }].concat(fam.kids === 1 ? [Object.assign({}, kids[0], { x: 0.02 })] : kids.slice(0, fam.kids));
+  const famAll: any[] = [{ L: meL, x: meX, s: hOf(meL) }, { L: ptL, x: -meX, s: hOf(ptL) }].concat(fam.kids === 1 ? [Object.assign({}, kids[0], { x: 0.02 })] : fam.kids === 3 ? [Object.assign({}, kids[0], { x: -0.3 }), Object.assign({}, kids[2], { x: 0.06, z: 0.7 }), Object.assign({}, kids[1], { x: 0.38 })] : kids.slice(0, fam.kids));
   if (kind !== 'family') { ofOtherPhoto(ren, kind, me, pet, key, done); return; }
   // the children's hair and features stay the same from one photo to the next
   let rs = 7; const rnd = () => { rs = (rs * 16807) % 2147483647; return rs / 2147483647; };
@@ -371,7 +371,7 @@ function ofOtherPhoto(ren: any, kind: string, me: any, pet: any, key: string, do
     if (kind === 'pet') {
       const A: any = {}, rug = new T.Mesh(new T.CircleGeometry(1.4, 48), new T.MeshStandardMaterial({ color: 0x8A4E3A, roughness: 0.9 })); rug.rotation.x = -Math.PI / 2; scene.add(rug);
       petPlace(T, scene, A, [0, 0], 0.4); if (A.pet && A.pet.body && A.pet.body.U) A.pet.body.U.uBreath.value = 0;
-      cam.position.set(0.55, 0.6, 1.1); cam.lookAt(0.15, 0.08, 0.02);
+      cam.position.set(0.95, 0.95, 1.75); cam.lookAt(0.05, 0.12, 0);
     } else {
       const L = me && me.look ? Object.assign({}, me.look, { hat: 'cap' }) : ctLook('me', 'm', 'public');
       const m = Human.build(dressed(L, 'captain'), 'captain', (company() && company().color) || '#2C8CFF', av3Style(), 0.5), g = new T.Group(); g.add(m.root); scene.add(g);
