@@ -4251,3 +4251,11 @@ html.calm .dclock b em { animation: none; }
 .gs-t th { color: var(--ink-3, #8A96A3); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
 .gs-t tr.ok td:first-child { color: #4FD18B; } .gs-t tr.mid td:first-child { color: #F4C542; } .gs-t tr.bad td:first-child { color: #FF7A6B; }
 .tr3d .tr-halls-ui, .tr3d .tr-room-ui { display: contents; }
+.tr3d .gs-hud { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
+.tr3d .gs-hud .gs-row { display: flex; align-items: center; gap: 12px; }
+.tr3d .gs-graph canvas { width: 280px; height: 75px; display: block; border-radius: 8px; background: rgba(0,0,0,.25); }
+.tr3d .gs-keys { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font: 500 11.5px Inter, sans-serif; color: #C9D6E2; }
+.tr3d .gs-keys i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.tr3d .gs-keys .k-f i { background: #4FD18B; } .tr3d .gs-keys .k-c i { background: #5AA9FF; } .tr3d .gs-keys .k-g i { background: #F4A742; }
+.tr3d .gs-keys b { color: #fff; font-weight: 600; margin-left: 4px; }
+@media (max-width: 640px) { .tr3d .gs-graph canvas { width: 100%; height: 70px; } }

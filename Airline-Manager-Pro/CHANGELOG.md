@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.135 (2026-11-04)
+
+- Stress test: live graph (fps, processor and graphics ms; EXT_disjoint_timer_query_webgl2 where offered), per-stage processor/graphics times in the report
+- Fairer advice: 28 fps counts as smooth on phones, floor at one step below the device's own recommendation, 6 GB phones at least Medium
+
 ## 0.9.134 (2026-11-04)
 
 - Joined building in the game (TestRooms game mode, trHost/trEnter/trRoomFrame): office, Operations and the hub lounge run hosted (OfficeRoom/OpsRoom/LoungeRoom open(…, host)); their controls via AbortController; doorways via host.pass/out
