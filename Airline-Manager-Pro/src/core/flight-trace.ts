@@ -47,6 +47,8 @@ const FlightTrace = {
     if (m && m.inScene && m.inScene[f.id]) {
       for (const k in m.scenes) { const sc = m.scenes[k], p = sc.planes && sc.planes.filter((x: ApvPlane) => x.id === f.id)[0]; if (p) return { pos: m.inScene[f.id], hdg: p.hdg, rwy: p.rwy || '' }; }
     }
+    // near an airport: the same ground model every view uses
+    if (!(f.real && f.pos)) { const g = GroundSim.pos(f); if (g) { const p = GroundSim.plane(f); return { pos: g, hdg: p ? p.hdg : 0, rwy: p && p.rwy || '' }; } }
     if (f.real && f.pos) return { pos: f.pos, hdg: f.hdg || 0, rwy: '' };
     const pp = F.depAt ? flightPathPos(f) : null;
     if (pp) return { pos: pp.pos, hdg: pp.hdg, rwy: '' };
@@ -70,8 +72,12 @@ const FlightTrace = {
       let problem = '';
       if (L && (now - L.t) < 120000 && moved > 0.5) {
         const dt = (now - L.t) / 1000;
-        if (moved > maxGs * 2.5 * dt / 3600 + 1) problem = 'JUMP';
+        const placed = (GroundSim.placed[f.id] || 0) > L.t;   // set down at its place on purpose (another airport's position before): not a jump
+        if (placed) problem = '';
+        else if (moved > maxGs * 2.5 * dt / 3600 + 1) problem = 'JUMP';
         else if (actual > maxGs) problem = 'FAST';
+        // on the ground nothing rolls faster than a take-off: anything more is a jump the ground model let through
+        if (!problem && !placed && alt < 50 && /taxi|push|gate|holding|lining/i.test(ph) && actual > 60) problem = 'FAST';
       }
       // touchdown: on the runway it was cleared to?
       // (on the runway now, or it already landed between two looks: then it is taxiing in or at the gate)

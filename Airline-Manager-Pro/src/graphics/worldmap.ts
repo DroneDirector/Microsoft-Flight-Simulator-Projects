@@ -90,6 +90,7 @@ const _followMemo: { [key: string]: { id: string; z: number } } = {};
 /** Where a flight is now: its real position when it comes from the simulator, otherwise along its route. */
 function flightPos(f: LiveFlight): number[] {
   if (f.pos) return f.pos;
+  const g = GroundSim.pos(f); if (g) return g;   // near an airport: where the airport's taxi model has it
   const fp = flightPathPos(f); if (fp) return fp.pos;   // along its departure, route, arrival and approach
   const A = apt(f.from), B = apt(f.to); if (!A || !B) return f.pos || (A || B || { pos: [0, 0] } as any).pos;
   return gcInterpolate(A.pos, B.pos, f.t);
@@ -483,13 +484,13 @@ class WorldMap {
       const ppm = this.pxPerM(), fade = clamp((degPx - AIRPORT_DEG_PX) / AIRPORT_DEG_PX, 0, 1);
       for (const icao of Object.keys(this.scenes)) {
         const sc = this.scenes[icao]; if (!sc.L || !sc.graph) continue;
-        sc.ctx = c; sc.s = ppm; sc.track = this.following || this.selected;
+        sc.map = this; sc.ctx = c; sc.s = ppm; sc.track = this.following || this.selected;
         try { sc.computePlanes(Date.now()); } catch (e) { continue; }   // one airport's trouble never stops the map
         if (fade > 0) sc.drawLayoutEmbedded(c, fade);
         for (const pl of sc.planes) if (!pl.parked) this.inScene[pl.id] = sc.lonLat(pl.x, pl.y);
       }
       this.sceneDraws = fade > 0;
-      if (fade > 0) for (const icao of Object.keys(this.scenes)) { const sc = this.scenes[icao]; if (sc.L && sc.graph) sc.drawAircraftTo(c, now); }
+      if (fade > 0) for (const icao of Object.keys(this.scenes)) { const sc = this.scenes[icao]; if (sc.L && sc.graph) { sc.map = this; sc.drawAircraftTo(c, now); } }
     }
     try { nightMapDraw(c, this); } catch (e) { /* never stop the map */ }
     try { WxLayer.draw(c, this, degPx); } catch (e) { /* never stop the map */ }
@@ -626,7 +627,7 @@ class WorldMap {
     for (const k of want) if (!this.scenes[k]) this.scenes[k] = makeAirportScene(k, this);
     // keep a few recent ones, let the rest go
     const keys = Object.keys(this.scenes);
-    if (keys.length > 6) for (const k of keys) if (want.indexOf(k) < 0 && Object.keys(this.scenes).length > 6) { this.scenes[k].alive = false; delete this.scenes[k]; }
+    if (keys.length > 6) for (const k of keys) if (want.indexOf(k) < 0 && Object.keys(this.scenes).length > 6) delete this.scenes[k];   // the scene itself stays for the ground model
     if (want.length) this.baseDirty = true;
   }
 

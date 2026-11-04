@@ -437,6 +437,7 @@ class AirportView {
   }
 
   computePlanes(now: number) {
+    (this as any).usedAt = now;
     const out: ApvPlane[] = [], L = this.L, g = this.graph, A0 = this.active;
     let A = A0;
     const icao = this.icao, typeOf = (f: any) => acType(flightTypeId(f));
@@ -543,11 +544,30 @@ class AirportView {
       const k = this.nodeXY(st), park = g.parks[+st.slice(1)];
       out.push({ reg: a.reg, stype: park ? park[4] : 0, id: 'park-' + a.reg, x: k[0], y: k[1], hdg: park ? this.standHdg(+st.slice(1), a.typeId) : 0, alt: 0, phase: a.status === 'maintenance' || a.status === 'grounded' ? 'In maintenance' : 'Parked', label: a.reg, you: a.reg === (State as any).myReg[State.companyId], span: spanOf(t), nose: noseWheelAhead(t.id), prop: t.cls === 'bush' || t.cls === 'turboprop' || t.cls === 'ga', parked: true });
     }
+    this.groundSmooth(out, now);
     this.planes = out;
     // stands are freed when their aircraft has left (taken off) or isn't here any more
     const book = gateBook(icao, L), here: { [r: string]: boolean } = {};
     for (const p of out) if (p.alt < 1 && !/take-off|lift-off|climb/i.test(p.phase)) here[p.parked ? p.id.slice(5) : (State.live.filter(f => f.id === p.id)[0] || {} as any).reg] = true;
     for (const r in book) if (!here[r]) delete book[r];
+  }
+
+  /** No aircraft ever jumps on the ground: when its place moves on further than it can roll (its route was worked out
+   *  again from another point, the airport's layout got more detailed, it was shown elsewhere before), it rolls there
+   *  at taxi speed instead. A move of kilometres is a placement (another airport's position before), taken as it is. */
+  groundSmooth(out: ApvPlane[], now: number) {
+    for (const p of out) {
+      if (p.parked || p.you) continue;
+      const prev = GroundSim.last[p.id], dt = prev ? (now - prev.t) / 1000 : 0;
+      if (prev && dt > 0 && dt < 8 && (p.alt < 1 || prev.alt < 1)) {
+        const q = this.xy(prev.ll[1], prev.ll[0]), d = Math.hypot(p.x - q[0], p.y - q[1]);
+        const lim = Math.max(30, Math.max(p.kt || 0, prev.kt || 0) + 20) * KT * dt + 1;
+        if (d > 3000) GroundSim.placed[p.id] = now;
+        else if (d > lim) { const k = lim / d; p.x = q[0] + (p.x - q[0]) * k; p.y = q[1] + (p.y - q[1]) * k; p.hdg = (Math.atan2(p.x - q[0], p.y - q[1]) * 180 / Math.PI + 360) % 360; }
+      } else if (!prev || dt >= 8) GroundSim.placed[p.id] = now;   // first seen by the airport model (or after a while away): set down where it is
+      else if (prev && dt === 0) { const q = this.xy(prev.ll[1], prev.ll[0]); if (Math.hypot(p.x - q[0], p.y - q[1]) < 3000) { p.x = q[0]; p.y = q[1]; } }
+      GroundSim.last[p.id] = { ll: this.lonLat(p.x, p.y), t: now, alt: p.alt || 0, kt: p.kt || 0 };
+    }
   }
 
   /* ---------- drawing ---------- */
@@ -928,9 +948,13 @@ ACTIONS['apv-retry'] = () => {
     .catch(() => { if (v.alive) { v.fetching = false; v.setLayout(v.L, true); } });
 };
 
+const _aptScenes: { [icao: string]: AirportView } = {};
 /** An airport drawn inside the world map: its layout loads in the background (runways first). */
 function makeAirportScene(icao: string, map: WorldMap): AirportView {
-  const v: AirportView = Object.create(AirportView.prototype);
+  // one scene per airport for the whole app (the maps, the 3D view and the ground model share it), so an aircraft on
+  // the ground is in one place whatever shows it
+  const had = _aptScenes[icao]; if (had && had.alive) { if (map) had.map = map; (had as any).usedAt = Date.now(); return had; }
+  const v: AirportView = Object.create(AirportView.prototype); _aptScenes[icao] = v; (v as any).usedAt = Date.now();
   Object.assign(v, { embedded: true, map, icao, alive: true, track: null, planes: [], routes: {}, reachCache: {}, joins: null, joinsBy: {}, frames: {}, ptrs: {}, s: 1, w: 0, h: 0, cx: 0, cy: 0, fetching: true,
     col: { bg: cssVar('--map-bg'), line: cssVar('--line'), line2: cssVar('--line-2'), ink: cssVar('--ink'), dim: cssVar('--ink-2'), dim3: cssVar('--ink-3'), cyan: cssVar('--cyan'), mag: cssVar('--magenta'), green: cssVar('--green'), amber: cssVar('--amber'), panel: cssVar('--panel'), panel3: cssVar('--panel-3') } });
   AirportLayouts.get(icao, L => { if (L && v.alive) v.setLayout(L, true); v.fetching = false; }).then(L => { if (v.alive && L && (!v.L || v.L.source === 'runways' || L.source !== 'runways')) v.setLayout(L); });
