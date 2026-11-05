@@ -316,7 +316,17 @@ function lgBuild(scene: any, q: number): any {
     // globe lights over the counter, a little in front of it (the glass rack hangs over the top)
     for (let i = 0; i < 5; i++) { const gx = xa + 0.4 + i * (xr - xa - 0.8) / 4, gz = bz - 0.5, gy = Math.min(2.85, H - 1.4);
       prop('bar-pendant-globe', gx, gz, 0, () => { add(new T.CylinderGeometry(0.004, 0.004, H - gy - 0.17, 6), black, gx, (H + gy + 0.17) / 2, gz).castShadow = false; const gl = add(new T.SphereGeometry(0.17, 24, 16), new T.MeshStandardMaterial({ color: 0xFFFFFF, emissive: 0xFFF1DA, emissiveIntensity: 1.1, roughness: 0.4 }), gx, gy, gz); gl.castShadow = false; add(new T.CylinderGeometry(0.03, 0.03, 0.04, 12), brassB, gx, gy + 0.18, gz); }); }
+    try { lgMixStation(root, (xc + xr) / 2, 1.13, bz + 0.62); } catch (e) { /* none */ }
     try { lgBarBuild(A, root, lv, bxp, bz, z1, H, q); } catch (e) { console.error(e); } }
+  // paintings on every level: not too many, each with its picture light. The northern lights and the dusk on the side
+  // walls (towards the windows), the arcs of gold beside the bar, the storm over the refreshment corner.
+  { const k = lv === 0 ? 0.8 : 1, y = lv === 0 ? 2.1 : 2.25, fidsL = -W * 0.05 - 1.65, own = Models.has('lounge-props/wall-art.glb');
+    const left = lv >= 1 ? x0 + 5.65 : x0 + 2.0;
+    const hang = (name: string, kind: string, w: number, h: number, x: number, z: number, ry: number) => { try { lgHangPainting(root, name, kind, w * k, h * k, x, y, z, ry); } catch (e) { /* bare wall */ } };
+    hang(own ? 'wall-art' : 'painting-aurora', 'aurora', 2.6, 1.5, x0 + 0.02, z0 + D * 0.17, Math.PI / 2);
+    hang(own ? 'wall-art' : 'painting-dusk', 'dusk', 1.8, 1.2, x1 - 0.02, z0 + D * 0.2, -Math.PI / 2);
+    hang('painting-gold', 'gold', 1.3, 1.6, (left + fidsL) / 2, z1 - 0.02, Math.PI);
+    hang('painting-storm', 'storm', 2.4, 1.3, x1 - 3.0, z1 - 0.02, Math.PI); }
   // Business and Flagship: the art deco fireplace on the west wall: a black lacquer chimney breast to the ceiling, a
   // brass surround in five stepped frames like a sunburst, a fan of brass rays above, warm light washing up the breast.
   // The fire is the lounge's own (its flames and their light). File: lounge-props/fireplace.glb.
@@ -348,8 +358,6 @@ function lgBuild(scene: any, q: number): any {
       for (const [X, Z] of [[-0.6, -0.65], [0.6, -0.65], [0, 0.85]]) { const l = new T.Mesh(new T.CylinderGeometry(0.05, 0.04, 0.62, 10), pm); l.position.set(X, 0.31, Z); g.add(l); }
       const bench = new T.Mesh(new T.BoxGeometry(0.8, 0.08, 0.36), pm); bench.position.set(0, 0.48, -1.35); g.add(bench); for (const s of [-1, 1]) { const l = new T.Mesh(new T.BoxGeometry(0.05, 0.46, 0.3), pm); l.position.set(s * 0.35, 0.23, -1.35); g.add(l); } });
     block(px - 1.1, pz - 1.3, px + 1.1, pz + 1.0);
-    for (const s of [-1, 1]) prop('wall-art', s * (W / 2 - 0.04), z0 + D * 0.25, -s * Math.PI / 2, () => { const [c, x] = ctCanvas(512, 384), r = ctRng(s > 0 ? 3 : 7); x.fillStyle = '#E9E2D2'; x.fillRect(0, 0, 512, 384); for (let i = 0; i < 9; i++) { x.fillStyle = ['#16224A', '#D4AF37', '#5A1622', '#2F6B4A', '#E07B39'][i % 5]; x.globalAlpha = 0.75; x.beginPath(); x.arc(r() * 512, r() * 384, 30 + r() * 110, 0, 6.3); x.fill(); } x.globalAlpha = 1;
-      const pic = new T.Mesh(new T.PlaneGeometry(1.6, 1.2), new T.MeshStandardMaterial({ map: ctTex(c), roughness: 0.6 })); pic.position.set(s * (W / 2 - 0.06), 2.0, z0 + D * 0.25); pic.rotation.y = -s * Math.PI / 2; root.add(pic); bx(0.04, 1.32, 1.72, gold, s * (W / 2 - 0.03), 2.0, z0 + D * 0.25); });
     { const cx = x0 + 3.2 + 1.2, cz = z1 - 1.2; prop('champagne-bucket', cx, cz, 0, () => { add(new T.CylinderGeometry(0.11, 0.08, 0.22, 20, 1, true), chrome, cx, 1.24, cz); const b = add(new T.CylinderGeometry(0.035, 0.04, 0.3, 12), M({ color: 0x1F3A20, roughness: 0.1 }), cx, 1.3, cz); b.rotation.z = 0.25; add(new T.CylinderGeometry(0.015, 0.02, 0.06, 8), gold, cx + 0.04, 1.48, cz); }); }
   }
   // the lights

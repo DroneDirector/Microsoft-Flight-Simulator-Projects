@@ -198,11 +198,16 @@ towards +Z (where you sit or stand to use it), standing on the floor; fitted to 
 | `lounge-props/bar-pendant-globe.glb` | Globe pendant light over the bar |
 | `lounge-props/ceiling-copper-waves.glb` | Lounge ceiling: copper waves with warm hidden light (every level) |
 | `lounge-props/welcome-mat.glb` | Welcome mat inside the lounge doors (where you arrive) |
+| `lounge-props/painting-aurora.glb` | Painting: northern lights over the hills (west wall) |
+| `lounge-props/painting-dusk.glb` | Painting: an aircraft climbing into the dusk (east wall) |
+| `lounge-props/painting-gold.glb` | Painting: arcs of gold (beside the bar) |
+| `lounge-props/painting-storm.glb` | Painting: a storm over the sea, a lit harbour (over the refreshment corner) |
+| `lounge-props/mixing-station.glb` | Mixing station on the bar: shaker, jigger, bar spoon, strainer, muddler, garnish tray |
 | `lounge-props/pendant-light.glb` | Pendant light (Business) |
 | `lounge-props/chandelier.glb` | Chandelier (Flagship) |
 | `lounge-props/fireplace.glb` | Fireplace, art deco brass on black lacquer (Business and Flagship; the fire is drawn by the app) |
 | `lounge-props/grand-piano.glb` | Grand piano (Flagship) |
-| `lounge-props/wall-art.glb` | Framed art (Flagship) |
+| `lounge-props/wall-art.glb` | Framed art: a model of your own here hangs on both side walls instead of the two paintings there |
 | `lounge-props/champagne-bucket.glb` | Champagne bucket (Flagship) |
 | `lounge-props/departures-screen.glb` | Departures screen frame (the list is drawn by the app; also hanging in the concourse) |
 | `lounge-props/arrivals-screen.glb` | Arrivals screen frame (beside the departures screen) |

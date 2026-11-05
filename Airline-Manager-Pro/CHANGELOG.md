@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.158
+- The bartender's new look (Spanish skin tone, light brown hair, clean-shaven); a mixing station on the bar; four new paintings with picture lights in the lounge.
+
 ## 0.9.157
 - A new lounge: copper-wave ceiling and taller walls, a black and brass L-shaped bar with a real mirror behind the bottles, an art deco fireplace, more flight boards, a welcome mat where you arrive, subtle reflections on every metal.
 
