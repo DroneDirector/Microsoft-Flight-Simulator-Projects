@@ -255,6 +255,31 @@ The plants are the shared ones (`props/plant-3.glb`). The people are the people 
 | `training-props/wall-clock.glb` | Wall clock (the app draws its hands, which keep the time) |
 | `training-props/double-door-leaf.glb` | One leaf of the double doors (opens inwards; the app turns it) |
 
+## Your private suite (`suite-props/`)
+
+The hall, bathroom, bedroom and dressing alcove behind your office. Metres, front towards +Z, standing on the floor;
+fitted to the size of the app's own. The water, the lights, the mirror's reflection and the clock's time are the app's own.
+
+| File | What |
+|---|---|
+| `suite-props/suite-door.glb` | Door in the suite (office to hall, the bathroom, the bedroom), hinged at its left edge |
+| `suite-props/toilet.glb` | Wall-hung toilet with its flush plate (the seat lid lifts: a part named lid is turned) |
+| `suite-props/vanity.glb` | Bathroom vanity unit with its stone top |
+| `suite-props/basin.glb` | Basin and its tap (the water runs from the app) |
+| `suite-props/bath-mirror.glb` | Frame of the bathroom mirror (the reflection is drawn by the app) |
+| `suite-props/shower.glb` | Shower: the glass panel, the rain head and the tray (the water falls from the app) |
+| `suite-props/bathtub.glb` | Freestanding bath with its filler |
+| `suite-props/towel-rail.glb` | Heated towel rail with a towel |
+| `suite-props/bath-plant.glb` | Plant in the bathroom |
+| `suite-props/bed.glb` | Double bed with its channelled headboard, bedding and pillows |
+| `suite-props/nightstand.glb` | Nightstand with a drawer (one each side of the bed) |
+| `suite-props/bed-lamp.glb` | Bedside lamp (its light is drawn by the app, on and off) |
+| `suite-props/bedside-clock.glb` | Digital clock case (the time on it is drawn by the app) |
+| `suite-props/bedroom-art.glb` | Painting over the bed |
+| `suite-props/bedroom-armchair.glb` | Armchair by the window |
+| `suite-props/bedroom-rug.glb` | Rug under the bed |
+| `suite-props/wardrobe.glb` | Wardrobe in the dressing alcove (opening it opens your look) |
+
 ## Security (`security-props/`)
 
 What the security officers and the police carry. Metres, the front towards +Z. The officers and the police themselves are

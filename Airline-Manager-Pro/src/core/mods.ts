@@ -43,6 +43,7 @@ function modSlots(): ModSlot[] {
   for (const sx of ['female', 'male']) { add(`people/person-${sx}`, 'people', `Person, ${sx} (any group)`); for (const [g, n] of PEOPLE_GROUPS) add(`people/person-${sx}-${g}`, 'people', `Person, ${sx}, ${n}`); }
   for (const [f, n] of HANGAR_PROP_FILES) add('hangar-props/' + f, 'props', n);
   for (const [f, n] of LOUNGE_PROP_FILES) add('lounge-props/' + f, 'props', n);
+  for (const [f, n] of SUITE_PROP_FILES) add('suite-props/' + f, 'props', n);
   for (const [f, n] of TRAINING_PROP_FILES) add('training-props/' + f, 'props', n);
   for (const [f, n] of PROP_FILES) add('props/' + f, 'props', n);
   for (const [f, n] of ITEM_FILES) add('items/' + f, 'items', n);

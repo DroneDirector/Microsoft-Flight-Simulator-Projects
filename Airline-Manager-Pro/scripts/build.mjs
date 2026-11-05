@@ -105,7 +105,7 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
   }
   const mSrc = readFileSync(join(root, 'src/graphics/models.ts'), 'utf8');
   const pairs = name => { const b = mSrc.slice(mSrc.indexOf('const ' + name)); return [...b.slice(0, b.indexOf('];') + 2).matchAll(/\['([^']+)', '([^']+)'\]/g)].map(x => [x[1], x[2]]); };
-  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES'), tpr = pairs('TRAINING_PROP_FILES'), spr = pairs('SECURITY_PROP_FILES'), shp = pairs('PROP_FILES'), crm = pairs('CRASH_FILES'), crx = pairs('CRASH_FX_FILES');
+  const veh = pairs('VEHICLE_FILES'), jw = pairs('JETWAY_FILES'), ppl = pairs('PEOPLE_GROUPS'), itm = pairs('ITEM_FILES'), hgr = pairs('HANGAR_FILES'), hpr = pairs('HANGAR_PROP_FILES'), lpr = pairs('LOUNGE_PROP_FILES'), tpr = pairs('TRAINING_PROP_FILES'), spr = pairs('SECURITY_PROP_FILES'), sup = pairs('SUITE_PROP_FILES'), shp = pairs('PROP_FILES'), crm = pairs('CRASH_FILES'), crx = pairs('CRASH_FX_FILES');
   const have = f => files.includes(f) ? ' (in use)' : '';
   const md = [
     '# Replaceable models', '',
@@ -163,6 +163,11 @@ copyFileSync(join(root, 'assets/vendor/three-gltf.js'), join(root, 'www/vendor/t
     'The plants are the shared ones (`props/plant-3.glb`). The people are the people files.', '',
     '| File | What |', '|---|---|',
     ...tpr.map(([f, n]) => `| \`training-props/${f}.glb\`${have('training-props/' + f + '.glb')} | ${n} |`), '',
+    '## Your private suite (`suite-props/`)', '',
+    'The hall, bathroom, bedroom and dressing alcove behind your office. Metres, front towards +Z, standing on the floor;',
+    'fitted to the size of the app\'s own. The water, the lights, the mirror\'s reflection and the clock\'s time are the app\'s own.', '',
+    '| File | What |', '|---|---|',
+    ...sup.map(([f, n]) => `| \`suite-props/${f}.glb\`${have('suite-props/' + f + '.glb')} | ${n} |`), '',
     '## Security (`security-props/`)', '',
     'What the security officers and the police carry. Metres, the front towards +Z. The officers and the police themselves are',
     'the people files; the officers\' print (the airline name and SECURITY GUARD) is drawn by the app on their jacket or shirt.', '',
