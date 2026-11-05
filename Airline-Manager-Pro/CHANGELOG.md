@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9.159
+- Your private suite behind the office: a bathroom (toilet, basin, a real mirror, shower, bath), a bedroom (lamp and light switches, the game's time on the clock, completely dark with both off) and a wardrobe that opens your look.
+
 ## 0.9.158
 - The bartender's new look (Spanish skin tone, light brown hair, clean-shaven); a mixing station on the bar; four new paintings with picture lights in the lounge.
 

@@ -143,8 +143,9 @@ function ofBuild(scene: any, q: number) {
   const rug = plane(3.6, 3.0, M({ map: ctTex(ofRug()), roughness: 1 }), 0, 0.006, 0, 0); rug.rotation.x = -Math.PI / 2;
   const ce = plane(X1 - X0, Z1 - Z0, mat.ceiling, 0, HH, (Z0 + Z1) / 2, 0); ce.rotation.x = Math.PI / 2;
   // walls: deep blue above oak panelling, the window wall in light plaster
-  plane(X1 - X0, HH, mat.wall, 0, HH / 2, Z0, 0); plane(X1 - X0, HH, mat.wall, 0, HH / 2, Z1, Math.PI); plane(Z1 - Z0, HH, mat.wall, X0, HH / 2, (Z0 + Z1) / 2, Math.PI / 2); plane(Z1 - Z0, HH, mat.wallLight, X1, HH / 2, (Z0 + Z1) / 2, -Math.PI / 2);
-  const pan: [number, number, number, number, number][] = [[0, Z0 + 0.03, X1 - X0, 0, 0], [0, Z1 - 0.03, X1 - X0, Math.PI, 0], [X0 + 0.03, (Z0 + Z1) / 2, Z1 - Z0, Math.PI / 2, 0]];
+  // the back wall has the door to your suite in it (x −0.8 … 0.0)
+  plane(2.4, HH, mat.wall, -2.0, HH / 2, Z0, 0); plane(3.2, HH, mat.wall, 1.6, HH / 2, Z0, 0); plane(0.8, HH - 2.15, mat.wall, -0.4, 2.15 + (HH - 2.15) / 2, Z0, 0); plane(X1 - X0, HH, mat.wall, 0, HH / 2, Z1, Math.PI); plane(Z1 - Z0, HH, mat.wall, X0, HH / 2, (Z0 + Z1) / 2, Math.PI / 2); plane(Z1 - Z0, HH, mat.wallLight, X1, HH / 2, (Z0 + Z1) / 2, -Math.PI / 2);
+  const pan: [number, number, number, number, number][] = [[-2.0, Z0 + 0.03, 2.4, 0, 0], [1.6, Z0 + 0.03, 3.2, 0, 0], [0, Z1 - 0.03, X1 - X0, Math.PI, 0], [X0 + 0.03, (Z0 + Z1) / 2, Z1 - Z0, Math.PI / 2, 0]];
   for (const [x, z, len, ry] of pan) { bx(len, 1.0, 0.04, mat.oak, x, 0.5, z, ry); bx(len, 0.06, 0.07, mat.walnut, x, 1.02, z, ry); bx(len, 0.12, 0.05, mat.walnut, x, 0.06, z, ry); }
   for (const [x, z, ry] of [[0, Z0 + 0.02, 0], [0, Z1 - 0.02, Math.PI], [X0 + 0.02, (Z0 + Z1) / 2, Math.PI / 2], [X1 - 0.02, (Z0 + Z1) / 2, -Math.PI / 2]] as number[][]) { const len = Math.abs(ry) === Math.PI / 2 ? Z1 - Z0 : X1 - X0; bx(len, 0.12, 0.1, mat.ceiling, x, HH - 0.06, z, ry); }
   // the big window over the airport (right wall)
@@ -221,7 +222,10 @@ function ofBuild(scene: any, q: number) {
     const bm = M({ map: ctTex(ofBooks()), roughness: 0.8 });
     for (let i = 0; i < 6; i++) { bx(1.36, 0.03, 0.34, mat.walnut, 0, 0.1 + i * 0.45, 0, 0, g); if (i < 5) { const b = new T.Mesh(new T.PlaneGeometry(1.3, 0.34), bm); b.position.set(0, 0.29 + i * 0.45, 0.06); g.add(b); } }
   }
-  frame(1.9, 1.07, new T.MeshStandardMaterial({ map: ctTex(ofRouteMap(co)), roughness: 0.5 }), 0, 1.75, Z0 + 0.05, 0, mat.walnut);
+  frame(1.3, 0.73, new T.MeshStandardMaterial({ map: ctTex(ofRouteMap(co)), roughness: 0.5 }), 0.9, 1.75, Z0 + 0.05, 0, mat.walnut);   // beside the door to your suite
+  // the door to your suite: a walnut frame on this side (the door itself and the rooms behind: office-suite.ts)
+  bx(0.08, 2.25, 0.08, mat.walnut, -0.84, 1.12, Z0 + 0.04); bx(0.08, 2.25, 0.08, mat.walnut, 0.04, 1.12, Z0 + 0.04); bx(0.96, 0.1, 0.08, mat.walnut, -0.4, 2.2, Z0 + 0.04);
+  try { const S = osBuild(root, q); A.suite = S; A.hits.push(...S.hits); A.occ = S.occ; } catch (e) { console.error(e); }
   frame(0.62, 0.93, M({ map: ctTex(ofPoster(1, co, (apt(co.hub) || {} as any).city)), roughness: 0.5 }), X0 + 0.05, 1.75, -0.4, Math.PI / 2, mat.black);
   frame(0.62, 0.93, M({ map: ctTex(ofPoster(2, co, 'Reykjavík')), roughness: 0.5 }), X0 + 0.05, 1.75, 0.6, Math.PI / 2, mat.black);
   frame(0.9, 0.6, M({ map: ctTex(ctPainting(5)), roughness: 0.6 }), X0 + 0.05, 1.8, 2.0, Math.PI / 2, mat.brass);
@@ -532,6 +536,7 @@ function ofReady() {
 }
 OfficeRoom.close = function (quiet?: boolean) {
   const R = OfficeRoom; if (!R.on) return; R.on = false;
+  try { osRestore(R); } catch (e) { /* as it was */ }
   if (R.host) {   // in the building: only the room's own controls go; the building keeps the room
     const H = R.host; R.host = null;
     if (R.overlay && R.overlay.classList.contains('lap-screen')) { try { lapUnmount(); } catch (e) { /* closed */ } }
@@ -789,10 +794,12 @@ function ofFrame() {
   if (R.glow) { if ((R.seat && !R.lapHover) || R.overlay || R.lapZ) R.glow.hide(); R.glow.step(dt); }
   // frame generation: the photo in your hands moves with your view
   if (R.perf) { const P = R.ph && R.ph.st !== 'idle' && R.A && R.A.photoAt; R.perf.anchor = P ? R.cam : null; R.perf.anchorDraw = P ? [R.A.photoAt] : null; }
+  try { osStep(R, dt, now); } catch (e) { /* the suite rests */ }
   FrameGen.draw(R.perf, R.ren, R.scene, R.cam); Perf.frame(R.perf, R.ren);
 }
 function ofBlocked(x: number, z: number): boolean {
   const H = OfficeRoom.host; if (H) { const d = H.pass('office', x, z); if (d) return d < 0; }   // the doorway to the corridor: open or shut
+  if (OfficeRoom.A && OfficeRoom.A.suite && osIn(x, z)) return osBlocked(x, z);   // your suite, through its door
   if (x < -2.9 || x > 2.9 || z < -3.1 || z > 2.7) return true;
   const B = [[-1.3, -0.7, 1.3, 0.7], [-0.45, 0.6, 0.45, 1.4], [-0.45, -1.4, 0.45, -0.6], [-3.2, 0.1, -1.6, 2.3], [-1.4, 2.25, 1.4, 3.0], [-3.1, -3.4, -1.5, -2.85], [1.5, -3.4, 3.1, -2.85], [2.5, -3.2, 3.2, -2.5]];
   for (const r of B) if (x > r[0] && x < r[2] && z > r[1] && z < r[3]) return true;
@@ -816,7 +823,7 @@ function ofWalk(dt: number, now?: number) {
   // what's in front of you: the chair (sit) or the door (leave)
   const aim = R.root.querySelector('.of-aim') as HTMLElement, obj = ofAimedObj(), hint = obj ? obj.userData.act : '';
   if (R.glow) { if (obj) R.glow.showObj(obj); else R.glow.hide(); }   // what you can use glows softly
-  if (aim) { aim.hidden = false; aim.textContent = hint === 'sit' ? 'Click to sit in your chair' : hint === 'door' ? (R.host ? (R.doorT ? 'Click to shut the door' : 'Click to open the door to the corridor') : 'Click the door to leave the office') : '·'; aim.classList.toggle('on', !!hint); }
+  if (aim) { aim.hidden = false; aim.textContent = osHint(hint) ? osHint(hint) : hint === 'sit' ? 'Click to sit in your chair' : hint === 'door' ? (R.host ? (R.doorT ? 'Click to shut the door' : 'Click to open the door to the corridor') : 'Click the door to leave the office') : '·'; aim.classList.toggle('on', !!hint); }
 }
 function ofAimed(e?: PointerEvent): string { const o = ofAimedObj(e); return o ? o.userData.act : ''; }
 /** What you can use at the mouse (or, walking, at the dot in the middle), within reach. */
@@ -825,6 +832,7 @@ function ofAimedObj(e?: PointerEvent): any {
   if (e && !aimLocked()) { const r = (R.root.querySelector('canvas') as HTMLElement).getBoundingClientRect(); rc.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), R.cam); }
   else rc.setFromCamera(new T.Vector2(0, 0), R.cam);
   const h = rc.intersectObjects(R.A.hits, false)[0];
+  if (h && R.A.occ) { const w = rc.intersectObjects(R.A.occ, false)[0]; if (w && w.distance < h.distance - 0.02) return null; }   // a wall in between
   return h && (h.distance < 2.6 || (/^(pet|bowl)/.test(h.object.userData.act || '') && h.distance < 7)) ? h.object : null;
 }
 function ofClickAt(e?: PointerEvent) {
@@ -843,6 +851,7 @@ function ofClickAt(e?: PointerEvent) {
   if (a === 'bowl-water') { if (!petRefill(R.A, 'water')) toast('The water bowl is full', 'info'); return; }
   if (a === 'bowl-food') { ofBowlPick(); return; }
   if (R.seat) return;
+  if (a && a.indexOf('suite-') === 0) { osClick(a); return; }   // in your suite
   if (a === 'door' && R.host) { R.doorT = R.doorT ? 0 : 1; sfxDoor('wood', R.doorT === 1); return; }   // in the building: the door opens and shuts
   if (a === 'sit') ofSit(); else if (a === 'door') { Sound.tick(); roomExitMenu(R.root, 'office', to => { R.doorT = 1; setTimeout(() => ofExitToMain('', to), 650); }); }
 }

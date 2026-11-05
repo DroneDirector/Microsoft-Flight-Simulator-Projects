@@ -75,6 +75,18 @@ const SECURITY_PROP_FILES: [string, string][] = [
   ['taser', 'Taser held by an officer (the grip at the origin, the muzzle towards +Z, about 16 cm long)'],
   ['handcuffs', 'Handcuffs on the wrists behind the back (the two cuffs side by side along X, about 15 cm across)'],
 ];
+/** Your office's private suite: the hall, the bathroom, the bedroom and the dressing alcove (suite-props/<name>.glb). */
+const SUITE_PROP_FILES: [string, string][] = [
+  ['suite-door', 'Door in the suite (office to hall, the bathroom, the bedroom), hinged at its left edge'],
+  ['toilet', 'Wall-hung toilet with its flush plate (the seat lid lifts: a part named lid is turned)'], ['vanity', 'Bathroom vanity unit with its stone top'],
+  ['basin', 'Basin and its tap (the water runs from the app)'], ['bath-mirror', 'Frame of the bathroom mirror (the reflection is drawn by the app)'],
+  ['shower', 'Shower: the glass panel, the rain head and the tray (the water falls from the app)'], ['bathtub', 'Freestanding bath with its filler'],
+  ['towel-rail', 'Heated towel rail with a towel'], ['bath-plant', 'Plant in the bathroom'],
+  ['bed', 'Double bed with its channelled headboard, bedding and pillows'], ['nightstand', 'Nightstand with a drawer (one each side of the bed)'],
+  ['bed-lamp', 'Bedside lamp (its light is drawn by the app, on and off)'], ['bedside-clock', 'Digital clock case (the time on it is drawn by the app)'],
+  ['bedroom-art', 'Painting over the bed'], ['bedroom-armchair', 'Armchair by the window'], ['bedroom-rug', 'Rug under the bed'],
+  ['wardrobe', 'Wardrobe in the dressing alcove (opening it opens your look)'],
+];
 /** The shared props, one file each (props/<name>.glb). */
 const PROP_FILES: [string, string][] = [
   ['plant-1', 'Potted plant 1: fiddle-leaf fig in a glazed ceramic pot (about 1.6 m)'],

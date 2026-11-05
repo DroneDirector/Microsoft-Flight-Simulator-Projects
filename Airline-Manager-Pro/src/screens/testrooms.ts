@@ -124,7 +124,7 @@ function trOffice(scene: any, q: number) {
   R.doors.push({ k: 'office', name: 'your office', mat: 'wood', k0: 0, to: 0, n: 'x', mid: [-3.2, -2.6], half: 0.5, set: (e: number) => { if (A.doorLeaf) A.doorLeaf.rotation.y = -1.5 * e; },
     pass: [-3.55, -3.0, -2.75, -2.2] });   // where you walk through when it is open [x0, z0, x1, z1]
   // the visitor's chair and the route in, as in the office
-  R.ofWalk = (x: number, z: number) => x > -3.2 && x < 3.2 && z > -3.4 && z < 3.0 && !ofBlocked(x, z);
+  R.ofWalk = (x: number, z: number) => x > -3.2 && x < 3.2 && z > -10.6 && z < 3.0 && !ofBlocked(x, z);   // with your suite behind it
   R.walk.push(R.walkOf.office = (x: number, z: number) => R.ofWalk(x, z));
 }
 function trOps(scene: any, q: number, ren: any) {
