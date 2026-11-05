@@ -127,3 +127,57 @@ function lgMirrorsStep(R: any) {
   const A = R.A; if (!A || !A.mirrors || !R.ren || !R.scene || !R.cam) return;
   for (const m of A.mirrors) { try { m.userData.update(R.ren, R.scene, R.cam); } catch (e) { /* that one rests */ } }
 }
+
+/** Our own paintings for the lounge walls, painted here: brush strokes over a gradient. Northern lights over the
+ *  hills, an aircraft climbing into the dusk, a storm over the sea with a lit harbour, and arcs of gold. */
+const LG_PAINT_PAL: { [k: string]: string[] } = {
+  aurora: ['#07131F', '#0E2C3A', '#2BD49A', '#9BF2C9', '#6B5BD6', '#1E3B2E'], dusk: ['#2A1A3A', '#C2556A', '#F1A25B', '#FBE3A8', '#3A2A4A', '#1A1424'],
+  storm: ['#1D2830', '#46606E', '#9DB4BE', '#E7EEF0', '#2A3540', '#C7A15A'], gold: ['#1A1206', '#6A4A1A', '#D9A441', '#F5DFA0', '#3C2A12', '#FFF4D6'],
+};
+function lgPainting(kind: string, w: number, h: number): HTMLCanvasElement {
+  const N = DESKTOP ? 1024 : 768, W2 = N, H2 = Math.round(N * h / w), [c, x] = ctCanvas(W2, H2), r = ctRng(kind.length * 97 + 3), pal = LG_PAINT_PAL[kind] || LG_PAINT_PAL.gold, k = N / 768;
+  const stroke = (col: string, x0: number, y0: number, len: number, ang: number, wd: number) => { x.save(); x.translate(x0, y0); x.rotate(ang); x.fillStyle = col; x.globalAlpha = 0.35 + r() * 0.5; x.beginPath(); x.ellipse(0, 0, len * k, wd * k, 0, 0, 7); x.fill(); x.restore(); };
+  const g = x.createLinearGradient(0, 0, 0, H2); g.addColorStop(0, pal[0]); g.addColorStop(0.55, pal[1]); g.addColorStop(1, pal[5]); x.fillStyle = g; x.fillRect(0, 0, W2, H2);
+  for (let i = 0; i < 1400; i++) { const y = r() * H2, t = y / H2; stroke(pal[t < 0.5 ? (r() < 0.6 ? 1 : 0) : (r() < 0.5 ? 4 : 5)], r() * W2, y, 10 + r() * 30, (r() - 0.5) * 0.4, 1.5 + r() * 3); }
+  if (kind === 'aurora') { for (let b = 0; b < 3; b++) for (let i = 0; i < 260; i++) { const xx = i / 260 * W2, yy = H2 * (0.15 + b * 0.12) + Math.sin(i / 30 + b) * 40 * k; stroke(pal[2 + (b % 2)], xx, yy + r() * 60 * k, 4 + r() * 6, Math.PI / 2 + (r() - 0.5) * 0.3, 1 + r() * 2); }
+    x.globalAlpha = 1; x.fillStyle = '#0A1410'; x.beginPath(); x.moveTo(0, H2 * 0.78); for (let i = 0; i <= 20; i++) x.lineTo(i / 20 * W2, H2 * (0.7 + 0.12 * Math.sin(i * 1.3) * r())); x.lineTo(W2, H2); x.lineTo(0, H2); x.fill(); }
+  if (kind === 'dusk') { x.globalAlpha = 0.9; const sg = x.createRadialGradient(W2 * 0.3, H2 * 0.62, 5, W2 * 0.3, H2 * 0.62, H2 * 0.45); sg.addColorStop(0, '#FFF0C0'); sg.addColorStop(0.2, 'rgba(250,180,90,.8)'); sg.addColorStop(1, 'rgba(250,120,90,0)'); x.fillStyle = sg; x.fillRect(0, 0, W2, H2);
+    x.globalAlpha = 1; x.strokeStyle = 'rgba(255,240,220,.85)'; x.lineWidth = 3 * k; x.beginPath(); x.moveTo(W2 * 0.05, H2 * 0.5); x.quadraticCurveTo(W2 * 0.5, H2 * 0.25, W2 * 0.95, H2 * 0.12); x.stroke();
+    x.fillStyle = '#2A1A30'; x.beginPath(); x.moveTo(W2 * 0.95, H2 * 0.12); x.lineTo(W2 * 0.88, H2 * 0.13); x.lineTo(W2 * 0.86, H2 * 0.16); x.closePath(); x.fill(); }
+  if (kind === 'storm') { for (let i = 0; i < 500; i++) stroke(pal[3], r() * W2, H2 * (0.2 + r() * 0.35), 20 + r() * 50, (r() - 0.5) * 0.2, 4 + r() * 8); x.globalAlpha = 1; x.fillStyle = '#C7A15A'; for (let i = 0; i < 30; i++) { x.beginPath(); x.arc(W2 * (0.1 + i * 0.028), H2 * (0.82 + Math.sin(i) * 0.01), 2.5 * k, 0, 7); x.fill(); } }
+  if (kind === 'gold') { x.globalAlpha = 0.85; for (let i = 0; i < 9; i++) { x.strokeStyle = i % 2 ? pal[3] : pal[2]; x.lineWidth = (3 + i) * k; x.beginPath(); x.arc(W2 * 0.5, H2 * 1.4, H2 * (0.6 + i * 0.09), Math.PI * 1.15, Math.PI * 1.85); x.stroke(); } }
+  x.globalAlpha = 1; x.fillStyle = 'rgba(255,255,255,.04)'; for (let i = 0; i < 4000; i++) x.fillRect(r() * W2, r() * H2, 1, 1);
+  return c;
+}
+/** A painting in a brass frame with a black slip and a small brass picture light over it, hung on a wall
+ *  (x, y, z its centre on the wall; ry so it faces into the room). Its own file: lounge-props/<name>.glb. */
+function lgHangPainting(root: any, name: string, kind: string, w: number, h: number, x: number, y: number, z: number, ry: number): any {
+  const T = THREE, g = new T.Group(); g.name = name; g.position.set(x, y, z); g.rotation.y = ry; root.add(g);
+  const brass = new T.MeshStandardMaterial({ color: 0xC9A25E, metalness: 0.95, roughness: 0.28 }), black = new T.MeshStandardMaterial({ color: 0x141414, roughness: 0.6 });
+  const box = (bw: number, bh: number, bd: number, m: any, px: number, py: number, pz: number) => { const o = new T.Mesh(new T.BoxGeometry(bw, bh, bd), m); o.position.set(px, py, pz); o.castShadow = false; o.receiveShadow = true; g.add(o); return o; };
+  box(w + 0.14, h + 0.14, 0.05, brass, 0, 0, 0.025); box(w + 0.04, h + 0.04, 0.06, black, 0, 0, 0.03);
+  const pic = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshStandardMaterial({ map: ctTex(lgPainting(kind, w, h)), roughness: 0.75 })); pic.position.z = 0.062; pic.userData.keep = true; g.add(pic);
+  // the picture light: an arm and a brass hood with a warm strip under it
+  box(0.02, 0.02, 0.18, brass, 0, h / 2 + 0.14, 0.1); box(Math.min(0.7, w * 0.45), 0.05, 0.07, brass, 0, h / 2 + 0.14, 0.2);
+  const lit = new T.Mesh(new T.BoxGeometry(Math.min(0.66, w * 0.43), 0.008, 0.04), new T.MeshBasicMaterial({ color: 0xFFE2B0, toneMapped: false })); lit.position.set(0, h / 2 + 0.112, 0.2); g.add(lit);
+  try { Models.swap(g, 'lounge-props/' + name + '.glb', false); } catch (e) { /* the app's own */ }
+  return g;
+}
+/** On the bar's corner, behind the counter: the bartender's mixing station (shaker, jigger, bar spoon, strainer,
+ *  muddler on a rubber mat, a garnish tray with lemon, lime and orange). File: lounge-props/mixing-station.glb. */
+function lgMixStation(root: any, x: number, y: number, z: number): any {
+  const T = THREE, g = new T.Group(); g.name = 'mixing-station'; g.position.set(x, y, z); root.add(g);
+  const steel = new T.MeshStandardMaterial({ color: 0xD8DCE0, metalness: 1, roughness: 0.18 }), wood = new T.MeshStandardMaterial({ map: ctTex(ctWood('#6B4428', '#2E1A0E', 5)), roughness: 0.45 });
+  const add = (geo: any, m: any, px: number, py: number, pz: number) => { const o = new T.Mesh(geo, m); o.position.set(px, py, pz); o.castShadow = false; g.add(o); return o; };
+  const lathe = (p: number[][], m: any, px: number, pz: number) => add(new T.LatheGeometry(p.map(q => new T.Vector2(q[0], q[1])), 24), m, px, 0, pz);
+  add(new T.BoxGeometry(0.32, 0.01, 0.6), new T.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 }), 0, 0.005, 0);
+  lathe([[0, 0], [0.042, 0], [0.046, 0.12], [0.045, 0.16], [0.038, 0.18], [0.03, 0.22], [0.016, 0.24], [0, 0.245]], steel, 0, -0.18);   // shaker
+  lathe([[0, 0], [0.024, 0], [0.006, 0.045], [0.024, 0.09], [0, 0.09]], steel, -0.02, 0);                                                  // jigger
+  add(new T.CylinderGeometry(0.003, 0.003, 0.32, 6), steel, 0.06, 0.014, 0.1).rotation.x = Math.PI / 2;                                    // bar spoon
+  add(new T.CylinderGeometry(0.04, 0.04, 0.008, 20), steel, -0.08, 0.014, 0.18);                                                           // strainer
+  add(new T.CylinderGeometry(0.012, 0.016, 0.24, 10), wood, 0.08, 0.022, -0.02).rotation.x = Math.PI / 2;                                  // muddler
+  add(new T.BoxGeometry(0.16, 0.04, 0.28), wood, 0.2, 0.02, 0.05);                                                                          // garnish tray
+  [0xF2D23A, 0x7BC043, 0xF28C28].forEach((col, i) => add(new T.CylinderGeometry(0.02, 0.02, 0.006, 16), new T.MeshStandardMaterial({ color: col, roughness: 0.6 }), 0.2, 0.045, -0.04 + i * 0.08));
+  try { Models.swap(g, 'lounge-props/mixing-station.glb', false); } catch (e) { /* the app's own */ }
+  return g;
+}

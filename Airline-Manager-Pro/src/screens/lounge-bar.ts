@@ -160,11 +160,12 @@ function lgBartenderMake(R: any, B: any) {
   const T = THREE, A = R.A;
   try {
     const L: any = randomLook('lounge-bartender-' + (R.k || ''), 'm', 'fa'); L.civil = true; L.top = 'vest'; L.uniform = 1; L.neck = 'tie'; L.hat = 'none'; L.bottom = 'trousers'; L.shoes = 'oxford'; L.glasses = 'none';
+    L.skin = 3; L.hairColor = 3; L.facial = 'none';   // his look: a Spanish skin tone, light brown hair, clean-shaven (the same build, so the same moves)
     const m = Human.build(dressed(L, 'fa' as any), 'fa', '#1C1F26', av3Style(), R.q >= 2 ? 0.75 : 0.55); try { modelsPeople(m, L); } catch (e) { /* the app's own */ }
     m.root.traverse((o: any) => { if (o.isMesh) { o.castShadow = R.q >= 1; o.receiveShadow = true; } });
     const pivot = new T.Group(), holder = new T.Group(); holder.add(m.root); pivot.add(holder); A.root.add(pivot);
-    // a bartender's apron, from the waist down (white, long)
-    const top = m.top || 1.75, apron = new T.Mesh(new T.PlaneGeometry(0.42, top * 0.42), new T.MeshStandardMaterial({ color: 0xF2EFE8, roughness: 0.85, side: T.DoubleSide }));
+    // a bartender's apron, from the waist down (charcoal, long)
+    const top = m.top || 1.75, apron = new T.Mesh(new T.PlaneGeometry(0.42, top * 0.42), new T.MeshStandardMaterial({ color: 0x2A2C30, roughness: 0.85, side: T.DoubleSide }));
     apron.position.set(0, top * 0.36, 0.13); holder.add(apron);
     const hit = new T.Mesh(new T.BoxGeometry(0.6, 1.8, 0.5), new T.MeshBasicMaterial({ visible: false })); hit.userData.act = 'bartender'; hit.userData.keep = true; A.root.add(hit); A.hits.push(hit);
     B.m = m; B.pivot = pivot; B.holder = holder; B.hit = hit; B.armR = null; B.armL = null; B.dist = 0;
